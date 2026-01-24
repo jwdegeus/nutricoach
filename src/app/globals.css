@@ -5,4 +5,56 @@
 @theme {
   --font-sans: Inter, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --font-sans--font-feature-settings: 'cv11';
+
+  /* Nutrition App Color Palette - Primary: Emerald (health, fresh, natural) */
+  --color-primary-50: oklch(0.979 0.021 166.113);
+  --color-primary-100: oklch(0.95 0.052 163.051);
+  --color-primary-200: oklch(0.905 0.093 164.15);
+  --color-primary-300: oklch(0.845 0.143 164.978);
+  --color-primary-400: oklch(0.765 0.177 163.223);
+  --color-primary-500: oklch(0.696 0.17 162.48);
+  --color-primary-600: oklch(0.596 0.145 163.225);
+  --color-primary-700: oklch(0.508 0.118 165.612);
+  --color-primary-800: oklch(0.432 0.095 166.913);
+  --color-primary-900: oklch(0.378 0.077 168.94);
+  --color-primary-950: oklch(0.262 0.051 172.552);
+
+  /* Secondary: Orange (warmth, energy, food) */
+  --color-secondary-50: oklch(0.98 0.016 73.684);
+  --color-secondary-100: oklch(0.954 0.038 75.164);
+  --color-secondary-200: oklch(0.901 0.076 70.697);
+  --color-secondary-300: oklch(0.837 0.128 66.29);
+  --color-secondary-400: oklch(0.75 0.183 55.934);
+  --color-secondary-500: oklch(0.705 0.213 47.604);
+  --color-secondary-600: oklch(0.646 0.222 41.116);
+  --color-secondary-700: oklch(0.553 0.195 38.402);
+  --color-secondary-800: oklch(0.47 0.157 37.304);
+  --color-secondary-900: oklch(0.408 0.123 38.172);
+  --color-secondary-950: oklch(0.266 0.079 36.259);
+
+  /* Accent: Lime (freshness, vitality) */
+  --color-accent-50: oklch(0.986 0.031 120.757);
+  --color-accent-100: oklch(0.967 0.067 122.328);
+  --color-accent-200: oklch(0.938 0.127 124.321);
+  --color-accent-300: oklch(0.897 0.196 126.665);
+  --color-accent-400: oklch(0.841 0.238 128.85);
+  --color-accent-500: oklch(0.768 0.233 130.85);
+  --color-accent-600: oklch(0.648 0.2 131.684);
+  --color-accent-700: oklch(0.532 0.157 131.589);
+  --color-accent-800: oklch(0.453 0.124 130.933);
+  --color-accent-900: oklch(0.405 0.101 131.063);
+  --color-accent-950: oklch(0.274 0.072 132.109);
+
+  /* Background: Stone (warm neutral, better for food context than zinc) */
+  --color-background-50: oklch(0.985 0.001 106.423);
+  --color-background-100: oklch(0.97 0.001 106.424);
+  --color-background-200: oklch(0.923 0.003 48.717);
+  --color-background-300: oklch(0.869 0.005 56.366);
+  --color-background-400: oklch(0.709 0.01 56.259);
+  --color-background-500: oklch(0.553 0.013 58.071);
+  --color-background-600: oklch(0.444 0.011 73.639);
+  --color-background-700: oklch(0.374 0.01 67.558);
+  --color-background-800: oklch(0.268 0.007 34.298);
+  --color-background-900: oklch(0.216 0.006 56.043);
+  --color-background-950: oklch(0.147 0.004 49.25);
 }

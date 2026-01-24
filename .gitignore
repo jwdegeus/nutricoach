@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# supabase local development (not used - remote only)
+supabase/.branches
+supabase/.temp
+supabase/.volumes

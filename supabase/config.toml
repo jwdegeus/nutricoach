@@ -1,0 +1,37 @@
+# Supabase Configuration
+# This project uses REMOTE database only (no local development database)
+
+[project]
+# Project reference ID (from Supabase dashboard)
+# This is automatically set when you run: supabase link --project-ref <your-project-ref>
+# Or manually set it here:
+# project_id = "hmopmdzqicjfdtwbfrtk"
+
+[db]
+# Remote database connection settings
+# These are managed automatically when linked to a remote project
+# No local database configuration needed
+
+[api]
+# API settings for remote project
+# These are managed automatically when linked to a remote project
+
+[studio]
+# Studio settings - disabled for remote-only setup
+enabled = false
+
+[inbucket]
+# Inbucket (email testing) - disabled for remote-only setup
+enabled = false
+
+[storage]
+# Storage settings for remote project
+# These are managed automatically when linked to a remote project
+
+[auth]
+# Auth settings for remote project
+# These are managed automatically when linked to a remote project
+
+[functions]
+# Edge Functions settings
+# These are managed automatically when linked to a remote project

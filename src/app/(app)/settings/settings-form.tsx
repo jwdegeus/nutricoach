@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updatePassword } from "@/src/app/(auth)/actions";
+import { setCurrentUserAsAdmin } from "./actions/set-admin.action";
 import { Button } from "@/components/catalyst/button";
 import { Input } from "@/components/catalyst/input";
 import { Field, FieldGroup, Label, Description } from "@/components/catalyst/fieldset";
@@ -99,18 +100,47 @@ export function SettingsForm({ user }: SettingsFormProps) {
             Beheer je account en sessies.
           </Text>
         </div>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-base/6 font-medium text-zinc-950 sm:text-sm/6 dark:text-white">
-              Account verwijderen
-            </p>
-            <p className="text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400 mt-1">
-              Verwijder permanent je account en alle bijbehorende gegevens.
-            </p>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-base/6 font-medium text-zinc-950 sm:text-sm/6 dark:text-white">
+                Admin rol aanvragen
+              </p>
+              <p className="text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400 mt-1">
+                Maak jezelf admin (alleen mogelijk als er nog geen admins zijn).
+              </p>
+            </div>
+            <Button
+              onClick={async () => {
+                setError(null);
+                setSuccess(null);
+                startTransition(async () => {
+                  const result = await setCurrentUserAsAdmin();
+                  if (result.error) {
+                    setError(result.error);
+                  } else if (result.success) {
+                    setSuccess("Je hebt nu admin rechten! Ververs de pagina om de admin functies te zien.");
+                  }
+                });
+              }}
+              disabled={isPending}
+            >
+              {isPending ? "Bezig..." : "Maak mij admin"}
+            </Button>
           </div>
-          <Button color="red">
-            Account verwijderen
-          </Button>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-base/6 font-medium text-zinc-950 sm:text-sm/6 dark:text-white">
+                Account verwijderen
+              </p>
+              <p className="text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400 mt-1">
+                Verwijder permanent je account en alle bijbehorende gegevens.
+              </p>
+            </div>
+            <Button color="red">
+              Account verwijderen
+            </Button>
+          </div>
         </div>
       </div>
     </div>

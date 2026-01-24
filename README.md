@@ -2,7 +2,39 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+ 
+- Supabase CLI (`npm install -g supabase`)
+- A Supabase project (remote only - no local database)
+
+### Setup
+
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Configure environment variables:**
+   ```bash
+   cp ENV.example .env.local
+   ```
+   Fill in your Supabase credentials from your project dashboard.
+
+3. **Link to remote Supabase project:**
+   ```bash
+   supabase login
+   supabase link --project-ref <your-project-ref>
+   ```
+
+4. **Push database migrations:**
+   ```bash
+   npm run db:push
+   # or
+   supabase db push
+   ```
+
+5. **Run the development server:**
 
 ```bash
 npm run dev
@@ -28,6 +60,21 @@ To learn more about Next.js, take a look at the following resources:
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Database Management
+
+This project uses **remote Supabase database only** (no local database).
+
+### Available Scripts
+
+- `npm run db:push` - Push migrations to remote database
+- `npm run db:reset` - Reset remote database (⚠️ deletes all data!)
+- `npm run db:status` - Check migration status
+- `npm run db:migration <name>` - Create new migration
+
+### Database Setup
+
+See [docs/remote-database-setup.md](./docs/remote-database-setup.md) for detailed instructions.
 
 ## Deploy on Vercel
 

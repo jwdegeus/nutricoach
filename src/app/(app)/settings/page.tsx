@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
+import { isAdmin } from "@/src/lib/auth/roles";
 import { SettingsForm } from "./settings-form";
+import { AdminDietManagement } from "./components/AdminDietManagement";
 
 export const metadata: Metadata = {
   title: "Instellingen | NutriCoach",
@@ -18,6 +20,8 @@ export default async function SettingsPage() {
     redirect("/login");
   }
 
+  const admin = await isAdmin();
+
   return (
     <div className="space-y-8">
       <div>
@@ -30,6 +34,8 @@ export default async function SettingsPage() {
       </div>
 
       <SettingsForm user={user} />
+
+      {admin && <AdminDietManagement />}
     </div>
   );
 }

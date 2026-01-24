@@ -74,8 +74,31 @@ export async function signIn(formData: FormData) {
     };
   }
 
-  revalidatePath("/", "layout");
-  redirect(redirectTo || "/dashboard");
+  // Check onboarding status before redirecting
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    const { data: preferences } = await supabase
+      .from("user_preferences")
+      .select("onboarding_completed")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    // If onboarding not completed, redirect to onboarding
+    // Otherwise use redirectTo or default to dashboard
+    const finalRedirect = preferences?.onboarding_completed
+      ? redirectTo || "/dashboard"
+      : "/onboarding";
+
+    revalidatePath("/", "layout");
+    redirect(finalRedirect);
+  } else {
+    // Fallback (shouldn't happen after successful login)
+    revalidatePath("/", "layout");
+    redirect(redirectTo || "/dashboard");
+  }
 }
 
 export async function resetPassword(formData: FormData) {

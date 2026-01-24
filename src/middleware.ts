@@ -47,9 +47,39 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // If user is authenticated and trying to access auth pages, redirect to dashboard
+  // If user is authenticated and trying to access auth pages, check onboarding first
   if (user && isPublicRoute && pathname !== "/auth/callback") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    // Check onboarding status before redirecting
+    const { data: preferences } = await supabase
+      .from("user_preferences")
+      .select("onboarding_completed")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    // Redirect to onboarding if not completed, otherwise to dashboard
+    const redirectPath = preferences?.onboarding_completed ? "/dashboard" : "/onboarding";
+    return NextResponse.redirect(new URL(redirectPath, request.url));
+  }
+
+  // Onboarding gating: check if user has completed onboarding
+  // Only apply to (app) routes, not to onboarding page itself or auth routes
+  if (
+    user &&
+    !isPublicRoute &&
+    pathname !== "/" &&
+    !pathname.startsWith("/onboarding")
+  ) {
+    // Lightweight check: only fetch onboarding_completed flag
+    const { data: preferences } = await supabase
+      .from("user_preferences")
+      .select("onboarding_completed")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    // If onboarding is not completed, redirect to onboarding
+    if (!preferences?.onboarding_completed) {
+      return NextResponse.redirect(new URL("/onboarding", request.url));
+    }
   }
 
   return supabaseResponse;

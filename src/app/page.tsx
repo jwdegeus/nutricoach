@@ -8,7 +8,16 @@ export default async function Home() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect("/dashboard");
+    // Check onboarding status before redirecting
+    const { data: preferences } = await supabase
+      .from("user_preferences")
+      .select("onboarding_completed")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    // Redirect to onboarding if not completed, otherwise to dashboard
+    const redirectPath = preferences?.onboarding_completed ? "/dashboard" : "/onboarding";
+    redirect(redirectPath);
   } else {
     redirect("/login");
   }

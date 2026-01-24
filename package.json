@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:push": "supabase db push",
+    "db:reset": "supabase db reset --linked",
+    "db:status": "supabase db remote commit",
+    "db:migration": "supabase migration new"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",

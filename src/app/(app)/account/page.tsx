@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
 import { AccountProfile } from "./account-profile";
+import { DietPreferencesForm } from "./diet-preferences-form";
 
 export const metadata: Metadata = {
   title: "Mijn Account | NutriCoach",
@@ -30,6 +31,8 @@ export default async function AccountPage() {
       </div>
 
       <AccountProfile user={user} />
+      
+      <DietPreferencesForm />
     </div>
   );
 }

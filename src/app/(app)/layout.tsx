@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ApplicationLayout } from "@/src/components/app/ApplicationLayout";
+import { ClientOnlyApplicationLayout } from "@/src/components/app/ClientOnlyApplicationLayout";
 
 export const metadata: Metadata = {
   title: "Dashboard | NutriCoach",
@@ -11,5 +11,7 @@ export default function AppLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <ApplicationLayout>{children}</ApplicationLayout>;
+  // Onboarding gating is handled in middleware.ts for better performance
+  // Use ClientOnlyApplicationLayout to prevent hydration mismatches with Headless UI
+  return <ClientOnlyApplicationLayout>{children}</ClientOnlyApplicationLayout>;
 }
