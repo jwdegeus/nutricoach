@@ -7,12 +7,16 @@ import { Input } from "@/components/catalyst/input";
 import { Field, FieldGroup, Label, Description } from "@/components/catalyst/fieldset";
 import { Text } from "@/components/catalyst/text";
 import type { User } from "@supabase/supabase-js";
+import { useTranslations } from "next-intl";
+import { LanguageSelector } from "./language-selector";
 
 interface AccountProfileProps {
   user: User;
 }
 
 export function AccountProfile({ user }: AccountProfileProps) {
+  const t = useTranslations('account');
+  const tCommon = useTranslations('common');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -38,30 +42,30 @@ export function AccountProfile({ user }: AccountProfileProps) {
     <div className="space-y-8">
       {error && (
         <div className="rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">
-          <strong>Fout:</strong> {error}
+          <strong>{tCommon('error')}:</strong> {error}
         </div>
       )}
 
       {success && (
         <div className="rounded-lg bg-green-50 p-4 text-sm text-green-600 dark:bg-green-950/50 dark:text-green-400">
-          <strong>Succes:</strong> {success}
+          <strong>{tCommon('success')}:</strong> {success}
         </div>
       )}
 
       <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
         <div className="mb-6">
           <h2 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
-            Profielgegevens
+            {t('profileData')}
           </h2>
           <Text className="mt-1">
-            Update je persoonlijke informatie. Je e-mailadres kan niet worden gewijzigd.
+            {t('profileDescription')}
           </Text>
         </div>
         <form action={handleSubmit}>
           <FieldGroup>
             <Field>
-              <Label htmlFor="email">E-mailadres</Label>
-              <Description>Je e-mailadres kan niet worden gewijzigd.</Description>
+              <Label htmlFor="email">{t('email')}</Label>
+              <Description>{t('emailDescription')}</Description>
               <Input
                 id="email"
                 type="email"
@@ -71,32 +75,32 @@ export function AccountProfile({ user }: AccountProfileProps) {
             </Field>
 
             <Field>
-              <Label htmlFor="full_name">Volledige naam</Label>
+              <Label htmlFor="full_name">{t('fullName')}</Label>
               <Input
                 id="full_name"
                 type="text"
                 name="full_name"
                 defaultValue={fullName}
-                placeholder="Je volledige naam"
+                placeholder={t('fullNamePlaceholder')}
                 autoComplete="name"
               />
             </Field>
 
             <Field>
-              <Label htmlFor="display_name">Weergavenaam</Label>
-              <Description>Deze naam wordt getoond in de applicatie.</Description>
+              <Label htmlFor="display_name">{t('displayName')}</Label>
+              <Description>{t('displayNameDescription')}</Description>
               <Input
                 id="display_name"
                 type="text"
                 name="display_name"
                 defaultValue={displayName}
-                placeholder="Je weergavenaam"
+                placeholder={t('displayNamePlaceholder')}
               />
             </Field>
 
             <div className="flex justify-end">
               <Button type="submit" disabled={isPending}>
-                {isPending ? "Opslaan..." : "Opslaan"}
+                {isPending ? tCommon('saving') : tCommon('save')}
               </Button>
             </div>
           </FieldGroup>
@@ -106,13 +110,13 @@ export function AccountProfile({ user }: AccountProfileProps) {
       <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
         <div className="mb-6">
           <h2 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
-            Account informatie
+            {t('accountInfo')}
           </h2>
         </div>
         <div className="space-y-4">
           <div className="flex justify-between py-2">
             <span className="text-base/6 font-medium text-zinc-950 sm:text-sm/6 dark:text-white">
-              Account aangemaakt
+              {t('accountCreated')}
             </span>
             <span className="text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
               {new Date(user.created_at).toLocaleDateString("nl-NL", {
@@ -124,7 +128,7 @@ export function AccountProfile({ user }: AccountProfileProps) {
           </div>
           <div className="flex justify-between py-2">
             <span className="text-base/6 font-medium text-zinc-950 sm:text-sm/6 dark:text-white">
-              Laatste login
+              {t('lastLogin')}
             </span>
             <span className="text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
               {user.last_sign_in_at
@@ -135,19 +139,21 @@ export function AccountProfile({ user }: AccountProfileProps) {
                     hour: "2-digit",
                     minute: "2-digit",
                   })
-                : "Nog niet ingelogd"}
+                : t('neverLoggedIn')}
             </span>
           </div>
           <div className="flex justify-between py-2">
             <span className="text-base/6 font-medium text-zinc-950 sm:text-sm/6 dark:text-white">
-              E-mail bevestigd
+              {t('emailConfirmed')}
             </span>
             <span className="text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
-              {user.email_confirmed_at ? "Ja" : "Nee"}
+              {user.email_confirmed_at ? t('yes') : t('no')}
             </span>
           </div>
         </div>
       </div>
+
+      <LanguageSelector />
     </div>
   );
 }

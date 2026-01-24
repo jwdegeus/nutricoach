@@ -23,7 +23,7 @@ import {
 import { SidebarLayout } from '@/components/catalyst/sidebar-layout'
 import { Avatar } from '@/components/catalyst/avatar'
 import { Link } from '@/components/catalyst/link'
-import { navItems } from '@/src/lib/nav'
+import { useTranslatedNavItems } from '@/src/lib/nav-hooks'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/src/lib/supabase/client'
 import { useEffect, useState } from 'react'
@@ -42,6 +42,10 @@ import {
   InboxIcon,
 } from '@heroicons/react/20/solid'
 import { ThemeSwitcher } from './theme-switcher'
+import { ShoppingCart } from './ShoppingCart'
+import { PlanEditStatusIndicator } from './PlanEditStatusIndicator'
+import { NotificationsIndicator } from './NotificationsIndicator'
+import { useTranslations } from 'next-intl'
 
 function AccountDropdownMenu({
   anchor,
@@ -50,29 +54,31 @@ function AccountDropdownMenu({
   anchor: 'top start' | 'bottom end'
   onLogout: () => void
 }) {
+  const t = useTranslations('menu')
+  
   return (
     <DropdownMenu className="min-w-64" anchor={anchor}>
       <DropdownItem href="/account">
         <UserIcon />
-        <DropdownLabel>Mijn profiel</DropdownLabel>
+        <DropdownLabel>{t('myProfile')}</DropdownLabel>
       </DropdownItem>
       <DropdownItem href="/settings">
         <Cog8ToothIcon />
-        <DropdownLabel>Instellingen</DropdownLabel>
+        <DropdownLabel>{t('settings')}</DropdownLabel>
       </DropdownItem>
       <DropdownDivider />
       <DropdownItem href="/privacy-policy">
         <ShieldCheckIcon />
-        <DropdownLabel>Privacybeleid</DropdownLabel>
+        <DropdownLabel>{t('privacyPolicy')}</DropdownLabel>
       </DropdownItem>
       <DropdownItem href="/share-feedback">
         <LightBulbIcon />
-        <DropdownLabel>Feedback delen</DropdownLabel>
+        <DropdownLabel>{t('shareFeedback')}</DropdownLabel>
       </DropdownItem>
       <DropdownDivider />
       <DropdownItem onClick={onLogout}>
         <ArrowRightStartOnRectangleIcon />
-        <DropdownLabel>Uitloggen</DropdownLabel>
+        <DropdownLabel>{t('logout')}</DropdownLabel>
       </DropdownItem>
     </DropdownMenu>
   )
@@ -81,6 +87,9 @@ function AccountDropdownMenu({
 export function ApplicationLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
+  const t = useTranslations('common')
+  const tNav = useTranslations('nav')
+  const tMenu = useTranslations('menu')
   const [initials, setInitials] = useState('U')
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
@@ -146,6 +155,7 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
     router.refresh()
   }
 
+  const navItems = useTranslatedNavItems()
   const mainItems = navItems.filter((item) => !item.group)
   const secondaryItems = navItems.filter((item) => item.group === 'secondary')
 
@@ -155,10 +165,13 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
         <Navbar>
           <NavbarSpacer />
           <NavbarSection>
-            <NavbarItem href="/search" aria-label="Zoeken">
+            <NavbarItem href="/search" aria-label={t('search')}>
               <MagnifyingGlassIcon />
             </NavbarItem>
-            <NavbarItem href="/inbox" aria-label="Inbox">
+            <ShoppingCart />
+            <PlanEditStatusIndicator />
+            <NotificationsIndicator />
+            <NavbarItem href="/inbox" aria-label={t('inbox')}>
               <InboxIcon />
             </NavbarItem>
             <ThemeSwitcher variant="navbar" />
@@ -185,7 +198,7 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
               <DropdownMenu className="min-w-80 lg:min-w-64" anchor="bottom start">
                 <DropdownItem href="/settings">
                   <Cog8ToothIcon />
-                  <DropdownLabel>Instellingen</DropdownLabel>
+                  <DropdownLabel>{t('settings')}</DropdownLabel>
                 </DropdownItem>
                 <DropdownDivider />
                 <DropdownItem href="/dashboard">
@@ -195,18 +208,18 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
                 <DropdownDivider />
                 <DropdownItem href="/teams/create">
                   <PlusIcon />
-                  <DropdownLabel>Nieuw team&hellip;</DropdownLabel>
+                  <DropdownLabel>{tMenu('newTeam')}</DropdownLabel>
                 </DropdownItem>
               </DropdownMenu>
             </Dropdown>
             <SidebarSection className="max-lg:hidden">
               <SidebarItem href="/search">
                 <MagnifyingGlassIcon />
-                <SidebarLabel>Zoeken</SidebarLabel>
+                <SidebarLabel>{t('search')}</SidebarLabel>
               </SidebarItem>
               <SidebarItem href="/inbox">
                 <InboxIcon />
-                <SidebarLabel>Inbox</SidebarLabel>
+                <SidebarLabel>{t('inbox')}</SidebarLabel>
               </SidebarItem>
             </SidebarSection>
           </SidebarHeader>
@@ -229,7 +242,7 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
 
             {secondaryItems.length > 0 && (
               <SidebarSection>
-                <SidebarHeading>Overig</SidebarHeading>
+                <SidebarHeading>{tNav('other')}</SidebarHeading>
                 {secondaryItems.map((item) => {
                   const Icon = item.icon
                   const isActive = pathname === item.href || pathname.startsWith(item.href + '/')

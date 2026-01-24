@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { signUp } from "../actions";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/catalyst/button";
+import { Input } from "@/components/catalyst/input";
+import { Field, Label, Description } from "@/components/catalyst/fieldset";
 
 export function RegisterForm() {
   const [error, setError] = useState<string | null>(null);
@@ -27,21 +28,19 @@ export function RegisterForm() {
   return (
     <form action={handleSubmit} className="space-y-6">
       {error && (
-        <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+        <div className="rounded-lg bg-red-50 dark:bg-red-950/50 p-4 text-sm text-red-600 dark:text-red-400">
           <strong>Fout:</strong> {error}
         </div>
       )}
 
       {success && (
-        <div className="rounded-lg bg-green-500/10 p-4 text-sm text-green-600 dark:text-green-400">
+        <div className="rounded-lg bg-green-50 dark:bg-green-950/50 p-4 text-sm text-green-600 dark:text-green-400">
           <strong>Succes:</strong> {success}
         </div>
       )}
 
-      <div className="space-y-2">
-        <label htmlFor="email" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-          E-mail
-        </label>
+      <Field>
+        <Label htmlFor="email">E-mail</Label>
         <Input
           id="email"
           type="email"
@@ -50,12 +49,10 @@ export function RegisterForm() {
           autoComplete="email"
           placeholder="jouw@email.nl"
         />
-      </div>
+      </Field>
 
-      <div className="space-y-2">
-        <label htmlFor="password" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-          Wachtwoord
-        </label>
+      <Field>
+        <Label htmlFor="password">Wachtwoord</Label>
         <Input
           id="password"
           type="password"
@@ -65,13 +62,11 @@ export function RegisterForm() {
           placeholder="••••••••"
           minLength={6}
         />
-        <p className="text-xs text-muted-foreground">Minimaal 6 tekens</p>
-      </div>
+        <Description>Minimaal 6 tekens</Description>
+      </Field>
 
-      <div className="space-y-2">
-        <label htmlFor="passwordConfirm" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-          Bevestig wachtwoord
-        </label>
+      <Field>
+        <Label htmlFor="passwordConfirm">Bevestig wachtwoord</Label>
         <Input
           id="passwordConfirm"
           type="password"
@@ -81,15 +76,15 @@ export function RegisterForm() {
           placeholder="••••••••"
           minLength={6}
         />
-      </div>
+      </Field>
 
       <Button type="submit" className="w-full" disabled={isPending}>
         {isPending ? "Registreren..." : "Registreer"}
       </Button>
 
-      <div className="text-center text-sm text-muted-foreground">
+      <div className="text-center text-sm text-zinc-500 dark:text-zinc-400">
         Al een account?{" "}
-        <Link href="/login" className="font-medium text-primary hover:underline">
+        <Link href="/login" className="font-medium text-blue-600 dark:text-blue-400 hover:underline">
           Log hier in
         </Link>
       </div>

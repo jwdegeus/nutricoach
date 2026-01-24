@@ -24,6 +24,11 @@ export type OnboardingInput = {
   servingsDefault: number;
   kcalTarget?: number | null;
   varietyLevel?: VarietyLevel;
+  mealPreferences?: {
+    breakfast?: string[];
+    lunch?: string[];
+    dinner?: string[];
+  };
 };
 
 /**
@@ -41,6 +46,11 @@ export type OnboardingStatus = {
     varietyLevel?: VarietyLevel;
     allergies?: string[];
     dislikes?: string[];
+    mealPreferences?: {
+      breakfast?: string[];
+      lunch?: string[];
+      dinner?: string[];
+    };
   };
 };
 

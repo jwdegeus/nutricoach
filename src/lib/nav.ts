@@ -6,6 +6,8 @@ import {
   Calendar,
   Settings,
   FileText,
+  ShoppingBasket,
+  Activity,
 } from "lucide-react";
 
 export type NavItem = {
@@ -13,6 +15,7 @@ export type NavItem = {
   href: string;
   icon: LucideIcon;
   group?: string;
+  translationKey?: string;
 };
 
 export type NavGroup = {
@@ -20,40 +23,68 @@ export type NavGroup = {
   items: NavItem[];
 };
 
-export const navItems: NavItem[] = [
+// Base nav items structure (without translations)
+export const baseNavItems: NavItem[] = [
   {
     label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
+    translationKey: "dashboard",
   },
   {
     label: "Clients",
     href: "/clients",
     icon: Users,
+    translationKey: "clients",
   },
   {
     label: "Meal Plans",
     href: "/meal-plans",
     icon: UtensilsCrossed,
+    translationKey: "mealPlans",
+  },
+  {
+    label: "Maaltijden",
+    href: "/meals",
+    icon: UtensilsCrossed,
+    translationKey: "meals",
+  },
+  {
+    label: "Pantry",
+    href: "/pantry",
+    icon: ShoppingBasket,
+    translationKey: "pantry",
+  },
+  {
+    label: "Runs",
+    href: "/runs",
+    icon: Activity,
+    translationKey: "runs",
   },
   {
     label: "Calendar",
     href: "/calendar",
     icon: Calendar,
+    translationKey: "calendar",
   },
   {
     label: "Reports",
     href: "/reports",
     icon: FileText,
     group: "secondary",
+    translationKey: "reports",
   },
   {
     label: "Settings",
     href: "/settings",
     icon: Settings,
     group: "secondary",
+    translationKey: "settings",
   },
 ];
+
+// For backward compatibility, export navItems (will be overridden by hook/function)
+export const navItems: NavItem[] = baseNavItems;
 
 export const navGroups: NavGroup[] = [
   {
@@ -66,34 +97,49 @@ export const navGroups: NavGroup[] = [
   },
 ];
 
+// Helper function to get translated nav items
+export function getTranslatedNavItems(t: (key: string) => string): NavItem[] {
+  return baseNavItems.map(item => ({
+    ...item,
+    label: item.translationKey ? t(`nav.${item.translationKey}`) : item.label
+  }));
+}
+
 // Helper function to get page title from route
-export function getPageTitle(pathname: string): string {
+export function getPageTitle(pathname: string, t?: (key: string) => string): string {
   // Check exact matches first
-  const item = navItems.find((item) => item.href === pathname);
-  if (item) return item.label;
+  const item = baseNavItems.find((item) => item.href === pathname);
+  if (item) {
+    if (t && item.translationKey) {
+      return t(`nav.${item.translationKey}`);
+    }
+    return item.label;
+  }
 
   // Check for account and settings routes
   if (pathname === "/account" || pathname.startsWith("/account")) {
-    return "Mijn Account";
+    return t ? t("account.title") : "Mijn Account";
   }
   if (pathname === "/settings" || pathname.startsWith("/settings")) {
-    return "Instellingen";
+    return t ? t("nav.settings") : "Instellingen";
   }
 
-  return "Dashboard";
+  return t ? t("nav.dashboard") : "Dashboard";
 }
 
 // Helper function to get breadcrumbs from route
-export function getBreadcrumbs(pathname: string): Array<{ label: string; href: string }> {
-  const breadcrumbs = [{ label: "Home", href: "/dashboard" }];
+export function getBreadcrumbs(pathname: string, t?: (key: string) => string): Array<{ label: string; href: string }> {
+  const homeLabel = t ? t("common.home") : "Home";
+  const breadcrumbs = [{ label: homeLabel, href: "/dashboard" }];
   
   if (pathname === "/dashboard") {
     return breadcrumbs;
   }
   
-  const item = navItems.find((item) => item.href === pathname);
+  const item = baseNavItems.find((item) => item.href === pathname);
   if (item) {
-    breadcrumbs.push({ label: item.label, href: item.href });
+    const label = t && item.translationKey ? t(`nav.${item.translationKey}`) : item.label;
+    breadcrumbs.push({ label, href: item.href });
   }
   
   return breadcrumbs;

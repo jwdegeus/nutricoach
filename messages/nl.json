@@ -1,0 +1,72 @@
+{
+  "common": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "settings": "Instellingen",
+    "profile": "Mijn profiel",
+    "logout": "Uitloggen",
+    "search": "Zoeken",
+    "inbox": "Inbox",
+    "save": "Opslaan",
+    "saving": "Opslaan...",
+    "cancel": "Annuleren",
+    "delete": "Verwijderen",
+    "edit": "Bewerken",
+    "close": "Sluiten",
+    "loading": "Laden...",
+    "error": "Fout",
+    "success": "Succes",
+    "language": "Taal",
+    "dutch": "Nederlands",
+    "english": "Engels"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "clients": "Clients",
+    "mealPlans": "Meal Plans",
+    "meals": "Maaltijden",
+    "pantry": "Pantry",
+    "runs": "Runs",
+    "calendar": "Kalender",
+    "reports": "Rapporten",
+    "settings": "Instellingen",
+    "other": "Overig"
+  },
+  "account": {
+    "title": "Mijn Account",
+    "description": "Beheer je accountgegevens en voorkeuren",
+    "profileData": "Profielgegevens",
+    "profileDescription": "Update je persoonlijke informatie. Je e-mailadres kan niet worden gewijzigd.",
+    "email": "E-mailadres",
+    "emailDescription": "Je e-mailadres kan niet worden gewijzigd.",
+    "fullName": "Volledige naam",
+    "fullNamePlaceholder": "Je volledige naam",
+    "displayName": "Weergavenaam",
+    "displayNameDescription": "Deze naam wordt getoond in de applicatie.",
+    "displayNamePlaceholder": "Je weergavenaam",
+    "accountInfo": "Account informatie",
+    "accountCreated": "Account aangemaakt",
+    "lastLogin": "Laatste login",
+    "neverLoggedIn": "Nog niet ingelogd",
+    "emailConfirmed": "E-mail bevestigd",
+    "yes": "Ja",
+    "no": "Nee",
+    "languagePreference": "Taalvoorkeur",
+    "languageDescription": "Kies je voorkeurstaal voor de interface"
+  },
+  "menu": {
+    "myProfile": "Mijn profiel",
+    "settings": "Instellingen",
+    "privacyPolicy": "Privacybeleid",
+    "shareFeedback": "Feedback delen",
+    "logout": "Uitloggen",
+    "newTeam": "Nieuw team&hellip;",
+    "myAccount": "Mijn Account"
+  },
+  "metadata": {
+    "title": "NutriCoach",
+    "description": "NutriCoach - Nutrition Coaching Platform",
+    "dashboardTitle": "Dashboard | NutriCoach",
+    "dashboardDescription": "NutriCoach Dashboard"
+  }
+}

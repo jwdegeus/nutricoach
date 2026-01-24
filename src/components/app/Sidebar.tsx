@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/src/lib/utils";
-import { navItems } from "@/src/lib/nav";
-import { Separator } from "@/components/ui/separator";
+import { useTranslatedNavItems } from "@/src/lib/nav-hooks";
+import { Divider } from "@/components/catalyst/divider";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const navItems = useTranslatedNavItems();
 
   const mainItems = navItems.filter((item) => !item.group);
   const secondaryItems = navItems.filter((item) => item.group === "secondary");
@@ -51,7 +52,7 @@ export function Sidebar() {
           {/* Separator */}
           {secondaryItems.length > 0 && (
             <>
-              <Separator className="my-4" />
+              <Divider className="my-4" />
               <div className="space-y-1">
                 {secondaryItems.map((item) => {
                   const Icon = item.icon;

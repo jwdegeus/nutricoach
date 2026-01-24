@@ -17,6 +17,7 @@ import { Text } from "@/components/catalyst/text";
 import { Textarea } from "@/components/catalyst/textarea";
 import { Checkbox, CheckboxField } from "@/components/catalyst/checkbox";
 import { Select } from "@/components/catalyst/select";
+import { ConfirmDialog } from "@/components/catalyst/confirm-dialog";
 
 type DietRulesManagerProps = {
   dietTypeId: string;
@@ -32,6 +33,8 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [deleteRuleId, setDeleteRuleId] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const [formData, setFormData] = useState<DietRuleInput>({
     dietTypeId,
@@ -161,17 +164,21 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
     });
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Weet je zeker dat je deze regel wilt verwijderen?")) {
-      return;
-    }
+  function handleDelete(id: string) {
+    setDeleteRuleId(id);
+    setShowDeleteDialog(true);
+  }
 
+  async function handleDeleteConfirm() {
+    if (!deleteRuleId) return;
+
+    setShowDeleteDialog(false);
     setError(null);
     setSuccess(null);
 
     startTransition(async () => {
       try {
-        const result = await deleteDietRule(id);
+        const result = await deleteDietRule(deleteRuleId);
         if ("error" in result) {
           setError(result.error);
         } else {
@@ -180,6 +187,8 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
         }
       } catch (err) {
         setError("Onverwachte fout bij verwijderen");
+      } finally {
+        setDeleteRuleId(null);
       }
     });
   }
@@ -547,7 +556,22 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
   }
 
   return (
-    <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
+    <>
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onClose={() => {
+          setShowDeleteDialog(false);
+          setDeleteRuleId(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Regel verwijderen"
+        description="Weet je zeker dat je deze regel wilt verwijderen?"
+        confirmLabel="Verwijderen"
+        cancelLabel="Annuleren"
+        confirmColor="red"
+        isLoading={isPending}
+      />
+      <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <Text className="font-medium text-zinc-950 dark:text-white">
@@ -561,7 +585,6 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
           <Button
             onClick={() => setExpanded(!expanded)}
             color="zinc"
-            size="sm"
           >
             {expanded ? "Verbergen" : "Bekijken"}
           </Button>
@@ -739,7 +762,6 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
                       <Button
                         onClick={() => startEdit(rule)}
                         color="zinc"
-                        size="sm"
                         disabled={editingId === rule.id || isCreating}
                       >
                         Bewerken
@@ -747,7 +769,6 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
                       <Button
                         onClick={() => handleDelete(rule.id)}
                         color="red"
-                        size="sm"
                         disabled={isPending}
                       >
                         Verwijderen
@@ -761,5 +782,6 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
         </>
       )}
     </div>
+    </>
   );
 }

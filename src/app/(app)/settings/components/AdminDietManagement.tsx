@@ -16,6 +16,7 @@ import { Field, FieldGroup, Label, Description } from "@/components/catalyst/fie
 import { Text } from "@/components/catalyst/text";
 import { Textarea } from "@/components/catalyst/textarea";
 import { Checkbox, CheckboxField } from "@/components/catalyst/checkbox";
+import { ConfirmDialog } from "@/components/catalyst/confirm-dialog";
 
 export function AdminDietManagement() {
   const router = useRouter();
@@ -25,6 +26,8 @@ export function AdminDietManagement() {
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isCreating, setIsCreating] = useState(false);
+  const [deleteDietId, setDeleteDietId] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Form state for creating new diet type
   const [formData, setFormData] = useState<DietTypeInput>({
@@ -109,17 +112,21 @@ export function AdminDietManagement() {
     });
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Weet je zeker dat je dit dieettype wilt verwijderen? (Het wordt gedeactiveerd)")) {
-      return;
-    }
+  function handleDelete(id: string) {
+    setDeleteDietId(id);
+    setShowDeleteDialog(true);
+  }
 
+  async function handleDeleteConfirm() {
+    if (!deleteDietId) return;
+
+    setShowDeleteDialog(false);
     setError(null);
     setSuccess(null);
 
     startTransition(async () => {
       try {
-        const result = await deleteDietType(id);
+        const result = await deleteDietType(deleteDietId);
         if ("error" in result) {
           setError(result.error);
         } else {
@@ -128,6 +135,8 @@ export function AdminDietManagement() {
         }
       } catch (err) {
         setError("Onverwachte fout bij verwijderen");
+      } finally {
+        setDeleteDietId(null);
       }
     });
   }
@@ -142,6 +151,20 @@ export function AdminDietManagement() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onClose={() => {
+          setShowDeleteDialog(false);
+          setDeleteDietId(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Dieettype verwijderen"
+        description="Weet je zeker dat je dit dieettype wilt verwijderen? (Het wordt gedeactiveerd)"
+        confirmLabel="Verwijderen"
+        cancelLabel="Annuleren"
+        confirmColor="red"
+        isLoading={isPending}
+      />
       <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
         <div className="mb-6 flex items-center justify-between">
           <div>

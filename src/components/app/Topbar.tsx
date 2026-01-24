@@ -5,21 +5,25 @@ import { usePathname } from "next/navigation";
 import { Search, User, Settings, LogOut, ChevronRight } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { getPageTitle, getBreadcrumbs } from "@/src/lib/nav";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/catalyst/input";
 import { MobileSidebar } from "@/src/components/app/MobileSidebar";
 import {
+  Dropdown,
+  DropdownButton,
   DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  DropdownItem,
+  DropdownHeader,
+  DropdownDivider,
+} from "@/components/catalyst/dropdown";
+import { useTranslations } from "next-intl";
 
 export function Topbar() {
   const pathname = usePathname();
-  const pageTitle = getPageTitle(pathname);
-  const breadcrumbs = getBreadcrumbs(pathname);
+  const t = useTranslations();
+  const pageTitle = getPageTitle(pathname, (key: string) => t(key));
+  const breadcrumbs = getBreadcrumbs(pathname, (key: string) => t(key));
+  const tCommon = useTranslations('common');
+  const tMenu = useTranslations('menu');
 
   return (
     <header className="flex h-16 items-center border-b border-gray-200 bg-white px-4 md:px-6 dark:bg-gray-800/75 dark:border-gray-700">
@@ -62,51 +66,41 @@ export function Topbar() {
             <Search className="absolute left-3 h-4 w-4 text-gray-500 dark:text-gray-400 pointer-events-none" />
             <Input
               type="search"
-              placeholder="Search..."
+              placeholder={tCommon('search') + '...'}
               className="w-64 pl-9 pr-4"
             />
           </div>
 
           {/* User Dropdown Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className="flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                aria-label="User menu"
-              >
-                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
-                  <User className="h-4 w-4" />
-                </div>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/profile" className="flex items-center gap-2 cursor-pointer">
-                  <User className="h-4 w-4" />
-                  <span>Profile</span>
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
-                  <Settings className="h-4 w-4" />
-                  <span>Settings</span>
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive cursor-pointer"
+          <Dropdown>
+            <DropdownButton>
+              <div className="h-8 w-8 rounded-full bg-zinc-600 dark:bg-zinc-500 flex items-center justify-center text-white">
+                <User className="h-4 w-4" />
+              </div>
+            </DropdownButton>
+            <DropdownMenu anchor="bottom end">
+              <DropdownHeader>{tMenu('myAccount')}</DropdownHeader>
+              <DropdownDivider />
+              <DropdownItem href="/account">
+                <User className="h-4 w-4" />
+                <span>{tMenu('myProfile')}</span>
+              </DropdownItem>
+              <DropdownItem href="/settings">
+                <Settings className="h-4 w-4" />
+                <span>{tCommon('settings')}</span>
+              </DropdownItem>
+              <DropdownDivider />
+              <DropdownItem
                 onClick={() => {
                   // TODO: Implement logout logic
                   console.log("Logout clicked");
                 }}
               >
-                <LogOut className="h-4 w-4 mr-2" />
-                <span>Logout</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <LogOut className="h-4 w-4" />
+                <span>{tCommon('logout')}</span>
+              </DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
         </div>
       </div>
     </header>

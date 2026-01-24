@@ -1,39 +1,43 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { cn } from "@/src/lib/utils";
-import { navItems } from "@/src/lib/nav";
+import { useTranslatedNavItems } from "@/src/lib/nav-hooks";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { Separator } from "@/components/ui/separator";
+  Dialog,
+  DialogTitle,
+  DialogBody,
+} from "@/components/catalyst/dialog";
+import { Divider } from "@/components/catalyst/divider";
+import { Button } from "@/components/catalyst/button";
+
+// Separator is an alias for Divider
+const Separator = Divider;
 
 export function MobileSidebar() {
   const pathname = usePathname();
+  const [open, setOpen] = React.useState(false);
+  const navItems = useTranslatedNavItems();
 
   const mainItems = navItems.filter((item) => !item.group);
   const secondaryItems = navItems.filter((item) => item.group === "secondary");
 
   return (
-    <Sheet>
-      <SheetTrigger asChild>
-        <button
-          className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden"
-          aria-label="Open menu"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-      </SheetTrigger>
-      <SheetContent side="left" className="w-64 p-0">
-        <SheetHeader className="border-b px-6 py-4">
-          <SheetTitle className="text-lg font-semibold">NutriCoach</SheetTitle>
-        </SheetHeader>
+    <>
+      <Button
+        plain
+        onClick={() => setOpen(true)}
+        className="md:hidden"
+        aria-label="Open menu"
+      >
+        <Menu className="h-5 w-5" />
+      </Button>
+      <Dialog open={open} onClose={() => setOpen(false)}>
+        <DialogTitle>NutriCoach</DialogTitle>
+        <DialogBody className="p-0">
 
         <nav className="flex flex-col space-y-1 p-4">
           {/* Main Navigation */}
@@ -89,7 +93,8 @@ export function MobileSidebar() {
             </>
           )}
         </nav>
-      </SheetContent>
-    </Sheet>
+        </DialogBody>
+      </Dialog>
+    </>
   );
 }

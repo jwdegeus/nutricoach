@@ -137,6 +137,25 @@ export async function loadOnboardingStatusAction(): Promise<
         : undefined,
       allergies: preferences?.allergies ?? [],
       dislikes: preferences?.dislikes ?? [],
+      mealPreferences: (() => {
+        // Normalize to arrays, handling both string (legacy) and array values
+        const normalizeToArray = (value: string | string[] | null | undefined): string[] | undefined => {
+          if (!value) return undefined;
+          if (Array.isArray(value)) return value.length > 0 ? value : undefined;
+          if (typeof value === 'string' && value.trim()) return [value.trim()];
+          return undefined;
+        };
+        
+        const breakfast = normalizeToArray(preferences?.breakfast_preference);
+        const lunch = normalizeToArray(preferences?.lunch_preference);
+        const dinner = normalizeToArray(preferences?.dinner_preference);
+        
+        // Only include mealPreferences if at least one has values
+        if (breakfast || lunch || dinner) {
+          return { breakfast, lunch, dinner };
+        }
+        return undefined;
+      })(),
     },
   };
 
@@ -187,6 +206,9 @@ export async function saveOnboardingAction(
     allergies: input.allergies,
     dislikes: input.dislikes,
     variety_window_days: varietyWindowDays,
+    breakfast_preference: input.mealPreferences?.breakfast || [],
+    lunch_preference: input.mealPreferences?.lunch || [],
+    dinner_preference: input.mealPreferences?.dinner || [],
     onboarding_completed: true,
     onboarding_completed_at: new Date().toISOString(),
   };
@@ -269,6 +291,7 @@ export async function saveOnboardingAction(
       varietyLevel: input.varietyLevel,
       allergies: input.allergies,
       dislikes: input.dislikes,
+      mealPreferences: input.mealPreferences,
     },
   };
 

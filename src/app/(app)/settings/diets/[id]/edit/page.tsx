@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
 import { isAdmin } from "@/src/lib/auth/roles";
 import { getAllDietTypes } from "../../../actions/diet-admin.actions";
-import { DietEditPage } from "./diet-edit-page";
+import { DietEditPageClient } from "./diet-edit-page-client";
 
 export const metadata: Metadata = {
   title: "Dieettype bewerken | NutriCoach",
@@ -41,5 +41,5 @@ export default async function EditDietPage({ params }: PageProps) {
     redirect("/settings");
   }
 
-  return <DietEditPage dietType={dietType} />;
+  return <DietEditPageClient dietType={dietType} />;
 }

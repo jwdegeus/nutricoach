@@ -1,0 +1,72 @@
+{
+  "common": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "settings": "Settings",
+    "profile": "My Profile",
+    "logout": "Logout",
+    "search": "Search",
+    "inbox": "Inbox",
+    "save": "Save",
+    "saving": "Saving...",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "language": "Language",
+    "dutch": "Dutch",
+    "english": "English"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "clients": "Clients",
+    "mealPlans": "Meal Plans",
+    "meals": "Meals",
+    "pantry": "Pantry",
+    "runs": "Runs",
+    "calendar": "Calendar",
+    "reports": "Reports",
+    "settings": "Settings",
+    "other": "Other"
+  },
+  "account": {
+    "title": "My Account",
+    "description": "Manage your account details and preferences",
+    "profileData": "Profile Data",
+    "profileDescription": "Update your personal information. Your email address cannot be changed.",
+    "email": "Email Address",
+    "emailDescription": "Your email address cannot be changed.",
+    "fullName": "Full Name",
+    "fullNamePlaceholder": "Your full name",
+    "displayName": "Display Name",
+    "displayNameDescription": "This name will be shown in the application.",
+    "displayNamePlaceholder": "Your display name",
+    "accountInfo": "Account Information",
+    "accountCreated": "Account Created",
+    "lastLogin": "Last Login",
+    "neverLoggedIn": "Never logged in",
+    "emailConfirmed": "Email Confirmed",
+    "yes": "Yes",
+    "no": "No",
+    "languagePreference": "Language Preference",
+    "languageDescription": "Choose your preferred language for the interface"
+  },
+  "menu": {
+    "myProfile": "My Profile",
+    "settings": "Settings",
+    "privacyPolicy": "Privacy Policy",
+    "shareFeedback": "Share Feedback",
+    "logout": "Logout",
+    "newTeam": "New Team&hellip;",
+    "myAccount": "My Account"
+  },
+  "metadata": {
+    "title": "NutriCoach",
+    "description": "NutriCoach - Nutrition Coaching Platform",
+    "dashboardTitle": "Dashboard | NutriCoach",
+    "dashboardDescription": "NutriCoach Dashboard"
+  }
+}

@@ -23,6 +23,7 @@ import { Text } from "@/components/catalyst/text";
 import { Textarea } from "@/components/catalyst/textarea";
 import { Checkbox, CheckboxField } from "@/components/catalyst/checkbox";
 import { Select } from "@/components/catalyst/select";
+import { ConfirmDialog } from "@/components/catalyst/confirm-dialog";
 
 type DietEditPageProps = {
   dietType: DietTypeOutput;
@@ -39,6 +40,8 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [isCreatingRule, setIsCreatingRule] = useState(false);
   const [activeTab, setActiveTab] = useState<"diet" | "rules">("diet");
+  const [deleteRuleId, setDeleteRuleId] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Diet form state
   const [dietFormData, setDietFormData] = useState<DietTypeInput>({
@@ -200,17 +203,21 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
     });
   }
 
-  async function handleDeleteRule(id: string) {
-    if (!confirm("Weet je zeker dat je deze regel wilt verwijderen?")) {
-      return;
-    }
+  function handleDeleteRule(id: string) {
+    setDeleteRuleId(id);
+    setShowDeleteDialog(true);
+  }
 
+  async function handleDeleteRuleConfirm() {
+    if (!deleteRuleId) return;
+
+    setShowDeleteDialog(false);
     setError(null);
     setSuccess(null);
 
     startTransition(async () => {
       try {
-        const result = await deleteDietRule(id);
+        const result = await deleteDietRule(deleteRuleId);
         if ("error" in result) {
           setError(result.error);
         } else {
@@ -219,6 +226,8 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
         }
       } catch (err) {
         setError("Onverwachte fout bij verwijderen");
+      } finally {
+        setDeleteRuleId(null);
       }
     });
   }
@@ -584,9 +593,23 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onClose={() => {
+          setShowDeleteDialog(false);
+          setDeleteRuleId(null);
+        }}
+        onConfirm={handleDeleteRuleConfirm}
+        title="Regel verwijderen"
+        description="Weet je zeker dat je deze regel wilt verwijderen?"
+        confirmLabel="Verwijderen"
+        cancelLabel="Annuleren"
+        confirmColor="red"
+        isLoading={isPending}
+      />
       <div className="flex items-center justify-between">
         <div>
-          <Button onClick={() => router.push("/settings")} color="zinc" size="sm">
+          <Button onClick={() => router.push("/settings")} color="zinc">
             ← Terug naar instellingen
           </Button>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white">
@@ -879,7 +902,6 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
                       <Button
                         onClick={() => startEditRule(rule)}
                         color="zinc"
-                        size="sm"
                         disabled={editingRuleId === rule.id || isCreatingRule}
                       >
                         Bewerken
@@ -887,7 +909,6 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
                       <Button
                         onClick={() => handleDeleteRule(rule.id)}
                         color="red"
-                        size="sm"
                         disabled={isPending}
                       >
                         Verwijderen

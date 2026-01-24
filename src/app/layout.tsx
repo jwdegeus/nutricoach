@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "@/src/components/theme-provider";
+import { getLocale, getMessages } from 'next-intl/server';
+import { I18nProvider } from "@/src/components/i18n-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -10,14 +12,17 @@ export const metadata: Metadata = {
   description: "NutriCoach - Nutrition Coaching Platform",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
     <html
-      lang="en"
+      lang={locale}
       suppressHydrationWarning
       className="text-stone-950 antialiased lg:bg-stone-50 dark:bg-stone-950 dark:text-stone-50 dark:lg:bg-stone-900"
     >
@@ -40,15 +45,17 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-          storageKey="nutricoach-theme"
-        >
-          {children}
-        </ThemeProvider>
+        <I18nProvider locale={locale} messages={messages}>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+            storageKey="nutricoach-theme"
+          >
+            {children}
+          </ThemeProvider>
+        </I18nProvider>
       </body>
     </html>
   );

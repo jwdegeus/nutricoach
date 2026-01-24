@@ -4,8 +4,9 @@ import { useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "../actions";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/catalyst/button";
+import { Input } from "@/components/catalyst/input";
+import { Field, Label } from "@/components/catalyst/fieldset";
 
 export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
@@ -29,15 +30,13 @@ export function LoginForm() {
   return (
     <form action={handleSubmit} className="space-y-6">
       {error && (
-        <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+        <div className="rounded-lg bg-red-50 dark:bg-red-950/50 p-4 text-sm text-red-600 dark:text-red-400">
           <strong>Fout:</strong> {error}
         </div>
       )}
 
-      <div className="space-y-2">
-        <label htmlFor="email" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-          E-mail
-        </label>
+      <Field>
+        <Label htmlFor="email">E-mail</Label>
         <Input
           id="email"
           type="email"
@@ -46,12 +45,10 @@ export function LoginForm() {
           autoComplete="email"
           placeholder="jouw@email.nl"
         />
-      </div>
+      </Field>
 
-      <div className="space-y-2">
-        <label htmlFor="password" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-          Wachtwoord
-        </label>
+      <Field>
+        <Label htmlFor="password">Wachtwoord</Label>
         <Input
           id="password"
           type="password"
@@ -60,7 +57,7 @@ export function LoginForm() {
           autoComplete="current-password"
           placeholder="••••••••"
         />
-      </div>
+      </Field>
 
       <div className="flex items-center justify-between">
         <Link href="/reset-password" className="text-sm text-primary hover:underline">
@@ -72,9 +69,9 @@ export function LoginForm() {
         {isPending ? "Inloggen..." : "Inloggen"}
       </Button>
 
-      <div className="text-center text-sm text-muted-foreground">
+      <div className="text-center text-sm text-zinc-500 dark:text-zinc-400">
         Nog geen account?{" "}
-        <Link href="/register" className="font-medium text-primary hover:underline">
+        <Link href="/register" className="font-medium text-blue-600 dark:text-blue-400 hover:underline">
           Registreer hier
         </Link>
       </div>
