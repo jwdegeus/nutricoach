@@ -44,10 +44,10 @@ export const baseNavItems: NavItem[] = [
     translationKey: "mealPlans",
   },
   {
-    label: "Maaltijden",
-    href: "/meals",
+    label: "Recepten",
+    href: "/recipes",
     icon: UtensilsCrossed,
-    translationKey: "meals",
+    translationKey: "recipes",
   },
   {
     label: "Pantry",

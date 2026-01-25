@@ -36,10 +36,12 @@ import {
   PlusIcon,
   ShieldCheckIcon,
   UserIcon,
+  AdjustmentsHorizontalIcon,
 } from '@heroicons/react/16/solid'
 import {
   MagnifyingGlassIcon,
   InboxIcon,
+  PhotoIcon,
 } from '@heroicons/react/20/solid'
 import { ThemeSwitcher } from './theme-switcher'
 import { PlanEditStatusIndicator } from './PlanEditStatusIndicator'
@@ -48,9 +50,11 @@ import { useTranslations } from 'next-intl'
 function AccountDropdownMenu({
   anchor,
   onLogout,
+  isAdmin = false,
 }: {
   anchor: 'top start' | 'bottom end'
   onLogout: () => void
+  isAdmin?: boolean
 }) {
   const t = useTranslations('menu')
   
@@ -64,6 +68,15 @@ function AccountDropdownMenu({
         <Cog8ToothIcon />
         <DropdownLabel>{t('settings')}</DropdownLabel>
       </DropdownItem>
+      {isAdmin && (
+        <>
+          <DropdownDivider />
+          <DropdownItem href="/admin/recipe-sources">
+            <AdjustmentsHorizontalIcon />
+            <DropdownLabel>Admin</DropdownLabel>
+          </DropdownItem>
+        </>
+      )}
       <DropdownDivider />
       <DropdownItem href="/privacy-policy">
         <ShieldCheckIcon />
@@ -92,6 +105,7 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [mounted, setMounted] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -123,9 +137,21 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
       setEmail(userEmail)
     }
 
+    async function checkAdminStatus(userId: string) {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'admin')
+        .maybeSingle()
+      
+      setIsAdmin(data !== null && data.role === 'admin')
+    }
+
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         updateUserInfo(user)
+        checkAdminStatus(user.id)
       }
     })
 
@@ -134,10 +160,12 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         updateUserInfo(session.user)
+        checkAdminStatus(session.user.id)
       } else {
         setInitials('U')
         setDisplayName('')
         setEmail('')
+        setIsAdmin(false)
       }
     })
 
@@ -156,6 +184,7 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
   const navItems = useTranslatedNavItems()
   const mainItems = navItems.filter((item) => !item.group)
   const secondaryItems = navItems.filter((item) => item.group === 'secondary')
+  const tCommon = useTranslations('common')
 
   return (
     <SidebarLayout
@@ -163,6 +192,9 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
         <Navbar>
           <NavbarSpacer />
           <NavbarSection>
+            <NavbarItem href="/recipes/import" aria-label={tCommon('addRecipe')}>
+              <PhotoIcon />
+            </NavbarItem>
             <NavbarItem href="/search" aria-label={t('search')}>
               <MagnifyingGlassIcon />
             </NavbarItem>
@@ -176,7 +208,7 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
                 <DropdownButton as={NavbarItem}>
                   <Avatar initials={initials} square />
                 </DropdownButton>
-                <AccountDropdownMenu anchor="bottom end" onLogout={handleLogout} />
+                <AccountDropdownMenu anchor="bottom end" onLogout={handleLogout} isAdmin={isAdmin} />
               </Dropdown>
             )}
           </NavbarSection>
@@ -274,7 +306,7 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
                   </span>
                   <ChevronUpIcon />
                 </DropdownButton>
-                <AccountDropdownMenu anchor="top start" onLogout={handleLogout} />
+                <AccountDropdownMenu anchor="top start" onLogout={handleLogout} isAdmin={isAdmin} />
               </Dropdown>
             )}
           </SidebarFooter>

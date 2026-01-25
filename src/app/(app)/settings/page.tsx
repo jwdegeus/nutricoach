@@ -4,6 +4,7 @@ import { createClient } from "@/src/lib/supabase/server";
 import { isAdmin } from "@/src/lib/auth/roles";
 import { SettingsForm } from "./settings-form";
 import { AdminDietManagement } from "./components/AdminDietManagement";
+import { AdminLinks } from "./components/AdminLinks";
 
 export const metadata: Metadata = {
   title: "Instellingen | NutriCoach",
@@ -35,7 +36,12 @@ export default async function SettingsPage() {
 
       <SettingsForm user={user} />
 
-      {admin && <AdminDietManagement />}
+      {admin && (
+        <>
+          <AdminLinks />
+          <AdminDietManagement />
+        </>
+      )}
     </div>
   );
 }

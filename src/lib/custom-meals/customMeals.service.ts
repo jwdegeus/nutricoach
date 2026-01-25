@@ -21,6 +21,7 @@ export type CustomMealRecord = {
   sourceType: "photo" | "screenshot" | "file" | "gemini";
   sourceImageUrl: string | null;
   sourceImagePath: string | null;
+  source: string | null;
   aiAnalysis: any | null;
   originalLanguage: string | null;
   translatedContent: any | null;
@@ -30,6 +31,7 @@ export type CustomMealRecord = {
   lastConsumedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  notes: string | null;
 };
 
 /**
@@ -222,6 +224,7 @@ export class CustomMealsService {
       sourceType: row.source_type,
       sourceImageUrl: row.source_image_url,
       sourceImagePath: row.source_image_path,
+      source: row.source || null,
       aiAnalysis: row.ai_analysis,
       originalLanguage: row.original_language,
       translatedContent: row.translated_content,
@@ -231,6 +234,7 @@ export class CustomMealsService {
       lastConsumedAt: row.last_consumed_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      notes: row.notes || null,
     };
   }
 }

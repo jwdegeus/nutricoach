@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { TopMealsWidget } from "@/src/components/app/dashboard/top-meals-widget";
-import { getTopConsumedMealsAction } from "@/src/app/(app)/meals/actions/meals.actions";
+import { getTopConsumedMealsAction } from "@/src/app/(app)/recipes/actions/meals.actions";
 
 export const metadata: Metadata = {
   title: "Dashboard | NutriCoach",

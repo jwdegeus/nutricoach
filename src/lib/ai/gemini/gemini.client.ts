@@ -238,9 +238,12 @@ class GeminiClient {
     prompt?: string;
     jsonSchema?: object;
     temperature?: number;
+    purpose?: ModelPurpose; // Optional purpose override
   }): Promise<string> {
-    const { imageData, mimeType, prompt, jsonSchema, temperature = 0.4 } = args;
-    const modelName = this.getModelName("vision");
+    const { imageData, mimeType, prompt, jsonSchema, temperature = 0.4, purpose = "vision" } = args;
+    // Use getModelName to support configurable vision model via GEMINI_MODEL_VISION env var
+    // Defaults to GEMINI_MODEL if not set, but can be overridden to gemini-3-flash-preview or other models
+    const modelName = this.getModelName(purpose);
 
     // Build content parts
     const parts: Array<{ inlineData?: { data: string; mimeType: string }; text?: string }> = [];
@@ -282,26 +285,60 @@ class GeminiClient {
         config.response_json_schema = jsonSchema;
       }
 
-      const response = await this.ai.models.generateContent({
-        model: modelName,
-        contents: parts,
-        config,
-      });
+      // Retry logic for rate limits with exponential backoff
+      let lastError: Error | null = null;
+      const maxRetries = 3;
+      const baseDelayMs = 2000; // 2 seconds
 
-      const text = response.text;
-      if (!text) {
-        throw new Error("Empty response from Gemini Vision API");
-      }
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const response = await this.ai.models.generateContent({
+            model: modelName,
+            contents: parts,
+            config,
+          });
 
-      return text;
-    } catch (error) {
-      // Handle quota/rate limit errors (429) with better messaging
-      if (error instanceof Error) {
-        const errorMessage = error.message;
-        
-        // Check for quota exceeded errors
-        if (errorMessage.includes("429") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("quota")) {
-          const retryMatch = errorMessage.match(/retry.*?(\d+)\s*s/i) || errorMessage.match(/(\d+)\s*second/i);
+          const text = response.text;
+          if (!text) {
+            throw new Error("Empty response from Gemini Vision API");
+          }
+
+          return text;
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          const errorMessage = lastError.message;
+          
+          // Check for rate limit errors (429, RESOURCE_EXHAUSTED, quota)
+          const isRateLimit = errorMessage.includes("429") || 
+                             errorMessage.includes("RESOURCE_EXHAUSTED") || 
+                             errorMessage.includes("quota") ||
+                             errorMessage.includes("rate limit") ||
+                             errorMessage.includes("RPM");
+          
+          if (isRateLimit && attempt < maxRetries) {
+            // Calculate exponential backoff delay
+            const delayMs = baseDelayMs * Math.pow(2, attempt);
+            console.warn(
+              `[GeminiClient] Rate limit hit (attempt ${attempt + 1}/${maxRetries + 1}), ` +
+              `retrying in ${delayMs}ms...`
+            );
+            
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            continue; // Retry
+          }
+          
+          // If not a rate limit error, or we've exhausted retries, throw
+          if (!isRateLimit) {
+            throw new Error(
+              `Gemini Vision API error: ${errorMessage}. ` +
+              "Check your API key and model configuration."
+            );
+          }
+          
+          // Rate limit error after all retries exhausted
+          const retryMatch = errorMessage.match(/retry.*?(\d+)\s*s/i) || 
+                           errorMessage.match(/(\d+)\s*second/i);
           const retrySeconds = retryMatch ? parseInt(retryMatch[1], 10) : null;
           
           const retryInfo = retrySeconds 
@@ -309,16 +346,19 @@ class GeminiClient {
             : " Please wait a moment and try again.";
           
           throw new Error(
-            `Gemini Vision API quota exceeded (rate limit).${retryInfo} ` +
-            "This usually means you've hit the free tier limits. " +
-            "Consider upgrading to a paid plan or waiting for the quota to reset."
+            `Gemini Vision API rate limit exceeded after ${maxRetries + 1} attempts.${retryInfo} ` +
+            `Model: ${modelName}. ` +
+            "Consider using gemini-2.0-flash-exp for better rate limits or waiting for the quota to reset."
           );
         }
-        
-        throw new Error(
-          `Gemini Vision API error: ${errorMessage}. ` +
-          "Check your API key and model configuration."
-        );
+      }
+      
+      // Should never reach here, but TypeScript needs this
+      throw lastError || new Error("Unknown error from Gemini Vision API");
+    } catch (error) {
+      // Re-throw if already processed
+      if (error instanceof Error) {
+        throw error;
       }
       throw new Error("Unknown error from Gemini Vision API");
     }

@@ -44,3 +44,6 @@ next-env.d.ts
 supabase/.branches
 supabase/.temp
 supabase/.volumes
+
+# uploaded files (stored locally, can be migrated to CDN/S3 later)
+/public/uploads

@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
   serverActions: {
-    bodySizeLimit: '10mb', // Increased for image uploads (base64 encoded images can be large)
+    bodySizeLimit: '10MB', // Increased for image uploads (base64 encoded images can be large)
   },
 };
 
