@@ -1,12 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/catalyst/button";
-import { PlusIcon, CameraIcon, PhotoIcon, DocumentIcon } from "@heroicons/react/20/solid";
 import { MealsList } from "./MealsList";
-import { MealUploadModal } from "./MealUploadModal";
-import type { CustomMealRecord } from "@/src/lib/custom-meals/customMeals.service";
 
 type MealsPageClientProps = {
   initialMeals: {
@@ -16,24 +11,41 @@ type MealsPageClientProps = {
 };
 
 export function MealsPageClient({ initialMeals }: MealsPageClientProps) {
-  const router = useRouter();
   const [meals, setMeals] = useState(initialMeals);
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [uploadType, setUploadType] = useState<"photo" | "screenshot" | "file" | null>(null);
-
-  const handleMealAdded = (newMeal: CustomMealRecord) => {
-    setMeals((prev) => ({
-      ...prev,
-      customMeals: [newMeal, ...prev.customMeals],
-    }));
-    setIsUploadModalOpen(false);
-  };
 
   // Handle consumption logged - update local state optimistically
-  const handleConsumptionLogged = useCallback(() => {
+  const handleConsumptionLogged = useCallback((mealId: string, source: "custom" | "gemini") => {
     // Optimistically update consumption counts in local state
-    // The router.refresh() in MealsList will update server data
-    // This prevents the need for a full page reload
+    setMeals((prev) => {
+      if (source === "custom") {
+        return {
+          ...prev,
+          customMeals: prev.customMeals.map((meal) =>
+            meal.id === mealId
+              ? {
+                  ...meal,
+                  consumptionCount: (meal.consumptionCount || 0) + 1,
+                  lastConsumedAt: new Date().toISOString(),
+                  firstConsumedAt: meal.firstConsumedAt || new Date().toISOString(),
+                }
+              : meal
+          ),
+        };
+      } else {
+        return {
+          ...prev,
+          mealHistory: prev.mealHistory.map((meal) =>
+            meal.id === mealId
+              ? {
+                  ...meal,
+                  usage_count: (meal.usage_count || 0) + 1,
+                  last_used_at: new Date().toISOString(),
+                }
+              : meal
+          ),
+        };
+      }
+    });
   }, []);
 
   const allMeals = [
@@ -42,55 +54,9 @@ export function MealsPageClient({ initialMeals }: MealsPageClientProps) {
   ];
 
   return (
-    <>
-      <div className="mb-6">
-        <div className="flex gap-3">
-          <Button
-            onClick={() => {
-              setUploadType("photo");
-              setIsUploadModalOpen(true);
-            }}
-          >
-            <CameraIcon className="h-5 w-5 mr-2" />
-            Foto Maken
-          </Button>
-          <Button
-            onClick={() => {
-              setUploadType("screenshot");
-              setIsUploadModalOpen(true);
-            }}
-          >
-            <PhotoIcon className="h-5 w-5 mr-2" />
-            Screenshot
-          </Button>
-          <Button
-            onClick={() => {
-              setUploadType("file");
-              setIsUploadModalOpen(true);
-            }}
-          >
-            <DocumentIcon className="h-5 w-5 mr-2" />
-            Bestand Uploaden
-          </Button>
-        </div>
-      </div>
-
-      <MealsList 
-        meals={allMeals}
-        onConsumptionLogged={handleConsumptionLogged}
-      />
-
-      {isUploadModalOpen && uploadType && (
-        <MealUploadModal
-          isOpen={isUploadModalOpen}
-          onClose={() => {
-            setIsUploadModalOpen(false);
-            setUploadType(null);
-          }}
-          uploadType={uploadType}
-          onMealAdded={handleMealAdded}
-        />
-      )}
-    </>
+    <MealsList 
+      meals={allMeals}
+      onConsumptionLogged={handleConsumptionLogged}
+    />
   );
 }

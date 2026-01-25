@@ -42,9 +42,7 @@ import {
   InboxIcon,
 } from '@heroicons/react/20/solid'
 import { ThemeSwitcher } from './theme-switcher'
-import { ShoppingCart } from './ShoppingCart'
 import { PlanEditStatusIndicator } from './PlanEditStatusIndicator'
-import { NotificationsIndicator } from './NotificationsIndicator'
 import { useTranslations } from 'next-intl'
 
 function AccountDropdownMenu({
@@ -168,9 +166,7 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
             <NavbarItem href="/search" aria-label={t('search')}>
               <MagnifyingGlassIcon />
             </NavbarItem>
-            <ShoppingCart />
             <PlanEditStatusIndicator />
-            <NotificationsIndicator />
             <NavbarItem href="/inbox" aria-label={t('inbox')}>
               <InboxIcon />
             </NavbarItem>

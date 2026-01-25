@@ -2,7 +2,6 @@
 
 import { createClient } from "@/src/lib/supabase/server";
 import { CustomMealsService } from "@/src/lib/custom-meals/customMeals.service";
-import { analyzeMealImage, recipeAnalysisToMeal } from "@/src/lib/custom-meals/mealImageAnalysis.service";
 import type { CustomMealRecord } from "@/src/lib/custom-meals/customMeals.service";
 import type { MealSlot } from "@/src/lib/diets";
 
@@ -18,78 +17,6 @@ type ActionResult<T> =
         message: string;
       };
     };
-
-/**
- * Upload and analyze a meal image
- */
-export async function uploadAndAnalyzeMealAction(args: {
-  imageData: string; // Base64 or data URL
-  mimeType: string;
-  mealSlot: MealSlot;
-  date: string; // YYYY-MM-DD
-}): Promise<ActionResult<{ mealId: string; meal: CustomMealRecord }>> {
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return {
-        ok: false,
-        error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om maaltijden toe te voegen",
-        },
-      };
-    }
-
-    // Analyze image
-    let analysis;
-    try {
-      analysis = await analyzeMealImage(args.imageData, args.mimeType);
-    } catch (error) {
-      return {
-        ok: false,
-        error: {
-          code: "AI_ERROR",
-          message: `Fout bij analyseren van afbeelding: ${error instanceof Error ? error.message : "Unknown error"}`,
-        },
-      };
-    }
-
-    // Convert to Meal format
-    const meal = recipeAnalysisToMeal(analysis, args.mealSlot, args.date);
-
-    // Create custom meal
-    const service = new CustomMealsService();
-    const customMeal = await service.createMeal({
-      userId: user.id,
-      name: meal.name,
-      mealSlot: args.mealSlot,
-      sourceType: "photo", // Could be determined from upload type
-      aiAnalysis: analysis,
-      originalLanguage: analysis.language,
-      mealData: meal,
-    });
-
-    return {
-      ok: true,
-      data: {
-        mealId: customMeal.id,
-        meal: customMeal,
-      },
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      error: {
-        code: "DB_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-    };
-  }
-}
 
 /**
  * Get all meals for current user (custom meals + meal history)
@@ -216,6 +143,108 @@ export async function getTopConsumedMealsAction(): Promise<ActionResult<CustomMe
       ok: true,
       data: topMeals,
     };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: "DB_ERROR",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+    };
+  }
+}
+
+/**
+ * Get a single meal by ID (custom meal or meal history)
+ */
+export async function getMealByIdAction(
+  mealId: string,
+  source: "custom" | "gemini"
+): Promise<ActionResult<CustomMealRecord | any>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: {
+          code: "AUTH_ERROR",
+          message: "Je moet ingelogd zijn om maaltijden te bekijken",
+        },
+      };
+    }
+
+    if (source === "custom") {
+      const service = new CustomMealsService();
+      const meal = await service.getMealById(mealId, user.id);
+
+      if (!meal) {
+        return {
+          ok: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Maaltijd niet gevonden",
+          },
+        };
+      }
+
+      return {
+        ok: true,
+        data: meal,
+      };
+    } else {
+      // Get from meal_history
+      const { data, error } = await supabase
+        .from("meal_history")
+        .select("*")
+        .eq("id", mealId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        return {
+          ok: false,
+          error: {
+            code: "DB_ERROR",
+            message: error.message,
+          },
+        };
+      }
+
+      if (!data) {
+        return {
+          ok: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Maaltijd niet gevonden",
+          },
+        };
+      }
+
+      return {
+        ok: true,
+        data: {
+          id: data.id,
+          mealId: data.meal_id,
+          mealName: data.meal_name,
+          mealSlot: data.meal_slot,
+          dietKey: data.diet_key,
+          mealData: data.meal_data,
+          userRating: data.user_rating,
+          nutritionScore: data.nutrition_score,
+          varietyScore: data.variety_score,
+          combinedScore: data.combined_score,
+          usageCount: data.usage_count,
+          firstUsedAt: data.first_used_at,
+          lastUsedAt: data.last_used_at,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+        },
+      };
+    }
   } catch (error) {
     return {
       ok: false,
