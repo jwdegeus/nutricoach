@@ -96,33 +96,19 @@ function parseGeminiResponse(
 /**
  * Build prompt for Gemini Vision API
  */
-function buildRecipeExtractionPrompt(targetLocale: string, sourceLocale?: string | null): string {
-  const localeNames: Record<string, string> = {
-    nl: "Nederlands (Dutch)",
-    en: "English",
-    de: "Deutsch (German)",
-    fr: "Français (French)",
-    es: "Español (Spanish)",
-  };
-
-  const targetLanguageName = localeNames[targetLocale] || targetLocale;
-  const translationNote = sourceLocale && sourceLocale !== targetLocale
-    ? `The recipe appears to be in ${localeNames[sourceLocale] || sourceLocale}. Translate all text to ${targetLanguageName}.`
-    : `Detect the source language. If it's different from ${targetLanguageName}, translate all text to ${targetLanguageName}. If it's already in ${targetLanguageName}, keep it as is.`;
-
+function buildRecipeExtractionPrompt(): string {
   return `Analyze this recipe image carefully and extract ALL information.
 
 WORKFLOW:
 1. Perform OCR: Extract ALL visible text from the image
 2. Detect source language: Identify the language of the recipe (e.g., 'en', 'nl', 'de', 'fr', 'es')
-3. ${translationNote}
-4. Extract structured data: Parse ingredients, instructions, times, servings
+3. Extract structured data: Parse ingredients, instructions, times, servings
 
 REQUIRED OUTPUT FORMAT (strict JSON, no markdown, no extra text):
 {
-  "title": "Recipe name (translated to ${targetLanguageName} if needed)",
+  "title": "Recipe name in original language",
   "language_detected": "Source language code (e.g., 'en', 'nl', 'de') or null if unclear",
-  "translated_to": "${targetLocale}",
+  "translated_to": null,
   "servings": number or null,
   "times": {
     "prep_minutes": number or null,
@@ -134,14 +120,14 @@ REQUIRED OUTPUT FORMAT (strict JSON, no markdown, no extra text):
       "original_line": "Exact text as it appears in the image (REQUIRED - preserve original language)",
       "quantity": number or null,
       "unit": "string or null (e.g., 'g', 'ml', 'cups')",
-      "name": "Normalized ingredient name (REQUIRED - translated to ${targetLanguageName})",
-      "note": "string or null (translated to ${targetLanguageName})"
+      "name": "Normalized ingredient name in original language",
+      "note": "string or null in original language"
     }
   ],
   "instructions": [
     {
       "step": 1,
-      "text": "Instruction text (translated to ${targetLanguageName})"
+      "text": "Instruction text in original language"
     }
   ],
   "confidence": {
@@ -154,20 +140,15 @@ REQUIRED OUTPUT FORMAT (strict JSON, no markdown, no extra text):
 CRITICAL RULES:
 1. OCR: Extract ALL text visible in the image accurately
 2. Language Detection: Identify the source language correctly
-3. Translation: If source language differs from ${targetLanguageName}, translate:
-   - Recipe title
-   - All ingredient names
-   - All instruction steps
-   - Any notes or additional text
-4. Preservation: Keep "original_line" in the original language (for reference)
-5. For each ingredient:
-   - "original_line" MUST be the exact text from the image (preserve original language)
+3. Keep ALL text in original language - do NOT translate
+4. For each ingredient:
+   - "original_line" MUST be the exact text from the image
    - Extract quantity and unit if present
-   - "name" should be translated to ${targetLanguageName}
-6. Instructions must be step-by-step, numbered starting from 1, all in ${targetLanguageName}
-7. Return ONLY valid JSON conforming to the schema above
-8. Do NOT include markdown code blocks
-9. Do NOT include any text outside the JSON object
+   - "name" should be normalized but in original language
+5. Instructions must be step-by-step, numbered starting from 1, in original language
+6. Return ONLY valid JSON conforming to the schema above
+7. Do NOT include markdown code blocks
+8. Do NOT include any text outside the JSON object
 
 If you cannot extract certain information, use null for optional fields, but NEVER omit required fields.`;
 }
@@ -181,14 +162,12 @@ If you cannot extract certain information, use null for optional fields, but NEV
 export async function processRecipeImageWithGemini(args: {
   imageData: string; // Base64 string or data URL
   mimeType: string;
-  targetLocale?: string;
-  sourceLocale?: string;
 }): Promise<{
   extracted: GeminiExtractedRecipe;
   rawResponse: string;
   ocrText?: string; // If Gemini provides separate OCR text
 }> {
-  const { imageData, mimeType, targetLocale = "nl", sourceLocale } = args;
+  const { imageData, mimeType } = args;
 
   // Validate image size (base64)
   // Handle data URL format for size check
@@ -205,8 +184,8 @@ export async function processRecipeImageWithGemini(args: {
 
   const gemini = getGeminiClient();
 
-  // Build prompt with translation instructions
-  const prompt = buildRecipeExtractionPrompt(targetLocale, sourceLocale);
+  // Build prompt
+  const prompt = buildRecipeExtractionPrompt();
 
   // Convert Zod schema to JSON schema for Gemini
   const jsonSchema = {
@@ -214,7 +193,7 @@ export async function processRecipeImageWithGemini(args: {
     properties: {
       title: { type: "string" },
       language_detected: { type: ["string", "null"] },
-      translated_to: { type: "string" },
+      translated_to: { type: ["string", "null"] },
       servings: { type: ["number", "null"] },
       times: {
         type: "object",
@@ -265,11 +244,11 @@ export async function processRecipeImageWithGemini(args: {
         items: { type: "string" },
       },
     },
-    required: ["title", "translated_to", "ingredients", "instructions", "times"],
+    required: ["title", "ingredients", "instructions", "times"],
   };
 
   try {
-    console.log(`[GeminiRecipeImport] Calling Gemini Vision API with image size: ${imageData.length} bytes, mimeType: ${mimeType}, targetLocale: ${targetLocale}`);
+    console.log(`[GeminiRecipeImport] Calling Gemini Vision API with image size: ${imageData.length} bytes, mimeType: ${mimeType}`);
     const startTime = Date.now();
     
     // Call Gemini Vision API

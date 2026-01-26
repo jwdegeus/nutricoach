@@ -9,9 +9,11 @@ import { Text } from "@/components/catalyst/text";
 import { Badge } from "@/components/catalyst/badge";
 import { Select } from "@/components/catalyst/select";
 import { Link } from "@/components/catalyst/link";
-import { PhotoIcon } from "@heroicons/react/24/solid";
+import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/catalyst/dialog";
+import { PhotoIcon, CameraIcon, ClipboardDocumentIcon } from "@heroicons/react/24/solid";
 import { ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon, SparklesIcon } from "@heroicons/react/24/solid";
 import { ImportStatusPanel } from "./components/ImportStatusPanel";
+import { RecipeEditForm } from "./components/RecipeEditForm";
 import {
   createRecipeImportAction,
   loadRecipeImportAction,
@@ -119,11 +121,18 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
+  // Camera state
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
   // Remote job state (source of truth)
   const [remoteJob, setRemoteJob] = useState<RecipeImportJob | null>(null);
   const [loadingJob, setLoadingJob] = useState(false);
   const [processingJob, setProcessingJob] = useState(false);
   const [finalizingJob, setFinalizingJob] = useState(false);
+  // Translation happens automatically - no state needed
   const [error, setError] = useState<string | null>(null);
   const [selectedMealSlot, setSelectedMealSlot] = useState<"breakfast" | "lunch" | "dinner" | "snack" | "">("");
 
@@ -175,6 +184,8 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
+
+  // Translation happens during extraction, no polling needed
   
   // Debug: Log when processingJob changes
   useEffect(() => {
@@ -459,6 +470,102 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
     [handleFileSelect]
   );
 
+  // Handle camera capture
+  const handleOpenCamera = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }, // Prefer back camera
+      });
+      setCameraStream(stream);
+      setCameraOpen(true);
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+      setError(t("errorCameraAccess"));
+    }
+  }, [t]);
+
+  const handleCloseCamera = useCallback(() => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+    setCameraOpen(false);
+  }, [cameraStream]);
+
+  const handleCapturePhoto = useCallback(() => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) return;
+
+    // Set canvas dimensions to match video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // Draw video frame to canvas
+    ctx.drawImage(video, 0, 0);
+
+    // Convert canvas to blob
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+
+        // Create File from blob
+        const file = new File([blob], `camera-${Date.now()}.jpg`, {
+          type: "image/jpeg",
+          lastModified: Date.now(),
+        });
+
+        // Close camera and process file
+        handleCloseCamera();
+        handleFileSelect(file);
+      },
+      "image/jpeg",
+      0.9
+    );
+  }, [handleCloseCamera, handleFileSelect]);
+
+  // Handle paste from clipboard
+  const handlePaste = useCallback(
+    async (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith("image/")) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) {
+            handleFileSelect(file);
+          }
+          break;
+        }
+      }
+    },
+    [handleFileSelect]
+  );
+
+  // Set up paste event listener
+  useEffect(() => {
+    if (uiState === "idle") {
+      window.addEventListener("paste", handlePaste);
+      return () => {
+        window.removeEventListener("paste", handlePaste);
+      };
+    }
+  }, [uiState, handlePaste]);
+
+  // Set up video stream when camera opens
+  useEffect(() => {
+    if (cameraOpen && cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+    }
+  }, [cameraOpen, cameraStream]);
+
   // Handle start processing with Gemini
   const handleStartProcessing = useCallback(async () => {
     if (!remoteJob || !localSelectedFile || processingJob) return;
@@ -549,6 +656,8 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
     router.push("/recipes/import");
   }, [router]);
 
+  // Translation happens automatically - no manual trigger needed
+
   // Handle finalize recipe import
   const handleFinalize = useCallback(async () => {
     if (!remoteJob || finalizingJob) return;
@@ -604,6 +713,15 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
     };
   }, [previewUrl]);
 
+  // Cleanup camera stream on unmount
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [cameraStream]);
+
   // Show loading state while loading job or processing
   if ((loadingJob && jobId) || (processingJob && !remoteJob)) {
     return (
@@ -621,11 +739,20 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
     );
   }
 
-  // Get extracted recipe data
+  // Get extracted recipe data (translated version if available, otherwise original)
   const extractedRecipe: GeminiExtractedRecipe | null =
     remoteJob?.extractedRecipeJson && typeof remoteJob.extractedRecipeJson === "object"
       ? (remoteJob.extractedRecipeJson as GeminiExtractedRecipe)
       : null;
+  
+  // Get original recipe data (before translation)
+  const originalRecipe: GeminiExtractedRecipe | null =
+    remoteJob?.originalRecipeJson && typeof remoteJob.originalRecipeJson === "object"
+      ? (remoteJob.originalRecipeJson as GeminiExtractedRecipe)
+      : extractedRecipe; // Fallback to extracted if no original stored
+
+  // Get target language for display
+  const targetLang = remoteJob?.targetLocale || "nl";
 
   // Get validation errors
   const validationErrors =
@@ -667,14 +794,62 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
               <div className="rounded-full bg-primary-100 dark:bg-primary-900/30 p-4">
                 <PhotoIcon className="h-8 w-8 text-primary-600 dark:text-primary-400" />
               </div>
-              <div>
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                 <label htmlFor="recipe-upload-input" className="cursor-pointer">
-                  <Button as="span" color="primary" disabled={isPending}>
+                  <Button as="span" color="primary" disabled={isPending} className="w-full sm:w-auto">
+                    <PhotoIcon className="h-4 w-4 mr-2" />
                     {isPending ? t("uploading") : t("selectFile")}
                   </Button>
                 </label>
-                <Text className="mt-2">{t("dragDrop")}</Text>
+                <Button
+                  onClick={handleOpenCamera}
+                  disabled={isPending}
+                  color="primary"
+                  outline
+                  className="w-full sm:w-auto"
+                >
+                  <CameraIcon className="h-4 w-4 mr-2" />
+                  {t("takePhoto")}
+                </Button>
+                <Button
+                  onClick={async () => {
+                    // Try to read from clipboard API (works in some browsers)
+                    try {
+                      if (navigator.clipboard && navigator.clipboard.read) {
+                        const items = await navigator.clipboard.read();
+                        const imageItem = items.find((item) => 
+                          item.types.some((type) => type.startsWith("image/"))
+                        );
+                        if (imageItem) {
+                          const imageType = imageItem.types.find((type) => type.startsWith("image/"));
+                          if (imageType) {
+                            const blob = await imageItem.getType(imageType);
+                            const file = new File([blob], `paste-${Date.now()}.${imageType.split("/")[1]}`, {
+                              type: imageType,
+                              lastModified: Date.now(),
+                            });
+                            handleFileSelect(file);
+                            return;
+                          }
+                        }
+                      }
+                      // If clipboard API doesn't work, show hint
+                      setError(t("pasteHint"));
+                    } catch (err) {
+                      // Clipboard API not available or permission denied - show hint
+                      setError(t("pasteHint"));
+                    }
+                  }}
+                  disabled={isPending}
+                  color="primary"
+                  outline
+                  className="w-full sm:w-auto"
+                >
+                  <ClipboardDocumentIcon className="h-4 w-4 mr-2" />
+                  {t("pasteImage")}
+                </Button>
               </div>
+              <Text className="mt-2">{t("dragDrop")}</Text>
               <Text className="text-sm text-zinc-500 dark:text-zinc-400">
                 {t("fileTypes")}
               </Text>
@@ -919,11 +1094,31 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
                     </div>
                   )}
 
-                  {/* Title */}
-                  <div>
-                    <Subheading level={3}>{t("reviewName")}</Subheading>
-                    <Text className="text-lg font-medium">{extractedRecipe.title}</Text>
-                  </div>
+                  {/* Translation happens automatically - no button needed */}
+
+                  {/* Edit Form - Allows users to edit recipe before finalizing */}
+                  {(() => {
+                    // Debug logging
+                    const sourceImageMeta = remoteJob.sourceImageMeta as any;
+                    console.log("[RecipeImportClient] Rendering RecipeEditForm with sourceImageMeta:", JSON.stringify({
+                      jobId: remoteJob.id,
+                      sourceImageMeta: sourceImageMeta,
+                      savedImageUrl: sourceImageMeta?.savedImageUrl,
+                      savedImagePath: sourceImageMeta?.savedImagePath,
+                      imageUrl: sourceImageMeta?.imageUrl,
+                      allKeys: sourceImageMeta ? Object.keys(sourceImageMeta) : [],
+                    }, null, 2));
+                    return null;
+                  })()}
+                  <RecipeEditForm
+                    jobId={remoteJob.id}
+                    recipe={extractedRecipe}
+                    sourceImageMeta={remoteJob.sourceImageMeta}
+                    onUpdated={async () => {
+                      // Reload job to get updated recipe data
+                      await loadJob(remoteJob.id);
+                    }}
+                  />
 
                   {/* Language Info */}
                   {(extractedRecipe.language_detected || extractedRecipe.translated_to) && (
@@ -938,14 +1133,6 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
                           <>{t("translatedTo")}: {extractedRecipe.translated_to}</>
                         )}
                       </Text>
-                    </div>
-                  )}
-
-                  {/* Servings */}
-                  {extractedRecipe.servings && (
-                    <div>
-                      <Subheading level={3}>{t("reviewServings")}</Subheading>
-                      <Text>{extractedRecipe.servings}</Text>
                     </div>
                   )}
 
@@ -972,52 +1159,6 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
                           </Text>
                         )}
                       </div>
-                    </div>
-                  )}
-
-                  {/* Ingredients */}
-                  {extractedRecipe.ingredients && extractedRecipe.ingredients.length > 0 && (
-                    <div>
-                      <Subheading level={3}>{t("reviewIngredients")}</Subheading>
-                      <ul className="list-disc list-inside space-y-2 mt-2">
-                        {extractedRecipe.ingredients.map((ingredient, idx) => (
-                          <li key={idx} className="text-zinc-700 dark:text-zinc-300">
-                            <span className="font-medium">{ingredient.name}</span>
-                            {(ingredient.quantity !== null || ingredient.unit) && (
-                              <span className="text-zinc-500 dark:text-zinc-400">
-                                {" "}
-                                {ingredient.quantity !== null && ingredient.quantity}
-                                {ingredient.quantity !== null && ingredient.unit && " "}
-                                {ingredient.unit}
-                              </span>
-                            )}
-                            {ingredient.note && (
-                              <span className="text-zinc-500 dark:text-zinc-400 italic">
-                                {" "}({ingredient.note})
-                              </span>
-                            )}
-                            {ingredient.original_line !== ingredient.name && (
-                              <div className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">
-                                {t("original")}: {ingredient.original_line}
-                              </div>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Instructions */}
-                  {extractedRecipe.instructions && extractedRecipe.instructions.length > 0 && (
-                    <div>
-                      <Subheading level={3}>{t("reviewInstructions")}</Subheading>
-                      <ol className="list-decimal list-inside space-y-2 mt-2">
-                        {extractedRecipe.instructions.map((instruction, idx) => (
-                          <li key={idx} className="text-zinc-700 dark:text-zinc-300">
-                            {instruction.text}
-                          </li>
-                        ))}
-                      </ol>
                     </div>
                   )}
 
@@ -1100,6 +1241,36 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
           )}
         </>
       )}
+
+      {/* Camera Dialog */}
+      <Dialog open={cameraOpen} onClose={handleCloseCamera} size="lg">
+        <DialogTitle>{t("cameraTitle")}</DialogTitle>
+        <DialogBody>
+          <div className="space-y-4">
+            <div className="relative bg-zinc-900 rounded-lg overflow-hidden aspect-video">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="w-full h-full object-cover"
+              />
+              <canvas ref={canvasRef} className="hidden" />
+            </div>
+            <Text className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
+              {t("cameraHint")}
+            </Text>
+          </div>
+        </DialogBody>
+        <DialogActions>
+          <Button onClick={handleCloseCamera} outline>
+            {t("cancel")}
+          </Button>
+          <Button onClick={handleCapturePhoto} color="primary">
+            <CameraIcon className="h-4 w-4 mr-2" />
+            {t("capturePhoto")}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }

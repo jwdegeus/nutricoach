@@ -42,6 +42,16 @@ export function RecipeDetailPageClient({ mealId, mealSource }: RecipeDetailPageC
       }
 
       const loadedMeal = mealResult.data;
+      console.log("[MealDetailPageClient] Meal loaded:", {
+        id: loadedMeal.id,
+        name: loadedMeal.name,
+        sourceImageUrl: loadedMeal.sourceImageUrl,
+        source_image_url: loadedMeal.source_image_url,
+        sourceImagePath: loadedMeal.sourceImagePath,
+        source_image_path: loadedMeal.source_image_path,
+        allKeys: Object.keys(loadedMeal),
+        fullMeal: JSON.stringify(loadedMeal, null, 2).substring(0, 500),
+      });
       setMeal(loadedMeal);
 
       // Build NEVO food names map

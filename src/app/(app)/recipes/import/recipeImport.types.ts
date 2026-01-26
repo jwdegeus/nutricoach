@@ -23,6 +23,13 @@ export type SourceImageMeta = {
   mimetype?: string;
   width?: number;
   height?: number;
+  // For URL imports
+  url?: string;
+  domain?: string;
+  source?: string;
+  imageUrl?: string; // Original external image URL
+  savedImageUrl?: string; // Locally saved image URL (preferred for display)
+  savedImagePath?: string; // Locally saved image path
 };
 
 /**
@@ -39,6 +46,7 @@ export type RecipeImportJob = {
   rawOcrText: string | null;
   geminiRawJson: any | null;
   extractedRecipeJson: any | null;
+  originalRecipeJson: any | null; // Original recipe in source language (before translation)
   validationErrorsJson: any | null;
   confidenceOverall: number | null;
   createdAt: string;
@@ -72,3 +80,35 @@ export type UpdateRecipeImportStatusInput = {
   status: RecipeImportStatus;
   errorMessage?: string;
 };
+
+/**
+ * Import recipe from URL input
+ */
+export type ImportRecipeFromUrlInput = {
+  url: string;
+};
+
+/**
+ * Import recipe from URL result (success)
+ */
+export type ImportRecipeFromUrlSuccess = {
+  ok: true;
+  jobId?: string;
+  recipeId?: string;
+};
+
+/**
+ * Import recipe from URL result (error)
+ */
+export type ImportRecipeFromUrlError = {
+  ok: false;
+  errorCode: "INVALID_URL" | "UNAUTHORIZED" | "INTERNAL";
+  message: string;
+};
+
+/**
+ * Import recipe from URL result (discriminated union)
+ */
+export type ImportRecipeFromUrlResult =
+  | ImportRecipeFromUrlSuccess
+  | ImportRecipeFromUrlError;

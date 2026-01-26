@@ -53,3 +53,23 @@ export const updateRecipeImportStatusInputSchema = z.object({
   status: recipeImportStatusSchema,
   errorMessage: z.string().optional(),
 });
+
+/**
+ * Import recipe from URL input schema
+ */
+export const importRecipeFromUrlInputSchema = z.object({
+  url: z
+    .string()
+    .min(1, "URL is verplicht")
+    .max(2048, "URL mag maximaal 2048 tekens lang zijn")
+    .refine(
+      (url) => {
+        const trimmed = url.trim();
+        return trimmed.startsWith("http://") || trimmed.startsWith("https://");
+      },
+      {
+        message: "URL moet beginnen met http:// of https://",
+      }
+    )
+    .transform((url) => url.trim()),
+});

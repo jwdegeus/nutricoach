@@ -36,6 +36,16 @@ export async function finalizeRecipeImport(args: {
     // Parse error message to determine error code
     const errorMessage = error.message || "Unknown error";
     
+    // Log full error details for debugging
+    console.error("[finalizeRecipeImport] RPC error:", {
+      error,
+      errorMessage,
+      errorCode: error.code,
+      errorDetails: error.details,
+      errorHint: error.hint,
+      jobId: args.jobId,
+    });
+    
     // Map Postgres exceptions to error types
     if (errorMessage.includes("AUTH_ERROR")) {
       throw new Error(`AUTH_ERROR: ${errorMessage}`);

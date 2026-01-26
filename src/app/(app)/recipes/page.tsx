@@ -65,7 +65,7 @@ export default async function RecipesPage() {
     const t = await getTranslations('recipes');
 
     return (
-      <div className="p-6">
+      <div className="w-full max-w-none">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight">{t('pageTitle')}</h1>
           <Link href="/recipes/import">

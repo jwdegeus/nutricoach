@@ -5,11 +5,10 @@ import { useRouter } from "next/navigation";
 import {
   getAllDietTypes,
   createDietType,
-  updateDietType,
   deleteDietType,
   type DietTypeOutput,
   type DietTypeInput,
-} from "../actions/diet-admin.actions";
+} from "@/src/app/(app)/settings/actions/diet-admin.actions";
 import { Button } from "@/components/catalyst/button";
 import { Input } from "@/components/catalyst/input";
 import { Field, FieldGroup, Label, Description } from "@/components/catalyst/fieldset";
@@ -17,17 +16,40 @@ import { Text } from "@/components/catalyst/text";
 import { Textarea } from "@/components/catalyst/textarea";
 import { Checkbox, CheckboxField } from "@/components/catalyst/checkbox";
 import { ConfirmDialog } from "@/components/catalyst/confirm-dialog";
+import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } from "@/components/catalyst/dialog";
+import { Badge } from "@/components/catalyst/badge";
+import {
+  Dropdown,
+  DropdownButton,
+  DropdownMenu,
+  DropdownItem,
+  DropdownSection,
+} from "@/components/catalyst/dropdown";
+import {
+  Table,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableBody,
+  TableCell,
+} from "@/components/catalyst/table";
+import {
+  PencilIcon,
+  TrashIcon,
+  PlusIcon,
+  EllipsisVerticalIcon,
+} from "@heroicons/react/20/solid";
 
-export function AdminDietManagement() {
+export function DietTypesAdminClient() {
   const router = useRouter();
   const [dietTypes, setDietTypes] = useState<DietTypeOutput[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [isCreating, setIsCreating] = useState(false);
   const [deleteDietId, setDeleteDietId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   // Form state for creating new diet type
   const [formData, setFormData] = useState<DietTypeInput>({
@@ -62,20 +84,20 @@ export function AdminDietManagement() {
     router.push(`/settings/diets/${dietType.id}/edit`);
   }
 
-  function startCreate() {
+  function handleCreate() {
     setFormData({
       name: "",
       description: "",
       displayOrder: dietTypes.length > 0 ? Math.max(...dietTypes.map(dt => dt.displayOrder)) + 1 : 0,
       isActive: true,
     });
-    setIsCreating(true);
+    setShowCreateDialog(true);
     setError(null);
     setSuccess(null);
   }
 
   function cancelCreate() {
-    setIsCreating(false);
+    setShowCreateDialog(false);
     setFormData({
       name: "",
       description: "",
@@ -143,14 +165,112 @@ export function AdminDietManagement() {
 
   if (isLoading) {
     return (
-      <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        <Text>Dieettypes laden...</Text>
+      <div className="p-6">
+        <Text className="text-zinc-500 dark:text-zinc-400">Dieettypes laden...</Text>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white">
+            Dieettypes Beheer
+          </h1>
+          <p className="mt-2 text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
+            Maak en beheer dieettypes die beschikbaar zijn in de onboarding en account pagina.
+          </p>
+        </div>
+        <Button onClick={handleCreate}>
+          <PlusIcon className="h-4 w-4 mr-1" />
+          Nieuw dieettype
+        </Button>
+      </div>
+
+      {error && (
+        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">
+          <strong>Fout:</strong> {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="rounded-lg bg-green-50 p-4 text-sm text-green-600 dark:bg-green-950/50 dark:text-green-400">
+          <strong>Succes:</strong> {success}
+        </div>
+      )}
+
+      <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+        <div className="overflow-x-auto">
+          <Table striped>
+            <TableHead>
+              <TableRow>
+                <TableHeader>Naam</TableHeader>
+                <TableHeader>Volgorde</TableHeader>
+                <TableHeader>Status</TableHeader>
+                <TableHeader className="text-right"></TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {dietTypes.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-zinc-500 dark:text-zinc-400 py-8">
+                    Geen dieettypes gevonden
+                  </TableCell>
+                </TableRow>
+              ) : (
+                dietTypes.map((dietType) => (
+                  <TableRow key={dietType.id}>
+                    <TableCell>
+                      <Text className="font-medium text-zinc-950 dark:text-white">
+                        {dietType.name}
+                      </Text>
+                    </TableCell>
+                    <TableCell>
+                      <Text className="text-sm text-zinc-500 dark:text-zinc-400">
+                        {dietType.displayOrder}
+                      </Text>
+                    </TableCell>
+                    <TableCell>
+                      {dietType.isActive ? (
+                        <Badge color="green">Actief</Badge>
+                      ) : (
+                        <Badge color="zinc">Inactief</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end">
+                        <Dropdown>
+                          <DropdownButton plain>
+                            <EllipsisVerticalIcon className="h-5 w-5 text-zinc-500" />
+                            <span className="sr-only">Acties</span>
+                          </DropdownButton>
+                          <DropdownMenu anchor="bottom end">
+                            <DropdownSection>
+                              <DropdownItem onClick={() => handleEdit(dietType)}>
+                                <PencilIcon data-slot="icon" />
+                                <span>Bewerken</span>
+                              </DropdownItem>
+                              <DropdownItem
+                                onClick={() => handleDelete(dietType.id)}
+                                className="text-red-600 data-focus:text-white data-focus:bg-red-600 dark:text-red-400"
+                              >
+                                <TrashIcon data-slot="icon" />
+                                <span>Verwijderen</span>
+                              </DropdownItem>
+                            </DropdownSection>
+                          </DropdownMenu>
+                        </Dropdown>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
       <ConfirmDialog
         open={showDeleteDialog}
         onClose={() => {
@@ -165,35 +285,14 @@ export function AdminDietManagement() {
         confirmColor="red"
         isLoading={isPending}
       />
-      <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
-              Dieettypes beheren
-            </h2>
-            <Text className="mt-1">
-              Maak en beheer dieettypes die beschikbaar zijn in de onboarding en account pagina.
-            </Text>
-          </div>
-          {!isCreating && (
-            <Button onClick={startCreate}>Nieuw dieettype</Button>
-          )}
-        </div>
 
-        {error && (
-          <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">
-            <strong>Fout:</strong> {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="mb-4 rounded-lg bg-green-50 p-4 text-sm text-green-600 dark:bg-green-950/50 dark:text-green-400">
-            <strong>Succes:</strong> {success}
-          </div>
-        )}
-
-        {isCreating && (
-          <form onSubmit={handleSubmit} className="mb-6 space-y-4 border-b border-zinc-200 pb-6 dark:border-zinc-800">
+      <Dialog open={showCreateDialog} onClose={cancelCreate}>
+        <DialogTitle>Nieuw dieettype aanmaken</DialogTitle>
+        <DialogDescription>
+          Voeg een nieuw dieettype toe aan het systeem.
+        </DialogDescription>
+        <form onSubmit={handleSubmit}>
+          <DialogBody>
             <FieldGroup>
               <Field>
                 <Label htmlFor="name">Naam *</Label>
@@ -252,71 +351,18 @@ export function AdminDietManagement() {
                   Alleen actieve dieettypes zijn zichtbaar voor gebruikers
                 </Description>
               </CheckboxField>
-
-              <div className="flex gap-2">
-                <Button type="submit" disabled={isPending}>
-                  {isPending ? "Opslaan..." : "Aanmaken"}
-                </Button>
-                <Button type="button" onClick={cancelCreate} color="zinc">
-                  Annuleren
-                </Button>
-              </div>
             </FieldGroup>
-          </form>
-        )}
-
-        <div className="space-y-2">
-          {dietTypes.length === 0 ? (
-            <Text className="text-zinc-500 dark:text-zinc-400">
-              Geen dieettypes gevonden
-            </Text>
-          ) : (
-            dietTypes.map((dietType) => (
-              <div
-                key={dietType.id}
-                className="flex items-center justify-between rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <Text className="font-medium text-zinc-950 dark:text-white">
-                      {dietType.name}
-                    </Text>
-                    {!dietType.isActive && (
-                      <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                        Inactief
-                      </span>
-                    )}
-                  </div>
-                  {dietType.description && (
-                    <Text className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                      {dietType.description}
-                    </Text>
-                  )}
-                  <Text className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-                    Volgorde: {dietType.displayOrder}
-                  </Text>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => handleEdit(dietType)}
-                    color="zinc"
-                    disabled={isCreating}
-                  >
-                    Bewerken
-                  </Button>
-                  <Button
-                    onClick={() => handleDelete(dietType.id)}
-                    color="red"
-                    disabled={isPending}
-                  >
-                    Verwijderen
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+          </DialogBody>
+          <DialogActions>
+            <Button type="button" onClick={cancelCreate} color="zinc">
+              Annuleren
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Opslaan..." : "Aanmaken"}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
     </div>
   );
 }

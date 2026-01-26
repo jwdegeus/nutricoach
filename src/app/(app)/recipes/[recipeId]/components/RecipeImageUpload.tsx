@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/catalyst/button";
 import { ConfirmDialog } from "@/components/catalyst/confirm-dialog";
 import { PhotoIcon, TrashIcon } from "@heroicons/react/20/solid";
@@ -30,6 +30,24 @@ export function RecipeImageUpload({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Update previewUrl when currentImageUrl changes
+  useEffect(() => {
+    console.log("[RecipeImageUpload] currentImageUrl changed:", { 
+      mealId, 
+      currentImageUrl, 
+      currentImageUrlType: typeof currentImageUrl,
+      currentImageUrlString: String(currentImageUrl),
+      previous: previewUrl 
+    });
+    // Ensure we use the string value, not an object
+    const imageUrlString = currentImageUrl && typeof currentImageUrl === 'string' 
+      ? currentImageUrl 
+      : currentImageUrl 
+        ? String(currentImageUrl) 
+        : null;
+    setPreviewUrl(imageUrlString);
+  }, [currentImageUrl, mealId]);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -172,6 +190,20 @@ export function RecipeImageUpload({
               src={previewUrl}
               alt="Recept foto"
               className="rounded-lg max-w-full h-auto max-h-48 object-contain shadow-sm hover:shadow-md transition-shadow"
+              onError={(e) => {
+                console.error("[RecipeImageUpload] Image failed to load:", {
+                  mealId,
+                  imageUrl: previewUrl,
+                  error: e
+                });
+                // Don't hide the image, just log the error
+              }}
+              onLoad={() => {
+                console.log("[RecipeImageUpload] Image loaded successfully:", {
+                  mealId,
+                  imageUrl: previewUrl
+                });
+              }}
             />
           </button>
           <div className="mt-2 flex items-center gap-2">

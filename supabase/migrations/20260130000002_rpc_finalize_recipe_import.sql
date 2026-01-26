@@ -40,6 +40,8 @@ DECLARE
   v_instructions JSONB;
   v_ingredients JSONB;
   v_meal_data JSONB;
+  v_source_domain TEXT;
+  v_source_image_url TEXT;
 BEGIN
   -- Get current user ID
   v_user_id := auth.uid();
@@ -55,7 +57,8 @@ BEGIN
     status,
     extracted_recipe_json,
     source_locale,
-    target_locale
+    target_locale,
+    source_image_meta
   INTO v_job
   FROM public.recipe_imports
   WHERE id = p_job_id
@@ -179,6 +182,16 @@ BEGIN
     'servings', v_servings
   );
 
+  -- Extract domain and image URL from source_image_meta if available (for URL imports)
+  IF v_job.source_image_meta IS NOT NULL THEN
+    IF v_job.source_image_meta ? 'domain' THEN
+      v_source_domain := v_job.source_image_meta->>'domain';
+    END IF;
+    IF v_job.source_image_meta ? 'imageUrl' THEN
+      v_source_image_url := v_job.source_image_meta->>'imageUrl';
+    END IF;
+  END IF;
+
   -- Step 1: Insert into custom_meals
   INSERT INTO public.custom_meals (
     user_id,
@@ -188,6 +201,7 @@ BEGIN
     source_type,
     source_image_url,
     source_image_path,
+    source,
     ai_analysis,
     original_language,
     translated_content,
@@ -200,8 +214,9 @@ BEGIN
     p_meal_slot,
     NULL, -- No diet type assigned yet
     'gemini', -- From recipe import
-    NULL, -- Will be populated from recipe_imports if needed
+    v_source_image_url, -- Image URL from recipe (if available)
     NULL,
+    v_source_domain, -- Domain name (e.g., "ah.nl") from URL import
     v_extracted_recipe, -- Store full extracted recipe
     v_job.source_locale,
     NULL, -- Already translated

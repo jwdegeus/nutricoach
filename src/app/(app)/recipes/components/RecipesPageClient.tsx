@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { RecipesList } from "./RecipesList";
 import type { CustomMealRecord } from "@/src/lib/custom-meals/customMeals.service";
 
@@ -11,8 +11,11 @@ type RecipesPageClientProps = {
   };
 };
 
+const ITEMS_PER_PAGE = 15;
+
 export function RecipesPageClient({ initialMeals }: RecipesPageClientProps) {
   const [meals, setMeals] = useState(initialMeals);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Handle consumption logged - update local state optimistically
   const handleConsumptionLogged = useCallback((mealId: string, source: "custom" | "gemini") => {
@@ -128,14 +131,41 @@ export function RecipesPageClient({ initialMeals }: RecipesPageClientProps) {
     });
   }, []);
 
-  const allMeals = [
+  const allMeals = useMemo(() => [
     ...meals.customMeals.map((m) => ({ ...m, source: "custom" as const })),
     ...meals.mealHistory.map((m) => ({ ...m, source: "gemini" as const })),
-  ];
+  ], [meals]);
+
+  // Calculate pagination
+  const totalItems = allMeals.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+  
+  // Reset to last valid page if current page is out of bounds (e.g., after deleting items)
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages]); // Only depend on totalPages to avoid loops
+  
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedMeals = allMeals.slice(startIndex, endIndex);
+
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+    // Scroll to top of table
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   return (
     <RecipesList 
-      meals={allMeals}
+      meals={paginatedMeals}
+      totalItems={totalItems}
+      currentPage={safeCurrentPage}
+      totalPages={totalPages}
+      itemsPerPage={ITEMS_PER_PAGE}
+      onPageChange={handlePageChange}
       onConsumptionLogged={handleConsumptionLogged}
       onDietTypeUpdated={handleDietTypeUpdated}
       onMealDeleted={handleMealDeleted}

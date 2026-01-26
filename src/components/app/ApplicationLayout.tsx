@@ -42,10 +42,12 @@ import {
   MagnifyingGlassIcon,
   InboxIcon,
   PhotoIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/20/solid'
 import { ThemeSwitcher } from './theme-switcher'
 import { PlanEditStatusIndicator } from './PlanEditStatusIndicator'
 import { useTranslations } from 'next-intl'
+import { RecipeImportModal } from '@/src/components/recipes/RecipeImportModal'
 
 function AccountDropdownMenu({
   anchor,
@@ -71,7 +73,7 @@ function AccountDropdownMenu({
       {isAdmin && (
         <>
           <DropdownDivider />
-          <DropdownItem href="/admin/recipe-sources">
+          <DropdownItem href="/admin">
             <AdjustmentsHorizontalIcon />
             <DropdownLabel>Admin</DropdownLabel>
           </DropdownItem>
@@ -106,6 +108,7 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
   const [email, setEmail] = useState('')
   const [mounted, setMounted] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -194,6 +197,12 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
           <NavbarSection>
             <NavbarItem href="/recipes/import" aria-label={tCommon('addRecipe')}>
               <PhotoIcon />
+            </NavbarItem>
+            <NavbarItem
+              onClick={() => setIsImportModalOpen(true)}
+              aria-label="Recept importeren via URL"
+            >
+              <ArrowDownTrayIcon />
             </NavbarItem>
             <NavbarItem href="/search" aria-label={t('search')}>
               <MagnifyingGlassIcon />
@@ -314,6 +323,10 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
       }
     >
       {children}
+      <RecipeImportModal
+        open={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+      />
     </SidebarLayout>
   )
 }

@@ -215,14 +215,7 @@ export async function processRecipeImportWithGeminiAction(
       return processingResult;
     }
 
-    // Step 2: Get user's language preference for translation target
-    const profileService = new ProfileService();
-    const userLanguage = await profileService.getUserLanguage(user.id);
-    const targetLocale = input.targetLocale || userLanguage;
-
-    console.log(`[RecipeImport] Starting Gemini processing for job ${input.jobId}, targetLocale: ${targetLocale}`);
-
-    // Step 3: Process with Gemini (OCR + Translation + Extraction)
+    // Step 2: Process with Gemini (OCR + Extraction)
     let geminiResult: {
       extracted: any;
       rawResponse: string;
@@ -246,8 +239,6 @@ export async function processRecipeImportWithGeminiAction(
         processRecipeImageWithGemini({
           imageData,
           mimeType,
-          targetLocale, // Use user's preferred language
-          sourceLocale: input.sourceLocale, // Will be detected by Gemini if not provided
         }),
         timeoutPromise,
       ]);
@@ -346,15 +337,25 @@ export async function processRecipeImportWithGeminiAction(
         throw new Error(`Database update failed: ${updateError.message}`);
       }
 
-      // Step 4: Update target_locale in database
-      await supabase
-        .from("recipe_imports")
-        .update({
-          target_locale: targetLocale,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", input.jobId)
-        .eq("user_id", user.id);
+      // Step 4: Automatically translate recipe if needed
+      console.log("[processRecipeImportWithGeminiAction] Step 4: Auto-translating recipe...");
+      try {
+        const { translateRecipeImportAction } = await import("./recipeImport.translate.actions");
+        const translateResult = await translateRecipeImportAction({
+          jobId: input.jobId,
+          // targetLocale will be determined from user preferences in the action
+        });
+
+        if (translateResult.ok) {
+          console.log("[processRecipeImportWithGeminiAction] Translation completed successfully");
+        } else {
+          // Log but don't fail - recipe is already extracted
+          console.error("[processRecipeImportWithGeminiAction] Translation failed (non-fatal):", translateResult.error);
+        }
+      } catch (translateError) {
+        // Log but don't fail - recipe is already extracted
+        console.error("[processRecipeImportWithGeminiAction] Translation error (non-fatal):", translateError);
+      }
 
       // Step 5: Transition to 'ready_for_review'
       const reviewResult = await updateRecipeImportStatusAction({

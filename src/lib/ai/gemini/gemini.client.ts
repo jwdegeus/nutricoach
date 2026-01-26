@@ -58,8 +58,8 @@ class GeminiClient {
         // Use GEMINI_MODEL_HIGH_ACCURACY if set, otherwise fallback to GEMINI_MODEL, otherwise default
         return process.env.GEMINI_MODEL_HIGH_ACCURACY ?? this.model;
       case "translate":
-        // Use default model for translation (fast and cheap)
-        return this.model;
+        // Use GEMINI_MODEL_TRANSLATE if set, otherwise fallback to GEMINI_MODEL, otherwise default
+        return process.env.GEMINI_MODEL_TRANSLATE ?? this.model;
       case "vision":
         // Use vision-capable model (gemini-2.0-flash-exp supports vision)
         return process.env.GEMINI_MODEL_VISION ?? this.model;

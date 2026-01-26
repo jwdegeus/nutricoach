@@ -3,11 +3,14 @@
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/catalyst/badge";
 import { Text } from "@/components/catalyst/text";
-import { ClockIcon, UserGroupIcon, StarIcon } from "@heroicons/react/20/solid";
+import { Button } from "@/components/catalyst/button";
+import { StarIcon, SparklesIcon } from "@heroicons/react/20/solid";
 import { RecipeNotesEditor } from "./RecipeNotesEditor";
 import { ImageLightbox } from "./ImageLightbox";
 import { RecipeImageUpload } from "./RecipeImageUpload";
 import { RecipeSourceEditor } from "./RecipeSourceEditor";
+import { RecipeAIMagician } from "./RecipeAIMagician";
+import { RecipePrepTimeAndServingsEditor } from "./RecipePrepTimeAndServingsEditor";
 import { updateRecipeNotesAction } from "../../actions/meals.actions";
 import type { CustomMealRecord } from "@/src/lib/custom-meals/customMeals.service";
 
@@ -19,6 +22,7 @@ type MealDetailProps = {
 
 export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetailProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [aiMagicianOpen, setAiMagicianOpen] = useState(false);
   
   // Get initial image URL from meal data
   const initialImageUrl = meal.sourceImageUrl || meal.source_image_url || null;
@@ -30,8 +34,18 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
   // Update image URL when meal data changes
   useEffect(() => {
     const newImageUrl = meal.sourceImageUrl || meal.source_image_url || null;
-    setImageUrl(newImageUrl);
-  }, [meal.sourceImageUrl, meal.source_image_url]);
+    if (newImageUrl !== imageUrl) {
+      console.log("[MealDetail] Image URL changed:", { 
+        old: imageUrl, 
+        new: newImageUrl, 
+        mealId: meal.id,
+        sourceImageUrl: meal.sourceImageUrl,
+        source_image_url: meal.source_image_url,
+        mealKeys: Object.keys(meal),
+      });
+      setImageUrl(newImageUrl);
+    }
+  }, [meal.sourceImageUrl, meal.source_image_url, imageUrl, meal.id]);
 
   // Update recipe source when meal data changes
   useEffect(() => {
@@ -127,6 +141,14 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
                 }}
               />
             </div>
+
+            {/* AI Magician Button */}
+            <div className="mt-4">
+              <Button onClick={() => setAiMagicianOpen(true)}>
+                <SparklesIcon data-slot="icon" />
+                AI Magician
+              </Button>
+            </div>
           </div>
           
           {/* Source Image Upload/Display - Right aligned */}
@@ -158,26 +180,22 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
           />
         )}
 
+        {/* Prep Time and Servings Editor */}
+        <div className="mt-4">
+          <RecipePrepTimeAndServingsEditor
+            currentPrepTime={mealData?.prepTime}
+            currentServings={mealData?.servings}
+            mealId={meal.id}
+            source={mealSource}
+            onUpdated={() => {
+              // Refresh the page to show updated data
+              window.location.reload();
+            }}
+          />
+        </div>
+
         {/* Basic Info */}
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          {mealData?.prepTime && (
-            <div className="flex items-center gap-2">
-              <ClockIcon className="h-4 w-4 text-zinc-500" />
-              <span className="text-zinc-600 dark:text-zinc-400">
-                Bereidingstijd: <span className="font-medium">{mealData.prepTime} minuten</span>
-              </span>
-            </div>
-          )}
-
-          {mealData?.servings && (
-            <div className="flex items-center gap-2">
-              <UserGroupIcon className="h-4 w-4 text-zinc-500" />
-              <span className="text-zinc-600 dark:text-zinc-400">
-                Porties: <span className="font-medium">{mealData.servings}</span>
-              </span>
-            </div>
-          )}
-
           {consumptionCount > 0 && (
             <div className="flex items-center gap-2">
               <span className="text-zinc-600 dark:text-zinc-400">
@@ -382,6 +400,14 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
           </div>
         </div>
       )}
+
+      {/* AI Magician Dialog */}
+      <RecipeAIMagician
+        open={aiMagicianOpen}
+        onClose={() => setAiMagicianOpen(false)}
+        recipeId={meal.id}
+        recipeName={mealName}
+      />
     </div>
   );
 }

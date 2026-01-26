@@ -78,6 +78,18 @@ export async function finalizeRecipeImportAction(
       };
     }
 
+    // Load job to check source_image_meta before finalizing
+    const { data: jobData, error: jobLoadError } = await supabase
+      .from("recipe_imports")
+      .select("source_image_meta")
+      .eq("id", input.jobId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (jobData) {
+      console.log("[finalizeRecipeImportAction] Job source_image_meta before finalize:", JSON.stringify(jobData.source_image_meta, null, 2));
+    }
+
     // Finalize recipe import (RPC handles all validation, ownership checks, and writes atomically)
     try {
       const result = await finalizeRecipeImport({
@@ -86,6 +98,26 @@ export async function finalizeRecipeImportAction(
         mealSlot: input.mealSlot || "dinner",
       });
 
+      // Verify the recipe was created with image URL
+      if (result.recipeId) {
+        const { data: createdMeal, error: mealLoadError } = await supabase
+          .from("custom_meals")
+          .select("source_image_url, source_image_path")
+          .eq("id", result.recipeId)
+          .eq("user_id", user.id)
+          .single();
+
+        if (createdMeal) {
+          console.log("[finalizeRecipeImportAction] Created meal image data:", {
+            recipeId: result.recipeId,
+            source_image_url: createdMeal.source_image_url,
+            source_image_path: createdMeal.source_image_path,
+          });
+        } else if (mealLoadError) {
+          console.error("[finalizeRecipeImportAction] Error loading created meal:", mealLoadError);
+        }
+      }
+
       return {
         ok: true,
         data: result,
@@ -93,6 +125,13 @@ export async function finalizeRecipeImportAction(
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
+
+      // Log full error for debugging
+      console.error("[finalizeRecipeImportAction] Error details:", {
+        errorMessage,
+        error,
+        jobId: input.jobId,
+      });
 
       // Parse error code from error message (set by RPC function)
       let code: "AUTH_ERROR" | "VALIDATION_ERROR" | "DB_ERROR" | "NOT_FOUND" | "FORBIDDEN" = "DB_ERROR";

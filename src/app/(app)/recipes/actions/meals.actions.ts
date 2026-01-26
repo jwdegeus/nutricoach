@@ -548,6 +548,246 @@ export async function updateRecipeNotesAction(args: {
 }
 
 /**
+ * Update recipe preparation time and servings
+ * When servings change, recalculates ingredient quantities and updates instructions
+ */
+export async function updateRecipePrepTimeAndServingsAction(args: {
+  mealId: string;
+  source: "custom" | "gemini";
+  prepTime?: number | null;
+  servings?: number | null;
+}): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: {
+          code: "AUTH_ERROR",
+          message: "Je moet ingelogd zijn om receptgegevens bij te werken",
+        },
+      };
+    }
+
+    // Validate servings if provided
+    if (args.servings !== undefined && args.servings !== null && args.servings < 1) {
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Portiegrootte moet minimaal 1 zijn",
+        },
+      };
+    }
+
+    // Validate prepTime if provided
+    if (args.prepTime !== undefined && args.prepTime !== null && args.prepTime < 0) {
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Bereidingstijd kan niet negatief zijn",
+        },
+      };
+    }
+
+    // Get current meal data
+    let currentMealData: any;
+    let currentAiAnalysis: any;
+    const tableName = args.source === "custom" ? "custom_meals" : "meal_history";
+
+    const { data: currentMeal, error: fetchError } = await supabase
+      .from(tableName)
+      .select("meal_data, ai_analysis")
+      .eq("id", args.mealId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (fetchError) {
+      return {
+        ok: false,
+        error: {
+          code: "DB_ERROR",
+          message: fetchError.message,
+        },
+      };
+    }
+
+    if (!currentMeal) {
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Recept niet gevonden",
+        },
+      };
+    }
+
+    currentMealData = currentMeal.meal_data || {};
+    currentAiAnalysis = currentMeal.ai_analysis || {};
+
+    // Calculate ratio if servings changed
+    const oldServings = currentMealData.servings || null;
+    const newServings = args.servings !== undefined ? args.servings : oldServings;
+    const servingsChanged = oldServings !== null && newServings !== null && oldServings !== newServings;
+    const ratio = servingsChanged && oldServings > 0 ? newServings / oldServings : 1;
+
+    // Update meal_data
+    const updatedMealData = { ...currentMealData };
+
+    if (args.prepTime !== undefined) {
+      updatedMealData.prepTime = args.prepTime;
+    }
+
+    if (args.servings !== undefined) {
+      updatedMealData.servings = args.servings;
+    }
+
+    // Recalculate ingredient quantities if servings changed
+    if (servingsChanged && updatedMealData.ingredientRefs && Array.isArray(updatedMealData.ingredientRefs)) {
+      updatedMealData.ingredientRefs = updatedMealData.ingredientRefs.map((ref: any) => ({
+        ...ref,
+        quantityG: Math.round(ref.quantityG * ratio),
+      }));
+    }
+
+    // Also recalculate legacy ingredients format
+    if (servingsChanged && updatedMealData.ingredients && Array.isArray(updatedMealData.ingredients)) {
+      updatedMealData.ingredients = updatedMealData.ingredients.map((ing: any) => {
+        const updated = { ...ing };
+        if (ing.quantity !== null && ing.quantity !== undefined) {
+          updated.quantity = Math.round(ing.quantity * ratio * 10) / 10; // Round to 1 decimal
+        }
+        return updated;
+      });
+    }
+
+    // Update instructions to reflect new portion size
+    let updatedAiAnalysis = { ...currentAiAnalysis };
+    if (servingsChanged && currentAiAnalysis.instructions) {
+      const instructions = currentAiAnalysis.instructions;
+      
+      if (Array.isArray(instructions)) {
+        // Update each instruction step
+        updatedAiAnalysis.instructions = instructions.map((instruction: any) => {
+          const instructionText = typeof instruction === 'string' 
+            ? instruction 
+            : (instruction?.text || instruction?.step || String(instruction));
+          
+          // Replace common portion references in instructions
+          let updatedText = instructionText;
+          
+          // Replace "voor X personen" or "voor X personen" patterns
+          updatedText = updatedText.replace(
+            /voor\s+(\d+)\s+personen?/gi,
+            `voor ${newServings} personen`
+          );
+          
+          // Replace "X personen" patterns
+          updatedText = updatedText.replace(
+            /(\d+)\s+personen?/g,
+            (match, num) => {
+              const oldNum = parseInt(num);
+              if (oldNum === oldServings) {
+                return `${newServings} personen`;
+              }
+              return match;
+            }
+          );
+          
+          // Replace numeric quantities that might be portion-related
+          // This is a simple heuristic - we look for numbers followed by common units
+          updatedText = updatedText.replace(
+            /(\d+(?:[.,]\d+)?)\s*(?:x|×)\s*(\d+)/g,
+            (match, qty, multiplier) => {
+              const quantity = parseFloat(qty.replace(',', '.'));
+              const mult = parseInt(multiplier);
+              if (mult === oldServings) {
+                const newQty = Math.round(quantity * ratio * 10) / 10;
+                return `${newQty} x ${newServings}`;
+              }
+              return match;
+            }
+          );
+          
+          if (typeof instruction === 'string') {
+            return updatedText;
+          } else {
+            return {
+              ...instruction,
+              text: updatedText,
+              step: updatedText,
+            };
+          }
+        });
+      } else if (typeof instructions === 'string') {
+        // Single string instruction
+        let updatedText = instructions;
+        updatedText = updatedText.replace(
+          /voor\s+(\d+)\s+personen?/gi,
+          `voor ${newServings} personen`
+        );
+        updatedText = updatedText.replace(
+          /(\d+)\s+personen?/g,
+          (match, num) => {
+            const oldNum = parseInt(num);
+            if (oldNum === oldServings) {
+              return `${newServings} personen`;
+            }
+            return match;
+          }
+        );
+        updatedAiAnalysis.instructions = updatedText;
+      }
+    }
+
+    // Update database
+    const updateData: any = {
+      meal_data: updatedMealData,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Only update ai_analysis if it was modified
+    if (servingsChanged) {
+      updateData.ai_analysis = updatedAiAnalysis;
+    }
+
+    const { error: updateError } = await supabase
+      .from(tableName)
+      .update(updateData)
+      .eq("id", args.mealId)
+      .eq("user_id", user.id);
+
+    if (updateError) {
+      return {
+        ok: false,
+        error: {
+          code: "DB_ERROR",
+          message: updateError.message,
+        },
+      };
+    }
+
+    return {
+      ok: true,
+      data: undefined,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: "DB_ERROR",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+    };
+  }
+}
+
+/**
  * Get a single meal by ID (custom meal or meal history)
  */
 export async function getMealByIdAction(
@@ -606,13 +846,23 @@ export async function getMealByIdAction(
       // Get notes
       const notes = meal.notes || null;
 
+      const mealData = {
+        ...meal,
+        userRating: ratingData?.user_rating || null,
+        notes,
+      };
+      
+      // Debug logging for image URL
+      console.log("[getMealByIdAction] Custom meal loaded:", {
+        id: meal.id,
+        name: meal.name,
+        sourceImageUrl: meal.sourceImageUrl,
+        sourceImagePath: meal.sourceImagePath,
+      });
+      
       return {
         ok: true,
-        data: {
-          ...meal,
-          userRating: ratingData?.user_rating || null,
-          notes,
-        },
+        data: mealData,
       };
     } else {
       // Get from meal_history

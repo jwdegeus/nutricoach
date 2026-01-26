@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/catalyst/button";
 import { Link } from "@/components/catalyst/link";
-import { TagIcon } from "@heroicons/react/20/solid";
+import { TagIcon, Squares2X2Icon } from "@heroicons/react/20/solid";
 
 export function AdminLinks() {
   return (
@@ -20,6 +20,12 @@ export function AdminLinks() {
           <Button outline className="w-full justify-start">
             <TagIcon className="h-4 w-4 mr-2" />
             Recept Bronnen Beheer
+          </Button>
+        </Link>
+        <Link href="/admin/diet-types">
+          <Button outline className="w-full justify-start">
+            <Squares2X2Icon className="h-4 w-4 mr-2" />
+            Dieettypes Beheer
           </Button>
         </Link>
       </div>

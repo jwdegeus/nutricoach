@@ -48,7 +48,7 @@ export const geminiConfidenceSchema = z.object({
 export const geminiExtractedRecipeSchema = z.object({
   title: z.string().min(1).describe("Recipe title/name"),
   language_detected: z.string().nullable().describe("Detected source language code (e.g., 'en', 'nl', 'de')"),
-  translated_to: z.string().describe("Target language code for translation (e.g., 'nl')"),
+  translated_to: z.string().nullable().describe("Target language code for translation (null if not translated yet)"),
   servings: z.number().int().min(1).nullable().describe("Number of servings"),
   times: geminiTimesSchema.describe("Time information"),
   ingredients: z.array(geminiIngredientSchema).min(1).describe("List of ingredients (at least one required)"),

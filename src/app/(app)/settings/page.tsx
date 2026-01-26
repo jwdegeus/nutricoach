@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
 import { isAdmin } from "@/src/lib/auth/roles";
 import { SettingsForm } from "./settings-form";
-import { AdminDietManagement } from "./components/AdminDietManagement";
 import { AdminLinks } from "./components/AdminLinks";
 
 export const metadata: Metadata = {
@@ -36,12 +35,7 @@ export default async function SettingsPage() {
 
       <SettingsForm user={user} />
 
-      {admin && (
-        <>
-          <AdminLinks />
-          <AdminDietManagement />
-        </>
-      )}
+      {admin && <AdminLinks />}
     </div>
   );
 }
