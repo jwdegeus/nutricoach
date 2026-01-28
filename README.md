@@ -83,6 +83,32 @@ See [docs/remote-database-setup.md](./docs/remote-database-setup.md) for detaile
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Alleen main-branch
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Vercel bouwt alleen op de **main**-branch (`ignoreCommand` in `vercel.json`). Andere branches triggeren geen build.
+
+### Deployment checks
+
+Elke Vercel-build op main draait **deployment checks** vóór het bouwen:
+
+1. **Prettier** – formatting
+2. **ESLint** – lint (max-warnings 9999)
+3. **TypeScript** – `tsc --noEmit`
+4. **Next.js build** – only if all checks pass
+
+- **Build command:** `npm run deploy-check` (see `vercel.json`)
+- **Install command:** `npm ci` (reproducible install)
+
+If Prettier, ESLint or TypeScript fails, the deploy fails. Fix locally with:
+
+```bash
+npm run check-all
+```
+
+### CI (GitHub Actions)
+
+On every push/PR to `main`, the same checks run in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). That way you see failures in GitHub before a deploy.
+
+### Environment variables
+
+Configure in Vercel: **Project → Settings → Environment Variables**. Use the same variables as in `ENV.example` (Supabase URL/anon key, etc.) for Production and Preview as needed.

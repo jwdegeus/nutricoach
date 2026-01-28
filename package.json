@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "deploy-check": "npm run check-all && npm run build",
     "start": "next start",
     "lint": "eslint",
     "check-all": "prettier --check . && eslint . --max-warnings 9999 && tsc --noEmit",

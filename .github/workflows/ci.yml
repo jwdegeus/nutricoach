@@ -1,0 +1,33 @@
+# CI: run pre-deploy checks on every push and PR.
+# Vercel runs deploy-check (check-all + build) on deploy; this gives fast feedback in GitHub.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prettier
+        run: npx prettier --check .
+
+      - name: ESLint
+        run: npx eslint . --max-warnings 9999
+
+      - name: TypeScript
+        run: npx tsc --noEmit
