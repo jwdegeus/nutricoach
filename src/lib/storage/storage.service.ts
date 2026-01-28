@@ -1,19 +1,21 @@
 /**
  * Storage Service
  *
- * Handles file storage with support for local filesystem (now) and future CDN/S3 support.
+ * Handles file storage with support for Vercel Blob (primary) and local filesystem (fallback).
  *
  * Storage Strategy:
+ * - Blob (default when BLOB_READ_WRITE_TOKEN is set): Vercel Blob storage, public URLs
  * - Local: Files stored in public/uploads/recipe-images/
  * - Future: Can be extended to support CDN (Cloudflare, etc.) or S3
  */
 
 import 'server-only';
-import { writeFile, mkdir, access } from 'fs/promises';
+import { put } from '@vercel/blob';
+import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
-export type StorageProvider = 'local' | 'cdn' | 's3';
+export type StorageProvider = 'blob' | 'local' | 'cdn' | 's3';
 
 export interface StorageConfig {
   provider: StorageProvider;
@@ -26,18 +28,75 @@ export interface UploadResult {
   path: string;
 }
 
+/** Check if a path or URL is a Vercel Blob URL (for delete/display logic). */
+export function isVercelBlobUrl(pathOrUrl: string | null | undefined): boolean {
+  if (!pathOrUrl) return false;
+  return (
+    pathOrUrl.startsWith('https://') &&
+    pathOrUrl.includes('blob.vercel-storage.com')
+  );
+}
+
 export class StorageService {
   private config: StorageConfig;
 
   constructor(config?: Partial<StorageConfig>) {
     this.config = {
-      provider: (process.env.STORAGE_PROVIDER as StorageProvider) || 'local',
+      provider: this.resolveProvider(),
       baseUrl: process.env.STORAGE_BASE_URL || undefined,
       localPath:
         process.env.STORAGE_LOCAL_PATH ||
         join(process.cwd(), 'public', 'uploads', 'recipe-images'),
       ...config,
     };
+  }
+
+  /** Resolve provider from env at runtime so BLOB_READ_WRITE_TOKEN is always respected. */
+  private resolveProvider(): StorageProvider {
+    const isVercel = process.env.VERCEL === '1';
+    const explicit = process.env.STORAGE_PROVIDER?.trim() as
+      | StorageProvider
+      | undefined;
+
+    // On Vercel, filesystem is read-only – never use local storage
+    if (isVercel) {
+      if (explicit === 'local') {
+        throw new Error(
+          'Local storage is not supported on Vercel. Use Blob storage and set BLOB_READ_WRITE_TOKEN in Project Settings → Environment Variables.',
+        );
+      }
+      const hasBlobToken =
+        typeof process.env.BLOB_READ_WRITE_TOKEN === 'string' &&
+        process.env.BLOB_READ_WRITE_TOKEN.length > 0;
+      if (!hasBlobToken) {
+        throw new Error(
+          'BLOB_READ_WRITE_TOKEN is required on Vercel for image uploads. Add it in Project Settings → Environment Variables (from your Blob store).',
+        );
+      }
+      return 'blob';
+    }
+
+    if (explicit === 'blob' || explicit === 'local') return explicit;
+    const hasBlobToken =
+      typeof process.env.BLOB_READ_WRITE_TOKEN === 'string' &&
+      process.env.BLOB_READ_WRITE_TOKEN.length > 0;
+    return hasBlobToken ? 'blob' : 'local';
+  }
+
+  private get provider(): StorageProvider {
+    return this.resolveProvider();
+  }
+
+  /**
+   * Upload an image file to Vercel Blob (use when BLOB_READ_WRITE_TOKEN is set).
+   * Bypasses provider selection so uploads always go to Blob when called.
+   */
+  async uploadImageToBlob(
+    file: Buffer | string,
+    filename: string,
+    userId: string,
+  ): Promise<UploadResult> {
+    return this.uploadBlob(file, filename, userId);
   }
 
   /**
@@ -53,7 +112,9 @@ export class StorageService {
     filename: string,
     userId: string,
   ): Promise<UploadResult> {
-    switch (this.config.provider) {
+    switch (this.provider) {
+      case 'blob':
+        return this.uploadBlob(file, filename, userId);
       case 'local':
         return this.uploadLocal(file, filename, userId);
       case 'cdn':
@@ -61,9 +122,7 @@ export class StorageService {
       case 's3':
         return this.uploadS3(file, filename, userId);
       default:
-        throw new Error(
-          `Unsupported storage provider: ${this.config.provider}`,
-        );
+        throw new Error(`Unsupported storage provider: ${this.provider}`);
     }
   }
 
@@ -74,7 +133,10 @@ export class StorageService {
    * @returns Public URL
    */
   getPublicUrl(path: string): string {
-    switch (this.config.provider) {
+    switch (this.provider) {
+      case 'blob':
+        // Path is already the full Blob URL
+        return path;
       case 'local':
         // For local storage, return relative path from public directory
         // Remove process.cwd() and ensure it starts with /
@@ -91,10 +153,34 @@ export class StorageService {
       case 's3':
         return this.config.baseUrl ? `${this.config.baseUrl}/${path}` : path;
       default:
-        throw new Error(
-          `Unsupported storage provider: ${this.config.provider}`,
-        );
+        throw new Error(`Unsupported storage provider: ${this.provider}`);
     }
+  }
+
+  /**
+   * Upload to Vercel Blob storage (public access).
+   */
+  private async uploadBlob(
+    file: Buffer | string,
+    filename: string,
+    userId: string,
+  ): Promise<UploadResult> {
+    const sanitizedFilename = this.sanitizeFilename(filename);
+    const timestamp = Date.now();
+    const pathname = `recipe-images/${userId}/${timestamp}-${sanitizedFilename}`;
+    const fileBuffer =
+      typeof file === 'string' ? Buffer.from(file, 'base64') : file;
+
+    const blob = await put(pathname, fileBuffer, {
+      access: 'public',
+      addRandomSuffix: true,
+    });
+
+    // Store the public URL in both url and path so DB and delete route work
+    return {
+      url: blob.url,
+      path: blob.url,
+    };
   }
 
   /**

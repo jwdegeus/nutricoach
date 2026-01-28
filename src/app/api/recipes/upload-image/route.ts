@@ -56,12 +56,21 @@ export async function POST(request: NextRequest) {
     const mimeType = base64Match[1];
     const base64Data = base64Match[2];
 
-    // Upload to storage
-    const uploadResult = await storageService.uploadImage(
-      base64Data,
-      filename || 'recipe-image.jpg',
-      user.id,
-    );
+    // Use Blob when token is set (ensures uploads go to Vercel Blob in production/local)
+    const useBlob =
+      typeof process.env.BLOB_READ_WRITE_TOKEN === 'string' &&
+      process.env.BLOB_READ_WRITE_TOKEN.length > 0;
+    const uploadResult = useBlob
+      ? await storageService.uploadImageToBlob(
+          base64Data,
+          filename || 'recipe-image.jpg',
+          user.id,
+        )
+      : await storageService.uploadImage(
+          base64Data,
+          filename || 'recipe-image.jpg',
+          user.id,
+        );
 
     // Update meal record
     if (source === 'custom') {

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/src/lib/supabase/server';
+import { del } from '@vercel/blob';
 import { unlink } from 'fs/promises';
-import { join } from 'path';
 import { existsSync } from 'fs';
+import { isVercelBlobUrl } from '@/src/lib/storage/storage.service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,13 +76,22 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Delete file from filesystem if it exists
-      if (meal.source_image_path && existsSync(meal.source_image_path)) {
-        try {
-          await unlink(meal.source_image_path);
-        } catch (unlinkError) {
-          // Log error but don't fail the request if file doesn't exist
-          console.warn('Failed to delete file:', unlinkError);
+      // Delete file: Vercel Blob (by URL) or local filesystem
+      const pathOrUrl = meal.source_image_path ?? meal.source_image_url;
+      if (pathOrUrl) {
+        if (isVercelBlobUrl(pathOrUrl)) {
+          try {
+            await del(pathOrUrl);
+          } catch (blobError) {
+            // Log error but don't fail the request if blob already deleted
+            console.warn('Failed to delete blob:', blobError);
+          }
+        } else if (existsSync(pathOrUrl)) {
+          try {
+            await unlink(pathOrUrl);
+          } catch (unlinkError) {
+            console.warn('Failed to delete file:', unlinkError);
+          }
         }
       }
 

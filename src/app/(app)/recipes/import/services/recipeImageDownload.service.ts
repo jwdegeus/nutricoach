@@ -90,12 +90,13 @@ export async function downloadAndSaveRecipeImage(
       ? sanitizedFilename
       : `${sanitizedFilename}.${extension}`;
 
-    // Upload to storage (storage service accepts Buffer directly)
-    const uploadResult = await storageService.uploadImage(
-      buffer, // Pass Buffer directly, storage service handles it
-      filename,
-      userId,
-    );
+    // Use Blob when token is set (same as upload-image API route)
+    const useBlob =
+      typeof process.env.BLOB_READ_WRITE_TOKEN === 'string' &&
+      process.env.BLOB_READ_WRITE_TOKEN.length > 0;
+    const uploadResult = useBlob
+      ? await storageService.uploadImageToBlob(buffer, filename, userId)
+      : await storageService.uploadImage(buffer, filename, userId);
 
     console.log(
       `[downloadAndSaveRecipeImage] Image saved successfully: ${uploadResult.url}`,
