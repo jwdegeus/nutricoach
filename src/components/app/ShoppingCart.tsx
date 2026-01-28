@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { usePathname } from "next/navigation";
-import { ShoppingCartIcon } from "@heroicons/react/20/solid";
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { usePathname } from 'next/navigation';
+import { ShoppingCartIcon } from '@heroicons/react/20/solid';
 import {
   Dropdown,
   DropdownButton,
@@ -10,15 +10,17 @@ import {
   DropdownItem,
   DropdownHeader,
   DropdownDivider,
-} from "@/components/catalyst/dropdown";
-import { NavbarItem } from "@/components/catalyst/navbar";
-import { Text } from "@/components/catalyst/text";
-import { getShoppingCartAction } from "@/src/app/(app)/meal-plans/actions/shopping-cart.actions";
-import type { ShoppingListResponse } from "@/src/lib/agents/meal-planner";
+} from '@/components/catalyst/dropdown';
+import { NavbarItem } from '@/components/catalyst/navbar';
+import { Text } from '@/components/catalyst/text';
+import { getShoppingCartAction } from '@/src/app/(app)/meal-plans/actions/shopping-cart.actions';
+import type { ShoppingListResponse } from '@/src/lib/agents/meal-planner';
 
 export function ShoppingCart() {
   const pathname = usePathname();
-  const [shoppingList, setShoppingList] = useState<ShoppingListResponse | null>(null);
+  const [shoppingList, setShoppingList] = useState<ShoppingListResponse | null>(
+    null,
+  );
   const [planId, setPlanId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -49,13 +51,16 @@ export function ShoppingCart() {
   // Refresh when pathname changes (e.g., after deleting a meal plan)
   // But only if pathname actually changed and we're not on a shopping page
   useEffect(() => {
-    if (prevPathnameRef.current !== pathname && !pathname.includes('/shopping')) {
+    if (
+      prevPathnameRef.current !== pathname &&
+      !pathname.includes('/shopping')
+    ) {
       // Debounce to avoid rapid successive calls
       const timeoutId = setTimeout(() => {
         loadShoppingCart();
         prevPathnameRef.current = pathname;
       }, 300);
-      
+
       return () => clearTimeout(timeoutId);
     } else {
       prevPathnameRef.current = pathname;
@@ -81,7 +86,8 @@ export function ShoppingCart() {
     };
 
     window.addEventListener('meal-plan-changed', handleMealPlanChange);
-    return () => window.removeEventListener('meal-plan-changed', handleMealPlanChange);
+    return () =>
+      window.removeEventListener('meal-plan-changed', handleMealPlanChange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty deps - only set up listener once
 
@@ -90,7 +96,7 @@ export function ShoppingCart() {
     ? shoppingList.groups.reduce(
         (sum, group) =>
           sum + group.items.filter((item) => item.missingG > 0).length,
-        0
+        0,
       )
     : 0;
 
@@ -110,14 +116,16 @@ export function ShoppingCart() {
         <ShoppingCartIcon className="h-5 w-5" />
         {itemCount > 0 && (
           <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs font-semibold text-white">
-            {itemCount > 9 ? "9+" : itemCount}
+            {itemCount > 9 ? '9+' : itemCount}
           </span>
         )}
       </DropdownButton>
       <DropdownMenu anchor="bottom end" className="w-80 max-h-[32rem]">
         <DropdownHeader>
           <div className="flex items-center justify-between w-full">
-            <span className="font-semibold text-zinc-950 dark:text-white">Boodschappenlijst</span>
+            <span className="font-semibold text-zinc-950 dark:text-white">
+              Boodschappenlijst
+            </span>
             {planId && (
               <DropdownItem
                 href={`/meal-plans/${planId}/shopping`}
@@ -152,7 +160,9 @@ export function ShoppingCart() {
                     </div>
                   </div>
                 ))}
-                {groupIndex < shoppingList.groups.length - 1 && <DropdownDivider />}
+                {groupIndex < shoppingList.groups.length - 1 && (
+                  <DropdownDivider />
+                )}
               </div>
             );
           })}

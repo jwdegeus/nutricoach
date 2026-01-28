@@ -21,3 +21,11 @@ export type ActionSuccess<T> = {
  * Either returns data or an error
  */
 export type ActionResult<T> = ActionError | ActionSuccess<T>;
+
+/**
+ * Alternative result type used by settings/ingredient-categories actions:
+ * ok/data on success, ok/error with code+message on failure.
+ */
+export type ActionResultWithOk<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: { code: string; message: string } };

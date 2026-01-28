@@ -1,12 +1,17 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Button } from "@/components/catalyst/button";
-import { Text } from "@/components/catalyst/text";
-import { Badge } from "@/components/catalyst/badge";
-import { ExclamationTriangleIcon, XMarkIcon, ClipboardIcon, CheckIcon } from "@heroicons/react/20/solid";
-import { useRouter } from "next/navigation";
-import { formatReasonForBadge } from "@/src/lib/guardrails-vnext/ui/reasonLabels";
+import { useState } from 'react';
+import { Button } from '@/components/catalyst/button';
+import { Text } from '@/components/catalyst/text';
+import { Badge } from '@/components/catalyst/badge';
+import {
+  ExclamationTriangleIcon,
+  XMarkIcon,
+  ClipboardIcon,
+  CheckIcon,
+} from '@heroicons/react/20/solid';
+import { useRouter } from 'next/navigation';
+import { formatReasonForBadge } from '@/src/lib/guardrails-vnext/ui/reasonLabels';
 
 type GuardrailsViolationCalloutProps = {
   reasonCodes: string[];
@@ -28,17 +33,12 @@ function CopyHashButton({ hash }: { hash: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error("Failed to copy:", error);
+      console.error('Failed to copy:', error);
     }
   };
 
   return (
-    <Button
-      onClick={handleCopy}
-      color="zinc"
-      plain
-      className="ml-2"
-    >
+    <Button onClick={handleCopy} plain className="ml-2">
       {copied ? (
         <>
           <CheckIcon className="h-4 w-4" />
@@ -56,7 +56,7 @@ function CopyHashButton({ hash }: { hash: string }) {
 
 /**
  * Guardrails Violation Callout Component
- * 
+ *
  * Displays a clear error callout when recipe adaptation apply is blocked
  * by Guard Rails vNext hard constraint violations.
  */
@@ -90,16 +90,12 @@ export function GuardrailsViolationCallout({
                 Kan niet toepassen door dieetregels
               </Text>
               <Text className="mt-1 text-sm text-red-700 dark:text-red-300">
-                Deze aanpassing schendt één of meer harde Guard Rails regels. Pas het recept aan of wijzig de regels.
+                Deze aanpassing schendt één of meer harde Guard Rails regels.
+                Pas het recept aan of wijzig de regels.
               </Text>
             </div>
             {onDismiss && (
-              <Button
-                onClick={onDismiss}
-                color="zinc"
-                plain
-                className="ml-2"
-              >
+              <Button onClick={onDismiss} plain className="ml-2">
                 <XMarkIcon className="h-4 w-4" />
               </Button>
             )}
@@ -113,11 +109,12 @@ export function GuardrailsViolationCallout({
               </Text>
               <div className="flex flex-wrap gap-2">
                 {visibleReasonCodes.map((code, idx) => {
-                  const { label, code: reasonCode } = formatReasonForBadge(code);
+                  const { label, code: reasonCode } =
+                    formatReasonForBadge(code);
                   return (
-                    <Badge 
-                      key={idx} 
-                      color="red" 
+                    <Badge
+                      key={idx}
+                      color="red"
                       className="text-xs"
                       title={reasonCode}
                     >
@@ -137,7 +134,9 @@ export function GuardrailsViolationCallout({
           {/* Hash and Version */}
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center">
-              <Text className="text-xs text-red-700 dark:text-red-300">Hash:</Text>
+              <Text className="text-xs text-red-700 dark:text-red-300">
+                Hash:
+              </Text>
               <code className="ml-2 text-xs font-mono text-red-800 dark:text-red-200">
                 {shortHash}
               </code>
@@ -153,12 +152,7 @@ export function GuardrailsViolationCallout({
           {/* CTA Link */}
           {dietId && (
             <div>
-              <Button
-                onClick={handleViewRules}
-                color="red"
-                outline
-                className="text-sm"
-              >
+              <Button onClick={handleViewRules} outline className="text-sm">
                 Bekijk Guard Rails regels
               </Button>
             </div>

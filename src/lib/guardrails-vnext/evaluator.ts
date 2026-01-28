@@ -1,8 +1,8 @@
 /**
  * Guard Rails vNext - Evaluator
- * 
+ *
  * Pure, deterministic evaluator for guard rails rulesets.
- * 
+ *
  * @see docs/guardrails-vnext-semantics.md for evaluation semantics
  */
 
@@ -27,10 +27,10 @@ const EVALUATOR_VERSION = '1.0.0';
 
 /**
  * Get specificity score for a rule
- * 
+ *
  * user = 3, diet = 2, global = 1
  * If specificity is not set, default to diet (2)
- * 
+ *
  * @param rule - Guard rule
  * @returns Specificity score (1-3)
  */
@@ -45,12 +45,12 @@ function getSpecificity(rule: GuardRule): number {
 
 /**
  * Sort rules according to evaluation semantics
- * 
+ *
  * Sorting order:
  * 1. Priority DESC (higher = first)
  * 2. Specificity DESC (user > diet > global)
  * 3. RuleId lexicographic (stable tie-break)
- * 
+ *
  * @param rules - Rules to sort
  * @returns Sorted rules array
  */
@@ -60,14 +60,14 @@ export function sortRules(rules: GuardRule[]): GuardRule[] {
     if (a.priority !== b.priority) {
       return b.priority - a.priority; // DESC
     }
-    
+
     // Level 2: Specificity
     const specificityA = getSpecificity(a);
     const specificityB = getSpecificity(b);
     if (specificityA !== specificityB) {
       return specificityB - specificityA; // DESC
     }
-    
+
     // Level 3: Stable tie-break (ruleId lexicographic)
     return a.id.localeCompare(b.id);
   });
@@ -75,9 +75,9 @@ export function sortRules(rules: GuardRule[]): GuardRule[] {
 
 /**
  * Validate rule configuration
- * 
+ *
  * Checks for config errors (e.g., substring mode on steps target).
- * 
+ *
  * @param rule - Rule to validate
  * @returns Error code if invalid, null if valid
  */
@@ -87,22 +87,22 @@ function validateRule(rule: GuardRule): GuardReasonCode | null {
   if (preferredMode === 'substring' && rule.target === 'step') {
     return 'EVALUATOR_ERROR';
   }
-  
+
   return null;
 }
 
 /**
  * Get match mode for rule
- * 
+ *
  * Determines which match mode to use, with fallback logic.
- * 
+ *
  * @param rule - Rule to get match mode for
  * @param targetType - Target type being matched
  * @returns Match mode to use
  */
 function getMatchMode(rule: GuardRule, targetType: MatchTarget): MatchMode {
   const preferred = rule.match.preferredMatchMode;
-  
+
   // If preferred mode is set and valid, use it
   if (preferred) {
     // Validate: substring not allowed for steps
@@ -112,7 +112,7 @@ function getMatchMode(rule: GuardRule, targetType: MatchTarget): MatchMode {
     }
     return preferred;
   }
-  
+
   // Default fallback logic
   if (targetType === 'metadata' && rule.match.canonicalId) {
     return 'canonical_id';
@@ -123,7 +123,7 @@ function getMatchMode(rule: GuardRule, targetType: MatchTarget): MatchMode {
   if (targetType === 'step') {
     return 'word_boundary'; // Default for steps
   }
-  
+
   return 'exact'; // Ultimate fallback
 }
 
@@ -140,13 +140,14 @@ function getMatchMode(rule: GuardRule, targetType: MatchTarget): MatchMode {
  */
 function findRuleMatches(
   rule: GuardRule,
-  targets: { ingredient: TextAtom[]; step: TextAtom[]; metadata: TextAtom[] }
+  targets: { ingredient: TextAtom[]; step: TextAtom[]; metadata: TextAtom[] },
 ): GuardRuleMatch[] {
   const matches: GuardRuleMatch[] = [];
   const slots: { type: MatchTarget; atoms: TextAtom[] }[] = [];
 
   if (rule.action === 'block' && rule.target === 'ingredient') {
-    if (targets.ingredient?.length) slots.push({ type: 'ingredient', atoms: targets.ingredient });
+    if (targets.ingredient?.length)
+      slots.push({ type: 'ingredient', atoms: targets.ingredient });
     if (targets.step?.length) slots.push({ type: 'step', atoms: targets.step });
   } else {
     const arr = targets[rule.target];
@@ -161,7 +162,7 @@ function findRuleMatches(
     const termMatches = findMatches(atoms, rule.match.term, matchMode);
     for (const { atom, matchedText } of termMatches) {
       const isDuplicate = matches.some(
-        (m) => m.ruleId === rule.id && m.targetPath === atom.path
+        (m) => m.ruleId === rule.id && m.targetPath === atom.path,
       );
       if (!isDuplicate) {
         matches.push({
@@ -181,7 +182,7 @@ function findRuleMatches(
         const synonymMatches = findMatches(atoms, synonym, matchMode);
         for (const { atom, matchedText } of synonymMatches) {
           const isDuplicate = matches.some(
-            (m) => m.ruleId === rule.id && m.targetPath === atom.path
+            (m) => m.ruleId === rule.id && m.targetPath === atom.path,
           );
           if (!isDuplicate) {
             matches.push({
@@ -202,7 +203,7 @@ function findRuleMatches(
       for (const atom of atoms) {
         if (matchTextAtom(atom, rule.match.canonicalId, 'canonical_id')) {
           const isDuplicate = matches.some(
-            (m) => m.ruleId === rule.id && m.targetPath === atom.path
+            (m) => m.ruleId === rule.id && m.targetPath === atom.path,
           );
           if (!isDuplicate) {
             matches.push({
@@ -225,9 +226,9 @@ function findRuleMatches(
 
 /**
  * Get reason code for a rule
- * 
+ *
  * Uses rule.metadata.ruleCode if available, otherwise falls back based on strictness/action.
- * 
+ *
  * @param rule - Rule to get reason code for
  * @returns Reason code
  */
@@ -252,29 +253,29 @@ function getReasonCode(rule: GuardRule): GuardReasonCode {
     'RULESET_LOAD_ERROR',
     'UNKNOWN_ERROR',
   ];
-  
+
   if (validReasonCodes.includes(ruleCode as GuardReasonCode)) {
     return ruleCode as GuardReasonCode;
   }
-  
+
   // Fallback based on strictness/action
   if (rule.strictness === 'soft') {
     return 'SOFT_CONSTRAINT_VIOLATION';
   }
-  
+
   if (rule.action === 'block') {
     return 'FORBIDDEN_INGREDIENT';
   }
-  
+
   return 'UNKNOWN_ERROR';
 }
 
 /**
  * Apply match to decision state
- * 
+ *
  * Updates decision state based on match and rule.
  * Handles config errors, allow/block logic, and strictness.
- * 
+ *
  * @param state - Current decision state
  * @param rule - Rule that matched
  * @param matches - Matches found for this rule
@@ -290,7 +291,7 @@ function applyMatchToDecision(
     configErrors: Array<{ ruleId: string; error: GuardReasonCode }>;
   },
   rule: GuardRule,
-  matches: GuardRuleMatch[]
+  matches: GuardRuleMatch[],
 ): typeof state {
   // Check for config errors first
   const configError = validateRule(rule);
@@ -310,23 +311,23 @@ function applyMatchToDecision(
     }
     return state;
   }
-  
+
   // No matches, no effect
   if (matches.length === 0) {
     return state;
   }
-  
+
   // Handle allow rules (tracking only, block can override)
   if (rule.action === 'allow') {
     state.hasAllow = true;
     // Allow rules don't change outcome, but are tracked in matches
     return state;
   }
-  
+
   // Handle block rules
   if (rule.action === 'block') {
     const reasonCode = getReasonCode(rule);
-    
+
     if (rule.strictness === 'hard') {
       // Hard block → blocks output
       state.hasHardBlock = true;
@@ -339,17 +340,20 @@ function applyMatchToDecision(
       state.reasonCodes.push(reasonCode);
     }
   }
-  
+
   return state;
 }
 
 /**
  * Generate evaluation ID (deterministic)
- * 
+ *
  * @param context - Evaluation context
  * @returns Evaluation ID
  */
-function generateEvaluationId(context: { timestamp: string; mode: string }): string {
+function generateEvaluationId(context: {
+  timestamp: string;
+  mode: string;
+}): string {
   // Use timestamp + mode for deterministic ID generation
   // In production, could use UUID or hash
   return `eval-${context.timestamp}-${context.mode}`;
@@ -357,7 +361,7 @@ function generateEvaluationId(context: { timestamp: string; mode: string }): str
 
 /**
  * Build summary text
- * 
+ *
  * @param state - Decision state
  * @param appliedRuleIds - Applied rule IDs (for counting)
  * @returns Human-readable summary
@@ -370,42 +374,42 @@ function buildSummary(
     matches: GuardRuleMatch[];
     reasonCodes: GuardReasonCode[];
   },
-  appliedRuleIds: string[]
+  appliedRuleIds: string[],
 ): string {
   if (state.hasHardBlock) {
     const hardBlockCount = appliedRuleIds.length;
     return `Blocked: ${hardBlockCount} hard constraint violation(s) detected`;
   }
-  
+
   if (state.hasSoftBlock) {
     const softBlockCount = appliedRuleIds.length;
     return `Warned: ${softBlockCount} soft constraint violation(s) detected`;
   }
-  
+
   if (state.hasAllow && state.matches.length > 0) {
     return `Allowed: ${state.matches.length} allow rule(s) matched`;
   }
-  
+
   return 'Allowed: No violations detected';
 }
 
 /**
  * Evaluate guard rails against content
- * 
+ *
  * Main entry point for guard rails evaluation.
  * Returns deterministic decision with full trace.
- * 
+ *
  * @param input - Evaluation input (ruleset, context, targets)
  * @returns Guard decision with full trace
  */
 export function evaluateGuardrails(
-  input: GuardrailsEvaluateInput
+  input: GuardrailsEvaluateInput,
 ): GuardDecision {
   const { ruleset, context, targets } = input;
-  
+
   // Sort rules according to semantics
   const sortedRules = sortRules(ruleset.rules);
-  
+
   // Initialize decision state
   const state = {
     hasHardBlock: false,
@@ -416,7 +420,7 @@ export function evaluateGuardrails(
     configErrors: [] as Array<{ ruleId: string; error: GuardReasonCode }>,
     matches: [] as GuardRuleMatch[],
   };
-  
+
   // Initialize trace
   const evaluationId = generateEvaluationId(context);
   const trace: DecisionTrace = {
@@ -431,24 +435,25 @@ export function evaluateGuardrails(
     appliedRuleIds: [],
     reasonCodes: [],
   };
-  
+
   // Evaluate each rule
   for (let step = 0; step < sortedRules.length; step++) {
     const rule = sortedRules[step];
-    
+
     // Find matches for this rule
     const matches = findRuleMatches(rule, targets);
     const matchFound = matches.length > 0;
-    
+
     // Apply match to decision state
     const previousState = { ...state };
     applyMatchToDecision(state, rule, matches);
-    const applied = state.appliedRuleIds.length > previousState.appliedRuleIds.length ||
-                    state.reasonCodes.length > previousState.reasonCodes.length;
-    
+    const applied =
+      state.appliedRuleIds.length > previousState.appliedRuleIds.length ||
+      state.reasonCodes.length > previousState.reasonCodes.length;
+
     // Add matches to state
     state.matches.push(...matches);
-    
+
     // Add to trace
     trace.evaluationSteps.push({
       step: step + 1,
@@ -458,11 +463,11 @@ export function evaluateGuardrails(
       applied,
     });
   }
-  
+
   // Determine final outcome
   let outcome: 'allowed' | 'blocked' | 'warned';
   let ok: boolean;
-  
+
   if (state.hasHardBlock) {
     outcome = 'blocked';
     ok = false;
@@ -473,14 +478,14 @@ export function evaluateGuardrails(
     outcome = 'allowed';
     ok = true;
   }
-  
+
   trace.finalOutcome = outcome;
   trace.appliedRuleIds = [...state.appliedRuleIds];
   trace.reasonCodes = [...new Set(state.reasonCodes)]; // Deduplicate
-  
+
   // Build summary
   const summary = buildSummary(state, state.appliedRuleIds);
-  
+
   // Collect remediation hints from applied rules
   const remediationHints = state.appliedRuleIds
     .map((ruleId) => {
@@ -488,7 +493,7 @@ export function evaluateGuardrails(
       return rule?.remediation || [];
     })
     .flat();
-  
+
   // Build decision
   const decision: GuardDecision = {
     ok,
@@ -500,6 +505,6 @@ export function evaluateGuardrails(
     remediationHints,
     trace,
   };
-  
+
   return decision;
 }

@@ -1,22 +1,21 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
+import { createClient } from '@/src/lib/supabase/server';
 import type {
   RecipeImportJob,
   CreateRecipeImportInput,
   LoadRecipeImportInput,
   UpdateRecipeImportStatusInput,
   RecipeImportStatus,
-} from "../recipeImport.types";
+} from '../recipeImport.types';
 import {
   createRecipeImportInputSchema,
   loadRecipeImportInputSchema,
   updateRecipeImportStatusInputSchema,
   importRecipeFromUrlInputSchema,
-} from "../recipeImport.schemas";
-import type { ImportRecipeFromUrlResult } from "../recipeImport.types";
-import { fetchAndParseRecipeJsonLd } from "../server/fetchAndParseRecipeJsonLd";
-import { processRecipeUrlWithGemini } from "../services/geminiRecipeUrlImport.service";
+} from '../recipeImport.schemas';
+import type { ImportRecipeFromUrlResult } from '../recipeImport.types';
+import { processRecipeUrlWithGemini } from '../services/geminiRecipeUrlImport.service';
 
 /**
  * Action result type
@@ -26,7 +25,12 @@ type ActionResult<T> =
   | {
       ok: false;
       error: {
-        code: "AUTH_ERROR" | "VALIDATION_ERROR" | "DB_ERROR" | "NOT_FOUND" | "FORBIDDEN";
+        code:
+          | 'AUTH_ERROR'
+          | 'VALIDATION_ERROR'
+          | 'DB_ERROR'
+          | 'NOT_FOUND'
+          | 'FORBIDDEN';
         message: string;
       };
     };
@@ -34,11 +38,14 @@ type ActionResult<T> =
 /**
  * Valid status transitions
  */
-const VALID_STATUS_TRANSITIONS: Record<RecipeImportStatus, RecipeImportStatus[]> = {
-  uploaded: ["processing", "failed"],
-  processing: ["ready_for_review", "failed"],
-  ready_for_review: ["finalized", "failed"],
-  failed: ["uploaded", "processing"], // Allow retry
+const VALID_STATUS_TRANSITIONS: Record<
+  RecipeImportStatus,
+  RecipeImportStatus[]
+> = {
+  uploaded: ['processing', 'failed'],
+  processing: ['ready_for_review', 'failed'],
+  ready_for_review: ['finalized', 'failed'],
+  failed: ['uploaded', 'processing'], // Allow retry
   finalized: [], // Finalized is terminal
 };
 
@@ -47,7 +54,7 @@ const VALID_STATUS_TRANSITIONS: Record<RecipeImportStatus, RecipeImportStatus[]>
  */
 function isValidStatusTransition(
   currentStatus: RecipeImportStatus,
-  newStatus: RecipeImportStatus
+  newStatus: RecipeImportStatus,
 ): boolean {
   // Allow same status (no-op update)
   if (currentStatus === newStatus) {
@@ -61,12 +68,12 @@ function isValidStatusTransition(
 
 /**
  * Create a new recipe import job
- * 
+ *
  * @param raw - Raw input (will be validated)
  * @returns Job ID and initial status
  */
 export async function createRecipeImportAction(
-  raw: unknown
+  raw: unknown,
 ): Promise<ActionResult<{ jobId: string; status: RecipeImportStatus }>> {
   try {
     // Get authenticated user
@@ -79,8 +86,8 @@ export async function createRecipeImportAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om een recept te importeren",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om een recept te importeren',
         },
       };
     }
@@ -93,35 +100,35 @@ export async function createRecipeImportAction(
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
+          code: 'VALIDATION_ERROR',
           message:
             error instanceof Error
               ? error.message
-              : "Ongeldige input voor recipe import",
+              : 'Ongeldige input voor recipe import',
         },
       };
     }
 
     // Insert recipe import job
     const { data, error } = await supabase
-      .from("recipe_imports")
+      .from('recipe_imports')
       .insert({
         user_id: user.id, // Set server-side, not from client
-        status: "uploaded",
+        status: 'uploaded',
         source_image_path: input.sourceImagePath || null,
         source_image_meta: input.sourceImageMeta || null,
         source_locale: input.sourceLocale || null,
         target_locale: input.targetLocale || null,
       })
-      .select("id, status")
+      .select('id, status')
       .single();
 
     if (error) {
-      console.error("Error creating recipe import:", error);
+      console.error('Error creating recipe import:', error);
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: `Fout bij aanmaken recipe import: ${error.message}`,
         },
       };
@@ -135,15 +142,15 @@ export async function createRecipeImportAction(
       },
     };
   } catch (error) {
-    console.error("Unexpected error in createRecipeImportAction:", error);
+    console.error('Unexpected error in createRecipeImportAction:', error);
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
+        code: 'DB_ERROR',
         message:
           error instanceof Error
             ? error.message
-            : "Onbekende fout bij aanmaken recipe import",
+            : 'Onbekende fout bij aanmaken recipe import',
       },
     };
   }
@@ -151,12 +158,12 @@ export async function createRecipeImportAction(
 
 /**
  * Load a recipe import job by ID
- * 
+ *
  * @param raw - Raw input (will be validated)
  * @returns Recipe import job data
  */
 export async function loadRecipeImportAction(
-  raw: unknown
+  raw: unknown,
 ): Promise<ActionResult<RecipeImportJob>> {
   try {
     // Get authenticated user
@@ -169,8 +176,8 @@ export async function loadRecipeImportAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om recipe imports te bekijken",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om recipe imports te bekijken',
         },
       };
     }
@@ -183,29 +190,29 @@ export async function loadRecipeImportAction(
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
+          code: 'VALIDATION_ERROR',
           message:
             error instanceof Error
               ? error.message
-              : "Ongeldige input voor load recipe import",
+              : 'Ongeldige input voor load recipe import',
         },
       };
     }
 
     // Load recipe import job (include original_recipe_json)
     const { data, error } = await supabase
-      .from("recipe_imports")
-      .select("*, original_recipe_json")
-      .eq("id", input.jobId)
-      .eq("user_id", user.id) // Ensure user can only access own jobs
+      .from('recipe_imports')
+      .select('*, original_recipe_json')
+      .eq('id', input.jobId)
+      .eq('user_id', user.id) // Ensure user can only access own jobs
       .maybeSingle();
 
     if (error) {
-      console.error("Error loading recipe import:", error);
+      console.error('Error loading recipe import:', error);
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: `Fout bij ophalen recipe import: ${error.message}`,
         },
       };
@@ -215,8 +222,8 @@ export async function loadRecipeImportAction(
       return {
         ok: false,
         error: {
-          code: "NOT_FOUND",
-          message: "Recipe import niet gevonden of geen toegang",
+          code: 'NOT_FOUND',
+          message: 'Recipe import niet gevonden of geen toegang',
         },
       };
     }
@@ -247,16 +254,26 @@ export async function loadRecipeImportAction(
     // Debug logging for source_image_meta
     if (job.sourceImageMeta) {
       const sourceImageMeta = job.sourceImageMeta as any;
-      console.log("[loadRecipeImportAction] Job source_image_meta:", JSON.stringify({
-        jobId: job.id,
-        sourceImageMeta: sourceImageMeta,
-        savedImageUrl: sourceImageMeta?.savedImageUrl,
-        savedImagePath: sourceImageMeta?.savedImagePath,
-        imageUrl: sourceImageMeta?.imageUrl,
-        allKeys: Object.keys(sourceImageMeta),
-      }, null, 2));
+      console.log(
+        '[loadRecipeImportAction] Job source_image_meta:',
+        JSON.stringify(
+          {
+            jobId: job.id,
+            sourceImageMeta: sourceImageMeta,
+            savedImageUrl: sourceImageMeta?.savedImageUrl,
+            savedImagePath: sourceImageMeta?.savedImagePath,
+            imageUrl: sourceImageMeta?.imageUrl,
+            allKeys: Object.keys(sourceImageMeta),
+          },
+          null,
+          2,
+        ),
+      );
     } else {
-      console.log("[loadRecipeImportAction] Job source_image_meta is null for jobId:", job.id);
+      console.log(
+        '[loadRecipeImportAction] Job source_image_meta is null for jobId:',
+        job.id,
+      );
     }
 
     return {
@@ -264,15 +281,15 @@ export async function loadRecipeImportAction(
       data: job,
     };
   } catch (error) {
-    console.error("Unexpected error in loadRecipeImportAction:", error);
+    console.error('Unexpected error in loadRecipeImportAction:', error);
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
+        code: 'DB_ERROR',
         message:
           error instanceof Error
             ? error.message
-            : "Onbekende fout bij ophalen recipe import",
+            : 'Onbekende fout bij ophalen recipe import',
       },
     };
   }
@@ -280,12 +297,12 @@ export async function loadRecipeImportAction(
 
 /**
  * Update recipe import status
- * 
+ *
  * @param raw - Raw input (will be validated)
  * @returns Success or error
  */
 export async function updateRecipeImportStatusAction(
-  raw: unknown
+  raw: unknown,
 ): Promise<ActionResult<void>> {
   try {
     // Get authenticated user
@@ -298,8 +315,8 @@ export async function updateRecipeImportStatusAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om recipe import status te updaten",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om recipe import status te updaten',
         },
       };
     }
@@ -312,28 +329,31 @@ export async function updateRecipeImportStatusAction(
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
+          code: 'VALIDATION_ERROR',
           message:
             error instanceof Error
               ? error.message
-              : "Ongeldige input voor update recipe import status",
+              : 'Ongeldige input voor update recipe import status',
         },
       };
     }
 
     // Load current job to validate status transition
     const { data: currentJob, error: loadError } = await supabase
-      .from("recipe_imports")
-      .select("status, user_id")
-      .eq("id", input.jobId)
+      .from('recipe_imports')
+      .select('status, user_id')
+      .eq('id', input.jobId)
       .maybeSingle();
 
     if (loadError) {
-      console.error("Error loading recipe import for status update:", loadError);
+      console.error(
+        'Error loading recipe import for status update:',
+        loadError,
+      );
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: `Fout bij ophalen recipe import: ${loadError.message}`,
         },
       };
@@ -343,8 +363,8 @@ export async function updateRecipeImportStatusAction(
       return {
         ok: false,
         error: {
-          code: "NOT_FOUND",
-          message: "Recipe import niet gevonden",
+          code: 'NOT_FOUND',
+          message: 'Recipe import niet gevonden',
         },
       };
     }
@@ -354,18 +374,23 @@ export async function updateRecipeImportStatusAction(
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Geen toegang tot deze recipe import",
+          code: 'FORBIDDEN',
+          message: 'Geen toegang tot deze recipe import',
         },
       };
     }
 
     // Validate status transition
-    if (!isValidStatusTransition(currentJob.status as RecipeImportStatus, input.status)) {
+    if (
+      !isValidStatusTransition(
+        currentJob.status as RecipeImportStatus,
+        input.status,
+      )
+    ) {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
+          code: 'VALIDATION_ERROR',
           message: `Ongeldige status transitie van '${currentJob.status}' naar '${input.status}'`,
         },
       };
@@ -378,7 +403,7 @@ export async function updateRecipeImportStatusAction(
     };
 
     // Set finalized_at if status is finalized
-    if (input.status === "finalized") {
+    if (input.status === 'finalized') {
       updateData.finalized_at = new Date().toISOString();
     }
 
@@ -392,17 +417,17 @@ export async function updateRecipeImportStatusAction(
 
     // Update recipe import job
     const { error: updateError } = await supabase
-      .from("recipe_imports")
+      .from('recipe_imports')
       .update(updateData)
-      .eq("id", input.jobId)
-      .eq("user_id", user.id); // Double-check user ownership
+      .eq('id', input.jobId)
+      .eq('user_id', user.id); // Double-check user ownership
 
     if (updateError) {
-      console.error("Error updating recipe import status:", updateError);
+      console.error('Error updating recipe import status:', updateError);
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: `Fout bij updaten recipe import status: ${updateError.message}`,
         },
       };
@@ -413,15 +438,15 @@ export async function updateRecipeImportStatusAction(
       data: undefined,
     };
   } catch (error) {
-    console.error("Unexpected error in updateRecipeImportStatusAction:", error);
+    console.error('Unexpected error in updateRecipeImportStatusAction:', error);
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
+        code: 'DB_ERROR',
         message:
           error instanceof Error
             ? error.message
-            : "Onbekende fout bij updaten recipe import status",
+            : 'Onbekende fout bij updaten recipe import status',
       },
     };
   }
@@ -429,19 +454,19 @@ export async function updateRecipeImportStatusAction(
 
 /**
  * Import a recipe from a URL
- * 
+ *
  * This is a stub implementation that validates the URL and user authentication.
  * Future steps will add:
  * - HTML fetching with SSRF mitigation
  * - Recipe parsing/extraction
  * - Gemini integration for recipe extraction
  * - Database writes for import jobs and recipes
- * 
+ *
  * @param raw - Raw input (will be validated)
  * @returns Success with optional jobId/recipeId, or error with errorCode and message
  */
 export async function importRecipeFromUrlAction(
-  raw: unknown
+  raw: unknown,
 ): Promise<ImportRecipeFromUrlResult> {
   try {
     // Get authenticated user
@@ -453,8 +478,8 @@ export async function importRecipeFromUrlAction(
     if (!user) {
       return {
         ok: false,
-        errorCode: "UNAUTHORIZED",
-        message: "Je moet ingelogd zijn om een recept te importeren",
+        errorCode: 'UNAUTHORIZED',
+        message: 'Je moet ingelogd zijn om een recept te importeren',
       };
     }
 
@@ -465,11 +490,8 @@ export async function importRecipeFromUrlAction(
     } catch (error) {
       return {
         ok: false,
-        errorCode: "INVALID_URL",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Ongeldige URL",
+        errorCode: 'INVALID_URL',
+        message: error instanceof Error ? error.message : 'Ongeldige URL',
       };
     }
 
@@ -480,8 +502,8 @@ export async function importRecipeFromUrlAction(
     } catch {
       return {
         ok: false,
-        errorCode: "INVALID_URL",
-        message: "Ongeldige URL format",
+        errorCode: 'INVALID_URL',
+        message: 'Ongeldige URL format',
       };
     }
 
@@ -491,31 +513,48 @@ export async function importRecipeFromUrlAction(
     // Fetch HTML from URL (with SSRF mitigation)
     let html: string;
     try {
-      const { fetchHtml } = await import("../server/fetchAndParseRecipeJsonLd");
+      const { fetchHtml } = await import('../server/fetchAndParseRecipeJsonLd');
       html = await fetchHtml(input.url);
-      console.log(`[importRecipeFromUrlAction] Fetched HTML, size: ${html.length} bytes`);
-      
+      console.log(
+        `[importRecipeFromUrlAction] Fetched HTML, size: ${html.length} bytes`,
+      );
+
       // Try JSON-LD first (faster and more reliable)
       try {
-        const { fetchAndParseRecipeJsonLd } = await import("../server/fetchAndParseRecipeJsonLd");
+        const { fetchAndParseRecipeJsonLd } =
+          await import('../server/fetchAndParseRecipeJsonLd');
         const jsonLdResult = await fetchAndParseRecipeJsonLd(input.url);
-        console.log("[importRecipeFromUrlAction] JSON-LD result:", jsonLdResult.ok ? "OK" : "FAILED", jsonLdResult.ok ? jsonLdResult.draft?.title : jsonLdResult.message);
-        
+        console.log(
+          '[importRecipeFromUrlAction] JSON-LD result:',
+          jsonLdResult.ok ? 'OK' : 'FAILED',
+          jsonLdResult.ok ? jsonLdResult.draft?.title : jsonLdResult.message,
+        );
+
         if (jsonLdResult.ok && jsonLdResult.draft) {
           // Validate that we have actual recipe data
-          if (jsonLdResult.draft.ingredients.length > 0 && jsonLdResult.draft.steps.length > 0) {
+          if (
+            jsonLdResult.draft.ingredients.length > 0 &&
+            jsonLdResult.draft.steps.length > 0
+          ) {
             // JSON-LD extraction succeeded - create job and save recipe (no auto-translate; user translates via button)
-            console.log("[importRecipeFromUrlAction] Recipe extracted via JSON-LD:", jsonLdResult.draft);
+            console.log(
+              '[importRecipeFromUrlAction] Recipe extracted via JSON-LD:',
+              jsonLdResult.draft,
+            );
             const jsonLdExtractedRecipe = {
               title: jsonLdResult.draft.title,
-              language_detected: jsonLdResult.draft.sourceLanguage || "en",
+              language_detected: jsonLdResult.draft.sourceLanguage || 'en',
               translated_to: null,
               description: jsonLdResult.draft.description,
-              servings: jsonLdResult.draft.servings ? (() => {
-                const servingsNum = parseFloat(jsonLdResult.draft.servings);
-                return isNaN(servingsNum) || servingsNum <= 0 ? null : Math.round(servingsNum);
-              })() : null,
-              ingredients: jsonLdResult.draft.ingredients.map(ing => {
+              servings: jsonLdResult.draft.servings
+                ? (() => {
+                    const servingsNum = parseFloat(jsonLdResult.draft.servings);
+                    return isNaN(servingsNum) || servingsNum <= 0
+                      ? null
+                      : Math.round(servingsNum);
+                  })()
+                : null,
+              ingredients: jsonLdResult.draft.ingredients.map((ing) => {
                 const text = ing.text.trim();
                 let quantity: number | null = null;
                 let unit: string | null = null;
@@ -524,18 +563,29 @@ export async function importRecipeFromUrlAction(
                 const noteMatch = text.match(/^(.+?)\s*\(([^)]+)\)$/);
                 const mainPart = noteMatch ? noteMatch[1].trim() : text;
                 if (noteMatch) note = noteMatch[2].trim();
-                const qtyUnitMatch = mainPart.match(/^([\d\s½¼¾⅓⅔⅛⅜⅝⅞]+)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/);
+                const qtyUnitMatch = mainPart.match(
+                  /^([\d\s½¼¾⅓⅔⅛⅜⅝⅞]+)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/,
+                );
                 if (qtyUnitMatch) {
                   const qtyStr = qtyUnitMatch[1].trim();
                   const fractionMap: Record<string, number> = {
-                    '½': 0.5, '¼': 0.25, '¾': 0.75,
-                    '⅓': 0.333, '⅔': 0.667,
-                    '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875
+                    '½': 0.5,
+                    '¼': 0.25,
+                    '¾': 0.75,
+                    '⅓': 0.333,
+                    '⅔': 0.667,
+                    '⅛': 0.125,
+                    '⅜': 0.375,
+                    '⅝': 0.625,
+                    '⅞': 0.875,
                   };
                   let qty = 0;
                   for (const part of qtyStr.split(/\s+/)) {
                     if (fractionMap[part]) qty += fractionMap[part];
-                    else { const num = parseFloat(part); if (!isNaN(num)) qty += num; }
+                    else {
+                      const num = parseFloat(part);
+                      if (!isNaN(num)) qty += num;
+                    }
                   }
                   if (qty > 0) {
                     quantity = qty;
@@ -543,13 +593,20 @@ export async function importRecipeFromUrlAction(
                     name = qtyUnitMatch[3].trim();
                   }
                 } else {
-                  const unitMatch = mainPart.match(/^([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/);
-                  if (unitMatch) { unit = unitMatch[1].trim(); name = unitMatch[2].trim(); }
-                  else name = mainPart;
+                  const unitMatch = mainPart.match(
+                    /^([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/,
+                  );
+                  if (unitMatch) {
+                    unit = unitMatch[1].trim();
+                    name = unitMatch[2].trim();
+                  } else name = mainPart;
                 }
                 return { original_line: ing.text, name, quantity, unit, note };
               }),
-              instructions: jsonLdResult.draft.steps.map((step, idx) => ({ step: idx + 1, text: step.text })),
+              instructions: jsonLdResult.draft.steps.map((step, idx) => ({
+                step: idx + 1,
+                text: step.text,
+              })),
               times: {
                 prep_minutes: jsonLdResult.draft.prepTimeMinutes || null,
                 cook_minutes: jsonLdResult.draft.cookTimeMinutes || null,
@@ -559,95 +616,127 @@ export async function importRecipeFromUrlAction(
               warnings: [],
             };
             const { data: jobData, error: jobError } = await supabase
-              .from("recipe_imports")
+              .from('recipe_imports')
               .insert({
                 user_id: user.id,
-                status: "ready_for_review",
+                status: 'ready_for_review',
                 source_image_meta: {
                   url: input.url,
                   domain: domain,
-                  source: "url_import",
-                  ...(jsonLdResult.draft.imageUrl ? { imageUrl: jsonLdResult.draft.imageUrl } : {}),
+                  source: 'url_import',
+                  ...(jsonLdResult.draft.imageUrl
+                    ? { imageUrl: jsonLdResult.draft.imageUrl }
+                    : {}),
                 },
                 source_locale: jsonLdResult.draft.sourceLanguage || undefined,
                 extracted_recipe_json: jsonLdExtractedRecipe,
                 original_recipe_json: jsonLdExtractedRecipe,
                 confidence_overall: 95,
               })
-              .select("id")
+              .select('id')
               .single();
-            
+
             if (jobError) {
-              console.error("[importRecipeFromUrlAction] Error creating job:", jobError);
+              console.error(
+                '[importRecipeFromUrlAction] Error creating job:',
+                jobError,
+              );
               return {
                 ok: false,
-                errorCode: "INTERNAL",
+                errorCode: 'INTERNAL',
                 message: `Fout bij aanmaken import job: ${jobError.message}`,
               };
             }
-            
+
             // Download and save recipe image if available
             let savedImageUrl: string | null = null;
             let savedImagePath: string | null = null;
             if (jsonLdResult.draft.imageUrl) {
-              console.log("[importRecipeFromUrlAction] Image URL found:", jsonLdResult.draft.imageUrl);
-              console.log("[importRecipeFromUrlAction] Downloading and saving recipe image...");
+              console.log(
+                '[importRecipeFromUrlAction] Image URL found:',
+                jsonLdResult.draft.imageUrl,
+              );
+              console.log(
+                '[importRecipeFromUrlAction] Downloading and saving recipe image...',
+              );
               try {
-                const { downloadAndSaveRecipeImage } = await import("../services/recipeImageDownload.service");
+                const { downloadAndSaveRecipeImage } =
+                  await import('../services/recipeImageDownload.service');
                 const imageResult = await downloadAndSaveRecipeImage(
                   jsonLdResult.draft.imageUrl,
-                  user.id
+                  user.id,
                 );
 
                 if (imageResult) {
                   savedImageUrl = imageResult.url;
                   savedImagePath = imageResult.path;
-                  console.log("[importRecipeFromUrlAction] Image saved successfully:", savedImageUrl);
-                  
+                  console.log(
+                    '[importRecipeFromUrlAction] Image saved successfully:',
+                    savedImageUrl,
+                  );
+
                   // Update source_image_meta with saved image URL
                   await supabase
-                    .from("recipe_imports")
+                    .from('recipe_imports')
                     .update({
                       source_image_meta: {
                         url: input.url,
                         domain: domain,
-                        source: "url_import",
+                        source: 'url_import',
                         imageUrl: jsonLdResult.draft.imageUrl, // Keep original URL for reference
                         savedImageUrl: savedImageUrl, // Add saved local URL
                         savedImagePath: savedImagePath, // Add saved path
                       },
                     })
-                    .eq("id", jobData.id)
-                    .eq("user_id", user.id);
+                    .eq('id', jobData.id)
+                    .eq('user_id', user.id);
                 } else {
-                  console.warn("[importRecipeFromUrlAction] Failed to download/save image, continuing without it");
+                  console.warn(
+                    '[importRecipeFromUrlAction] Failed to download/save image, continuing without it',
+                  );
                 }
               } catch (imageError) {
                 // Log but don't fail - recipe is already extracted
-                console.error("[importRecipeFromUrlAction] Image download error (non-fatal):", imageError);
+                console.error(
+                  '[importRecipeFromUrlAction] Image download error (non-fatal):',
+                  imageError,
+                );
               }
             }
 
             // Step 2: Translate to user language (ingredients, description, instructions)
-            console.log("[importRecipeFromUrlAction] Translating JSON-LD recipe to user language...");
+            console.log(
+              '[importRecipeFromUrlAction] Translating JSON-LD recipe to user language...',
+            );
             try {
-              const { translateRecipeImportAction } = await import("./recipeImport.translate.actions");
-              const translateResult = await translateRecipeImportAction({ jobId: jobData.id });
+              const { translateRecipeImportAction } =
+                await import('./recipeImport.translate.actions');
+              const translateResult = await translateRecipeImportAction({
+                jobId: jobData.id,
+              });
               if (translateResult.ok) {
-                console.log("[importRecipeFromUrlAction] Translation completed");
+                console.log(
+                  '[importRecipeFromUrlAction] Translation completed',
+                );
               } else {
-                console.error("[importRecipeFromUrlAction] Translation failed (non-fatal):", translateResult.error);
+                console.error(
+                  '[importRecipeFromUrlAction] Translation failed (non-fatal):',
+                  translateResult.error,
+                );
               }
             } catch (translateError) {
-              console.error("[importRecipeFromUrlAction] Translation error (non-fatal):", translateError);
+              console.error(
+                '[importRecipeFromUrlAction] Translation error (non-fatal):',
+                translateError,
+              );
             }
 
             // Return fresh job (with translated extracted_recipe_json) so client shows it without refetch
             const { data: freshData } = await supabase
-              .from("recipe_imports")
-              .select("*, original_recipe_json")
-              .eq("id", jobData.id)
-              .eq("user_id", user.id)
+              .from('recipe_imports')
+              .select('*, original_recipe_json')
+              .eq('id', jobData.id)
+              .eq('user_id', user.id)
               .maybeSingle();
             const job = freshData
               ? ({
@@ -663,7 +752,9 @@ export async function importRecipeFromUrlAction(
                   extractedRecipeJson: freshData.extracted_recipe_json,
                   originalRecipeJson: freshData.original_recipe_json,
                   validationErrorsJson: freshData.validation_errors_json,
-                  confidenceOverall: freshData.confidence_overall ? parseFloat(freshData.confidence_overall.toString()) : null,
+                  confidenceOverall: freshData.confidence_overall
+                    ? parseFloat(freshData.confidence_overall.toString())
+                    : null,
                   createdAt: freshData.created_at,
                   updatedAt: freshData.updated_at,
                   finalizedAt: freshData.finalized_at,
@@ -677,106 +768,138 @@ export async function importRecipeFromUrlAction(
               job,
             };
           } else {
-            console.log("[importRecipeFromUrlAction] JSON-LD draft incomplete, trying Gemini");
+            console.log(
+              '[importRecipeFromUrlAction] JSON-LD draft incomplete, trying Gemini',
+            );
           }
         } else {
-          console.log("[importRecipeFromUrlAction] JSON-LD extraction failed:", jsonLdResult.message);
+          console.log(
+            '[importRecipeFromUrlAction] JSON-LD extraction failed:',
+            !jsonLdResult.ok ? jsonLdResult.message : 'Unknown',
+          );
         }
       } catch (jsonLdError) {
         // JSON-LD failed, continue with Gemini extraction
-        console.log("[importRecipeFromUrlAction] JSON-LD extraction error (continuing with Gemini):", jsonLdError);
+        console.log(
+          '[importRecipeFromUrlAction] JSON-LD extraction error (continuing with Gemini):',
+          jsonLdError,
+        );
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to fetch URL";
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to fetch URL';
       const errorCode = (error as any)?.code;
-      
+
       // Map specific error codes to user-friendly messages
-      if (errorCode === "ACCESS_DENIED" || errorCode === "NOT_FOUND" || errorCode === "CLIENT_ERROR") {
+      if (
+        errorCode === 'ACCESS_DENIED' ||
+        errorCode === 'NOT_FOUND' ||
+        errorCode === 'CLIENT_ERROR'
+      ) {
         return {
           ok: false,
-          errorCode: "INVALID_URL",
+          errorCode: 'INVALID_URL',
           message: errorMessage,
         };
       }
 
-      if (errorCode === "SERVER_ERROR") {
+      if (errorCode === 'SERVER_ERROR') {
         return {
           ok: false,
-          errorCode: "INTERNAL",
-          message: errorMessage,
-        };
-      }
-      
-      if (errorCode === "UNSUPPORTED_CONTENT_TYPE") {
-        return {
-          ok: false,
-          errorCode: "INVALID_URL",
-          message: errorMessage,
-        };
-      }
-      
-      if (errorCode === "RESPONSE_TOO_LARGE") {
-        return {
-          ok: false,
-          errorCode: "INVALID_URL",
+          errorCode: 'INTERNAL',
           message: errorMessage,
         };
       }
 
-      if (errorCode === "FETCH_TIMEOUT") {
+      if (errorCode === 'UNSUPPORTED_CONTENT_TYPE') {
         return {
           ok: false,
-          errorCode: "INVALID_URL",
+          errorCode: 'INVALID_URL',
           message: errorMessage,
         };
       }
-      
+
+      if (errorCode === 'RESPONSE_TOO_LARGE') {
+        return {
+          ok: false,
+          errorCode: 'INVALID_URL',
+          message: errorMessage,
+        };
+      }
+
+      if (errorCode === 'FETCH_TIMEOUT') {
+        return {
+          ok: false,
+          errorCode: 'INVALID_URL',
+          message: errorMessage,
+        };
+      }
+
       return {
         ok: false,
-        errorCode: "INVALID_URL",
+        errorCode: 'INVALID_URL',
         message: errorMessage,
       };
     }
 
     // Process with Gemini to extract recipe from HTML
     try {
-      console.log(`[importRecipeFromUrlAction] Calling Gemini with HTML size: ${html.length} bytes`);
+      console.log(
+        `[importRecipeFromUrlAction] Calling Gemini with HTML size: ${html.length} bytes`,
+      );
       const geminiResult = await processRecipeUrlWithGemini({
         html,
         url: input.url,
       });
 
-      console.log(`[importRecipeFromUrlAction] Gemini extraction completed. Ingredients: ${geminiResult.extracted.ingredients.length}, Instructions: ${geminiResult.extracted.instructions.length}`);
+      console.log(
+        `[importRecipeFromUrlAction] Gemini extraction completed. Ingredients: ${geminiResult.extracted.ingredients.length}, Instructions: ${geminiResult.extracted.instructions.length}`,
+      );
 
       // Check if extraction was successful (has ingredients and instructions)
       const hasIngredients = geminiResult.extracted.ingredients.length > 0;
       const hasInstructions = geminiResult.extracted.instructions.length > 0;
-      const hasWarnings = geminiResult.extracted.warnings && geminiResult.extracted.warnings.length > 0;
-      
+      const hasWarnings =
+        geminiResult.extracted.warnings &&
+        geminiResult.extracted.warnings.length > 0;
+
       // Check for placeholder/error indicators
-      const hasPlaceholderData = 
-        (hasIngredients && geminiResult.extracted.ingredients[0]?.name?.toLowerCase().includes("geen")) ||
-        (hasInstructions && geminiResult.extracted.instructions[0]?.text?.toLowerCase().includes("geen"));
+      const hasPlaceholderData =
+        (hasIngredients &&
+          geminiResult.extracted.ingredients[0]?.name
+            ?.toLowerCase()
+            .includes('geen')) ||
+        (hasInstructions &&
+          geminiResult.extracted.instructions[0]?.text
+            ?.toLowerCase()
+            .includes('geen'));
 
       if (hasWarnings && hasPlaceholderData) {
-        const warningMessage = geminiResult.extracted.warnings?.[0] || "Geen receptinformatie gevonden op deze pagina.";
-        console.log("[importRecipeFromUrlAction] Placeholder data detected, returning error");
+        const warningMessage =
+          geminiResult.extracted.warnings?.[0] ||
+          'Geen receptinformatie gevonden op deze pagina.';
+        console.log(
+          '[importRecipeFromUrlAction] Placeholder data detected, returning error',
+        );
         return {
           ok: false,
-          errorCode: "INVALID_URL",
+          errorCode: 'INVALID_URL',
           message: warningMessage,
         };
       }
 
       // Check if we have actual recipe data (not just placeholders)
       if (!hasIngredients || !hasInstructions) {
-        const errorMessage = hasWarnings 
-          ? (geminiResult.extracted.warnings?.[0] || "Geen receptinformatie gevonden op deze pagina.")
-          : "Geen ingrediënten of instructies gevonden in het recept.";
-        console.log("[importRecipeFromUrlAction] Missing ingredients or instructions");
+        const errorMessage = hasWarnings
+          ? geminiResult.extracted.warnings?.[0] ||
+            'Geen receptinformatie gevonden op deze pagina.'
+          : 'Geen ingrediënten of instructies gevonden in het recept.';
+        console.log(
+          '[importRecipeFromUrlAction] Missing ingredients or instructions',
+        );
         return {
           ok: false,
-          errorCode: "INVALID_URL",
+          errorCode: 'INVALID_URL',
           message: errorMessage,
         };
       }
@@ -784,78 +907,110 @@ export async function importRecipeFromUrlAction(
       // Additional validation: check confidence score
       const confidence = geminiResult.extracted.confidence?.overall;
       if (confidence !== null && confidence !== undefined && confidence < 30) {
-        const errorMessage = hasWarnings 
-          ? (geminiResult.extracted.warnings?.[0] || "Recept extractie had lage betrouwbaarheid.")
-          : "Recept extractie had lage betrouwbaarheid. Probeer een andere URL.";
-        console.log(`[importRecipeFromUrlAction] Low confidence score: ${confidence}`);
+        const errorMessage = hasWarnings
+          ? geminiResult.extracted.warnings?.[0] ||
+            'Recept extractie had lage betrouwbaarheid.'
+          : 'Recept extractie had lage betrouwbaarheid. Probeer een andere URL.';
+        console.log(
+          `[importRecipeFromUrlAction] Low confidence score: ${confidence}`,
+        );
         return {
           ok: false,
-          errorCode: "INVALID_URL",
+          errorCode: 'INVALID_URL',
           message: errorMessage,
         };
       }
 
       // Create job and save extracted recipe
-      console.log("[importRecipeFromUrlAction] Recipe draft extracted via Gemini:", geminiResult.draft);
-      console.log("[importRecipeFromUrlAction] Extracted recipe title:", geminiResult.extracted.title);
-      console.log("[importRecipeFromUrlAction] Detected language:", geminiResult.extracted.language_detected);
-      
+      console.log(
+        '[importRecipeFromUrlAction] Recipe draft extracted via Gemini:',
+        geminiResult.draft,
+      );
+      console.log(
+        '[importRecipeFromUrlAction] Extracted recipe title:',
+        geminiResult.extracted.title,
+      );
+      console.log(
+        '[importRecipeFromUrlAction] Detected language:',
+        geminiResult.extracted.language_detected,
+      );
+
       // Download and save recipe image if available
       let savedImageUrl: string | null = null;
       let savedImagePath: string | null = null;
       if (geminiResult.draft.imageUrl) {
-        console.log("[importRecipeFromUrlAction] Image URL found:", geminiResult.draft.imageUrl);
-        console.log("[importRecipeFromUrlAction] Downloading and saving recipe image...");
+        console.log(
+          '[importRecipeFromUrlAction] Image URL found:',
+          geminiResult.draft.imageUrl,
+        );
+        console.log(
+          '[importRecipeFromUrlAction] Downloading and saving recipe image...',
+        );
         try {
-          const { downloadAndSaveRecipeImage } = await import("../services/recipeImageDownload.service");
+          const { downloadAndSaveRecipeImage } =
+            await import('../services/recipeImageDownload.service');
           const imageResult = await downloadAndSaveRecipeImage(
             geminiResult.draft.imageUrl,
-            user.id
+            user.id,
           );
 
           if (imageResult) {
             savedImageUrl = imageResult.url;
             savedImagePath = imageResult.path;
-            console.log("[importRecipeFromUrlAction] Image saved successfully:", savedImageUrl);
+            console.log(
+              '[importRecipeFromUrlAction] Image saved successfully:',
+              savedImageUrl,
+            );
           } else {
-            console.warn("[importRecipeFromUrlAction] Failed to download/save image, continuing without it");
+            console.warn(
+              '[importRecipeFromUrlAction] Failed to download/save image, continuing without it',
+            );
           }
         } catch (imageError) {
           // Log but don't fail - recipe is already extracted
-          console.error("[importRecipeFromUrlAction] Image download error (non-fatal):", imageError);
+          console.error(
+            '[importRecipeFromUrlAction] Image download error (non-fatal):',
+            imageError,
+          );
         }
       }
 
       // Create job with extracted recipe
       const { data: jobData, error: jobError } = await supabase
-        .from("recipe_imports")
+        .from('recipe_imports')
         .insert({
           user_id: user.id,
-          status: "ready_for_review",
+          status: 'ready_for_review',
           source_image_meta: {
             url: input.url,
             domain: domain,
-            source: "url_import",
-            ...(geminiResult.draft.imageUrl ? { 
-              imageUrl: geminiResult.draft.imageUrl, // Keep original URL for reference
-              ...(savedImageUrl ? { savedImageUrl } : {}),
-              ...(savedImagePath ? { savedImagePath } : {}),
-            } : {}),
+            source: 'url_import',
+            ...(geminiResult.draft.imageUrl
+              ? {
+                  imageUrl: geminiResult.draft.imageUrl, // Keep original URL for reference
+                  ...(savedImageUrl ? { savedImageUrl } : {}),
+                  ...(savedImagePath ? { savedImagePath } : {}),
+                }
+              : {}),
           },
           source_locale: geminiResult.extracted.language_detected || undefined,
           gemini_raw_json: geminiResult.rawResponse,
           extracted_recipe_json: geminiResult.extracted,
           original_recipe_json: geminiResult.extracted,
-          confidence_overall: geminiResult.extracted.confidence?.overall || null,
+          confidence_overall:
+            geminiResult.extracted.confidence?.overall || null,
         })
-        .select("id")
+        .select('id')
         .single();
 
       if (jobError) {
-        console.error("[importRecipeFromUrlAction] Error creating job:", jobError);
+        console.error(
+          '[importRecipeFromUrlAction] Error creating job:',
+          jobError,
+        );
         return {
           ok: false,
-          errorCode: "INTERNAL",
+          errorCode: 'INTERNAL',
           message: `Fout bij aanmaken import job: ${jobError.message}`,
         };
       }
@@ -863,25 +1018,36 @@ export async function importRecipeFromUrlAction(
       console.log(`[importRecipeFromUrlAction] Recipe extracted successfully`);
 
       // Step 2: Translate to user language (ingredients, description, instructions)
-      console.log("[importRecipeFromUrlAction] Translating recipe to user language...");
+      console.log(
+        '[importRecipeFromUrlAction] Translating recipe to user language...',
+      );
       try {
-        const { translateRecipeImportAction } = await import("./recipeImport.translate.actions");
-        const translateResult = await translateRecipeImportAction({ jobId: jobData.id });
+        const { translateRecipeImportAction } =
+          await import('./recipeImport.translate.actions');
+        const translateResult = await translateRecipeImportAction({
+          jobId: jobData.id,
+        });
         if (translateResult.ok) {
-          console.log("[importRecipeFromUrlAction] Translation completed");
+          console.log('[importRecipeFromUrlAction] Translation completed');
         } else {
-          console.error("[importRecipeFromUrlAction] Translation failed (non-fatal):", translateResult.error);
+          console.error(
+            '[importRecipeFromUrlAction] Translation failed (non-fatal):',
+            translateResult.error,
+          );
         }
       } catch (translateError) {
-        console.error("[importRecipeFromUrlAction] Translation error (non-fatal):", translateError);
+        console.error(
+          '[importRecipeFromUrlAction] Translation error (non-fatal):',
+          translateError,
+        );
       }
 
       // Return fresh job (with translated extracted_recipe_json) so client shows it without refetch
       const { data: freshData } = await supabase
-        .from("recipe_imports")
-        .select("*, original_recipe_json")
-        .eq("id", jobData.id)
-        .eq("user_id", user.id)
+        .from('recipe_imports')
+        .select('*, original_recipe_json')
+        .eq('id', jobData.id)
+        .eq('user_id', user.id)
         .maybeSingle();
       const job = freshData
         ? ({
@@ -897,7 +1063,9 @@ export async function importRecipeFromUrlAction(
             extractedRecipeJson: freshData.extracted_recipe_json,
             originalRecipeJson: freshData.original_recipe_json,
             validationErrorsJson: freshData.validation_errors_json,
-            confidenceOverall: freshData.confidence_overall ? parseFloat(freshData.confidence_overall.toString()) : null,
+            confidenceOverall: freshData.confidence_overall
+              ? parseFloat(freshData.confidence_overall.toString())
+              : null,
             createdAt: freshData.created_at,
             updatedAt: freshData.updated_at,
             finalizedAt: freshData.finalized_at,
@@ -911,39 +1079,44 @@ export async function importRecipeFromUrlAction(
         job,
       };
     } catch (error) {
-      console.error("Error processing recipe URL with Gemini:", error);
-      
+      console.error('Error processing recipe URL with Gemini:', error);
+
       // Check if error message indicates access denied or no recipe found
-      const errorMessage = error instanceof Error ? error.message : "Failed to extract recipe from URL";
-      const isAccessDenied = errorMessage.toLowerCase().includes("access denied") || 
-                            errorMessage.toLowerCase().includes("toegang geweigerd") ||
-                            errorMessage.toLowerCase().includes("blokkeert toegang");
-      const isNoRecipeFound = errorMessage.toLowerCase().includes("geen receptinformatie") ||
-                             errorMessage.toLowerCase().includes("no recipe found");
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Failed to extract recipe from URL';
+      const isAccessDenied =
+        errorMessage.toLowerCase().includes('access denied') ||
+        errorMessage.toLowerCase().includes('toegang geweigerd') ||
+        errorMessage.toLowerCase().includes('blokkeert toegang');
+      const isNoRecipeFound =
+        errorMessage.toLowerCase().includes('geen receptinformatie') ||
+        errorMessage.toLowerCase().includes('no recipe found');
 
       if (isAccessDenied || isNoRecipeFound) {
         return {
           ok: false,
-          errorCode: "INVALID_URL",
+          errorCode: 'INVALID_URL',
           message: errorMessage,
         };
       }
 
       return {
         ok: false,
-        errorCode: "INTERNAL",
+        errorCode: 'INTERNAL',
         message: errorMessage,
       };
     }
   } catch (error) {
-    console.error("Unexpected error in importRecipeFromUrlAction:", error);
+    console.error('Unexpected error in importRecipeFromUrlAction:', error);
     return {
       ok: false,
-      errorCode: "INTERNAL",
+      errorCode: 'INTERNAL',
       message:
         error instanceof Error
           ? error.message
-          : "Onbekende fout bij importeren recept van URL",
+          : 'Onbekende fout bij importeren recept van URL',
     };
   }
 }

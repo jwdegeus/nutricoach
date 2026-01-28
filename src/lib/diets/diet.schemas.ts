@@ -1,26 +1,26 @@
 /**
  * Diet Schemas - Zod validation schemas for diet types
- * 
+ *
  * Provides runtime validation for diet profiles, rule sets, and agent contracts.
  */
 
-import { z } from "zod";
+import { z } from 'zod';
 
 // ============================================================================
 // Base Schemas
 // ============================================================================
 
 const dietKeySchema = z.enum([
-  "wahls_paleo_plus",
-  "keto",
-  "mediterranean",
-  "vegan",
-  "balanced",
+  'wahls_paleo_plus',
+  'keto',
+  'mediterranean',
+  'vegan',
+  'balanced',
 ]);
 
-const constraintTypeSchema = z.enum(["hard", "soft"]);
+const constraintTypeSchema = z.enum(['hard', 'soft']);
 
-export const mealSlotSchema = z.enum(["breakfast", "lunch", "dinner", "snack"]);
+export const mealSlotSchema = z.enum(['breakfast', 'lunch', 'dinner', 'snack']);
 
 // ============================================================================
 // Macro Range Schema
@@ -54,7 +54,7 @@ const batchCookingPreferenceSchema = z.object({
 // ============================================================================
 
 const budgetPreferenceSchema = z.object({
-  level: z.enum(["low", "medium", "high", "unlimited"]),
+  level: z.enum(['low', 'medium', 'high', 'unlimited']),
   maxPerMeal: z.number().min(0).optional(),
 });
 
@@ -93,8 +93,8 @@ export const dietProfileSchema = z.object({
   budgetPreference: budgetPreferenceSchema.optional(),
   pantryUsage: pantryPreferenceSchema.optional(),
   servingsDefault: z.number().min(1).max(10).optional(),
-  varietyLevel: z.enum(["low", "std", "high"]).optional(),
-  strictness: z.enum(["strict", "flexible"]).optional(),
+  varietyLevel: z.enum(['low', 'std', 'high']).optional(),
+  strictness: z.enum(['strict', 'flexible']).optional(),
   mealPreferences: z
     .object({
       breakfast: z.array(z.string()).optional(),
@@ -111,7 +111,7 @@ export type DietProfileInput = z.infer<typeof dietProfileSchema>;
 // ============================================================================
 
 const ingredientConstraintSchema = z.object({
-  type: z.enum(["allowed", "forbidden"]),
+  type: z.enum(['allowed', 'forbidden']),
   items: z.array(z.string()),
   categories: z.array(z.string()).optional(),
   constraintType: constraintTypeSchema,
@@ -143,7 +143,7 @@ const weeklyVarietyConstraintSchema = z.object({
 });
 
 const macroConstraintSchema = z.object({
-  scope: z.enum(["daily", "per_meal"]),
+  scope: z.enum(['daily', 'per_meal']),
   maxCarbs: z.number().min(0).optional(),
   maxSaturatedFat: z.number().min(0).optional(),
   minProtein: z.number().min(0).optional(),
@@ -154,7 +154,7 @@ const macroConstraintSchema = z.object({
 });
 
 const mealStructureConstraintSchema = z.object({
-  type: z.enum(["vegetable_cups", "meal_timing", "meal_count"]),
+  type: z.enum(['vegetable_cups', 'meal_timing', 'meal_count']),
   vegetableCupsRequirement: z
     .object({
       totalCups: z.number().min(0),
@@ -170,20 +170,38 @@ const mealStructureConstraintSchema = z.object({
     .object({
       breakfast: z
         .object({
-          min: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/).optional(),
-          max: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+          min: z
+            .string()
+            .regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/)
+            .optional(),
+          max: z
+            .string()
+            .regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/)
+            .optional(),
         })
         .optional(),
       lunch: z
         .object({
-          min: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/).optional(),
-          max: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+          min: z
+            .string()
+            .regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/)
+            .optional(),
+          max: z
+            .string()
+            .regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/)
+            .optional(),
         })
         .optional(),
       dinner: z
         .object({
-          min: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/).optional(),
-          max: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+          min: z
+            .string()
+            .regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/)
+            .optional(),
+          max: z
+            .string()
+            .regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/)
+            .optional(),
         })
         .optional(),
     })

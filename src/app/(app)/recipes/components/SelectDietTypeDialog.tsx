@@ -1,17 +1,17 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from "@/components/catalyst/dialog";
-import { Button } from "@/components/catalyst/button";
-import { Select } from "@/components/catalyst/select";
-import { getDietTypes } from "@/src/app/(app)/onboarding/queries/diet-types.queries";
-import type { DietType } from "@/src/app/(app)/onboarding/queries/diet-types.queries";
+} from '@/components/catalyst/dialog';
+import { Button } from '@/components/catalyst/button';
+import { Select } from '@/components/catalyst/select';
+import { getDietTypes } from '@/src/app/(app)/onboarding/queries/diet-types.queries';
+import type { DietType } from '@/src/app/(app)/onboarding/queries/diet-types.queries';
 
 type SelectDietTypeDialogProps = {
   open: boolean;
@@ -29,7 +29,7 @@ export function SelectDietTypeDialog({
   mealName,
 }: SelectDietTypeDialogProps) {
   const [dietTypes, setDietTypes] = useState<DietType[]>([]);
-  const [selectedDietTypeId, setSelectedDietTypeId] = useState<string>("");
+  const [selectedDietTypeId, setSelectedDietTypeId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -40,15 +40,17 @@ export function SelectDietTypeDialog({
         setDietTypes(types);
         // Find current diet type by name
         if (currentDietTypeName) {
-          const currentType = types.find((dt) => dt.name === currentDietTypeName);
+          const currentType = types.find(
+            (dt) => dt.name === currentDietTypeName,
+          );
           if (currentType) {
             setSelectedDietTypeId(currentType.id);
           }
         } else {
-          setSelectedDietTypeId("");
+          setSelectedDietTypeId('');
         }
       } catch (error) {
-        console.error("Failed to load diet types:", error);
+        console.error('Failed to load diet types:', error);
         setDietTypes([]);
       } finally {
         setIsLoading(false);
@@ -61,7 +63,7 @@ export function SelectDietTypeDialog({
   }, [open, currentDietTypeName]);
 
   const handleSave = () => {
-    if (selectedDietTypeId === "") {
+    if (selectedDietTypeId === '') {
       onSelect(null);
     } else {
       const selectedType = dietTypes.find((dt) => dt.id === selectedDietTypeId);
@@ -82,7 +84,8 @@ export function SelectDietTypeDialog({
       <DialogTitle>Label met dieettype</DialogTitle>
       <DialogBody>
         <DialogDescription>
-          Selecteer het primaire dieettype voor "{mealName}". Dit helpt bij het filteren en organiseren van je recepten.
+          Selecteer het primaire dieettype voor &quot;{mealName}&quot;. Dit
+          helpt bij het filteren en organiseren van je recepten.
         </DialogDescription>
         <div className="mt-4 space-y-2">
           <label
@@ -98,7 +101,7 @@ export function SelectDietTypeDialog({
             disabled={isLoading}
           >
             <option value="">
-              {isLoading ? "Laden..." : "-- Geen dieettype --"}
+              {isLoading ? 'Laden...' : '-- Geen dieettype --'}
             </option>
             {dietTypes.map((diet) => (
               <option key={diet.id} value={diet.id}>

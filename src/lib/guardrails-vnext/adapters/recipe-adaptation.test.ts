@@ -1,6 +1,6 @@
 /**
  * Guard Rails vNext - Recipe Adaptation Adapter Tests
- * 
+ *
  * Unit tests for the recipe adaptation adapter.
  */
 
@@ -10,7 +10,9 @@ import { mapRecipeDraftToGuardrailsTargets } from './recipe-adaptation';
 import type { RecipeAdaptationDraft } from '@/src/app/(app)/recipes/[recipeId]/recipe-ai.types';
 
 // Helper to create a minimal draft
-function createDraft(overrides?: Partial<RecipeAdaptationDraft>): RecipeAdaptationDraft {
+function createDraft(
+  overrides?: Partial<RecipeAdaptationDraft>,
+): RecipeAdaptationDraft {
   return {
     analysis: {
       violations: [],
@@ -156,9 +158,7 @@ describe('mapRecipeDraftToGuardrailsTargets', () => {
         rewrite: {
           title: 'Test Recipe',
           ingredients: [],
-          steps: [
-            { step: 1, text: 'KOOK DE PASTA' },
-          ],
+          steps: [{ step: 1, text: 'KOOK DE PASTA' }],
         },
       });
 
@@ -259,11 +259,11 @@ describe('mapRecipeDraftToGuardrailsTargets', () => {
       // Paths should be identical
       assert.deepStrictEqual(
         result1.ingredient.map((a) => a.path),
-        result2.ingredient.map((a) => a.path)
+        result2.ingredient.map((a) => a.path),
       );
       assert.deepStrictEqual(
         result1.step.map((a) => a.path),
-        result2.step.map((a) => a.path)
+        result2.step.map((a) => a.path),
       );
     });
   });

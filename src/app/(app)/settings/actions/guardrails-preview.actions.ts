@@ -1,10 +1,17 @@
-"use server";
+'use server';
 
-import { isAdmin } from "@/src/lib/auth/roles";
-import type { ActionResult } from "@/src/lib/types";
-import { loadGuardrailsRuleset, evaluateGuardrails } from "@/src/lib/guardrails-vnext";
-import type { TextAtom, GuardDecision, GuardRuleMatch } from "@/src/lib/guardrails-vnext/types";
-import { getGuardReasonLabel } from "@/src/lib/guardrails-vnext/ui/reasonLabels";
+import { isAdmin } from '@/src/lib/auth/roles';
+import type { ActionResult } from '@/src/lib/types';
+import {
+  loadGuardrailsRuleset,
+  evaluateGuardrails,
+} from '@/src/lib/guardrails-vnext';
+import type {
+  TextAtom,
+  GuardDecision,
+  GuardRuleMatch,
+} from '@/src/lib/guardrails-vnext/types';
+import { getGuardReasonLabel } from '@/src/lib/guardrails-vnext/ui/reasonLabels';
 
 /**
  * Preview evaluation input.
@@ -23,7 +30,7 @@ export type GuardrailsPreviewInput = {
  * Preview evaluation result view model
  */
 export type GuardrailsPreviewResult = {
-  outcome: "allowed" | "blocked" | "warned";
+  outcome: 'allowed' | 'blocked' | 'warned';
   ok: boolean;
   /** Korte uitleg waarom het recept wel/niet voldoet. */
   explanation: string;
@@ -65,28 +72,34 @@ function parsePastedRecipeText(raw: string): {
 } {
   const lines = raw.split(/\r?\n/).map((l) => l.trim());
   const ingredientHeaders = [
-    "ingrediënten",
-    "ingredients",
-    "ingredienten",
-    "benodigdheden",
+    'ingrediënten',
+    'ingredients',
+    'ingredienten',
+    'benodigdheden',
   ];
   const stepHeaders = [
-    "bereiding",
-    "instructies",
-    "stappen",
-    "instructions",
-    "steps",
-    "directions",
-    "method",
-    "wijze van bereiding",
-    "voorbereiding",
-    "preparation",
+    'bereiding',
+    'instructies',
+    'stappen',
+    'instructions',
+    'steps',
+    'directions',
+    'method',
+    'wijze van bereiding',
+    'voorbereiding',
+    'preparation',
   ];
-  const metadataHeaders = ["metadata", "tags", "categorieën", "categorie", "kenmerken"];
+  const metadataHeaders = [
+    'metadata',
+    'tags',
+    'categorieën',
+    'categorie',
+    'kenmerken',
+  ];
 
-  type Section = "ingredients" | "steps" | "metadata" | "unknown";
+  type Section = 'ingredients' | 'steps' | 'metadata' | 'unknown';
   const sections: { section: Section; lines: string[] }[] = [];
-  let current: Section = "ingredients";
+  let current: Section = 'ingredients';
   let currentLines: string[] = [];
 
   function flush() {
@@ -98,10 +111,10 @@ function parsePastedRecipeText(raw: string): {
 
   function stripListMarker(s: string): string {
     return s
-      .replace(/^[-*•]\s*/, "")
-      .replace(/^\d+[.)]\s*/, "")
-      .replace(/^stap\s+\d+[.:]\s*/i, "")
-      .replace(/^step\s+\d+[.:]\s*/i, "")
+      .replace(/^[-*•]\s*/, '')
+      .replace(/^\d+[.)]\s*/, '')
+      .replace(/^stap\s+\d+[.:]\s*/i, '')
+      .replace(/^step\s+\d+[.:]\s*/i, '')
       .trim();
   }
 
@@ -110,23 +123,23 @@ function parsePastedRecipeText(raw: string): {
     let next: Section | null = null;
 
     for (const h of ingredientHeaders) {
-      if (lower === h || lower.startsWith(h + ":") || lower === h + " ") {
-        next = "ingredients";
+      if (lower === h || lower.startsWith(h + ':') || lower === h + ' ') {
+        next = 'ingredients';
         break;
       }
     }
     if (!next) {
       for (const h of stepHeaders) {
-        if (lower === h || lower.startsWith(h + ":") || lower === h + " ") {
-          next = "steps";
+        if (lower === h || lower.startsWith(h + ':') || lower === h + ' ') {
+          next = 'steps';
           break;
         }
       }
     }
     if (!next) {
       for (const h of metadataHeaders) {
-        if (lower === h || lower.startsWith(h + ":") || lower === h + " ") {
-          next = "metadata";
+        if (lower === h || lower.startsWith(h + ':') || lower === h + ' ') {
+          next = 'metadata';
           break;
         }
       }
@@ -135,7 +148,7 @@ function parsePastedRecipeText(raw: string): {
     if (next) {
       flush();
       current = next;
-      const afterColon = line.replace(/^[^:]*:\s*/i, "").trim();
+      const afterColon = line.replace(/^[^:]*:\s*/i, '').trim();
       if (afterColon) currentLines.push(stripListMarker(afterColon));
     } else if (line) {
       currentLines.push(stripListMarker(line));
@@ -143,9 +156,13 @@ function parsePastedRecipeText(raw: string): {
   }
   flush();
 
-  const bySection = { ingredients: [] as string[], steps: [] as string[], metadata: [] as string[] };
+  const bySection = {
+    ingredients: [] as string[],
+    steps: [] as string[],
+    metadata: [] as string[],
+  };
   for (const { section, lines: ls } of sections) {
-    if (section !== "unknown") {
+    if (section !== 'unknown') {
       bySection[section].push(...ls.filter((l) => l.length > 0));
     }
   }
@@ -165,9 +182,9 @@ function parsePastedRecipeText(raw: string): {
   }
 
   return {
-    ingredients: bySection.ingredients.join("\n"),
-    steps: bySection.steps.join("\n"),
-    metadata: bySection.metadata.join("\n"),
+    ingredients: bySection.ingredients.join('\n'),
+    steps: bySection.steps.join('\n'),
+    metadata: bySection.metadata.join('\n'),
   };
 }
 
@@ -176,71 +193,75 @@ function parsePastedRecipeText(raw: string): {
  */
 function parseTextareaToAtoms(
   text: string,
-  prefix: "ingredients" | "steps" | "metadata"
+  prefix: 'ingredients' | 'steps' | 'metadata',
 ): TextAtom[] {
   return text
-    .split("\n")
+    .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
     .map((line, index) => ({
       text: line.toLowerCase(),
       path: `${prefix}[${index}]`,
-      locale: "nl" as const,
+      locale: 'nl' as const,
     }));
 }
 
 /**
  * Evaluate guard rails for preview (admin only)
- * 
+ *
  * @param input - Preview input (dietTypeId, ingredients, steps, metadata)
  * @returns Preview evaluation result
  */
 export async function evaluateDietGuardrailsAction(
-  input: GuardrailsPreviewInput
+  input: GuardrailsPreviewInput,
 ): Promise<ActionResult<GuardrailsPreviewResult>> {
   const admin = await isAdmin();
   if (!admin) {
-    return { error: "Geen toegang: alleen admins kunnen guard rails evalueren" };
+    return {
+      error: 'Geen toegang: alleen admins kunnen guard rails evalueren',
+    };
   }
 
   if (!input.dietTypeId) {
-    return { error: "Diet ID is vereist" };
+    return { error: 'Diet ID is vereist' };
   }
 
-  const hasRecipe = (input.recipeText ?? "").trim().length > 0;
+  const hasRecipe = (input.recipeText ?? '').trim().length > 0;
   const hasParts =
-    ((input.ingredients ?? "").trim().length > 0) ||
-    ((input.steps ?? "").trim().length > 0) ||
-    ((input.metadata ?? "").trim().length > 0);
+    (input.ingredients ?? '').trim().length > 0 ||
+    (input.steps ?? '').trim().length > 0 ||
+    (input.metadata ?? '').trim().length > 0;
   if (!hasRecipe && !hasParts) {
-    return { error: "Plak een recept of vul ingrediënten/stappen/metadata in." };
+    return {
+      error: 'Plak een recept of vul ingrediënten/stappen/metadata in.',
+    };
   }
 
   const parsed = hasRecipe
     ? parsePastedRecipeText(input.recipeText!.trim())
     : null;
-  const ingredients = parsed?.ingredients ?? (input.ingredients ?? "");
-  const steps = parsed?.steps ?? (input.steps ?? "");
-  const metadata = parsed?.metadata ?? (input.metadata ?? "");
+  const ingredients = parsed?.ingredients ?? input.ingredients ?? '';
+  const steps = parsed?.steps ?? input.steps ?? '';
+  const metadata = parsed?.metadata ?? input.metadata ?? '';
 
   try {
     // Load ruleset
     const ruleset = await loadGuardrailsRuleset({
       dietId: input.dietTypeId,
-      mode: "recipe_adaptation",
-      locale: "nl",
+      mode: 'recipe_adaptation',
+      locale: 'nl',
     });
 
     // Parse inputs to TextAtoms
-    const ingredientAtoms = parseTextareaToAtoms(ingredients, "ingredients");
-    const stepAtoms = parseTextareaToAtoms(steps, "steps");
-    const metadataAtoms = parseTextareaToAtoms(metadata, "metadata");
+    const ingredientAtoms = parseTextareaToAtoms(ingredients, 'ingredients');
+    const stepAtoms = parseTextareaToAtoms(steps, 'steps');
+    const metadataAtoms = parseTextareaToAtoms(metadata, 'metadata');
 
     // Build evaluation context
     const context = {
       dietId: input.dietTypeId,
-      locale: "nl" as const,
-      mode: "recipe_adaptation" as const,
+      locale: 'nl' as const,
+      mode: 'recipe_adaptation' as const,
       timestamp: new Date().toISOString(),
     };
 
@@ -271,55 +292,57 @@ export async function evaluateDietGuardrailsAction(
       // Find rule to determine action
       const rule = ruleset.rules.find((r) => r.id === match.ruleId);
       if (rule) {
-        if (rule.action === "allow") {
+        if (rule.action === 'allow') {
           matchesByAction.allow++;
-        } else if (rule.action === "block") {
+        } else if (rule.action === 'block') {
           matchesByAction.block++;
         }
       }
 
       // Count by target path
-      if (match.targetPath.startsWith("ingredients[")) {
+      if (match.targetPath.startsWith('ingredients[')) {
         matchesByTarget.ingredient++;
-      } else if (match.targetPath.startsWith("steps[")) {
+      } else if (match.targetPath.startsWith('steps[')) {
         matchesByTarget.step++;
-      } else if (match.targetPath.startsWith("metadata[")) {
+      } else if (match.targetPath.startsWith('metadata[')) {
         matchesByTarget.metadata++;
       }
     }
 
     // Get top 5 matches (prioritize applied rules)
-    const topMatches = decision.matches
-      .slice(0, 5)
-      .map((match) => {
-        const rule = ruleset.rules.find((r) => r.id === match.ruleId);
-        return {
-          ruleId: match.ruleId,
-          ruleLabel: rule?.metadata.label,
-          matchedText: match.matchedText.length > 80 
-            ? match.matchedText.substring(0, 80) + "..." 
+    const topMatches = decision.matches.slice(0, 5).map((match) => {
+      const rule = ruleset.rules.find((r) => r.id === match.ruleId);
+      return {
+        ruleId: match.ruleId,
+        ruleLabel: rule?.metadata.label,
+        matchedText:
+          match.matchedText.length > 80
+            ? match.matchedText.substring(0, 80) + '...'
             : match.matchedText,
-          targetPath: match.targetPath,
-          matchMode: match.matchMode,
-        };
-      });
+        targetPath: match.targetPath,
+        matchMode: match.matchMode,
+      };
+    });
 
     const blockMatches = decision.matches.filter((m) => {
       const r = ruleset.rules.find((x) => x.id === m.ruleId);
-      return r?.action === "block";
+      return r?.action === 'block';
     });
     const explanation = decision.ok
-      ? "Dit recept voldoet aan de actieve dieetregels."
+      ? 'Dit recept voldoet aan de actieve dieetregels.'
       : [
-          "Dit recept voldoet niet aan de dieetregels:",
+          'Dit recept voldoet niet aan de dieetregels:',
           ...decision.reasonCodes.map((c) => getGuardReasonLabel(c)),
           ...blockMatches.slice(0, 3).map((m) => {
             const r = ruleset.rules.find((x) => x.id === m.ruleId);
             const label = r?.metadata?.label ?? m.ruleId;
-            const snip = m.matchedText.length > 60 ? m.matchedText.slice(0, 60) + "…" : m.matchedText;
+            const snip =
+              m.matchedText.length > 60
+                ? m.matchedText.slice(0, 60) + '…'
+                : m.matchedText;
             return `${label} (${snip})`;
           }),
-        ].join(" ");
+        ].join(' ');
 
     const result: GuardrailsPreviewResult = {
       outcome: decision.outcome,
@@ -340,9 +363,9 @@ export async function evaluateDietGuardrailsAction(
 
     return { data: result };
   } catch (error) {
-    console.error("Error evaluating guard rails:", error);
+    console.error('Error evaluating guard rails:', error);
     return {
-      error: `Fout bij evalueren guard rails: ${error instanceof Error ? error.message : "Onbekende fout"}`,
+      error: `Fout bij evalueren guard rails: ${error instanceof Error ? error.message : 'Onbekende fout'}`,
     };
   }
 }

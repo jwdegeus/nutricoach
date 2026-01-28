@@ -14,16 +14,13 @@ export type {
   DietLogicTargets,
   DietLogicPhaseResult,
   DietLogicEvaluationResult,
-} from "./types";
+} from './types';
 
-export {
-  DIET_LOGIC_PRIORITY,
-  DIET_LOGIC_LABELS,
-} from "./types";
+export { DIET_LOGIC_PRIORITY, DIET_LOGIC_LABELS } from './types';
 
 export {
   loadDietLogicRuleset,
   loadDietLogicRulesetForUser,
   type LoadDietLogicOptions,
-} from "./loader";
-export { evaluateDietLogic } from "./evaluator";
+} from './loader';
+export { evaluateDietLogic } from './evaluator';

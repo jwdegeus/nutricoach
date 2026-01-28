@@ -1,6 +1,6 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
+import { createClient } from '@/src/lib/supabase/server';
 
 export type DietType = {
   id: string;
@@ -16,14 +16,14 @@ export async function getDietTypes(): Promise<DietType[]> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from("diet_types")
-    .select("id, name, description, display_order")
-    .eq("is_active", true)
-    .order("display_order", { ascending: true })
-    .order("name", { ascending: true });
+    .from('diet_types')
+    .select('id, name, description, display_order')
+    .eq('is_active', true)
+    .order('display_order', { ascending: true })
+    .order('name', { ascending: true });
 
   if (error) {
-    console.error("Error fetching diet types:", error);
+    console.error('Error fetching diet types:', error);
     // Return empty array on error (graceful degradation)
     return [];
   }

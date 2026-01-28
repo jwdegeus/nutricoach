@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   Dialog,
@@ -6,8 +6,8 @@ import {
   DialogDescription,
   DialogBody,
   DialogActions,
-} from "@/components/catalyst/dialog";
-import { Button } from "@/components/catalyst/button";
+} from '@/components/catalyst/dialog';
+import { Button } from '@/components/catalyst/button';
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -17,7 +17,7 @@ type ConfirmDialogProps = {
   description: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  confirmColor?: "red" | "zinc" | "blue";
+  confirmColor?: 'red' | 'zinc' | 'blue';
   isLoading?: boolean;
 };
 
@@ -27,9 +27,9 @@ export function ConfirmDialog({
   onConfirm,
   title,
   description,
-  confirmLabel = "Bevestigen",
-  cancelLabel = "Annuleren",
-  confirmColor = "red",
+  confirmLabel = 'Bevestigen',
+  cancelLabel = 'Annuleren',
+  confirmColor = 'red',
   isLoading = false,
 }: ConfirmDialogProps) {
   const handleConfirm = () => {
@@ -40,9 +40,7 @@ export function ConfirmDialog({
     <Dialog open={open} onClose={onClose}>
       <DialogTitle>{title}</DialogTitle>
       <DialogDescription>{description}</DialogDescription>
-      <DialogBody>
-        {/* Empty body - description is already shown */}
-      </DialogBody>
+      <DialogBody>{/* Empty body - description is already shown */}</DialogBody>
       <DialogActions>
         <Button outline onClick={onClose} disabled={isLoading}>
           {cancelLabel}
@@ -52,7 +50,7 @@ export function ConfirmDialog({
           onClick={handleConfirm}
           disabled={isLoading}
         >
-          {isLoading ? "Bezig..." : confirmLabel}
+          {isLoading ? 'Bezig...' : confirmLabel}
         </Button>
       </DialogActions>
     </Dialog>

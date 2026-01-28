@@ -1,11 +1,11 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/src/lib/supabase/server";
-import { isAdmin } from "@/src/lib/auth/roles";
-import { DietTypesAdminClient } from "./components/DietTypesAdminClient";
+import { redirect } from 'next/navigation';
+import { createClient } from '@/src/lib/supabase/server';
+import { isAdmin } from '@/src/lib/auth/roles';
+import { DietTypesAdminClient } from './components/DietTypesAdminClient';
 
 export const metadata = {
-  title: "Dieettypes Beheer | NutriCoach Admin",
-  description: "Beheer dieettypes",
+  title: 'Dieettypes Beheer | NutriCoach Admin',
+  description: 'Beheer dieettypes',
 };
 
 export default async function DietTypesAdminPage() {
@@ -15,12 +15,12 @@ export default async function DietTypesAdminPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   const userIsAdmin = await isAdmin();
   if (!userIsAdmin) {
-    redirect("/dashboard");
+    redirect('/dashboard');
   }
 
   return <DietTypesAdminClient />;

@@ -1,13 +1,17 @@
-"use client";
+'use client';
 
-import { useState, useTransition, useEffect } from "react";
-import { updateLanguagePreference } from "./account-actions";
-import { Button } from "@/components/catalyst/button";
-import { Field, FieldGroup, Label, Description } from "@/components/catalyst/fieldset";
-import { Text } from "@/components/catalyst/text";
-import { Select } from "@/components/catalyst/select";
-import { useTranslations, useLocale } from "next-intl";
-import { useRouter } from "next/navigation";
+import { useState, useTransition, useEffect } from 'react';
+import { updateLanguagePreference } from './account-actions';
+import {
+  Field,
+  FieldGroup,
+  Label,
+  Description,
+} from '@/components/catalyst/fieldset';
+import { Text } from '@/components/catalyst/text';
+import { Select } from '@/components/catalyst/select';
+import { useTranslations, useLocale } from 'next-intl';
+import { useRouter } from 'next/navigation';
 
 export function LanguageSelector() {
   const t = useTranslations('account');
@@ -27,7 +31,7 @@ export function LanguageSelector() {
     setSelectedLanguage(newLanguage);
     setError(null);
     setSuccess(null);
-    
+
     startTransition(async () => {
       const result = await updateLanguagePreference(newLanguage);
       if (result?.error) {
@@ -47,9 +51,7 @@ export function LanguageSelector() {
         <h2 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
           {t('languagePreference')}
         </h2>
-        <Text className="mt-1">
-          {t('languageDescription')}
-        </Text>
+        <Text className="mt-1">{t('languageDescription')}</Text>
       </div>
 
       {error && (

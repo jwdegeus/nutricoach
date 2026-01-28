@@ -1,14 +1,19 @@
-"use client";
+'use client';
 
-import { useState, useTransition } from "react";
-import { updateProfile } from "./account-actions";
-import { Button } from "@/components/catalyst/button";
-import { Input } from "@/components/catalyst/input";
-import { Field, FieldGroup, Label, Description } from "@/components/catalyst/fieldset";
-import { Text } from "@/components/catalyst/text";
-import type { User } from "@supabase/supabase-js";
-import { useTranslations } from "next-intl";
-import { LanguageSelector } from "./language-selector";
+import { useState, useTransition } from 'react';
+import { updateProfile } from './account-actions';
+import { Button } from '@/components/catalyst/button';
+import { Input } from '@/components/catalyst/input';
+import {
+  Field,
+  FieldGroup,
+  Label,
+  Description,
+} from '@/components/catalyst/fieldset';
+import { Text } from '@/components/catalyst/text';
+import type { User } from '@supabase/supabase-js';
+import { useTranslations } from 'next-intl';
+import { LanguageSelector } from './language-selector';
 
 interface AccountProfileProps {
   user: User;
@@ -35,8 +40,8 @@ export function AccountProfile({ user }: AccountProfileProps) {
   }
 
   const userMetadata = user.user_metadata || {};
-  const fullName = userMetadata.full_name || "";
-  const displayName = userMetadata.display_name || "";
+  const fullName = userMetadata.full_name || '';
+  const displayName = userMetadata.display_name || '';
 
   return (
     <div className="space-y-8">
@@ -57,9 +62,7 @@ export function AccountProfile({ user }: AccountProfileProps) {
           <h2 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
             {t('profileData')}
           </h2>
-          <Text className="mt-1">
-            {t('profileDescription')}
-          </Text>
+          <Text className="mt-1">{t('profileDescription')}</Text>
         </div>
         <form action={handleSubmit}>
           <FieldGroup>
@@ -69,7 +72,7 @@ export function AccountProfile({ user }: AccountProfileProps) {
               <Input
                 id="email"
                 type="email"
-                value={user.email || ""}
+                value={user.email || ''}
                 disabled
               />
             </Field>
@@ -119,10 +122,10 @@ export function AccountProfile({ user }: AccountProfileProps) {
               {t('accountCreated')}
             </span>
             <span className="text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
-              {new Date(user.created_at).toLocaleDateString("nl-NL", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
+              {new Date(user.created_at).toLocaleDateString('nl-NL', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
               })}
             </span>
           </div>
@@ -132,12 +135,12 @@ export function AccountProfile({ user }: AccountProfileProps) {
             </span>
             <span className="text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
               {user.last_sign_in_at
-                ? new Date(user.last_sign_in_at).toLocaleDateString("nl-NL", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
+                ? new Date(user.last_sign_in_at).toLocaleDateString('nl-NL', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
                   })
                 : t('neverLoggedIn')}
             </span>

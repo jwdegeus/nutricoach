@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/src/lib/supabase/server";
-import { isAdmin } from "@/src/lib/auth/roles";
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/src/lib/supabase/server';
+import { isAdmin } from '@/src/lib/auth/roles';
 
 /**
  * DELETE /api/admin/recipe-sources/[id]
@@ -8,7 +8,7 @@ import { isAdmin } from "@/src/lib/auth/roles";
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const userIsAdmin = await isAdmin();
@@ -17,11 +17,11 @@ export async function DELETE(
         {
           ok: false,
           error: {
-            code: "AUTH_ERROR",
-            message: "Alleen admins kunnen bronnen verwijderen",
+            code: 'AUTH_ERROR',
+            message: 'Alleen admins kunnen bronnen verwijderen',
           },
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -32,11 +32,11 @@ export async function DELETE(
         {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "ID is vereist",
+            code: 'VALIDATION_ERROR',
+            message: 'ID is vereist',
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -44,9 +44,9 @@ export async function DELETE(
 
     // Check if source exists and get usage count
     const { data: source } = await supabase
-      .from("recipe_sources")
-      .select("id, name, usage_count, is_system")
-      .eq("id", id)
+      .from('recipe_sources')
+      .select('id, name, usage_count, is_system')
+      .eq('id', id)
       .maybeSingle();
 
     if (!source) {
@@ -54,11 +54,11 @@ export async function DELETE(
         {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Bron niet gevonden",
+            code: 'VALIDATION_ERROR',
+            message: 'Bron niet gevonden',
           },
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -68,45 +68,49 @@ export async function DELETE(
         {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Systeembronnen die in gebruik zijn kunnen niet worden verwijderd",
+            code: 'VALIDATION_ERROR',
+            message:
+              'Systeembronnen die in gebruik zijn kunnen niet worden verwijderd',
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Delete the source
-    const { error } = await supabase.from("recipe_sources").delete().eq("id", id);
+    const { error } = await supabase
+      .from('recipe_sources')
+      .delete()
+      .eq('id', id);
 
     if (error) {
       return NextResponse.json(
         {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: error.message,
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     return NextResponse.json({
       ok: true,
-      data: { message: "Bron verwijderd" },
+      data: { message: 'Bron verwijderd' },
     });
   } catch (error) {
-    console.error("Error deleting recipe source:", error);
+    console.error('Error deleting recipe source:', error);
     return NextResponse.json(
       {
         ok: false,
         error: {
-          code: "DELETE_ERROR",
-          message: error instanceof Error ? error.message : "Onbekende fout",
+          code: 'DELETE_ERROR',
+          message: error instanceof Error ? error.message : 'Onbekende fout',
         },
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

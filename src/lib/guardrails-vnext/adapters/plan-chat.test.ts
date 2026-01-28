@@ -1,6 +1,6 @@
 /**
  * Guard Rails vNext - Plan Chat Adapter Tests
- * 
+ *
  * Unit tests for the plan chat adapter.
  */
 
@@ -23,7 +23,9 @@ function createPlanEdit(overrides?: Partial<PlanEdit>): PlanEdit {
 }
 
 // Helper to create a minimal meal plan
-function createMealPlan(overrides?: Partial<MealPlanResponse>): MealPlanResponse {
+function createMealPlan(
+  overrides?: Partial<MealPlanResponse>,
+): MealPlanResponse {
   return {
     requestId: 'test-request',
     days: [],
@@ -41,7 +43,10 @@ describe('mapPlanEditToGuardrailsTargets', () => {
       const result = mapPlanEditToGuardrailsTargets(edit, undefined, 'nl');
 
       assert.strictEqual(result.metadata.length, 1);
-      assert.strictEqual(result.metadata[0].text, 'replace breakfast with eggs and bacon');
+      assert.strictEqual(
+        result.metadata[0].text,
+        'replace breakfast with eggs and bacon',
+      );
       assert.strictEqual(result.metadata[0].path, 'edit.userIntentSummary');
       assert.strictEqual(result.metadata[0].locale, 'nl');
     });
@@ -72,9 +77,15 @@ describe('mapPlanEditToGuardrailsTargets', () => {
 
       assert.strictEqual(result.ingredient.length, 2);
       assert.strictEqual(result.ingredient[0].text, 'pasta');
-      assert.strictEqual(result.ingredient[0].path, 'edit.constraints.avoidIngredients[0]');
+      assert.strictEqual(
+        result.ingredient[0].path,
+        'edit.constraints.avoidIngredients[0]',
+      );
       assert.strictEqual(result.ingredient[1].text, 'dairy');
-      assert.strictEqual(result.ingredient[1].path, 'edit.constraints.avoidIngredients[1]');
+      assert.strictEqual(
+        result.ingredient[1].path,
+        'edit.constraints.avoidIngredients[1]',
+      );
     });
 
     it('should filter empty strings', () => {
@@ -87,7 +98,11 @@ describe('mapPlanEditToGuardrailsTargets', () => {
 
       // Should only have 1 note (empty userIntentSummary filtered, empty notes filtered)
       // userIntentSummary '   ' becomes '' after trim, so it's filtered out
-      assert.strictEqual(result.metadata.length, 1, `Expected 1 metadata, got ${result.metadata.length}: ${result.metadata.map(m => `${m.text} (${m.path})`).join(', ')}`);
+      assert.strictEqual(
+        result.metadata.length,
+        1,
+        `Expected 1 metadata, got ${result.metadata.length}: ${result.metadata.map((m) => `${m.text} (${m.path})`).join(', ')}`,
+      );
       const validNote = result.metadata.find((m) => m.path.includes('notes'));
       assert(validNote, 'Should have valid note in metadata');
       assert.strictEqual(validNote.text, 'valid note');
@@ -105,8 +120,14 @@ describe('mapPlanEditToGuardrailsTargets', () => {
       const result = mapPlanEditToGuardrailsTargets(edit, undefined, 'nl');
 
       // Check that all text is lowercased (order may vary)
-      assert(result.metadata.some((m) => m.text === 'replace breakfast'), 'Should contain lowercased userIntentSummary');
-      assert(result.metadata.some((m) => m.text === 'high protein'), 'Should contain lowercased note');
+      assert(
+        result.metadata.some((m) => m.text === 'replace breakfast'),
+        'Should contain lowercased userIntentSummary',
+      );
+      assert(
+        result.metadata.some((m) => m.text === 'high protein'),
+        'Should contain lowercased note',
+      );
       assert.strictEqual(result.ingredient[0].text, 'pasta');
     });
   });
@@ -140,9 +161,18 @@ describe('mapPlanEditToGuardrailsTargets', () => {
 
       // Should have edit metadata + plan snapshot ingredients + meal name
       // Metadata: userIntentSummary + meal name from snapshot
-      assert(result.metadata.length >= 1, `Expected at least 1 metadata, got ${result.metadata.length}`);
-      assert(result.ingredient.length >= 1, `Expected at least 1 ingredient, got ${result.ingredient.length}`);
-      assert(result.ingredient.some((ing) => ing.text === 'eieren'), 'Should contain eieren ingredient');
+      assert(
+        result.metadata.length >= 1,
+        `Expected at least 1 metadata, got ${result.metadata.length}`,
+      );
+      assert(
+        result.ingredient.length >= 1,
+        `Expected at least 1 ingredient, got ${result.ingredient.length}`,
+      );
+      assert(
+        result.ingredient.some((ing) => ing.text === 'eieren'),
+        'Should contain eieren ingredient',
+      );
     });
 
     it('should include both edit and snapshot ingredients (different paths)', () => {
@@ -176,10 +206,18 @@ describe('mapPlanEditToGuardrailsTargets', () => {
       // Should have ingredients from both edit and snapshot (different paths, so both included)
       // Edit has: avoidIngredients: ['pasta'] -> ingredient with path 'edit.constraints.avoidIngredients[0]'
       // Snapshot has: displayName: 'Pasta' -> ingredient with path 'days[0].meals[0].ingredients[0]'
-      assert(result.ingredient.length >= 1, `Should have at least 1 ingredient, got ${result.ingredient.length}`);
+      assert(
+        result.ingredient.length >= 1,
+        `Should have at least 1 ingredient, got ${result.ingredient.length}`,
+      );
       // Check that we have pasta ingredient (from either source)
-      const pastaIngredients = result.ingredient.filter((ing) => ing.text === 'pasta');
-      assert(pastaIngredients.length >= 1, `Should contain pasta ingredient. Got: ${result.ingredient.map(i => `${i.text} (${i.path})`).join(', ')}`);
+      const pastaIngredients = result.ingredient.filter(
+        (ing) => ing.text === 'pasta',
+      );
+      assert(
+        pastaIngredients.length >= 1,
+        `Should contain pasta ingredient. Got: ${result.ingredient.map((i) => `${i.text} (${i.path})`).join(', ')}`,
+      );
     });
   });
 
@@ -223,11 +261,11 @@ describe('mapPlanEditToGuardrailsTargets', () => {
       // Paths should be identical
       assert.deepStrictEqual(
         result1.metadata.map((a) => a.path),
-        result2.metadata.map((a) => a.path)
+        result2.metadata.map((a) => a.path),
       );
       assert.deepStrictEqual(
         result1.ingredient.map((a) => a.path),
-        result2.ingredient.map((a) => a.path)
+        result2.ingredient.map((a) => a.path),
       );
     });
   });

@@ -1,29 +1,29 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Placeholder from "@tiptap/extension-placeholder";
-import { Button } from "@/components/catalyst/button";
+import { useState } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
+import { Button } from '@/components/catalyst/button';
 import {
   BoldIcon,
   ItalicIcon,
   ListBulletIcon,
   NumberedListIcon,
-} from "@heroicons/react/20/solid";
+} from '@heroicons/react/20/solid';
 
 type RecipeNotesEditorProps = {
   initialContent: string | null;
   onSave: (content: string) => Promise<void>;
   mealId: string;
-  source: "custom" | "gemini";
+  source: 'custom' | 'gemini';
 };
 
 export function RecipeNotesEditor({
   initialContent,
   onSave,
-  mealId,
-  source,
+  mealId: _mealId,
+  source: _source,
 }: RecipeNotesEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -33,15 +33,16 @@ export function RecipeNotesEditor({
         },
       }),
       Placeholder.configure({
-        placeholder: "Voeg hier je notities toe... Je kunt tekst opmaken met vet, cursief, lijsten, etc.",
+        placeholder:
+          'Voeg hier je notities toe... Je kunt tekst opmaken met vet, cursief, lijsten, etc.',
       }),
     ],
-    content: initialContent || "",
+    content: initialContent || '',
     immediatelyRender: false,
     editorProps: {
       attributes: {
         class:
-          "prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-[150px] text-zinc-900 dark:text-zinc-100",
+          'prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-[150px] text-zinc-900 dark:text-zinc-100',
       },
     },
   });
@@ -63,7 +64,7 @@ export function RecipeNotesEditor({
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fout bij opslaan");
+      setError(err instanceof Error ? err.message : 'Fout bij opslaan');
     } finally {
       setIsSaving(false);
     }
@@ -72,7 +73,9 @@ export function RecipeNotesEditor({
   if (!editor) {
     return (
       <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        <div className="text-sm text-zinc-500 dark:text-zinc-400">Editor wordt geladen...</div>
+        <div className="text-sm text-zinc-500 dark:text-zinc-400">
+          Editor wordt geladen...
+        </div>
       </div>
     );
   }
@@ -84,7 +87,8 @@ export function RecipeNotesEditor({
           Notities
         </h3>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Voeg je eigen notities toe aan dit recept. Je kunt tekst opmaken met vet, cursief, lijsten en meer.
+          Voeg je eigen notities toe aan dit recept. Je kunt tekst opmaken met
+          vet, cursief, lijsten en meer.
         </p>
       </div>
 
@@ -94,7 +98,9 @@ export function RecipeNotesEditor({
           plain
           onClick={() => editor.chain().focus().toggleBold().run()}
           disabled={!editor.can().chain().focus().toggleBold().run()}
-          className={editor.isActive("bold") ? "bg-zinc-200 dark:bg-zinc-700" : ""}
+          className={
+            editor.isActive('bold') ? 'bg-zinc-200 dark:bg-zinc-700' : ''
+          }
         >
           <BoldIcon className="h-4 w-4" />
         </Button>
@@ -102,7 +108,9 @@ export function RecipeNotesEditor({
           plain
           onClick={() => editor.chain().focus().toggleItalic().run()}
           disabled={!editor.can().chain().focus().toggleItalic().run()}
-          className={editor.isActive("italic") ? "bg-zinc-200 dark:bg-zinc-700" : ""}
+          className={
+            editor.isActive('italic') ? 'bg-zinc-200 dark:bg-zinc-700' : ''
+          }
         >
           <ItalicIcon className="h-4 w-4" />
         </Button>
@@ -110,14 +118,18 @@ export function RecipeNotesEditor({
         <Button
           plain
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={editor.isActive("bulletList") ? "bg-zinc-200 dark:bg-zinc-700" : ""}
+          className={
+            editor.isActive('bulletList') ? 'bg-zinc-200 dark:bg-zinc-700' : ''
+          }
         >
           <ListBulletIcon className="h-4 w-4" />
         </Button>
         <Button
           plain
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={editor.isActive("orderedList") ? "bg-zinc-200 dark:bg-zinc-700" : ""}
+          className={
+            editor.isActive('orderedList') ? 'bg-zinc-200 dark:bg-zinc-700' : ''
+          }
         >
           <NumberedListIcon className="h-4 w-4" />
         </Button>
@@ -127,7 +139,7 @@ export function RecipeNotesEditor({
       <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg min-h-[200px] bg-white dark:bg-zinc-900">
         <EditorContent editor={editor} />
       </div>
-      
+
       <style jsx global>{`
         .ProseMirror {
           outline: none;
@@ -170,15 +182,13 @@ export function RecipeNotesEditor({
             <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           )}
           {success && (
-            <p className="text-sm text-green-600 dark:text-green-400">Notities opgeslagen!</p>
+            <p className="text-sm text-green-600 dark:text-green-400">
+              Notities opgeslagen!
+            </p>
           )}
         </div>
-        <Button
-          onClick={handleSave}
-          disabled={isSaving}
-          color="primary"
-        >
-          {isSaving ? "Opslaan..." : "Opslaan"}
+        <Button onClick={handleSave} disabled={isSaving} color="primary">
+          {isSaving ? 'Opslaan...' : 'Opslaan'}
         </Button>
       </div>
     </div>

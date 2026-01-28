@@ -1,11 +1,11 @@
-import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { createClient } from "@/src/lib/supabase/server";
-import { RecipeDetailPageClientLoader } from "./components/RecipeDetailPageClientLoader";
+import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/src/lib/supabase/server';
+import { RecipeDetailPageClientLoader } from './components/RecipeDetailPageClientLoader';
 
 export const metadata: Metadata = {
-  title: "Recept Details | NutriCoach",
-  description: "Bekijk details van een recept",
+  title: 'Recept Details | NutriCoach',
+  description: 'Bekijk details van een recept',
 };
 
 // Prevent automatic revalidation and caching issues
@@ -32,17 +32,21 @@ export default async function RecipeDetailPage({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   const { recipeId } = await params;
   const { source } = await searchParams;
-  const mealSource = (source === "gemini" ? "gemini" : "custom") as "custom" | "gemini";
+  const mealSource = (source === 'gemini' ? 'gemini' : 'custom') as
+    | 'custom'
+    | 'gemini';
 
   // Validate recipeId
-  if (!recipeId || recipeId === "undefined") {
-    redirect("/recipes");
+  if (!recipeId || recipeId === 'undefined') {
+    redirect('/recipes');
   }
 
-  return <RecipeDetailPageClientLoader mealId={recipeId} mealSource={mealSource} />;
+  return (
+    <RecipeDetailPageClientLoader mealId={recipeId} mealSource={mealSource} />
+  );
 }

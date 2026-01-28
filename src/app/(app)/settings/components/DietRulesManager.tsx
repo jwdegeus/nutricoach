@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect } from 'react';
 import {
   getDietRulesForAdmin,
   createDietRule,
@@ -8,23 +8,31 @@ import {
   deleteDietRule,
   type DietRuleInput,
   type DietRuleOutput,
-} from "../actions/diet-rules-admin.actions";
-import type { DietRuleType } from "@/src/app/(app)/onboarding/types/diet-rules.types";
-import { Button } from "@/components/catalyst/button";
-import { Input } from "@/components/catalyst/input";
-import { Field, FieldGroup, Label, Description } from "@/components/catalyst/fieldset";
-import { Text } from "@/components/catalyst/text";
-import { Textarea } from "@/components/catalyst/textarea";
-import { Checkbox, CheckboxField } from "@/components/catalyst/checkbox";
-import { Select } from "@/components/catalyst/select";
-import { ConfirmDialog } from "@/components/catalyst/confirm-dialog";
+} from '../actions/diet-rules-admin.actions';
+import type { DietRuleType } from '@/src/app/(app)/onboarding/types/diet-rules.types';
+import { Button } from '@/components/catalyst/button';
+import { Input } from '@/components/catalyst/input';
+import {
+  Field,
+  FieldGroup,
+  Label,
+  Description,
+} from '@/components/catalyst/fieldset';
+import { Text } from '@/components/catalyst/text';
+import { Textarea } from '@/components/catalyst/textarea';
+import { Checkbox, CheckboxField } from '@/components/catalyst/checkbox';
+import { Select } from '@/components/catalyst/select';
+import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
 
 type DietRulesManagerProps = {
   dietTypeId: string;
   dietTypeName: string;
 };
 
-export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerProps) {
+export function DietRulesManager({
+  dietTypeId,
+  dietTypeName,
+}: DietRulesManagerProps) {
   const [rules, setRules] = useState<DietRuleOutput[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,10 +46,10 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
 
   const [formData, setFormData] = useState<DietRuleInput>({
     dietTypeId,
-    ruleType: "exclude_ingredient",
-    ruleKey: "",
+    ruleType: 'exclude_ingredient',
+    ruleKey: '',
     ruleValue: {},
-    description: "",
+    description: '',
     priority: 50,
     isActive: true,
   });
@@ -57,13 +65,13 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
     setError(null);
     try {
       const result = await getDietRulesForAdmin(dietTypeId);
-      if ("error" in result) {
+      if ('error' in result) {
         setError(result.error);
       } else if (result.data) {
         setRules(result.data);
       }
     } catch (err) {
-      setError("Onverwachte fout bij laden regels");
+      setError('Onverwachte fout bij laden regels');
     } finally {
       setIsLoading(false);
     }
@@ -74,8 +82,8 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
       dietTypeId: rule.dietTypeId,
       ruleType: rule.ruleType,
       ruleKey: rule.ruleKey,
-      ruleValue: rule.ruleValue as DietRuleInput["ruleValue"],
-      description: rule.description || "",
+      ruleValue: rule.ruleValue as DietRuleInput['ruleValue'],
+      description: rule.description || '',
       priority: rule.priority,
       isActive: rule.isActive,
     });
@@ -88,10 +96,10 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
   function startCreate() {
     setFormData({
       dietTypeId,
-      ruleType: "exclude_ingredient",
-      ruleKey: "",
+      ruleType: 'exclude_ingredient',
+      ruleKey: '',
       ruleValue: {},
-      description: "",
+      description: '',
       priority: 50,
       isActive: true,
     });
@@ -106,10 +114,10 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
     setIsCreating(false);
     setFormData({
       dietTypeId,
-      ruleType: "exclude_ingredient",
-      ruleKey: "",
+      ruleType: 'exclude_ingredient',
+      ruleKey: '',
       ruleValue: {},
-      description: "",
+      description: '',
       priority: 50,
       isActive: true,
     });
@@ -133,7 +141,7 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
     setSuccess(null);
 
     if (!formData.ruleKey.trim()) {
-      setError("Regelkey is verplicht");
+      setError('Regelkey is verplicht');
       return;
     }
 
@@ -145,21 +153,23 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
         } else if (editingId) {
           result = await updateDietRule(editingId, formData);
         } else {
-          setError("Geen actie geselecteerd");
+          setError('Geen actie geselecteerd');
           return;
         }
 
-        if ("error" in result) {
+        if ('error' in result) {
           setError(result.error);
         } else {
           setSuccess(
-            isCreating ? "Regel succesvol aangemaakt" : "Regel succesvol bijgewerkt"
+            isCreating
+              ? 'Regel succesvol aangemaakt'
+              : 'Regel succesvol bijgewerkt',
           );
           cancelEdit();
           await loadRules();
         }
       } catch (err) {
-        setError("Onverwachte fout bij opslaan");
+        setError('Onverwachte fout bij opslaan');
       }
     });
   }
@@ -179,14 +189,14 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
     startTransition(async () => {
       try {
         const result = await deleteDietRule(deleteRuleId);
-        if ("error" in result) {
+        if ('error' in result) {
           setError(result.error);
         } else {
-          setSuccess("Regel succesvol verwijderd");
+          setSuccess('Regel succesvol verwijderd');
           await loadRules();
         }
       } catch (err) {
-        setError("Onverwachte fout bij verwijderen");
+        setError('Onverwachte fout bij verwijderen');
       } finally {
         setDeleteRuleId(null);
       }
@@ -198,7 +208,7 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
     const ruleValue = formData.ruleValue as Record<string, unknown>;
 
     switch (ruleType) {
-      case "exclude_ingredient": {
+      case 'exclude_ingredient': {
         const value = ruleValue as {
           excludedCategories?: string[];
           excludedIngredients?: string[];
@@ -206,38 +216,43 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
         return (
           <>
             <Field>
-              <Label htmlFor="excludedCategories">Uitgesloten categorieën</Label>
+              <Label htmlFor="excludedCategories">
+                Uitgesloten categorieën
+              </Label>
               <Textarea
                 id="excludedCategories"
-                value={value.excludedCategories?.join(", ") || ""}
+                value={value.excludedCategories?.join(', ') || ''}
                 onChange={(e) =>
                   updateRuleValue(
-                    "excludedCategories",
+                    'excludedCategories',
                     e.target.value
-                      .split(",")
+                      .split(',')
                       .map((s) => s.trim())
-                      .filter(Boolean)
+                      .filter(Boolean),
                   )
                 }
                 rows={2}
                 placeholder="Bijv. grains, dairy, legumes (gescheiden door komma's)"
               />
               <Description>
-                Categorieën die uitgesloten moeten worden (gescheiden door komma's)
+                Categorieën die uitgesloten moeten worden (gescheiden door
+                komma&apos;s)
               </Description>
             </Field>
             <Field>
-              <Label htmlFor="excludedIngredients">Uitgesloten ingrediënten</Label>
+              <Label htmlFor="excludedIngredients">
+                Uitgesloten ingrediënten
+              </Label>
               <Textarea
                 id="excludedIngredients"
-                value={value.excludedIngredients?.join(", ") || ""}
+                value={value.excludedIngredients?.join(', ') || ''}
                 onChange={(e) =>
                   updateRuleValue(
-                    "excludedIngredients",
+                    'excludedIngredients',
                     e.target.value
-                      .split(",")
+                      .split(',')
                       .map((s) => s.trim())
-                      .filter(Boolean)
+                      .filter(Boolean),
                   )
                 }
                 rows={2}
@@ -250,7 +265,7 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
           </>
         );
       }
-      case "require_ingredient": {
+      case 'require_ingredient': {
         const value = ruleValue as {
           requiredIngredients?: string[];
           frequency?: string;
@@ -267,14 +282,14 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
               <Label htmlFor="requiredIngredients">Vereiste ingrediënten</Label>
               <Textarea
                 id="requiredIngredients"
-                value={value.requiredIngredients?.join(", ") || ""}
+                value={value.requiredIngredients?.join(', ') || ''}
                 onChange={(e) =>
                   updateRuleValue(
-                    "requiredIngredients",
+                    'requiredIngredients',
                     e.target.value
-                      .split(",")
+                      .split(',')
                       .map((s) => s.trim())
-                      .filter(Boolean)
+                      .filter(Boolean),
                   )
                 }
                 rows={2}
@@ -285,8 +300,8 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
               <Label htmlFor="frequency">Frequentie</Label>
               <Select
                 id="frequency"
-                value={value.frequency || ""}
-                onChange={(e) => updateRuleValue("frequency", e.target.value)}
+                value={value.frequency || ''}
+                onChange={(e) => updateRuleValue('frequency', e.target.value)}
               >
                 <option value="">Geen</option>
                 <option value="daily">Dagelijks</option>
@@ -300,9 +315,12 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
               <Input
                 id="minAmountMl"
                 type="number"
-                value={value.minAmountMl || ""}
+                value={value.minAmountMl || ''}
                 onChange={(e) =>
-                  updateRuleValue("minAmountMl", e.target.value ? parseFloat(e.target.value) : undefined)
+                  updateRuleValue(
+                    'minAmountMl',
+                    e.target.value ? parseFloat(e.target.value) : undefined,
+                  )
                 }
                 placeholder="Bijv. 20"
               />
@@ -312,25 +330,30 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
               <Input
                 id="maxAmountMl"
                 type="number"
-                value={value.maxAmountMl || ""}
+                value={value.maxAmountMl || ''}
                 onChange={(e) =>
-                  updateRuleValue("maxAmountMl", e.target.value ? parseFloat(e.target.value) : undefined)
+                  updateRuleValue(
+                    'maxAmountMl',
+                    e.target.value ? parseFloat(e.target.value) : undefined,
+                  )
                 }
                 placeholder="Bijv. 40"
               />
             </Field>
             <Field>
-              <Label htmlFor="recommendedIngredients">Aanbevolen ingrediënten</Label>
+              <Label htmlFor="recommendedIngredients">
+                Aanbevolen ingrediënten
+              </Label>
               <Textarea
                 id="recommendedIngredients"
-                value={value.recommendedIngredients?.join(", ") || ""}
+                value={value.recommendedIngredients?.join(', ') || ''}
                 onChange={(e) =>
                   updateRuleValue(
-                    "recommendedIngredients",
+                    'recommendedIngredients',
                     e.target.value
-                      .split(",")
+                      .split(',')
                       .map((s) => s.trim())
-                      .filter(Boolean)
+                      .filter(Boolean),
                   )
                 }
                 rows={2}
@@ -340,7 +363,7 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
           </>
         );
       }
-      case "macro_constraint": {
+      case 'macro_constraint': {
         const value = ruleValue as {
           maxCarbsPer100g?: number;
           dailyCarbLimit?: number;
@@ -355,31 +378,44 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
               <Input
                 id="maxCarbsPer100g"
                 type="number"
-                value={value.maxCarbsPer100g || ""}
+                value={value.maxCarbsPer100g || ''}
                 onChange={(e) =>
-                  updateRuleValue("maxCarbsPer100g", e.target.value ? parseFloat(e.target.value) : undefined)
+                  updateRuleValue(
+                    'maxCarbsPer100g',
+                    e.target.value ? parseFloat(e.target.value) : undefined,
+                  )
                 }
               />
             </Field>
             <Field>
-              <Label htmlFor="dailyCarbLimit">Dagelijkse koolhydraat limiet (g)</Label>
+              <Label htmlFor="dailyCarbLimit">
+                Dagelijkse koolhydraat limiet (g)
+              </Label>
               <Input
                 id="dailyCarbLimit"
                 type="number"
-                value={value.dailyCarbLimit || ""}
+                value={value.dailyCarbLimit || ''}
                 onChange={(e) =>
-                  updateRuleValue("dailyCarbLimit", e.target.value ? parseFloat(e.target.value) : undefined)
+                  updateRuleValue(
+                    'dailyCarbLimit',
+                    e.target.value ? parseFloat(e.target.value) : undefined,
+                  )
                 }
               />
             </Field>
             <Field>
-              <Label htmlFor="maxSaturatedFatGrams">Max verzadigd vet per dag (g)</Label>
+              <Label htmlFor="maxSaturatedFatGrams">
+                Max verzadigd vet per dag (g)
+              </Label>
               <Input
                 id="maxSaturatedFatGrams"
                 type="number"
-                value={value.maxSaturatedFatGrams || ""}
+                value={value.maxSaturatedFatGrams || ''}
                 onChange={(e) =>
-                  updateRuleValue("maxSaturatedFatGrams", e.target.value ? parseFloat(e.target.value) : undefined)
+                  updateRuleValue(
+                    'maxSaturatedFatGrams',
+                    e.target.value ? parseFloat(e.target.value) : undefined,
+                  )
                 }
               />
             </Field>
@@ -387,14 +423,14 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
               <Label htmlFor="allowedTypes">Toegestane types</Label>
               <Textarea
                 id="allowedTypes"
-                value={value.allowedTypes?.join(", ") || ""}
+                value={value.allowedTypes?.join(', ') || ''}
                 onChange={(e) =>
                   updateRuleValue(
-                    "allowedTypes",
+                    'allowedTypes',
                     e.target.value
-                      .split(",")
+                      .split(',')
                       .map((s) => s.trim())
-                      .filter(Boolean)
+                      .filter(Boolean),
                   )
                 }
                 rows={2}
@@ -405,14 +441,14 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
               <Label htmlFor="forbiddenTypes">Verboden types</Label>
               <Textarea
                 id="forbiddenTypes"
-                value={value.forbiddenTypes?.join(", ") || ""}
+                value={value.forbiddenTypes?.join(', ') || ''}
                 onChange={(e) =>
                   updateRuleValue(
-                    "forbiddenTypes",
+                    'forbiddenTypes',
                     e.target.value
-                      .split(",")
+                      .split(',')
                       .map((s) => s.trim())
-                      .filter(Boolean)
+                      .filter(Boolean),
                   )
                 }
                 rows={2}
@@ -422,7 +458,7 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
           </>
         );
       }
-      case "meal_structure": {
+      case 'meal_structure': {
         const value = ruleValue as {
           vegetableCupsRequirement?: {
             totalCups: number;
@@ -440,15 +476,19 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
             {value.vegetableCupsRequirement && (
               <>
                 <Field>
-                  <Label htmlFor="totalCups">Totaal aantal koppen groente</Label>
+                  <Label htmlFor="totalCups">
+                    Totaal aantal koppen groente
+                  </Label>
                   <Input
                     id="totalCups"
                     type="number"
-                    value={value.vegetableCupsRequirement.totalCups || ""}
+                    value={value.vegetableCupsRequirement.totalCups || ''}
                     onChange={(e) =>
-                      updateRuleValue("vegetableCupsRequirement", {
+                      updateRuleValue('vegetableCupsRequirement', {
                         ...value.vegetableCupsRequirement,
-                        totalCups: e.target.value ? parseInt(e.target.value) : 0,
+                        totalCups: e.target.value
+                          ? parseInt(e.target.value)
+                          : 0,
                       })
                     }
                   />
@@ -458,25 +498,31 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
                   <Input
                     id="leafyCups"
                     type="number"
-                    value={value.vegetableCupsRequirement.leafyCups || ""}
+                    value={value.vegetableCupsRequirement.leafyCups || ''}
                     onChange={(e) =>
-                      updateRuleValue("vegetableCupsRequirement", {
+                      updateRuleValue('vegetableCupsRequirement', {
                         ...value.vegetableCupsRequirement,
-                        leafyCups: e.target.value ? parseInt(e.target.value) : 0,
+                        leafyCups: e.target.value
+                          ? parseInt(e.target.value)
+                          : 0,
                       })
                     }
                   />
                 </Field>
                 <Field>
-                  <Label htmlFor="sulfurCups">Zwavelrijke groenten koppen</Label>
+                  <Label htmlFor="sulfurCups">
+                    Zwavelrijke groenten koppen
+                  </Label>
                   <Input
                     id="sulfurCups"
                     type="number"
-                    value={value.vegetableCupsRequirement.sulfurCups || ""}
+                    value={value.vegetableCupsRequirement.sulfurCups || ''}
                     onChange={(e) =>
-                      updateRuleValue("vegetableCupsRequirement", {
+                      updateRuleValue('vegetableCupsRequirement', {
                         ...value.vegetableCupsRequirement,
-                        sulfurCups: e.target.value ? parseInt(e.target.value) : 0,
+                        sulfurCups: e.target.value
+                          ? parseInt(e.target.value)
+                          : 0,
                       })
                     }
                   />
@@ -486,11 +532,13 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
                   <Input
                     id="coloredCups"
                     type="number"
-                    value={value.vegetableCupsRequirement.coloredCups || ""}
+                    value={value.vegetableCupsRequirement.coloredCups || ''}
                     onChange={(e) =>
-                      updateRuleValue("vegetableCupsRequirement", {
+                      updateRuleValue('vegetableCupsRequirement', {
                         ...value.vegetableCupsRequirement,
-                        coloredCups: e.target.value ? parseInt(e.target.value) : 0,
+                        coloredCups: e.target.value
+                          ? parseInt(e.target.value)
+                          : 0,
                       })
                     }
                   />
@@ -504,11 +552,13 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
                   <Input
                     id="maxLeftoverHours"
                     type="number"
-                    value={value.freshnessRequirement.maxLeftoverHours || ""}
+                    value={value.freshnessRequirement.maxLeftoverHours || ''}
                     onChange={(e) =>
-                      updateRuleValue("freshnessRequirement", {
+                      updateRuleValue('freshnessRequirement', {
                         ...value.freshnessRequirement,
-                        maxLeftoverHours: e.target.value ? parseInt(e.target.value) : 0,
+                        maxLeftoverHours: e.target.value
+                          ? parseInt(e.target.value)
+                          : 0,
                       })
                     }
                   />
@@ -517,16 +567,18 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
                   <Label htmlFor="meatRequirement">Vlees vereiste</Label>
                   <Select
                     id="meatRequirement"
-                    value={value.freshnessRequirement.meatRequirement || ""}
+                    value={value.freshnessRequirement.meatRequirement || ''}
                     onChange={(e) =>
-                      updateRuleValue("freshnessRequirement", {
+                      updateRuleValue('freshnessRequirement', {
                         ...value.freshnessRequirement,
                         meatRequirement: e.target.value,
                       })
                     }
                   >
                     <option value="any">Elk</option>
-                    <option value="fresh_or_flash_frozen">Vers of diepvries</option>
+                    <option value="fresh_or_flash_frozen">
+                      Vers of diepvries
+                    </option>
                   </Select>
                 </Field>
               </>
@@ -542,7 +594,7 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
               value={JSON.stringify(ruleValue, null, 2)}
               onChange={(e) => {
                 try {
-                  updateRuleValue("", JSON.parse(e.target.value));
+                  updateRuleValue('', JSON.parse(e.target.value));
                 } catch {
                   // Invalid JSON, ignore
                 }
@@ -572,216 +624,226 @@ export function DietRulesManager({ dietTypeId, dietTypeName }: DietRulesManagerP
         isLoading={isPending}
       />
       <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <Text className="font-medium text-zinc-950 dark:text-white">
-            Regels voor {dietTypeName}
-          </Text>
-          <Text className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            {rules.length} regel{rules.length !== 1 ? "s" : ""}
-          </Text>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={() => setExpanded(!expanded)}
-            color="zinc"
-          >
-            {expanded ? "Verbergen" : "Bekijken"}
-          </Button>
-          {expanded && !isCreating && !editingId && (
-            <Button onClick={startCreate} size="sm">
-              Nieuwe regel
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <Text className="font-medium text-zinc-950 dark:text-white">
+              Regels voor {dietTypeName}
+            </Text>
+            <Text className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              {rules.length} regel{rules.length !== 1 ? 's' : ''}
+            </Text>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => setExpanded(!expanded)} color="zinc">
+              {expanded ? 'Verbergen' : 'Bekijken'}
             </Button>
-          )}
+            {expanded && !isCreating && !editingId && (
+              <Button onClick={startCreate} className="text-sm">
+                Nieuwe regel
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
 
-      {expanded && (
-        <>
-          {error && (
-            <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">
-              <strong>Fout:</strong> {error}
-            </div>
-          )}
+        {expanded && (
+          <>
+            {error && (
+              <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">
+                <strong>Fout:</strong> {error}
+              </div>
+            )}
 
-          {success && (
-            <div className="mb-4 rounded-lg bg-green-50 p-4 text-sm text-green-600 dark:bg-green-950/50 dark:text-green-400">
-              <strong>Succes:</strong> {success}
-            </div>
-          )}
+            {success && (
+              <div className="mb-4 rounded-lg bg-green-50 p-4 text-sm text-green-600 dark:bg-green-950/50 dark:text-green-400">
+                <strong>Succes:</strong> {success}
+              </div>
+            )}
 
-          {(isCreating || editingId) && (
-            <form onSubmit={handleSubmit} className="mb-6 space-y-4 border-b border-zinc-200 pb-6 dark:border-zinc-800">
-              <FieldGroup>
-                <Field>
-                  <Label htmlFor="ruleType">Regeltype *</Label>
-                  <Select
-                    id="ruleType"
-                    value={formData.ruleType}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        ruleType: e.target.value as DietRuleType,
-                        ruleValue: {},
-                      })
-                    }
-                    required
-                  >
-                    <option value="exclude_ingredient">Uitsluiten ingrediënt</option>
-                    <option value="require_ingredient">Vereisen ingrediënt</option>
-                    <option value="macro_constraint">Macro constraint</option>
-                    <option value="meal_structure">Maaltijd structuur</option>
-                  </Select>
-                </Field>
+            {(isCreating || editingId) && (
+              <form
+                onSubmit={handleSubmit}
+                className="mb-6 space-y-4 border-b border-zinc-200 pb-6 dark:border-zinc-800"
+              >
+                <FieldGroup>
+                  <Field>
+                    <Label htmlFor="ruleType">Regeltype *</Label>
+                    <Select
+                      id="ruleType"
+                      value={formData.ruleType}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          ruleType: e.target.value as DietRuleType,
+                          ruleValue: {},
+                        })
+                      }
+                      required
+                    >
+                      <option value="exclude_ingredient">
+                        Uitsluiten ingrediënt
+                      </option>
+                      <option value="require_ingredient">
+                        Vereisen ingrediënt
+                      </option>
+                      <option value="macro_constraint">Macro constraint</option>
+                      <option value="meal_structure">Maaltijd structuur</option>
+                    </Select>
+                  </Field>
 
-                <Field>
-                  <Label htmlFor="ruleKey">Regelkey *</Label>
-                  <Input
-                    id="ruleKey"
-                    value={formData.ruleKey}
-                    onChange={(e) =>
-                      setFormData({ ...formData, ruleKey: e.target.value })
-                    }
-                    required
-                    placeholder="Bijv. excluded_categories, daily_flaxseed_oil"
-                  />
-                  <Description>
-                    Unieke identifier voor deze regel binnen dit dieettype
-                  </Description>
-                </Field>
+                  <Field>
+                    <Label htmlFor="ruleKey">Regelkey *</Label>
+                    <Input
+                      id="ruleKey"
+                      value={formData.ruleKey}
+                      onChange={(e) =>
+                        setFormData({ ...formData, ruleKey: e.target.value })
+                      }
+                      required
+                      placeholder="Bijv. excluded_categories, daily_flaxseed_oil"
+                    />
+                    <Description>
+                      Unieke identifier voor deze regel binnen dit dieettype
+                    </Description>
+                  </Field>
 
-                <Field>
-                  <Label htmlFor="description">Beschrijving</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description || ""}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    rows={2}
-                    placeholder="Human-readable beschrijving van de regel"
-                  />
-                </Field>
+                  <Field>
+                    <Label htmlFor="description">Beschrijving</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          description: e.target.value,
+                        })
+                      }
+                      rows={2}
+                      placeholder="Human-readable beschrijving van de regel"
+                    />
+                  </Field>
 
-                <Field>
-                  <Label htmlFor="priority">Prioriteit</Label>
-                  <Input
-                    id="priority"
-                    type="number"
-                    value={formData.priority}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        priority: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    min={0}
-                    max={100}
-                  />
-                  <Description>
-                    Hogere prioriteit = belangrijker (0-100, guard rails zijn meestal 90+)
-                  </Description>
-                </Field>
+                  <Field>
+                    <Label htmlFor="priority">Prioriteit</Label>
+                    <Input
+                      id="priority"
+                      type="number"
+                      value={formData.priority}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          priority: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      min={0}
+                      max={100}
+                    />
+                    <Description>
+                      Hogere prioriteit = belangrijker (0-100, guard rails zijn
+                      meestal 90+)
+                    </Description>
+                  </Field>
 
-                {renderRuleValueEditor()}
+                  {renderRuleValueEditor()}
 
-                <CheckboxField>
-                  <Checkbox
-                    checked={formData.isActive ?? true}
-                    onChange={(value) =>
-                      setFormData({ ...formData, isActive: value })
-                    }
-                  />
-                  <Label>Actief</Label>
-                </CheckboxField>
+                  <CheckboxField>
+                    <Checkbox
+                      checked={formData.isActive ?? true}
+                      onChange={(value) =>
+                        setFormData({ ...formData, isActive: value })
+                      }
+                    />
+                    <Label>Actief</Label>
+                  </CheckboxField>
 
-                <div className="flex gap-2">
-                  <Button type="submit" disabled={isPending}>
-                    {isPending
-                      ? "Opslaan..."
-                      : isCreating
-                      ? "Aanmaken"
-                      : "Bijwerken"}
-                  </Button>
-                  <Button type="button" onClick={cancelEdit} color="zinc">
-                    Annuleren
-                  </Button>
-                </div>
-              </FieldGroup>
-            </form>
-          )}
-
-          {isLoading ? (
-            <Text className="text-zinc-500 dark:text-zinc-400">Regels laden...</Text>
-          ) : (
-            <div className="space-y-2">
-              {rules.length === 0 ? (
-                <Text className="text-zinc-500 dark:text-zinc-400">
-                  Geen regels gevonden
-                </Text>
-              ) : (
-                rules.map((rule) => (
-                  <div
-                    key={rule.id}
-                    className="flex items-start justify-between rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <Text className="font-medium text-zinc-950 dark:text-white">
-                          {rule.ruleType} / {rule.ruleKey}
-                        </Text>
-                        {!rule.isActive && (
-                          <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                            Inactief
-                          </span>
-                        )}
-                        {rule.priority >= 90 && (
-                          <span className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-600 dark:bg-red-950/50 dark:text-red-400">
-                            Guard Rail
-                          </span>
-                        )}
-                      </div>
-                      {rule.description && (
-                        <Text className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                          {rule.description}
-                        </Text>
-                      )}
-                      <Text className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-                        Prioriteit: {rule.priority}
-                      </Text>
-                      <details className="mt-2">
-                        <summary className="cursor-pointer text-xs text-zinc-500 dark:text-zinc-400">
-                          Regelwaarde bekijken
-                        </summary>
-                        <pre className="mt-2 overflow-auto rounded bg-zinc-100 p-2 text-xs dark:bg-zinc-800">
-                          {JSON.stringify(rule.ruleValue, null, 2)}
-                        </pre>
-                      </details>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => startEdit(rule)}
-                        color="zinc"
-                        disabled={editingId === rule.id || isCreating}
-                      >
-                        Bewerken
-                      </Button>
-                      <Button
-                        onClick={() => handleDelete(rule.id)}
-                        color="red"
-                        disabled={isPending}
-                      >
-                        Verwijderen
-                      </Button>
-                    </div>
+                  <div className="flex gap-2">
+                    <Button type="submit" disabled={isPending}>
+                      {isPending
+                        ? 'Opslaan...'
+                        : isCreating
+                          ? 'Aanmaken'
+                          : 'Bijwerken'}
+                    </Button>
+                    <Button type="button" onClick={cancelEdit} color="zinc">
+                      Annuleren
+                    </Button>
                   </div>
-                ))
-              )}
-            </div>
-          )}
-        </>
-      )}
-    </div>
+                </FieldGroup>
+              </form>
+            )}
+
+            {isLoading ? (
+              <Text className="text-zinc-500 dark:text-zinc-400">
+                Regels laden...
+              </Text>
+            ) : (
+              <div className="space-y-2">
+                {rules.length === 0 ? (
+                  <Text className="text-zinc-500 dark:text-zinc-400">
+                    Geen regels gevonden
+                  </Text>
+                ) : (
+                  rules.map((rule) => (
+                    <div
+                      key={rule.id}
+                      className="flex items-start justify-between rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Text className="font-medium text-zinc-950 dark:text-white">
+                            {rule.ruleType} / {rule.ruleKey}
+                          </Text>
+                          {!rule.isActive && (
+                            <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                              Inactief
+                            </span>
+                          )}
+                          {rule.priority >= 90 && (
+                            <span className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-600 dark:bg-red-950/50 dark:text-red-400">
+                              Guard Rail
+                            </span>
+                          )}
+                        </div>
+                        {rule.description && (
+                          <Text className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                            {rule.description}
+                          </Text>
+                        )}
+                        <Text className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+                          Prioriteit: {rule.priority}
+                        </Text>
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-xs text-zinc-500 dark:text-zinc-400">
+                            Regelwaarde bekijken
+                          </summary>
+                          <pre className="mt-2 overflow-auto rounded bg-zinc-100 p-2 text-xs dark:bg-zinc-800">
+                            {JSON.stringify(rule.ruleValue, null, 2)}
+                          </pre>
+                        </details>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => startEdit(rule)}
+                          color="zinc"
+                          disabled={editingId === rule.id || isCreating}
+                        >
+                          Bewerken
+                        </Button>
+                        <Button
+                          onClick={() => handleDelete(rule.id)}
+                          color="red"
+                          disabled={isPending}
+                        >
+                          Verwijderen
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </>
   );
 }

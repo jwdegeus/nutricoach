@@ -5,6 +5,7 @@ Technical documentation for the Meal Planning Agent that generates personalized 
 ## Overview
 
 The Meal Planner Agent is a service that:
+
 - Takes user preferences from onboarding (via `DietProfile`)
 - Derives strict guard rails (`DietRuleSet`) from the profile
 - Generates meal plans using Gemini AI with schema-enforced JSON output
@@ -142,7 +143,8 @@ Each meal now includes `ingredientRefs` (required) with NEVO codes:
 }
 ```
 
-**Important**: 
+**Important**:
+
 - All ingredients must use `nevoCode` values from the candidate pool provided to the agent
 - Macros are calculated server-side from NEVO data, not by the LLM
 - The `estimatedMacros` field is informative only and may be removed in future versions
@@ -174,14 +176,14 @@ GEMINI_MODEL=gemini-2.0-flash-exp
 Use the server action wrapper for app-layer integration:
 
 ```typescript
-import { generateMealPlanAction } from "@/src/app/(app)/menus/actions/generateMealPlan.action";
-import type { DietProfile } from "@/src/lib/diets";
+import { generateMealPlanAction } from '@/src/app/(app)/menus/actions/generateMealPlan.action';
+import type { DietProfile } from '@/src/lib/diets';
 
 // Get user's diet profile (from onboarding/database)
 const profile: DietProfile = {
-  dietKey: "wahls_paleo_plus",
-  allergies: ["nuts"],
-  dislikes: ["mushrooms"],
+  dietKey: 'wahls_paleo_plus',
+  allergies: ['nuts'],
+  dislikes: ['mushrooms'],
   calorieTarget: { target: 2000 },
   prepPreferences: { maxPrepMinutes: 30 },
   // ... other fields
@@ -189,8 +191,8 @@ const profile: DietProfile = {
 
 // Create request
 const request = {
-  dateRange: { start: "2026-01-25", end: "2026-01-31" },
-  slots: ["breakfast", "lunch", "dinner"],
+  dateRange: { start: '2026-01-25', end: '2026-01-31' },
+  slots: ['breakfast', 'lunch', 'dinner'],
   profile: profile, // Pass profile directly - rules are derived inside
 };
 
@@ -198,9 +200,9 @@ const request = {
 const result = await generateMealPlanAction(request);
 
 if (result.ok) {
-  console.log("Meal plan:", result.data);
+  console.log('Meal plan:', result.data);
 } else {
-  console.error("Error:", result.error.message);
+  console.error('Error:', result.error.message);
   // result.error.code is either "VALIDATION_ERROR" or "AGENT_ERROR"
 }
 ```
@@ -210,21 +212,21 @@ if (result.ok) {
 For direct service access (e.g., in other server-side code):
 
 ```typescript
-import { MealPlannerAgentService } from "@/src/lib/agents/meal-planner";
-import type { DietProfile } from "@/src/lib/diets";
+import { MealPlannerAgentService } from '@/src/lib/agents/meal-planner';
+import type { DietProfile } from '@/src/lib/diets';
 
 const profile: DietProfile = {
-  dietKey: "wahls_paleo_plus",
-  allergies: ["nuts"],
-  dislikes: ["mushrooms"],
+  dietKey: 'wahls_paleo_plus',
+  allergies: ['nuts'],
+  dislikes: ['mushrooms'],
   calorieTarget: { target: 2000 },
   prepPreferences: { maxPrepMinutes: 30 },
   // ... other fields
 };
 
 const request = {
-  dateRange: { start: "2026-01-25", end: "2026-01-31" },
-  slots: ["breakfast", "lunch", "dinner"],
+  dateRange: { start: '2026-01-25', end: '2026-01-31' },
+  slots: ['breakfast', 'lunch', 'dinner'],
   profile: profile,
 };
 
@@ -256,6 +258,7 @@ curl -X POST http://localhost:3000/api/v1/meal-plans/generate \
 ```
 
 **Response codes:**
+
 - `200 OK`: Success, returns `{ ok: true, data: MealPlanResponse }`
 - `400 Bad Request`: Validation error, returns `{ ok: false, error: { code: "VALIDATION_ERROR", message: "..." } }`
 - `500 Internal Server Error`: Agent error, returns `{ ok: false, error: { code: "AGENT_ERROR", message: "..." } }`
@@ -265,6 +268,7 @@ curl -X POST http://localhost:3000/api/v1/meal-plans/generate \
 ### Error Handling
 
 The service throws descriptive errors for:
+
 - Invalid input (Zod validation fails)
 - API errors (Gemini API fails)
 - Malformed JSON (parsing fails after repair attempt)
@@ -288,17 +292,20 @@ The service implements a **single repair attempt** for robustness:
    - If still invalid: throw error with all issues
 
 **Repair triggers on:**
+
 - JSON parse failures
 - Schema validation failures (Zod)
 - Hard constraint violations (forbidden ingredients, allergens, missing required categories)
 
 **Repair does NOT trigger on:**
+
 - Soft constraint violations (these are preferences, not requirements)
 - API errors (network issues, rate limits, etc.)
 
 ### Partial Regenerate (Day-Only)
 
 **Single-Day Generation:**
+
 - `MealPlannerAgentService.generateMealPlanDay()` generates meals for one specific date only
 - Uses focused prompt (`buildMealPlanDayPrompt`) that instructs LLM to generate only the requested day
 - **Minimal-change objective**: If `existingDay` is provided, the prompt instructs the LLM to:
@@ -308,11 +315,13 @@ The service implements a **single repair attempt** for robustness:
   - Prefer ingredients from the existing list over new ones
 
 **Benefits:**
+
 - **Cost reduction**: Only generates one day instead of full week (1 LLM call vs 1 full plan call)
 - **Stability**: Minimizes changes to existing plan, preserving user's shopping list
 - **Speed**: Faster generation for single-day updates
 
 **Usage in MealPlansService:**
+
 - When `regeneratePlanForUser()` is called with `onlyDate`:
   - Loads existing plan and finds the day to regenerate
   - Calls `generateMealPlanDay()` with existing day for minimal-change
@@ -320,6 +329,7 @@ The service implements a **single repair attempt** for robustness:
   - No full plan regeneration needed
 
 **Tradeoffs:**
+
 - May produce suboptimal recipes compared to full plan generation (but more stable)
 - Less variety across the week (but preserves user's existing choices)
 - Still respects all hard constraints and macro targets
@@ -327,11 +337,13 @@ The service implements a **single repair attempt** for robustness:
 ### Deterministic Macro Adjustment
 
 **Quantity Scaling:**
+
 - Before repair attempts, if only macro issues exist (no ingredient/constraint violations), the system attempts deterministic quantity adjustment
 - `adjustDayQuantitiesToTargets()` scales all ingredient quantities proportionally to meet calorie/macro targets
 - **No LLM call required** - pure mathematical scaling
 
 **Implementation:**
+
 - Calculates current macros via `calcDayMacros()` (uses NEVO data)
 - Determines scale factor based on calorie target: `scaleFactor = targetMid / currentCalories`
 - Clamps scale factor to bounds (default: 0.7 to 1.3 = ±30% max change)
@@ -340,17 +352,20 @@ The service implements a **single repair attempt** for robustness:
 - Re-validates adjusted day to ensure all constraints still met
 
 **Scale Bounds:**
+
 - **Default maxScale**: 1.3 (30% increase max)
 - **Default minScale**: 0.7 (30% decrease max)
 - **Rounding**: Nearest 5g (e.g., 127g → 125g, 128g → 130g)
 - **Minimum**: 1g per ingredient (never scales to zero)
 
 **Why These Bounds:**
+
 - 30% change is significant but not drastic (preserves recipe character)
 - 5g rounding is practical for cooking (most recipes don't need gram-level precision)
 - Prevents extreme scaling that would make recipes unrecognizable
 
 **Flow:**
+
 1. Generate day (LLM call)
 2. Validate constraints
 3. If only macro issues: attempt deterministic adjustment
@@ -359,6 +374,7 @@ The service implements a **single repair attempt** for robustness:
 6. If non-macro issues exist: skip adjustment, go directly to repair
 
 **Benefits:**
+
 - Reduces LLM calls for simple macro adjustments (common case)
 - Faster response time (no repair call needed for macro-only issues)
 - More stable output (deterministic scaling vs LLM variability)
@@ -368,6 +384,7 @@ The service implements a **single repair attempt** for robustness:
 After generation, the meal plan is validated against hard constraints:
 
 **Validated Constraints:**
+
 1. **Allergens**: Ingredients matching user allergies (case-insensitive substring match on displayName)
 2. **Dislikes**: Ingredients matching user dislikes (case-insensitive substring match on displayName)
 3. **Forbidden Ingredients**: Ingredients forbidden by diet rules (from `ingredientConstraints` with `constraintType: "hard"`)
@@ -378,6 +395,7 @@ After generation, the meal plan is validated against hard constraints:
    - Daily macro targets (min protein, min fat, max carbs) for hard constraints only
 
 **Validation Method:**
+
 - **NEVO Code Validation**: Direct database lookup to verify codes exist
 - **Macro Calculation**: Uses `calcDayMacros()` to calculate actual macros from NEVO data
 - Case-insensitive substring matching on ingredient displayNames (if provided)
@@ -386,6 +404,7 @@ After generation, the meal plan is validated against hard constraints:
 
 **Validation Issues:**
 Each issue includes:
+
 - `path`: JSON path to the problematic ingredient/meal/day (e.g., `"days[0].meals[0].ingredientRefs[2]"` or `"days[0]"`)
 - `code`: Error code:
   - `FORBIDDEN_INGREDIENT` - Ingredient forbidden by diet rules
@@ -533,7 +552,8 @@ The service supports two pantry models:
    - If `isAvailable === true`: treated as "sufficient" (missingG = 0)
    - If `isAvailable === false` or undefined: not available (availableG = 0)
 
-**Current Implementation**: 
+**Current Implementation**:
+
 - Placeholder adapter returns empty array (no items in pantry)
 - Service works correctly with empty pantry (all items marked as missing)
 - TODO: Replace `loadPantryAvailabilityByNevoCodes()` with actual pantry lookup when pantry/inventory system is implemented
@@ -565,15 +585,15 @@ The service supports two pantry models:
 
 3. **Grouping**: Groups items by `category` (defaults to "Overig" if no category)
 
-4. **Sorting**: 
+4. **Sorting**:
    - Groups sorted alphabetically by category
    - Items within groups sorted alphabetically by name
 
 ### Usage Example
 
 ```typescript
-import { MealPlannerShoppingService } from "@/src/lib/agents/meal-planner";
-import type { MealPlanResponse } from "@/src/lib/diets";
+import { MealPlannerShoppingService } from '@/src/lib/agents/meal-planner';
+import type { MealPlanResponse } from '@/src/lib/diets';
 
 const service = new MealPlannerShoppingService();
 
@@ -597,6 +617,7 @@ The shopping service now integrates with a real pantry/inventory system stored i
 #### Database Schema
 
 **Table: `pantry_items`**
+
 - `id` (UUID, primary key)
 - `user_id` (UUID, foreign key to `auth.users.id`)
 - `nevo_code` (TEXT, NEVO code)
@@ -605,10 +626,12 @@ The shopping service now integrates with a real pantry/inventory system stored i
 - `created_at`, `updated_at` (TIMESTAMPTZ)
 
 **Constraints:**
+
 - Unique constraint on `(user_id, nevo_code)` - one pantry item per user per NEVO code
 - Indexes on `user_id` and `nevo_code` for fast lookups
 
 **RLS Policies:**
+
 - Users can only view/insert/update/delete their own pantry items
 - All policies use `auth.uid() = user_id` check
 
@@ -622,17 +645,22 @@ The system supports both pantry models:
 #### Usage
 
 **With Pantry (Recommended):**
+
 ```typescript
-import { MealPlannerShoppingService } from "@/src/lib/agents/meal-planner";
+import { MealPlannerShoppingService } from '@/src/lib/agents/meal-planner';
 
 const service = new MealPlannerShoppingService();
 
 // Automatically loads pantry for user
 const coverage = await service.buildCoverageWithPantry(mealPlan, userId);
-const shoppingList = await service.buildShoppingListWithPantry(mealPlan, userId);
+const shoppingList = await service.buildShoppingListWithPantry(
+  mealPlan,
+  userId,
+);
 ```
 
 **Without Pantry (Backward Compatible):**
+
 ```typescript
 // Still works - all items marked as missing
 const coverage = await service.buildCoverage({ plan: mealPlan });
@@ -648,14 +676,14 @@ import {
   loadPantryAvailabilityAction,
   upsertPantryItemAction,
   bulkUpsertPantryItemsAction,
-} from "@/src/app/(app)/pantry/actions/pantry.actions";
+} from '@/src/app/(app)/pantry/actions/pantry.actions';
 
 // Load pantry availability
-const result = await loadPantryAvailabilityAction(["123", "456"]);
+const result = await loadPantryAvailabilityAction(['123', '456']);
 
 // Upsert single item
 await upsertPantryItemAction({
-  nevoCode: "123",
+  nevoCode: '123',
   availableG: 500,
   isAvailable: true,
 });
@@ -663,8 +691,8 @@ await upsertPantryItemAction({
 // Bulk upsert
 await bulkUpsertPantryItemsAction({
   items: [
-    { nevoCode: "123", availableG: 500 },
-    { nevoCode: "456", isAvailable: true },
+    { nevoCode: '123', availableG: 500 },
+    { nevoCode: '456', isAvailable: true },
   ],
 });
 ```
@@ -686,6 +714,7 @@ Meal plans are now persisted in the database with full snapshots of request, rul
 ### Database Schema
 
 **Table: `meal_plans`**
+
 - `id` (UUID, primary key)
 - `user_id` (UUID, foreign key to `auth.users.id`)
 - `diet_key` (TEXT) - Diet type identifier
@@ -698,15 +727,18 @@ Meal plans are now persisted in the database with full snapshots of request, rul
 - `created_at`, `updated_at` (TIMESTAMPTZ)
 
 **Indexes:**
+
 - `user_id` - Fast user lookups
 - `(user_id, date_from)` - Fast date range queries
 - `created_at DESC` - Fast history listing
 
 **RLS Policies:**
+
 - Users can only view/insert/update/delete their own meal plans
 - All policies use `auth.uid() = user_id` check
 
 **Table: `meal_plan_runs` (Observability)**
+
 - `id` (UUID, primary key)
 - `user_id` (UUID, foreign key to `auth.users.id`)
 - `meal_plan_id` (UUID, nullable, foreign key to `meal_plans.id`)
@@ -719,12 +751,14 @@ Meal plans are now persisted in the database with full snapshots of request, rul
 - `created_at` (TIMESTAMPTZ)
 
 **Indexes:**
+
 - `user_id` - Fast user lookups
 - `meal_plan_id` - Fast plan lookups
 - `created_at DESC` - Fast history queries
 - `status` - Error analysis
 
 **RLS Policies:**
+
 - Users can only view/insert their own run logs
 - Users can update their own run logs (for status updates from "running" to "success"/"error")
 - No DELETE policy (runs are immutable for audit trail)
@@ -734,6 +768,7 @@ Meal plans are now persisted in the database with full snapshots of request, rul
 The system loads real user profiles from the database instead of using demo profiles:
 
 **ProfileService** (`src/lib/profile/profile.service.ts`):
+
 - Loads `user_preferences` and `user_diet_profiles` tables
 - Maps database schema to `DietProfile` type:
   - `diet_type_id` → `dietKey` (via `diet_types.name` mapping)
@@ -748,6 +783,7 @@ The system loads real user profiles from the database instead of using demo prof
 **MealPlansService** (`src/lib/meal-plans/mealPlans.service.ts`):
 
 **Methods:**
+
 - `createPlanForUser(userId, input)` - Creates new meal plan:
   1. Loads DietProfile via ProfileService
   2. Builds MealPlanRequest
@@ -772,26 +808,29 @@ The system loads real user profiles from the database instead of using demo prof
 ### Observability
 
 **What we log:**
+
 - Duration (milliseconds)
 - Model name (from `GEMINI_MODEL` env var or default)
 - Status (success/error)
 - Error code and short message (no prompts, no API keys)
 
 **What we don't log:**
+
 - Prompts sent to Gemini API
 - API keys or tokens
 - Full error stack traces
 - User profile details
 
 **Usage:**
+
 ```typescript
-import { MealPlansService } from "@/src/lib/meal-plans/mealPlans.service";
+import { MealPlansService } from '@/src/lib/meal-plans/mealPlans.service';
 
 const service = new MealPlansService();
 
 // Create plan
 const { planId } = await service.createPlanForUser(userId, {
-  dateFrom: "2026-01-25",
+  dateFrom: '2026-01-25',
   days: 7,
 });
 
@@ -804,7 +843,7 @@ await service.regeneratePlanForUser(userId, { planId });
 // Regenerate single day
 await service.regeneratePlanForUser(userId, {
   planId,
-  onlyDate: "2026-01-27",
+  onlyDate: '2026-01-27',
 });
 ```
 
@@ -822,10 +861,12 @@ All actions include authentication checks and structured error handling.
 ### Shopping View Routes
 
 **Persist-First Approach:**
+
 - `/meal-plans/shopping?fromDate=YYYY-MM-DD&days=N` - Creates new plan and redirects to persisted plan
 - `/meal-plans/[planId]/shopping` - Shows shopping list for persisted plan
 
 The shopping view now uses persisted plans instead of generating on-the-fly, enabling:
+
 - History tracking
 - Regeneration without losing plan context
 - Consistent shopping lists across sessions
@@ -833,11 +874,13 @@ The shopping view now uses persisted plans instead of generating on-the-fly, ena
 ### History UI & Regenerate
 
 **Routes:**
+
 - `/meal-plans` - List all meal plans (history view)
 - `/meal-plans/[planId]` - Detail page with regenerate actions
 - `/meal-plans/[planId]/shopping` - Shopping list for specific plan
 
 **Regenerate Options:**
+
 - **Full regenerate**: Regenerates entire plan with same settings, updates plan in-place
 - **Single day regenerate**: Generates only the specified day (not full plan), replaces only that day in plan_snapshot
   - Uses minimal-change objective to preserve existing ingredients
@@ -845,6 +888,7 @@ The shopping view now uses persisted plans instead of generating on-the-fly, ena
   - Faster and cheaper than full regenerate
 
 **UI Components:**
+
 - `MealPlansTable` - Lists all plans with links to detail and shopping
 - `MealPlanSummary` - Shows plan overview, macros, enrichment status
 - `MealPlanActions` - Buttons for full/day regenerate with date selector
@@ -867,6 +911,7 @@ The shopping view now uses persisted plans instead of generating on-the-fly, ena
    - Log enrichment run separately from regenerate run
 
 **Enrichment Failure Handling:**
+
 - Plan operation (create/regenerate) always succeeds
 - Enrichment is optional - plan is usable without enrichment
 - Separate "enrich" run is logged with error status if enrichment fails
@@ -875,6 +920,7 @@ The shopping view now uses persisted plans instead of generating on-the-fly, ena
 ### Error Handling
 
 **Error Codes:**
+
 - `AUTH_ERROR` - Authentication required
 - `VALIDATION_ERROR` - Input validation failed
 - `DB_ERROR` - Database operation failed
@@ -883,6 +929,7 @@ The shopping view now uses persisted plans instead of generating on-the-fly, ena
 - `CONFLICT` - Concurrent operation in progress
 
 **AppError Class:**
+
 - Centralized error handling in `src/lib/errors/app-error.ts`
 - Provides typed error codes and safe user-facing messages
 - Server actions map AppError to ActionResult error codes
@@ -891,18 +938,21 @@ The shopping view now uses persisted plans instead of generating on-the-fly, ena
 ### Rate Limiting / Quota
 
 **Quota System:**
+
 - **Limit**: 10 runs per user per hour
 - **Applies to**: `generate` and `regenerate` run types (completed runs only)
 - **Enforcement**: Server-side check in `MealPlansService.assertWithinQuota()`
 - **Error**: Throws `AppError` with `RATE_LIMIT` code (end-to-end, not mapped to `AGENT_ERROR`)
 
 **Implementation:**
+
 - Queries `meal_plan_runs` for runs in last hour
 - Counts runs with `run_type IN ('generate', 'regenerate')` and `status IN ('success', 'error')`
 - Excludes "running" status to avoid counting incomplete runs
 - Throws `AppError("RATE_LIMIT", "Too many requests...")` if count >= 10
 
 **Quota Check Timing:**
+
 - Checked before Gemini API calls (not after)
 - Prevents unnecessary API usage when quota exceeded
 - Fail-fast approach for better UX
@@ -910,12 +960,14 @@ The shopping view now uses persisted plans instead of generating on-the-fly, ena
 ### Concurrency Control
 
 **Concurrency Lock:**
+
 - Prevents multiple simultaneous generate/regenerate operations per user
 - Implementation: `MealPlansService.assertNoActiveRun(userId, mealPlanId?)`
 - Checks for runs with `status = "running"` in last 10 minutes
 - Throws `AppError("CONFLICT", "A generation is already in progress...")` if active run exists
 
 **Running Status:**
+
 - Runs start with `status = "running"` when operation begins
 - Updated to `status = "success"` or `status = "error"` when operation completes
 - Allows tracking of in-progress operations for concurrency control
@@ -923,6 +975,7 @@ The shopping view now uses persisted plans instead of generating on-the-fly, ena
 ### Idempotency
 
 **Idempotent Create:**
+
 - `createPlanForUser()` checks for existing plan with same parameters:
   - `user_id`, `date_from`, `days`, `diet_key`
 - If existing plan found, returns existing `planId` without Gemini API call
@@ -936,6 +989,7 @@ The shopping view now uses persisted plans instead of generating on-the-fly, ena
 The pantry UI allows users to manage their ingredient inventory:
 
 **Pantry Page** (`/pantry`):
+
 - Search and add ingredients from NEVO database
 - View and edit existing pantry items
 - Toggle availability (binary)
@@ -943,6 +997,7 @@ The pantry UI allows users to manage their ingredient inventory:
 - Real-time search with debouncing (300ms)
 
 **Components**:
+
 - `PantrySearchAdd` - Search NEVO foods and add to pantry
 - `PantryList` - Display all pantry items
 - `PantryItemRow` - Edit individual pantry items (availability, quantity)
@@ -950,6 +1005,7 @@ The pantry UI allows users to manage their ingredient inventory:
 ### Runs Dashboard
 
 **Runs Page** (`/runs`):
+
 - Displays last 50 meal plan runs for current user
 - Shows run metadata: date, type, status, model, duration, error code
 - Status badges: success (green), running (yellow), error (red)
@@ -957,10 +1013,12 @@ The pantry UI allows users to manage their ingredient inventory:
 - Useful for diagnostics and debugging (no sensitive data exposed)
 
 **Components**:
+
 - `RunsTable` - Table component displaying run records
 - `listRunsAction` - Server action to fetch runs
 
 **Data Shown**:
+
 - `created_at` - When run was created
 - `run_type` - "generate" | "regenerate" | "enrich"
 - `status` - "running" | "success" | "error"
@@ -971,12 +1029,14 @@ The pantry UI allows users to manage their ingredient inventory:
 ### Shopping List View
 
 **Shopping Page** (`/meal-plans/shopping`):
+
 - Generates meal plan for specified date range (query params: `fromDate`, `days`)
 - Calculates shopping list and coverage with real pantry data
 - Shows missing ingredients panel with bulk add options
 - Displays shopping list grouped by category
 
 **Components**:
+
 - `MissingIngredientsPanel` - Lists missing items with bulk add buttons:
   - "Markeer alles als aanwezig" (binary available)
   - "Zet hoeveelheid op ontbrekend" (quantity-based)
@@ -1074,6 +1134,7 @@ After generating a meal plan, you can enrich it with cooking instructions, title
 3. **Pantry Staples**: If `allowPantryStaples === false`, the prompt explicitly forbids mentioning pantry staples (water, salt, pepper, oil) unless they're in the ingredient list
 
 **Validation Checks**:
+
 - `NEW_INGREDIENT`: A NEVO code in `ingredientNevoCodesUsed` is not in the meal's ingredient list
 - `UNKNOWN_NEVO_CODE`: A NEVO code doesn't match any ingredient in the plan
 - `MISSING_MEAL`: A meal in the plan doesn't have a corresponding enriched meal
@@ -1082,15 +1143,15 @@ After generating a meal plan, you can enrich it with cooking instructions, title
 ### Usage Example
 
 ```typescript
-import { MealPlannerEnrichmentService } from "@/src/lib/agents/meal-planner";
-import type { MealPlanResponse } from "@/src/lib/diets";
+import { MealPlannerEnrichmentService } from '@/src/lib/agents/meal-planner';
+import type { MealPlanResponse } from '@/src/lib/diets';
 
 const service = new MealPlannerEnrichmentService();
 
 // Enrich meal plan
 const enrichment = await service.enrichPlan(mealPlanResponse, {
   allowPantryStaples: false, // Don't allow generic pantry items
-  maxInstructionSteps: 8
+  maxInstructionSteps: 8,
 });
 ```
 
@@ -1128,6 +1189,7 @@ The Composer UI allows users to interactively edit meal plans via a chat interfa
 ### Architecture
 
 **Flow:**
+
 1. User sends chat message → `PlanChatService.handleChat()`
 2. Service loads plan and builds context (available dates, meal slots, guardrails)
 3. Prompt is built with conversation history and context
@@ -1151,6 +1213,7 @@ The `PlanEdit` type defines a minimal but useful set of actions:
 - **UPDATE_PANTRY**: Mark items as available / set availableG (requires `pantryUpdates`)
 
 Each edit includes:
+
 - `action`: One of the enum values
 - `planId`: Plan to edit
 - `date`/`mealSlot`: Required for meal/day actions
@@ -1175,6 +1238,7 @@ The `applyPlanEdit()` function safely applies edits:
 5. **Logs run** in `meal_plan_runs` (run_type: "regenerate")
 
 **Error Handling:**
+
 - Uses `AppError` with appropriate codes (AUTH_ERROR, VALIDATION_ERROR, DB_ERROR, AGENT_ERROR)
 - No prompt or API key exposure in errors
 - Validates all mutations before persisting
@@ -1200,6 +1264,7 @@ The `buildPlanChatPrompt()` function builds prompts that:
 3. **Pantry context in chat prompts**: The chat interface now includes pantry context (top 30 items from the current plan) in the prompt, allowing Gemini to make more realistic suggestions that align with what the user has available.
 
 **Key improvements:**
+
 - `MealResponseSchema`: New schema for single meal generation
 - `buildMealPrompt()`: Prompt builder for slot-only meal generation
 - `generateMeal()`: Service method for generating a single meal with validation and repair
@@ -1208,6 +1273,7 @@ The `buildPlanChatPrompt()` function builds prompts that:
 - Enrichment snapshot updates: In-place updates for changed meals, removal for deleted meals
 
 **Enrichment snapshot handling:**
+
 - If `enrichmentSnapshot` exists, it's updated in-place for the changed meal(s)
 - If `enrichmentSnapshot` is null, enrichment is skipped (pragmatic approach)
 - REMOVE_MEAL removes the meal from enrichment snapshot if present
@@ -1215,11 +1281,13 @@ The `buildPlanChatPrompt()` function builds prompts that:
 ### Step 16: Plan Detail Composer UI
 
 **Embedded Chat:**
+
 - Chat is now embedded directly in the plan detail page (`/meal-plans/[planId]`)
 - Primary experience: users can edit plans without navigating to a separate chat page
 - Chat appears below the plan cards for easy access
 
 **Plan Cards UI:**
+
 - Plan is displayed as cards per day with meal slots
 - Each meal card shows:
   - Enrichment data (title, prep/cook time, first 2 instructions) if available
@@ -1227,17 +1295,20 @@ The `buildPlanChatPrompt()` function builds prompts that:
   - Quick action buttons: "Swap" and "Remove"
 
 **Quick Actions:**
+
 - **Swap button** on meal cards: Injects prompt "Vervang [slot] op [date] door iets simpels"
 - **Add snack/smoothie** buttons in QuickEditBar: Injects prompts for adding snacks
 - **Regenerate day** button: Injects prompt "Maak hele dag [date] anders, maar houd het simpel"
 - All quick actions use the chat composer as single interface (no separate UI flows)
 
 **Injected Prompts:**
+
 - `PlanChatClient` supports `initialDraft` prop for pre-filling the textarea
 - Quick actions set the draft, user can immediately press Enter to submit
 - This creates a "composer-first" UX where chat is the primary editing interface
 
 **Summary/Actions Updates:**
+
 - `MealPlanSummary` shows enrichment status and "Chat enabled" badge with hint
 - `MealPlanActions` includes "Open Shopping" link
 - Both components guide users to use the embedded chat for edits
@@ -1257,6 +1328,7 @@ The `buildPlanChatPrompt()` function builds prompts that:
   - Error display
 
 Uses existing UI components:
+
 - `Textarea` from `@/components/catalyst/textarea`
 - `Button` from `@/components/catalyst/button`
 - Catalyst components for all UI needs
@@ -1272,6 +1344,7 @@ Uses existing UI components:
 3. **Single Source of Truth**: Onboarding data (`DietProfile`) is the only source of truth for diet rules
 
 The service flow:
+
 1. Validates `MealPlanRequest` (which contains `profile: DietProfile`)
 2. Derives `DietRuleSet` from `profile` using `deriveDietRuleSet()`
 3. Uses the derived rules for prompt building and validation
@@ -1289,6 +1362,7 @@ curl -X POST http://localhost:3000/api/v1/meal-plans/generate \
 ```
 
 **Error Codes:**
+
 - `VALIDATION_ERROR` (400): Input validation failed - check your request structure
 - `AGENT_ERROR` (500): Generation failed after repair attempt - check:
   - API key is valid
@@ -1297,6 +1371,7 @@ curl -X POST http://localhost:3000/api/v1/meal-plans/generate \
   - Error message for specific issues
 
 **Common Issues:**
+
 - **JSON parse errors**: Usually means Gemini returned non-JSON output (rare with structured output)
 - **Schema violations**: Output structure doesn't match expected schema
 - **Hard constraint violations**: Generated meals contain forbidden ingredients or missing required categories

@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useState, useTransition } from "react";
-import Link from "next/link";
-import { resetPassword } from "../actions";
-import { Button } from "@/components/catalyst/button";
-import { Input } from "@/components/catalyst/input";
-import { Field, Label } from "@/components/catalyst/fieldset";
+import { useState, useTransition } from 'react';
+import Link from 'next/link';
+import { resetPassword } from '../actions';
+import { Button } from '@/components/catalyst/button';
+import { Input } from '@/components/catalyst/input';
+import { Field, Label } from '@/components/catalyst/fieldset';
 
 export function ResetPasswordForm() {
   const [error, setError] = useState<string | null>(null);
@@ -52,11 +52,14 @@ export function ResetPasswordForm() {
       </Field>
 
       <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? "Verzenden..." : "Verstuur reset link"}
+        {isPending ? 'Verzenden...' : 'Verstuur reset link'}
       </Button>
 
       <div className="text-center text-sm text-zinc-500 dark:text-zinc-400">
-        <Link href="/login" className="font-medium text-blue-600 dark:text-blue-400 hover:underline">
+        <Link
+          href="/login"
+          className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+        >
           Terug naar login
         </Link>
       </div>

@@ -34,9 +34,11 @@ Guard Rails is het systeem dat ervoor zorgt dat AI-generated content (recepten, 
 ### vNext Implementatie (Nieuwe Code)
 
 **Alle nieuwe guard rails code moet in**:
+
 - `src/lib/guardrails-vnext/` (nieuwe module)
 
 **Waarom**:
+
 - Unified implementation voor alle flows
 - Deterministic evaluation
 - Decision trace support

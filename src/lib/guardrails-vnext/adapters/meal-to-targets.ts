@@ -21,7 +21,7 @@ export type MealLike = Pick<Meal, 'name' | 'ingredientRefs' | 'ingredients'> & {
  */
 export function mapMealToGuardrailsTargets(
   meal: MealLike | Meal | null | undefined,
-  locale?: 'nl' | 'en'
+  locale?: 'nl' | 'en',
 ): {
   ingredient: TextAtom[];
   step: TextAtom[];
@@ -32,10 +32,17 @@ export function mapMealToGuardrailsTargets(
   const metadataAtoms: TextAtom[] = [];
 
   if (!meal) {
-    return { ingredient: ingredientAtoms, step: stepAtoms, metadata: metadataAtoms };
+    return {
+      ingredient: ingredientAtoms,
+      step: stepAtoms,
+      metadata: metadataAtoms,
+    };
   }
 
-  const m = meal as MealLike & { ingredientRefs?: Array<{ displayName?: string; nevoCode?: string }>; ingredients?: Array<{ name?: string }> };
+  const m = meal as MealLike & {
+    ingredientRefs?: Array<{ displayName?: string; nevoCode?: string }>;
+    ingredients?: Array<{ name?: string }>;
+  };
 
   // Ingredients: ingredientRefs first (displayName or nevoCode), then legacy ingredients
   if (m.ingredientRefs?.length) {
@@ -52,7 +59,11 @@ export function mapMealToGuardrailsTargets(
   }
   if (m.ingredients?.length) {
     m.ingredients.forEach((ing, i) => {
-      const name = (typeof ing === 'object' && ing && 'name' in ing ? (ing as { name?: string }).name : '').trim();
+      const name = (
+        typeof ing === 'object' && ing && 'name' in ing
+          ? ((ing as { name?: string }).name ?? '')
+          : ''
+      ).trim();
       if (name) {
         ingredientAtoms.push({
           text: name.toLowerCase(),
@@ -64,10 +75,17 @@ export function mapMealToGuardrailsTargets(
   }
 
   // Steps: optional steps[] or instructions[]
-  const steps = (m as { steps?: Array<{ text?: string }> }).steps ?? (m as { instructions?: string[] }).instructions;
+  const steps =
+    (m as { steps?: Array<{ text?: string }> }).steps ??
+    (m as { instructions?: string[] }).instructions;
   if (Array.isArray(steps)) {
     steps.forEach((s, i) => {
-      const text = typeof s === 'string' ? s : (s && typeof s === 'object' && 'text' in s ? (s as { text?: string }).text : '');
+      const text =
+        typeof s === 'string'
+          ? s
+          : s && typeof s === 'object' && 'text' in s
+            ? (s as { text?: string }).text
+            : '';
       const t = String(text ?? '').trim();
       if (t) {
         stepAtoms.push({

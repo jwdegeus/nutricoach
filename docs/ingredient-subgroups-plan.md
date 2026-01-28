@@ -3,11 +3,13 @@
 ## Probleem Analyse
 
 **Huidige situatie:**
+
 - Ingrediënt categorieën (bijv. "gluten_containing_grains")
 - Items direct in categorie (bijv. "pasta" met synoniemen: ["spaghetti", "penne", ...])
 - Alle items worden als platte lijst getoond → rommelig en onoverzichtelijk
 
 **Gewenste situatie:**
+
 - Ingrediënt categorie (bijv. "gluten_containing_grains")
   - Subgroep (bijv. "pasta")
     - Items: "macaroni", "spaghetti" (elk met eigen synoniemen)
@@ -34,7 +36,7 @@ CREATE TABLE ingredient_subgroups (
 );
 
 -- Update ingredient_category_items om optioneel naar subgroep te verwijzen
-ALTER TABLE ingredient_category_items 
+ALTER TABLE ingredient_category_items
   ADD COLUMN subgroup_id UUID REFERENCES ingredient_subgroups(id) ON DELETE CASCADE;
 
 -- Items kunnen direct aan categorie hangen (backward compatible) OF aan subgroep
@@ -42,11 +44,13 @@ ALTER TABLE ingredient_category_items
 ```
 
 **Voordelen:**
+
 - Duidelijke hiërarchie
 - Backward compatible (items kunnen direct aan categorie)
 - Flexibel (subgroepen optioneel)
 
 **Nadelen:**
+
 - Extra tabel
 - Migratie nodig voor bestaande data
 
@@ -63,10 +67,12 @@ ALTER TABLE ingredient_category_items
 ```
 
 **Voordelen:**
+
 - Geen nieuwe tabel
 - Eenvoudiger schema
 
 **Nadelen:**
+
 - Minder duidelijk (item vs subgroep onderscheid)
 - Complexere queries
 
@@ -173,6 +179,7 @@ ALTER TABLE ingredient_category_items
 ## Migratie Strategie
 
 **Voor bestaande data:**
+
 1. Optioneel: Maak default subgroepen gebaseerd op bestaande items
 2. Of: Laat items direct aan categorie hangen (geen subgroep)
 3. Gebruikers kunnen later subgroepen aanmaken en items verplaatsen

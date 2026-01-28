@@ -7,9 +7,11 @@ Dit document beschrijft de onboarding flow voor NutriCoach, waarbij nieuwe gebru
 ## Doel & Scope (MVP)
 
 ### Doel
+
 Nieuwe gebruikers begeleiden door een gestructureerd proces om hun persoonlijke voorkeuren in te stellen voor maaltijdplanning. Dit zorgt ervoor dat de meal planner relevante en gepersonaliseerde maaltijden kan genereren.
 
 ### Scope (MVP)
+
 - 4-stap wizard voor het verzamelen van gebruikersvoorkeuren
 - Validatie van input volgens business rules
 - Opslag van voorkeuren in database
@@ -17,6 +19,7 @@ Nieuwe gebruikers begeleiden door een gestructureerd proces om hun persoonlijke 
 - Basis dieettype selectie (hardcoded lijst, later te vervangen door `diet_types` tabel)
 
 ### Uitgesloten (voor later)
+
 - Multi-tenant support
 - Geavanceerde dieettype configuratie
 - Preview van meal plan tijdens onboarding
@@ -29,6 +32,7 @@ Nieuwe gebruikers begeleiden door een gestructureerd proces om hun persoonlijke 
 Bevat gebruikersvoorkeuren voor mealplanning.
 
 **Key Fields:**
+
 - `user_id` (UUID, PK, FK naar `auth.users`)
 - `max_prep_minutes` (INTEGER, NOT NULL, DEFAULT 30) - Maximale bereidingstijd in minuten
 - `servings_default` (INTEGER, NOT NULL, DEFAULT 1) - Standaard aantal porties
@@ -42,6 +46,7 @@ Bevat gebruikersvoorkeuren voor mealplanning.
 - `updated_at` (TIMESTAMPTZ, NOT NULL, DEFAULT NOW())
 
 **Constraints:**
+
 - Primary key op `user_id`
 - Foreign key naar `auth.users(id)` met CASCADE DELETE
 - Automatische `updated_at` trigger
@@ -51,6 +56,7 @@ Bevat gebruikersvoorkeuren voor mealplanning.
 Bevat dieetprofielen met start/eind datums voor historisch overzicht.
 
 **Key Fields:**
+
 - `id` (UUID, PK, DEFAULT gen_random_uuid())
 - `user_id` (UUID, NOT NULL, FK naar `auth.users`)
 - `starts_on` (DATE, NOT NULL, DEFAULT CURRENT_DATE) - Startdatum van dit profiel
@@ -61,12 +67,14 @@ Bevat dieetprofielen met start/eind datums voor historisch overzicht.
 - `updated_at` (TIMESTAMPTZ, NOT NULL, DEFAULT NOW())
 
 **Constraints:**
+
 - Primary key op `id`
 - Foreign key naar `auth.users(id)` met CASCADE DELETE
 - Check constraint: `strictness >= 1 AND strictness <= 10`
 - Automatische `updated_at` trigger
 
 **Logica:**
+
 - Alleen één actief profiel per gebruiker (`ends_on IS NULL`)
 - Bij nieuwe onboarding: update bestaand actief profiel of create nieuw
 - Historische profielen blijven behouden voor analytics
@@ -80,6 +88,7 @@ Laadt de huidige onboarding status voor de ingelogde gebruiker.
 **Input:** Geen (gebruikt authenticated user context)
 
 **Output:**
+
 ```typescript
 ActionResult<OnboardingStatus>
 
@@ -106,6 +115,7 @@ ActionResult<OnboardingStatus>
 ```
 
 **Gebruik:**
+
 - Checken of onboarding voltooid is
 - Tonen van huidige voorkeuren in UI
 - Pre-fill van formulier bij herstart onboarding
@@ -115,6 +125,7 @@ ActionResult<OnboardingStatus>
 Slaat onboarding data op voor de ingelogde gebruiker.
 
 **Input:**
+
 ```typescript
 {
   dietTypeId: string;              // Required: UUID van gekozen dieettype
@@ -129,17 +140,20 @@ Slaat onboarding data op voor de ingelogde gebruiker.
 ```
 
 **Output:**
+
 ```typescript
-ActionResult<OnboardingStatus>  // Zelfde als loadOnboardingStatusAction
+ActionResult<OnboardingStatus>; // Zelfde als loadOnboardingStatusAction
 ```
 
 **Side Effects:**
+
 - Upsert `user_preferences` op `user_id`
 - Update of create actief `user_diet_profiles` record
 - Zet `onboarding_completed = true` en `onboarding_completed_at = NOW()`
 - Revalidate `/onboarding` path
 
 **Error Handling:**
+
 - Validatiefouten retourneren als `{ error: string }`
 - Database errors worden getoond met duidelijke foutmeldingen
 - Consistent error shape met andere server actions
@@ -147,31 +161,37 @@ ActionResult<OnboardingStatus>  // Zelfde als loadOnboardingStatusAction
 ## Validatieregels
 
 ### `maxPrepMinutes`
+
 - **Type:** `number`
 - **Waarden:** `15`, `30`, `45`, of `60`
 - **Foutmelding:** "maxPrepMinutes moet een van de volgende waarden zijn: 15, 30, 45, 60"
 
 ### `servingsDefault`
+
 - **Type:** `number`
 - **Range:** `1` tot en met `6`
 - **Foutmelding:** "servingsDefault moet tussen 1 en 6 liggen"
 
 ### `kcalTarget`
+
 - **Type:** `number | null`
 - **Range (indien niet null):** `800` tot en met `6000`
 - **Foutmelding:** "kcalTarget moet tussen 800 en 6000 liggen (of null zijn)"
 
 ### `allergies`
+
 - **Type:** `string[]`
 - **Max items:** `50`
 - **Foutmelding:** "allergies mag maximaal 50 items bevatten"
 
 ### `dislikes`
+
 - **Type:** `string[]`
 - **Max items:** `50`
 - **Foutmelding:** "dislikes mag maximaal 50 items bevatten"
 
 ### `dietTypeId`
+
 - **Type:** `string` (UUID)
 - **Required:** Ja
 - **Validatie:** Moet bestaan in dieettype lijst (momenteel hardcoded, later via `diet_types` tabel)
@@ -183,6 +203,7 @@ ActionResult<OnboardingStatus>  // Zelfde als loadOnboardingStatusAction
 **Row Level Security:** Enabled
 
 **Policies:**
+
 1. **SELECT:** `auth.uid() = user_id`
    - Gebruikers kunnen alleen hun eigen voorkeuren zien
 
@@ -199,6 +220,7 @@ ActionResult<OnboardingStatus>  // Zelfde als loadOnboardingStatusAction
 **Row Level Security:** Enabled
 
 **Policies:**
+
 1. **SELECT:** `auth.uid() = user_id`
    - Gebruikers kunnen alleen hun eigen dieetprofielen zien
 
@@ -214,12 +236,14 @@ ActionResult<OnboardingStatus>  // Zelfde als loadOnboardingStatusAction
 ## UX Flow
 
 ### Stap 1: Dieettype Selectie
+
 - **Component:** `Step1DietType`
 - **Input:** Dropdown met beschikbare dieettypes
 - **Validatie:** Verplicht veld
 - **Data:** Hardcoded lijst (tijdelijk, later via `diet_types` query)
 
 ### Stap 2: Allergieën & Voorkeuren
+
 - **Component:** `Step2AllergiesDislikes`
 - **Input:** Tag input voor allergieën en dislikes
 - **Features:**
@@ -229,6 +253,7 @@ ActionResult<OnboardingStatus>  // Zelfde als loadOnboardingStatusAction
 - **Validatie:** Optioneel (max 50 items per array)
 
 ### Stap 3: Praktische Voorkeuren
+
 - **Component:** `Step3Practical`
 - **Input:**
   - Dropdown voor maximale bereidingstijd (15/30/45/60 min)
@@ -236,6 +261,7 @@ ActionResult<OnboardingStatus>  // Zelfde als loadOnboardingStatusAction
 - **Validatie:** Beide verplicht
 
 ### Stap 4: Doelen & Voorkeuren
+
 - **Component:** `Step4Goal`
 - **Input:**
   - Optioneel: Caloriedoel (800-6000)
@@ -244,6 +270,7 @@ ActionResult<OnboardingStatus>  // Zelfde als loadOnboardingStatusAction
 - **Validatie:** Alle velden optioneel
 
 ### Navigatie
+
 - **Progress Indicator:** Toont huidige stap en percentage
 - **Back Button:** Beschikbaar vanaf stap 2, disabled op stap 1
 - **Next Button:** Disabled totdat verplichte velden zijn ingevuld
@@ -251,12 +278,14 @@ ActionResult<OnboardingStatus>  // Zelfde als loadOnboardingStatusAction
 - **Loading States:** Toont "Opslaan..." tijdens server action
 
 ### Redirect Flow
+
 - Na succesvol opslaan: Redirect naar `/dashboard`
 - Bij fout: Toon error message, blijf op huidige stap
 
 ## Onboarding Gating
 
 ### Implementatie
+
 Onboarding gating gebeurt op twee niveaus:
 
 1. **Layout Level (`src/app/(app)/layout.tsx`):**
@@ -269,11 +298,13 @@ Onboarding gating gebeurt op twee niveaus:
    - Voorkomt redirect loops
 
 ### Routes
+
 - **Gated routes:** Alle routes onder `(app)` behalve `/onboarding` zelf
 - **Excluded routes:** Auth routes (`(auth)`), public routes
 - **Redirect target:** `/onboarding` (niet `/login`)
 
 ### Performance
+
 - Lightweight query: alleen `onboarding_completed` flag wordt opgehaald
 - Geen zware joins of complexe queries in layout
 - Caching via Next.js layout caching
@@ -281,6 +312,7 @@ Onboarding gating gebeurt op twee niveaus:
 ## Mapping Functions
 
 ### Variety Level ↔ Days
+
 ```typescript
 "low"  → 3 dagen
 "std"  → 7 dagen (default)
@@ -288,6 +320,7 @@ Onboarding gating gebeurt op twee niveaus:
 ```
 
 ### Strictness ↔ Number
+
 ```typescript
 "flexible" → 2 (1-5 range)
 "strict"   → 9 (6-10 range)
@@ -295,6 +328,7 @@ default    → 5 (middle)
 ```
 
 **Reverse mapping:**
+
 - `1-5` → `"flexible"`
 - `6-10` → `"strict"`
 
@@ -303,22 +337,24 @@ default    → 5 (middle)
 ### Directe Integratie Punten
 
 1. **User Preferences Query:**
+
    ```typescript
    // In meal plan generator
    const { data: prefs } = await supabase
-     .from("user_preferences")
-     .select("*")
-     .eq("user_id", user.id)
+     .from('user_preferences')
+     .select('*')
+     .eq('user_id', user.id)
      .single();
    ```
 
 2. **Active Diet Profile:**
+
    ```typescript
    const { data: profile } = await supabase
-     .from("user_diet_profiles")
-     .select("*")
-     .eq("user_id", user.id)
-     .is("ends_on", null)
+     .from('user_diet_profiles')
+     .select('*')
+     .eq('user_id', user.id)
+     .is('ends_on', null)
      .single();
    ```
 
@@ -353,18 +389,21 @@ default    → 5 (middle)
 ## Best Practices
 
 ### Server Actions
+
 - ✅ Alle business logic in server actions, niet in UI
 - ✅ Consistent error handling pattern
 - ✅ Type-safe met TypeScript
 - ✅ Revalidate paths na mutaties
 
 ### Database
+
 - ✅ Gebruik upsert voor idempotentie
 - ✅ Transacties voor multi-table updates (indien nodig)
 - ✅ RLS policies voor security
 - ✅ Indexes op foreign keys en query patterns
 
 ### UI/UX
+
 - ✅ Progress indicator voor duidelijkheid
 - ✅ Validatie feedback per stap
 - ✅ Loading states tijdens async operations
@@ -374,25 +413,31 @@ default    → 5 (middle)
 ## Troubleshooting
 
 ### Redirect Loops
+
 **Symptoom:** Gebruiker blijft redirecten tussen `/onboarding` en `/dashboard`
 
 **Oplossing:**
+
 - Check of `onboarding_completed` flag correct wordt gezet
 - Verify dat onboarding page zelf niet redirect naar dashboard als niet voltooid
 - Check middleware configuratie
 
 ### Missing Preferences
+
 **Symptoom:** `user_preferences` record bestaat niet na onboarding
 
 **Oplossing:**
+
 - Check server action error logs
 - Verify RLS policies staan correct
 - Check of upsert correct wordt uitgevoerd
 
 ### Diet Profile Not Active
+
 **Symptoom:** Geen actief dieetprofiel na onboarding
 
 **Oplossing:**
+
 - Check of `ends_on` NULL is voor nieuwe profielen
 - Verify update logic voor bestaande profielen
 - Check database constraints

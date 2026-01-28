@@ -1,8 +1,8 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { PlanChatService } from "@/src/lib/agents/meal-planner/planChat.service";
-import { AppError } from "@/src/lib/errors/app-error";
+import { createClient } from '@/src/lib/supabase/server';
+import { PlanChatService } from '@/src/lib/agents/meal-planner/planChat.service';
+import { AppError } from '@/src/lib/errors/app-error';
 
 /**
  * Action result type
@@ -12,10 +12,19 @@ type ActionResult<T> =
   | {
       ok: false;
       error: {
-        code: "AUTH_ERROR" | "VALIDATION_ERROR" | "DB_ERROR" | "AGENT_ERROR" | "RATE_LIMIT" | "CONFLICT" | "GUARDRAILS_VIOLATION";
+        code:
+          | 'AUTH_ERROR'
+          | 'UNAUTHORIZED'
+          | 'VALIDATION_ERROR'
+          | 'DB_ERROR'
+          | 'AGENT_ERROR'
+          | 'RATE_LIMIT'
+          | 'CONFLICT'
+          | 'GUARDRAILS_VIOLATION'
+          | 'MEAL_LOCKED';
         message: string;
         details?: {
-          outcome: "blocked";
+          outcome: 'blocked';
           reasonCodes: string[];
           contentHash: string;
           rulesetVersion?: number;
@@ -25,13 +34,20 @@ type ActionResult<T> =
 
 /**
  * Submit a chat message and apply the resulting edit
- * 
+ *
  * @param raw - Raw input (will be validated)
  * @returns Reply message and optional applied edit result
  */
-export async function submitPlanChatMessageAction(
-  raw: unknown
-): Promise<ActionResult<{ reply: string; applied?: { planId: string; changed: { type: string; date?: string; mealSlot?: string }; summary: string } }>> {
+export async function submitPlanChatMessageAction(raw: unknown): Promise<
+  ActionResult<{
+    reply: string;
+    applied?: {
+      planId: string;
+      changed: { type: string; date?: string; mealSlot?: string };
+      summary: string;
+    };
+  }>
+> {
   try {
     // Get authenticated user
     const supabase = await createClient();
@@ -43,8 +59,8 @@ export async function submitPlanChatMessageAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om een chat bericht te versturen",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om een chat bericht te versturen',
         },
       };
     }
@@ -78,14 +94,20 @@ export async function submitPlanChatMessageAction(
 
     // Fallback for other errors
     const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+      error instanceof Error ? error.message : 'Unknown error';
 
     // Determine error code
-    let code: "VALIDATION_ERROR" | "DB_ERROR" | "AGENT_ERROR" = "DB_ERROR";
-    if (errorMessage.includes("validation") || errorMessage.includes("Invalid")) {
-      code = "VALIDATION_ERROR";
-    } else if (errorMessage.includes("Gemini") || errorMessage.includes("agent")) {
-      code = "AGENT_ERROR";
+    let code: 'VALIDATION_ERROR' | 'DB_ERROR' | 'AGENT_ERROR' = 'DB_ERROR';
+    if (
+      errorMessage.includes('validation') ||
+      errorMessage.includes('Invalid')
+    ) {
+      code = 'VALIDATION_ERROR';
+    } else if (
+      errorMessage.includes('Gemini') ||
+      errorMessage.includes('agent')
+    ) {
+      code = 'AGENT_ERROR';
     }
 
     return {

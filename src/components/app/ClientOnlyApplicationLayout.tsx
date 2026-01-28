@@ -1,19 +1,23 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { ApplicationLayout } from './ApplicationLayout'
+import { useEffect, useState } from 'react';
+import { ApplicationLayout } from './ApplicationLayout';
 
 /**
  * Client-only wrapper for ApplicationLayout to prevent hydration mismatches
  * Headless UI generates random IDs that differ between server and client.
  * This component ensures the layout only renders on the client side after hydration.
  */
-export function ClientOnlyApplicationLayout({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false)
+export function ClientOnlyApplicationLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    setMounted(true);
+  }, []);
 
   // During SSR and initial render, return a simple structure without Headless UI
   // This prevents hydration mismatches while maintaining the layout structure
@@ -40,8 +44,8 @@ export function ClientOnlyApplicationLayout({ children }: { children: React.Reac
           </div>
         </main>
       </div>
-    )
+    );
   }
 
-  return <ApplicationLayout>{children}</ApplicationLayout>
+  return <ApplicationLayout>{children}</ApplicationLayout>;
 }

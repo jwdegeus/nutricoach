@@ -1,22 +1,25 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from "@/components/catalyst/dialog";
-import { Button } from "@/components/catalyst/button";
-import { StarIcon } from "@heroicons/react/20/solid";
-import { getRecipeRatingAction, rateRecipeAction } from "../actions/meals.actions";
+} from '@/components/catalyst/dialog';
+import { Button } from '@/components/catalyst/button';
+import { StarIcon } from '@heroicons/react/20/solid';
+import {
+  getRecipeRatingAction,
+  rateRecipeAction,
+} from '../actions/meals.actions';
 
 type RecipeRatingDialogProps = {
   open: boolean;
   onClose: () => void;
   mealId: string;
-  source: "custom" | "gemini";
+  source: 'custom' | 'gemini';
   mealName: string;
   onRatingUpdated?: (rating: number | null) => void;
 };
@@ -39,7 +42,7 @@ export function RecipeRatingDialog({
   useEffect(() => {
     async function loadRating() {
       if (!open) return;
-      
+
       setIsLoading(true);
       setError(null);
       try {
@@ -50,8 +53,8 @@ export function RecipeRatingDialog({
           setError(result.error.message);
         }
       } catch (err) {
-        console.error("Error loading rating:", err);
-        setError(err instanceof Error ? err.message : "Fout bij laden rating");
+        console.error('Error loading rating:', err);
+        setError(err instanceof Error ? err.message : 'Fout bij laden rating');
       } finally {
         setIsLoading(false);
       }
@@ -82,7 +85,7 @@ export function RecipeRatingDialog({
         setError(result.error.message);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fout bij opslaan");
+      setError(err instanceof Error ? err.message : 'Fout bij opslaan');
     } finally {
       setIsSubmitting(false);
     }
@@ -105,7 +108,7 @@ export function RecipeRatingDialog({
       }
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fout bij verwijderen");
+      setError(err instanceof Error ? err.message : 'Fout bij verwijderen');
     } finally {
       setIsSubmitting(false);
     }
@@ -118,7 +121,8 @@ export function RecipeRatingDialog({
       <DialogTitle>Beoordeel recept</DialogTitle>
       <DialogBody>
         <DialogDescription>
-          Geef een beoordeling voor "{mealName}". Klik op een ster om je beoordeling te geven (1-5 sterren).
+          Geef een beoordeling voor &quot;{mealName}&quot;. Klik op een ster om
+          je beoordeling te geven (1-5 sterren).
         </DialogDescription>
         <div className="mt-6 space-y-4">
           {isLoading ? (
@@ -144,17 +148,17 @@ export function RecipeRatingDialog({
                     onMouseLeave={() => setHoveredRating(null)}
                     disabled={isSubmitting}
                     className="focus:outline-none focus:ring-2 focus:ring-blue-500 rounded p-1 transition-transform hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed"
-                    aria-label={`Beoordeel met ${star} ${star === 1 ? "ster" : "sterren"}`}
+                    aria-label={`Beoordeel met ${star} ${star === 1 ? 'ster' : 'sterren'}`}
                   >
                     <StarIcon
                       className={`h-10 w-10 transition-colors ${
                         star <= displayRating
-                          ? "text-yellow-400 fill-yellow-400"
-                          : "text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700"
+                          ? 'text-yellow-400 fill-yellow-400'
+                          : 'text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700'
                       } ${
                         isSubmitting
-                          ? "opacity-50"
-                          : "cursor-pointer hover:text-yellow-300 hover:fill-yellow-300"
+                          ? 'opacity-50'
+                          : 'cursor-pointer hover:text-yellow-300 hover:fill-yellow-300'
                       }`}
                     />
                   </button>
@@ -162,11 +166,16 @@ export function RecipeRatingDialog({
               </div>
               {rating !== null && (
                 <div className="text-sm text-zinc-600 dark:text-zinc-400">
-                  Huidige beoordeling: <span className="font-medium text-zinc-900 dark:text-white">{rating}/5 ⭐</span>
+                  Huidige beoordeling:{' '}
+                  <span className="font-medium text-zinc-900 dark:text-white">
+                    {rating}/5 ⭐
+                  </span>
                 </div>
               )}
               {error && (
-                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {error}
+                </p>
               )}
             </div>
           )}

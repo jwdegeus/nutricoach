@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { Select } from "@/components/catalyst/select";
-import { getDietTypes } from "../queries/diet-types.queries";
-import type { DietType } from "../queries/diet-types.queries";
+import { useEffect, useState } from 'react';
+import { Select } from '@/components/catalyst/select';
+import { getDietTypes } from '../queries/diet-types.queries';
+import type { DietType } from '../queries/diet-types.queries';
 
 interface Step1DietTypeProps {
   value: string;
@@ -21,7 +21,7 @@ export function Step1DietType({ value, onChange }: Step1DietTypeProps) {
         const types = await getDietTypes();
         setDietTypes(types);
       } catch (error) {
-        console.error("Failed to load diet types:", error);
+        console.error('Failed to load diet types:', error);
         // Fallback to empty array
         setDietTypes([]);
       } finally {
@@ -62,7 +62,7 @@ export function Step1DietType({ value, onChange }: Step1DietTypeProps) {
         >
           <option value="">
             {/* TODO: i18n key: onboarding.step1.selectPlaceholder */}
-            {isLoading ? "Laden..." : "-- Selecteer een dieettype --"}
+            {isLoading ? 'Laden...' : '-- Selecteer een dieettype --'}
           </option>
           {dietTypes.map((diet) => (
             <option key={diet.id} value={diet.id}>

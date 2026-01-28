@@ -1,18 +1,20 @@
 /**
  * Application Error Types
- * 
+ *
  * Centralized error handling with typed error codes and safe messages.
  * Safe messages are user-facing and do not expose sensitive data.
  */
 
 export type AppErrorCode =
-  | "AUTH_ERROR"
-  | "VALIDATION_ERROR"
-  | "DB_ERROR"
-  | "AGENT_ERROR"
-  | "RATE_LIMIT"
-  | "CONFLICT"
-  | "GUARDRAILS_VIOLATION";
+  | 'AUTH_ERROR'
+  | 'UNAUTHORIZED'
+  | 'VALIDATION_ERROR'
+  | 'DB_ERROR'
+  | 'AGENT_ERROR'
+  | 'RATE_LIMIT'
+  | 'CONFLICT'
+  | 'GUARDRAILS_VIOLATION'
+  | 'MEAL_LOCKED';
 
 /** Ontbrekende FORCE-categorie bij quotum-falen (voor substitutie/“voeg toe”-feedback) */
 export type ForceDeficitItem = {
@@ -26,7 +28,7 @@ export type ForceDeficitItem = {
  * Guardrails violation details
  */
 export type GuardrailsViolationDetails = {
-  outcome: "blocked";
+  outcome: 'blocked';
   reasonCodes: string[];
   contentHash: string;
   rulesetVersion?: number;
@@ -36,7 +38,7 @@ export type GuardrailsViolationDetails = {
 
 /**
  * Application Error
- * 
+ *
  * Extends Error with a typed error code and safe user-facing message.
  * The safeMessage should not expose sensitive data (API keys, prompts, etc.).
  */
@@ -48,21 +50,21 @@ export class AppError extends Error {
   constructor(
     code: AppErrorCode,
     safeMessage: string,
-    causeOrDetails?: unknown
+    causeOrDetails?: unknown,
   ) {
     super(safeMessage);
-    this.name = "AppError";
+    this.name = 'AppError';
     this.code = code;
     this.safeMessage = safeMessage;
 
     // Check if causeOrDetails is guardrails details
     if (
-      code === "GUARDRAILS_VIOLATION" &&
+      code === 'GUARDRAILS_VIOLATION' &&
       causeOrDetails &&
-      typeof causeOrDetails === "object" &&
-      "outcome" in causeOrDetails &&
-      "reasonCodes" in causeOrDetails &&
-      "contentHash" in causeOrDetails
+      typeof causeOrDetails === 'object' &&
+      'outcome' in causeOrDetails &&
+      'reasonCodes' in causeOrDetails &&
+      'contentHash' in causeOrDetails
     ) {
       this.guardrailsDetails = causeOrDetails as GuardrailsViolationDetails;
     } else if (causeOrDetails instanceof Error) {
@@ -76,7 +78,11 @@ export class AppError extends Error {
   /**
    * Convert to a plain object for serialization
    */
-  toJSON(): { code: AppErrorCode; message: string; details?: GuardrailsViolationDetails } {
+  toJSON(): {
+    code: AppErrorCode;
+    message: string;
+    details?: GuardrailsViolationDetails;
+  } {
     return {
       code: this.code,
       message: this.safeMessage,

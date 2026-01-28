@@ -1,10 +1,10 @@
 /**
  * Meal Planner Shopping Schemas
- * 
+ *
  * Zod validation schemas for pantry coverage and shopping list types.
  */
 
-import { z } from "zod";
+import { z } from 'zod';
 
 /**
  * Pantry availability schema

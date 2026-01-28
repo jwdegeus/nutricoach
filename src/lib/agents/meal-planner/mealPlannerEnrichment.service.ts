@@ -1,31 +1,31 @@
 /**
  * Meal Planner Enrichment Service
- * 
+ *
  * Enriches meal plans with titles, instructions, and cook plans using Gemini AI.
  * Ensures no new ingredients are added - only uses ingredients from the plan.
  */
 
-import { getGeminiClient } from "@/src/lib/ai/gemini/gemini.client";
-import { mealPlanResponseSchema } from "@/src/lib/diets/diet.schemas";
-import { getNevoFoodByCode } from "@/src/lib/nevo/nutrition-calculator";
-import type { MealPlanResponse, Meal } from "@/src/lib/diets";
+import { getGeminiClient } from '@/src/lib/ai/gemini/gemini.client';
+import { mealPlanResponseSchema } from '@/src/lib/diets/diet.schemas';
+import { getNevoFoodByCode } from '@/src/lib/nevo/nutrition-calculator';
+import type { MealPlanResponse, Meal } from '@/src/lib/diets';
 import type {
   MealPlanEnrichmentResponse,
   MealEnrichmentOptions,
   EnrichedMeal,
-} from "./mealPlannerEnrichment.types";
+} from './mealPlannerEnrichment.types';
 import {
   mealPlanEnrichmentResponseSchema,
   mealEnrichmentOptionsSchema,
   enrichedMealSchema,
-} from "./mealPlannerEnrichment.schemas";
+} from './mealPlannerEnrichment.schemas';
 import {
   buildMealEnrichmentPrompt,
   buildEnrichmentRepairPrompt,
   buildSingleMealEnrichmentPrompt,
-} from "./mealPlannerEnrichment.prompts";
-import { validateEnrichment } from "./mealPlannerEnrichment.validate";
-import { zodToJsonSchema } from "zod-to-json-schema";
+} from './mealPlannerEnrichment.prompts';
+import { validateEnrichment } from './mealPlannerEnrichment.validate';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 /**
  * In-memory cache for NEVO food lookups
@@ -72,7 +72,7 @@ async function getNevoFoodName(nevoCode: string): Promise<string> {
  * Build NEVO food names map
  */
 async function buildNevoFoodNamesByCode(
-  plan: MealPlanResponse
+  plan: MealPlanResponse,
 ): Promise<Record<string, string>> {
   const nevoCodes = new Set<string>();
 
@@ -103,7 +103,7 @@ async function buildNevoFoodNamesByCode(
 export class MealPlannerEnrichmentService {
   /**
    * Enrich a meal plan with titles, instructions, and cook plans
-   * 
+   *
    * @param raw - Raw meal plan (will be validated)
    * @param options - Enrichment options (optional)
    * @param language - User language preference ('nl' or 'en'), defaults to 'nl'
@@ -113,7 +113,7 @@ export class MealPlannerEnrichmentService {
   async enrichPlan(
     raw: unknown,
     options?: unknown,
-    language: 'nl' | 'en' = 'nl'
+    language: 'nl' | 'en' = 'nl',
   ): Promise<MealPlanEnrichmentResponse> {
     // Step 1: Validate meal plan input
     let plan: MealPlanResponse;
@@ -121,7 +121,7 @@ export class MealPlannerEnrichmentService {
       plan = mealPlanResponseSchema.parse(raw);
     } catch (error) {
       throw new Error(
-        `Invalid meal plan: ${error instanceof Error ? error.message : "Unknown validation error"}`
+        `Invalid meal plan: ${error instanceof Error ? error.message : 'Unknown validation error'}`,
       );
     }
 
@@ -142,8 +142,8 @@ export class MealPlannerEnrichmentService {
 
     // Step 5: Convert Zod schema to JSON schema
     const jsonSchema = zodToJsonSchema(mealPlanEnrichmentResponseSchema, {
-      name: "MealPlanEnrichmentResponse",
-      target: "openApi3",
+      name: 'MealPlanEnrichmentResponse',
+      target: 'openApi3',
     });
 
     // Step 6: Generate attempt #1
@@ -154,27 +154,24 @@ export class MealPlannerEnrichmentService {
         prompt,
         jsonSchema,
         temperature: 0.4,
-        purpose: "enrich",
+        purpose: 'enrich',
       });
     } catch (error) {
       throw new Error(
-        `Failed to generate enriched meal plan from Gemini API: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Failed to generate enriched meal plan from Gemini API: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
 
     // Step 7: Parse and validate
-    const firstAttemptResult = await this.parseAndValidate(
-      rawJson,
-      plan
-    );
+    const firstAttemptResult = await this.parseAndValidate(rawJson, plan);
 
     // Step 8: If successful, return
-    if (firstAttemptResult.success) {
+    if (firstAttemptResult.success && firstAttemptResult.response) {
       return firstAttemptResult.response;
     }
 
     // Step 9: Repair attempt (max 1 attempt)
-    const issues = firstAttemptResult.issues.join("\n");
+    const issues = firstAttemptResult.issues.join('\n');
     const repairPrompt = buildEnrichmentRepairPrompt({
       originalPrompt: prompt,
       badOutput: rawJson,
@@ -189,41 +186,38 @@ export class MealPlannerEnrichmentService {
         prompt: repairPrompt,
         jsonSchema,
         temperature: 0.2, // Lower temperature for more deterministic repair
-        purpose: "repair",
+        purpose: 'repair',
       });
     } catch (error) {
       throw new Error(
-        `Meal plan enrichment failed after repair attempt: API error - ${error instanceof Error ? error.message : "Unknown error"}`
+        `Meal plan enrichment failed after repair attempt: API error - ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
 
     // Step 10: Parse and validate repair attempt
-    const repairResult = await this.parseAndValidate(
-      repairRawJson,
-      plan
-    );
+    const repairResult = await this.parseAndValidate(repairRawJson, plan);
 
     // Step 11: If repair successful, return
-    if (repairResult.success) {
+    if (repairResult.success && repairResult.response) {
       return repairResult.response;
     }
 
     // Step 12: Repair failed - throw error
     throw new Error(
-      `Meal plan enrichment failed after repair attempt: ${repairResult.issues.join("; ")}`
+      `Meal plan enrichment failed after repair attempt: ${repairResult.issues.join('; ')}`,
     );
   }
 
   /**
    * Parse JSON and validate against schema and enrichment constraints
-   * 
+   *
    * @param rawJson - Raw JSON string from API
    * @param plan - Original meal plan
    * @returns Parse and validation result
    */
   private async parseAndValidate(
     rawJson: string,
-    plan: MealPlanResponse
+    plan: MealPlanResponse,
   ): Promise<{
     success: boolean;
     response?: MealPlanEnrichmentResponse;
@@ -237,7 +231,7 @@ export class MealPlannerEnrichmentService {
       parsed = JSON.parse(rawJson);
     } catch (error) {
       issues.push(
-        `JSON parse error: ${error instanceof Error ? error.message : "Unknown parse error"}`
+        `JSON parse error: ${error instanceof Error ? error.message : 'Unknown parse error'}`,
       );
       return { success: false, issues };
     }
@@ -248,7 +242,7 @@ export class MealPlannerEnrichmentService {
       response = mealPlanEnrichmentResponseSchema.parse(parsed);
     } catch (error) {
       issues.push(
-        `Schema validation error: ${error instanceof Error ? error.message : "Unknown validation error"}`
+        `Schema validation error: ${error instanceof Error ? error.message : 'Unknown validation error'}`,
       );
       return { success: false, issues };
     }
@@ -271,7 +265,7 @@ export class MealPlannerEnrichmentService {
 
   /**
    * Enrich a single meal with title, instructions, and timing
-   * 
+   *
    * @param args - Single meal enrichment arguments
    * @returns Enriched meal
    * @throws Error if validation fails or API call fails after repair attempt
@@ -316,8 +310,8 @@ export class MealPlannerEnrichmentService {
 
     // Step 4: Convert Zod schema to JSON schema for single meal
     const jsonSchema = zodToJsonSchema(enrichedMealSchema, {
-      name: "EnrichedMeal",
-      target: "openApi3",
+      name: 'EnrichedMeal',
+      target: 'openApi3',
     });
 
     // Step 5: Generate attempt #1
@@ -328,27 +322,24 @@ export class MealPlannerEnrichmentService {
         prompt,
         jsonSchema,
         temperature: 0.4,
-        purpose: "enrich",
+        purpose: 'enrich',
       });
     } catch (error) {
       throw new Error(
-        `Failed to generate enriched meal from Gemini API: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Failed to generate enriched meal from Gemini API: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
 
     // Step 6: Parse and validate
-    const firstAttemptResult = await this.parseAndValidateMeal(
-      rawJson,
-      meal
-    );
+    const firstAttemptResult = await this.parseAndValidateMeal(rawJson, meal);
 
     // Step 7: If successful, return
-    if (firstAttemptResult.success) {
+    if (firstAttemptResult.success && firstAttemptResult.response) {
       return firstAttemptResult.response;
     }
 
     // Step 8: Repair attempt (max 1 attempt)
-    const issues = firstAttemptResult.issues.join("\n");
+    const issues = firstAttemptResult.issues.join('\n');
     const repairPrompt = buildEnrichmentRepairPrompt({
       originalPrompt: prompt,
       badOutput: rawJson,
@@ -363,41 +354,38 @@ export class MealPlannerEnrichmentService {
         prompt: repairPrompt,
         jsonSchema,
         temperature: 0.2,
-        purpose: "repair",
+        purpose: 'repair',
       });
     } catch (error) {
       throw new Error(
-        `Meal enrichment failed after repair attempt: API error - ${error instanceof Error ? error.message : "Unknown error"}`
+        `Meal enrichment failed after repair attempt: API error - ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
 
     // Step 9: Parse and validate repair attempt
-    const repairResult = await this.parseAndValidateMeal(
-      repairRawJson,
-      meal
-    );
+    const repairResult = await this.parseAndValidateMeal(repairRawJson, meal);
 
     // Step 10: If repair successful, return
-    if (repairResult.success) {
+    if (repairResult.success && repairResult.response) {
       return repairResult.response;
     }
 
     // Step 11: Repair failed - throw error
     throw new Error(
-      `Meal enrichment failed after repair attempt: ${repairResult.issues.join("; ")}`
+      `Meal enrichment failed after repair attempt: ${repairResult.issues.join('; ')}`,
     );
   }
 
   /**
    * Parse JSON and validate single meal enrichment
-   * 
+   *
    * @param rawJson - Raw JSON string from API
    * @param meal - Original meal
    * @returns Parse and validation result
    */
   private async parseAndValidateMeal(
     rawJson: string,
-    meal: Meal
+    meal: Meal,
   ): Promise<{
     success: boolean;
     response?: EnrichedMeal;
@@ -411,7 +399,7 @@ export class MealPlannerEnrichmentService {
       parsed = JSON.parse(rawJson);
     } catch (error) {
       issues.push(
-        `JSON parse error: ${error instanceof Error ? error.message : "Unknown parse error"}`
+        `JSON parse error: ${error instanceof Error ? error.message : 'Unknown parse error'}`,
       );
       return { success: false, issues };
     }
@@ -422,7 +410,7 @@ export class MealPlannerEnrichmentService {
       response = enrichedMealSchema.parse(parsed);
     } catch (error) {
       issues.push(
-        `Schema validation error: ${error instanceof Error ? error.message : "Unknown validation error"}`
+        `Schema validation error: ${error instanceof Error ? error.message : 'Unknown validation error'}`,
       );
       return { success: false, issues };
     }
@@ -430,12 +418,12 @@ export class MealPlannerEnrichmentService {
     // Validate that date and mealSlot match
     if (response.date !== meal.date) {
       issues.push(
-        `Date mismatch: enriched meal date (${response.date}) does not match meal date (${meal.date})`
+        `Date mismatch: enriched meal date (${response.date}) does not match meal date (${meal.date})`,
       );
     }
     if (response.mealSlot !== meal.slot) {
       issues.push(
-        `Meal slot mismatch: enriched meal slot (${response.mealSlot}) does not match meal slot (${meal.slot})`
+        `Meal slot mismatch: enriched meal slot (${response.mealSlot}) does not match meal slot (${meal.slot})`,
       );
     }
 
@@ -447,11 +435,15 @@ export class MealPlannerEnrichmentService {
       }
     }
 
-    for (let codeIndex = 0; codeIndex < response.ingredientNevoCodesUsed.length; codeIndex++) {
+    for (
+      let codeIndex = 0;
+      codeIndex < response.ingredientNevoCodesUsed.length;
+      codeIndex++
+    ) {
       const code = response.ingredientNevoCodesUsed[codeIndex];
       if (!allowedCodes.has(code)) {
         issues.push(
-          `NEW_INGREDIENT: NEVO code ${code} is not in the meal's ingredient list (ingredientNevoCodesUsed[${codeIndex}])`
+          `NEW_INGREDIENT: NEVO code ${code} is not in the meal's ingredient list (ingredientNevoCodesUsed[${codeIndex}])`,
         );
       }
     }
@@ -460,7 +452,7 @@ export class MealPlannerEnrichmentService {
     const totalTime = response.prepTimeMin + response.cookTimeMin;
     if (totalTime > 240) {
       issues.push(
-        `BAD_TIME_ESTIMATE: Total time (prep + cook) exceeds 240 minutes: ${totalTime} minutes`
+        `BAD_TIME_ESTIMATE: Total time (prep + cook) exceeds 240 minutes: ${totalTime} minutes`,
       );
     }
 

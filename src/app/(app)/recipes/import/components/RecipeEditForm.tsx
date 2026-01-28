@@ -1,15 +1,20 @@
-"use client";
+'use client';
 
-import { useState, useTransition } from "react";
-import { Button } from "@/components/catalyst/button";
-import { Input } from "@/components/catalyst/input";
-import { Textarea } from "@/components/catalyst/textarea";
-import { Field, Fieldset, Label, Description } from "@/components/catalyst/fieldset";
-import { Heading, Subheading } from "@/components/catalyst/heading";
-import { Text } from "@/components/catalyst/text";
-import { PencilIcon, CheckIcon, XMarkIcon } from "@heroicons/react/20/solid";
-import { updateRecipeImportAction } from "../actions/recipeImport.update.actions";
-import type { GeminiExtractedRecipe } from "../recipeImport.gemini.schemas";
+import { useState, useTransition } from 'react';
+import { Button } from '@/components/catalyst/button';
+import { Input } from '@/components/catalyst/input';
+import { Textarea } from '@/components/catalyst/textarea';
+import {
+  Field,
+  Fieldset,
+  Label,
+  Description,
+} from '@/components/catalyst/fieldset';
+import { Heading, Subheading } from '@/components/catalyst/heading';
+import { Text } from '@/components/catalyst/text';
+import { PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import { updateRecipeImportAction } from '../actions/recipeImport.update.actions';
+import type { GeminiExtractedRecipe } from '../recipeImport.gemini.schemas';
 
 type RecipeEditFormProps = {
   jobId: string;
@@ -21,46 +26,53 @@ type RecipeEditFormProps = {
   onUpdated: () => void;
 };
 
-export function RecipeEditForm({ jobId, recipe, sourceImageMeta, onUpdated }: RecipeEditFormProps) {
+export function RecipeEditForm({
+  jobId,
+  recipe,
+  sourceImageMeta,
+  onUpdated,
+}: RecipeEditFormProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   // Form state
   const [title, setTitle] = useState(recipe.title);
-  const [servings, setServings] = useState<string>(recipe.servings?.toString() || "");
+  const [servings, setServings] = useState<string>(
+    recipe.servings?.toString() || '',
+  );
   const [ingredients, setIngredients] = useState(recipe.ingredients || []);
   const [instructions, setInstructions] = useState(recipe.instructions || []);
 
   const handleSave = () => {
     setError(null);
-    
+
     // Validate required fields
     if (!title.trim()) {
-      setError("Titel is verplicht");
+      setError('Titel is verplicht');
       return;
     }
 
     if (ingredients.length === 0) {
-      setError("Minimaal één ingrediënt is verplicht");
+      setError('Minimaal één ingrediënt is verplicht');
       return;
     }
 
-    if (ingredients.some(ing => !ing.name.trim())) {
-      setError("Alle ingrediënten moeten een naam hebben");
+    if (ingredients.some((ing) => !ing.name.trim())) {
+      setError('Alle ingrediënten moeten een naam hebben');
       return;
     }
 
     if (instructions.length === 0) {
-      setError("Minimaal één bereidingsinstructie is verplicht");
+      setError('Minimaal één bereidingsinstructie is verplicht');
       return;
     }
 
-    if (instructions.some(inst => !inst.text.trim())) {
-      setError("Alle bereidingsinstructies moeten tekst bevatten");
+    if (instructions.some((inst) => !inst.text.trim())) {
+      setError('Alle bereidingsinstructies moeten tekst bevatten');
       return;
     }
-    
+
     startTransition(async () => {
       const result = await updateRecipeImportAction({
         jobId,
@@ -68,15 +80,15 @@ export function RecipeEditForm({ jobId, recipe, sourceImageMeta, onUpdated }: Re
           title: title.trim(),
           servings: servings ? parseInt(servings) : null,
           ingredients: ingredients
-            .filter(ing => ing.name.trim()) // Filter out empty ingredients
-            .map(ing => ({
+            .filter((ing) => ing.name.trim()) // Filter out empty ingredients
+            .map((ing) => ({
               name: ing.name.trim(),
               quantity: ing.quantity,
               unit: ing.unit || null,
               note: ing.note || null,
             })),
           instructions: instructions
-            .filter(inst => inst.text.trim()) // Filter out empty instructions
+            .filter((inst) => inst.text.trim()) // Filter out empty instructions
             .map((inst, idx) => ({
               step: idx + 1,
               text: inst.text.trim(),
@@ -96,20 +108,26 @@ export function RecipeEditForm({ jobId, recipe, sourceImageMeta, onUpdated }: Re
   const handleCancel = () => {
     // Reset form to original values
     setTitle(recipe.title);
-    setServings(recipe.servings?.toString() || "");
+    setServings(recipe.servings?.toString() || '');
     setIngredients(recipe.ingredients || []);
     setInstructions(recipe.instructions || []);
     setError(null);
     setIsEditing(false);
   };
 
-  const updateIngredient = (index: number, field: 'name' | 'quantity' | 'unit' | 'note', value: string | number | null) => {
+  const updateIngredient = (
+    index: number,
+    field: 'name' | 'quantity' | 'unit' | 'note',
+    value: string | number | null,
+  ) => {
     const updated = [...ingredients];
     updated[index] = {
       ...updated[index],
       [field]: value,
       // Preserve original_line if it exists, otherwise use name
-      original_line: updated[index].original_line || (field === 'name' ? String(value) : updated[index].name),
+      original_line:
+        updated[index].original_line ||
+        (field === 'name' ? String(value) : updated[index].name),
     };
     setIngredients(updated);
   };
@@ -142,7 +160,11 @@ export function RecipeEditForm({ jobId, recipe, sourceImageMeta, onUpdated }: Re
               <Subheading level={4}>Afbeelding</Subheading>
               <div className="mt-2">
                 <img
-                  src={sourceImageMeta.savedImageUrl || sourceImageMeta.imageUrl || undefined}
+                  src={
+                    sourceImageMeta.savedImageUrl ||
+                    sourceImageMeta.imageUrl ||
+                    undefined
+                  }
                   alt={title}
                   className="w-full max-w-md h-auto rounded-lg border border-zinc-200 dark:border-zinc-800 object-cover"
                   onError={(e) => {
@@ -174,15 +196,16 @@ export function RecipeEditForm({ jobId, recipe, sourceImageMeta, onUpdated }: Re
                   <span className="font-medium">{ing.name}</span>
                   {(ing.quantity !== null || ing.unit) && (
                     <span className="text-zinc-500 dark:text-zinc-400">
-                      {" "}
+                      {' '}
                       {ing.quantity !== null && ing.quantity}
-                      {ing.quantity !== null && ing.unit && " "}
+                      {ing.quantity !== null && ing.unit && ' '}
                       {ing.unit}
                     </span>
                   )}
                   {ing.note && (
                     <span className="text-zinc-500 dark:text-zinc-400 italic">
-                      {" "}({ing.note})
+                      {' '}
+                      ({ing.note})
                     </span>
                   )}
                 </li>
@@ -194,7 +217,9 @@ export function RecipeEditForm({ jobId, recipe, sourceImageMeta, onUpdated }: Re
             <Subheading level={4}>Bereidingsinstructies</Subheading>
             <ol className="mt-2 space-y-2 list-decimal list-inside">
               {instructions.map((inst, idx) => (
-                <li key={idx} className="text-sm">{inst.text}</li>
+                <li key={idx} className="text-sm">
+                  {inst.text}
+                </li>
               ))}
             </ol>
           </div>
@@ -214,14 +239,16 @@ export function RecipeEditForm({ jobId, recipe, sourceImageMeta, onUpdated }: Re
           </Button>
           <Button onClick={handleSave} disabled={isPending}>
             <CheckIcon className="h-4 w-4 mr-2" />
-            {isPending ? "Opslaan..." : "Opslaan"}
+            {isPending ? 'Opslaan...' : 'Opslaan'}
           </Button>
         </div>
       </div>
 
       {error && (
         <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4">
-          <Text className="text-sm text-red-600 dark:text-red-400">{error}</Text>
+          <Text className="text-sm text-red-600 dark:text-red-400">
+            {error}
+          </Text>
         </div>
       )}
 
@@ -256,8 +283,10 @@ export function RecipeEditForm({ jobId, recipe, sourceImageMeta, onUpdated }: Re
               <div key={idx} className="flex gap-2 items-start">
                 <div className="flex-1 grid grid-cols-2 gap-2">
                   <Input
-                    value={ing.name || ""}
-                    onChange={(e) => updateIngredient(idx, 'name', e.target.value)}
+                    value={ing.name || ''}
+                    onChange={(e) =>
+                      updateIngredient(idx, 'name', e.target.value)
+                    }
                     disabled={isPending}
                     placeholder="Ingrediënt naam"
                     required
@@ -266,15 +295,23 @@ export function RecipeEditForm({ jobId, recipe, sourceImageMeta, onUpdated }: Re
                     <Input
                       type="number"
                       step="0.1"
-                      value={ing.quantity || ""}
-                      onChange={(e) => updateIngredient(idx, 'quantity', e.target.value ? parseFloat(e.target.value) : null)}
+                      value={ing.quantity || ''}
+                      onChange={(e) =>
+                        updateIngredient(
+                          idx,
+                          'quantity',
+                          e.target.value ? parseFloat(e.target.value) : null,
+                        )
+                      }
                       disabled={isPending}
                       placeholder="Hoeveelheid"
                       className="w-24"
                     />
                     <Input
-                      value={ing.unit || ""}
-                      onChange={(e) => updateIngredient(idx, 'unit', e.target.value || null)}
+                      value={ing.unit || ''}
+                      onChange={(e) =>
+                        updateIngredient(idx, 'unit', e.target.value || null)
+                      }
                       disabled={isPending}
                       placeholder="Eenheid"
                       className="w-24"
@@ -288,7 +325,6 @@ export function RecipeEditForm({ jobId, recipe, sourceImageMeta, onUpdated }: Re
                   }}
                   disabled={isPending}
                   outline
-                  color="red"
                 >
                   <XMarkIcon className="h-4 w-4" />
                 </Button>
@@ -296,7 +332,16 @@ export function RecipeEditForm({ jobId, recipe, sourceImageMeta, onUpdated }: Re
             ))}
             <Button
               onClick={() => {
-                setIngredients([...ingredients, { name: "", quantity: null, unit: null, note: null }]);
+                setIngredients([
+                  ...ingredients,
+                  {
+                    name: '',
+                    quantity: null,
+                    unit: null,
+                    note: null,
+                    original_line: '',
+                  },
+                ]);
               }}
               disabled={isPending}
               outline
@@ -335,7 +380,6 @@ export function RecipeEditForm({ jobId, recipe, sourceImageMeta, onUpdated }: Re
                   }}
                   disabled={isPending}
                   outline
-                  color="red"
                 >
                   <XMarkIcon className="h-4 w-4" />
                 </Button>
@@ -343,7 +387,10 @@ export function RecipeEditForm({ jobId, recipe, sourceImageMeta, onUpdated }: Re
             ))}
             <Button
               onClick={() => {
-                setInstructions([...instructions, { step: instructions.length + 1, text: "" }]);
+                setInstructions([
+                  ...instructions,
+                  { step: instructions.length + 1, text: '' },
+                ]);
               }}
               disabled={isPending}
               outline

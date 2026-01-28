@@ -1,13 +1,13 @@
 /**
  * Plan Chat Prompts
- * 
+ *
  * Builds prompts for the plan chat/composer interface.
  * Gemini returns a structured PlanEdit JSON object.
  */
 
 /**
  * Build prompt for plan chat
- * 
+ *
  * @param args - Chat prompt arguments
  * @returns Formatted prompt string
  */
@@ -18,9 +18,13 @@ export function buildPlanChatPrompt(args: {
   days: number;
   availableDates: string[];
   availableMealSlots: string[];
-  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
   guardrailsSummary: string;
-  pantryContext?: Array<{ nevoCode: string; name: string; availableG?: number }>; // Optional pantry context
+  pantryContext?: Array<{
+    nevoCode: string;
+    name: string;
+    availableG?: number;
+  }>; // Optional pantry context
 }): string {
   const {
     planId,
@@ -37,31 +41,41 @@ export function buildPlanChatPrompt(args: {
   // Format conversation history
   const conversationHistory = messages
     .map((msg) => {
-      const role = msg.role === "user" ? "User" : "Assistant";
+      const role = msg.role === 'user' ? 'User' : 'Assistant';
       return `${role}: ${msg.content}`;
     })
-    .join("\n\n");
+    .join('\n\n');
 
   // Format available dates
-  const datesList = availableDates.length > 0
-    ? availableDates.join(", ")
-    : "No dates available";
+  const datesList =
+    availableDates.length > 0
+      ? availableDates.join(', ')
+      : 'No dates available';
 
   // Format available meal slots
-  const slotsList = availableMealSlots.length > 0
-    ? availableMealSlots.join(", ")
-    : "No meal slots available";
+  const slotsList =
+    availableMealSlots.length > 0
+      ? availableMealSlots.join(', ')
+      : 'No meal slots available';
 
   // Format pantry context (limit to 30 items to keep context small)
-  const pantryInfo = pantryContext && pantryContext.length > 0
-    ? `\n\nPANTRY CONTEXT (items available in user's pantry - use these when making suggestions):
-${pantryContext.slice(0, 30).map((item) => {
-  const availableInfo = item.availableG ? ` (${item.availableG}g available)` : " (available)";
-  return `  - ${item.name} (nevoCode: ${item.nevoCode})${availableInfo}`;
-}).join("\n")}${pantryContext.length > 30 ? `\n  ... and ${pantryContext.length - 30} more items` : ""}
+  const pantryInfo =
+    pantryContext && pantryContext.length > 0
+      ? `\n\nPANTRY CONTEXT (items available in user's pantry - use these when making suggestions):
+${pantryContext
+  .slice(0, 30)
+  .map((item) => {
+    const availableInfo = item.availableG
+      ? ` (${item.availableG}g available)`
+      : ' (available)';
+    return `  - ${item.name} (nevoCode: ${item.nevoCode})${availableInfo}`;
+  })
+  .join(
+    '\n',
+  )}${pantryContext.length > 30 ? `\n  ... and ${pantryContext.length - 30} more items` : ''}
 
 When suggesting meals, prioritize ingredients from the pantry when possible. This makes suggestions more realistic and practical.`
-    : "";
+      : '';
 
   const prompt = `You are a meal plan editing assistant. Your task is to interpret user requests and output a structured PlanEdit JSON object.
 
@@ -127,8 +141,8 @@ OUTPUT REQUIREMENTS:
 3. Do NOT include any text outside the JSON object
 4. action: must be one of the enum values (REPLACE_MEAL, REGENERATE_DAY, ADD_SNACK, REMOVE_MEAL, UPDATE_PANTRY)
 5. planId: must be "${planId}"
-6. date: must be in YYYY-MM-DD format and must be one of: ${availableDates.join(", ")} (or omit if not required for action)
-7. mealSlot: must be one of: ${availableMealSlots.join(", ")} (or omit if not required for action)
+6. date: must be in YYYY-MM-DD format and must be one of: ${availableDates.join(', ')} (or omit if not required for action)
+7. mealSlot: must be one of: ${availableMealSlots.join(', ')} (or omit if not required for action)
 8. userIntentSummary: one sentence summary of what the user wants (max 200 chars)
 9. constraints: optional overrides (maxPrepMinutes, targetCalories, highProtein, vegetarian, avoidIngredients)
 10. pantryUpdates: required for UPDATE_PANTRY, array of { nevoCode, availableG?, isAvailable? }

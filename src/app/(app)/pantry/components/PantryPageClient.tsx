@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useRouter } from "next/navigation";
-import { PantrySearchAdd } from "./PantrySearchAdd";
-import { PantryList } from "./PantryList";
-import type { NutriScoreGrade } from "@/src/lib/nevo/nutrition-calculator";
+import { useRouter } from 'next/navigation';
+import { PantrySearchAdd } from './PantrySearchAdd';
+import { PantryList } from './PantryList';
+import type { NutriScoreGrade } from '@/src/lib/nevo/nutrition-calculator';
 
 type PantryItemWithName = {
   id: string;

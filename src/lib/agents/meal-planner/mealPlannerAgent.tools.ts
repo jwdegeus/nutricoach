@@ -1,11 +1,11 @@
 /**
  * Meal Planner Agent Tools
- * 
+ *
  * Server-side tools for NEVO ingredient lookup and macro calculation.
  * These tools are used by the meal planner agent to:
  * - Search for candidate ingredients from NEVO database
  * - Calculate macros for meals and days based on NEVO codes
- * 
+ *
  * All functions are read-only (no writes to database).
  */
 
@@ -14,8 +14,8 @@ import {
   calculateMealNutrition,
   calculateIngredientNutrition,
   type MealIngredient,
-} from "@/src/lib/nevo/nutrition-calculator";
-import type { MealPlanResponse, Meal, MealPlanDay } from "@/src/lib/diets";
+} from '@/src/lib/nevo/nutrition-calculator';
+import type { MealPlanResponse, Meal, MealPlanDay } from '@/src/lib/diets';
 
 /**
  * NEVO food candidate (simplified for agent use)
@@ -38,35 +38,35 @@ export type MacroSummary = {
 
 /**
  * Search for NEVO foods by query string
- * 
+ *
  * Wraps the existing searchNevoFoods function and formats results
  * for agent use (with nevoCode as string).
- * 
+ *
  * @param query - Search term (Dutch or English)
  * @param limit - Maximum number of results (default: 20)
  * @returns Array of candidate foods with nevoCode, name, and optional tags
  */
 export async function searchNevoFoodCandidates(
   query: string,
-  limit: number = 20
+  limit: number = 20,
 ): Promise<NevoFoodCandidate[]> {
   const results = await searchNevoFoods(query, limit);
-  
+
   return results.map((food) => ({
     nevoCode: String(food.nevo_code), // Convert to string for JSON schema compatibility
-    name: food.name_nl || food.name_en || "Unknown",
+    name: food.name_nl || food.name_en || 'Unknown',
     tags: food.food_group_nl ? [food.food_group_nl.toLowerCase()] : undefined,
   }));
 }
 
 /**
  * Calculate macros for a single meal based on ingredient references
- * 
+ *
  * @param ingredients - Array of ingredient references with nevoCode and quantityG
  * @returns Macro summary (calories, protein, carbs, fat)
  */
 export async function calcMealMacros(
-  ingredients: Array<{ nevoCode: string; quantityG: number }>
+  ingredients: Array<{ nevoCode: string; quantityG: number }>,
 ): Promise<MacroSummary> {
   // Convert to MealIngredient format (nevo_food_id is number)
   const mealIngredients: MealIngredient[] = ingredients.map((ing) => ({
@@ -87,16 +87,14 @@ export async function calcMealMacros(
 
 /**
  * Calculate macros for a single day based on all meals
- * 
+ *
  * @param dayMeals - Array of meals for the day
  * @returns Macro summary for the entire day
  */
-export async function calcDayMacros(
-  dayMeals: Meal[]
-): Promise<MacroSummary> {
+export async function calcDayMacros(dayMeals: Meal[]): Promise<MacroSummary> {
   // Collect all ingredient refs from all meals
   const allIngredients: Array<{ nevoCode: string; quantityG: number }> = [];
-  
+
   for (const meal of dayMeals) {
     if (meal.ingredientRefs && meal.ingredientRefs.length > 0) {
       for (const ref of meal.ingredientRefs) {
@@ -114,11 +112,11 @@ export async function calcDayMacros(
 
 /**
  * Build candidate pool for meal planning
- * 
+ *
  * Searches NEVO database for candidate foods in different categories
  * based on diet rules. Returns a structured pool of candidates that
  * the agent can choose from.
- * 
+ *
  * @param dietKey - Diet type (affects which categories to search)
  * @param excludeTerms - Terms to exclude from search (e.g., allergens)
  * @returns Structured candidate pool by category
@@ -134,19 +132,47 @@ export type CandidatePool = {
 
 export async function buildCandidatePool(
   dietKey: string,
-  excludeTerms: string[] = []
+  excludeTerms: string[] = [],
 ): Promise<CandidatePool> {
   // Define search terms per category (diet-aware)
   const searchTerms: Record<string, string[]> = {
-    proteins: dietKey === "vegan"
-      ? ["tofu", "tempeh", "seitan", "linzen", "kikkererwten", "bonen", "noten"]
-      : ["kip", "kipfilet", "eieren", "zalm", "tonijn", "rundvlees", "varkensvlees", "tofu"],
-    vegetables: ["broccoli", "spinazie", "wortel", "paprika", "tomaat", "komkommer", "ui", "knoflook"],
-    fruits: ["appel", "banaan", "bessen", "sinaasappel", "druiven", "peer"],
-    fats: ["olijfolie", "avocado", "noten", "zaden", "kokosolie"],
-    carbs: dietKey === "keto" || dietKey === "wahls_paleo_plus"
-      ? [] // Keto and Wahls don't use traditional carbs
-      : ["rijst", "aardappel", "pasta", "haver", "quinoa", "brood"],
+    proteins:
+      dietKey === 'vegan'
+        ? [
+            'tofu',
+            'tempeh',
+            'seitan',
+            'linzen',
+            'kikkererwten',
+            'bonen',
+            'noten',
+          ]
+        : [
+            'kip',
+            'kipfilet',
+            'eieren',
+            'zalm',
+            'tonijn',
+            'rundvlees',
+            'varkensvlees',
+            'tofu',
+          ],
+    vegetables: [
+      'broccoli',
+      'spinazie',
+      'wortel',
+      'paprika',
+      'tomaat',
+      'komkommer',
+      'ui',
+      'knoflook',
+    ],
+    fruits: ['appel', 'banaan', 'bessen', 'sinaasappel', 'druiven', 'peer'],
+    fats: ['olijfolie', 'avocado', 'noten', 'zaden', 'kokosolie'],
+    carbs:
+      dietKey === 'keto' || dietKey === 'wahls_paleo_plus'
+        ? [] // Keto and Wahls don't use traditional carbs
+        : ['rijst', 'aardappel', 'pasta', 'haver', 'quinoa', 'brood'],
   };
 
   // Build candidate pool in parallel
@@ -160,23 +186,25 @@ export async function buildCandidatePool(
 
   // Search each category
   const searchPromises: Promise<void>[] = [];
-  
+
   for (const [category, terms] of Object.entries(searchTerms)) {
     if (terms.length === 0) continue; // Skip empty categories (e.g., carbs for keto)
-    
+
     // Search with first term (can be extended to search multiple terms)
     const searchTerm = terms[0];
-    const promise = searchNevoFoodCandidates(searchTerm, 20).then((candidates) => {
-      // Filter out excluded terms
-      const filtered = candidates.filter((candidate) => {
-        const candidateName = candidate.name.toLowerCase();
-        return !excludeTerms.some((exclude) =>
-          candidateName.includes(exclude.toLowerCase())
-        );
-      });
-      pool[category] = filtered;
-    });
-    
+    const promise = searchNevoFoodCandidates(searchTerm, 20).then(
+      (candidates) => {
+        // Filter out excluded terms
+        const filtered = candidates.filter((candidate) => {
+          const candidateName = candidate.name.toLowerCase();
+          return !excludeTerms.some((exclude) =>
+            candidateName.includes(exclude.toLowerCase()),
+          );
+        });
+        pool[category] = filtered;
+      },
+    );
+
     searchPromises.push(promise);
   }
 
@@ -188,7 +216,7 @@ export async function buildCandidatePool(
 
 /**
  * Verify that a nevoCode exists in the NEVO database
- * 
+ *
  * @param nevoCode - NEVO code to verify
  * @returns true if code exists, false otherwise
  */
@@ -196,8 +224,9 @@ export async function verifyNevoCode(nevoCode: string): Promise<boolean> {
   try {
     const codeNum = parseInt(nevoCode, 10);
     if (isNaN(codeNum)) return false;
-    
-    const { getNevoFoodByCode } = await import("@/src/lib/nevo/nutrition-calculator");
+
+    const { getNevoFoodByCode } =
+      await import('@/src/lib/nevo/nutrition-calculator');
     const food = await getNevoFoodByCode(codeNum);
     return food !== null;
   } catch {
@@ -216,10 +245,10 @@ export type QuantityAdjustment = {
 
 /**
  * Adjust day quantities to meet macro targets deterministically
- * 
+ *
  * Scales ingredient quantities proportionally to meet calorie/macro targets
  * without changing ingredients. This avoids LLM calls for simple macro adjustments.
- * 
+ *
  * @param args - Adjustment parameters
  * @returns Adjusted day and list of adjustments made
  */
@@ -237,12 +266,7 @@ export async function adjustDayQuantitiesToTargets(args: {
   day: MealPlanDay;
   adjustments: QuantityAdjustment[];
 }> {
-  const {
-    day,
-    targets,
-    maxScale = 1.3,
-    minScale = 0.7,
-  } = args;
+  const { day, targets, maxScale = 1.3, minScale = 0.7 } = args;
 
   // Calculate current macros
   const currentMacros = await calcDayMacros(day.meals);

@@ -1,30 +1,41 @@
-"use client";
+'use client';
 
-import { useState, useTransition, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useTransition, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   getAllDietTypes,
   createDietType,
   deleteDietType,
   type DietTypeOutput,
   type DietTypeInput,
-} from "@/src/app/(app)/settings/actions/diet-admin.actions";
-import { Button } from "@/components/catalyst/button";
-import { Input } from "@/components/catalyst/input";
-import { Field, FieldGroup, Label, Description } from "@/components/catalyst/fieldset";
-import { Text } from "@/components/catalyst/text";
-import { Textarea } from "@/components/catalyst/textarea";
-import { Checkbox, CheckboxField } from "@/components/catalyst/checkbox";
-import { ConfirmDialog } from "@/components/catalyst/confirm-dialog";
-import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } from "@/components/catalyst/dialog";
-import { Badge } from "@/components/catalyst/badge";
+} from '@/src/app/(app)/settings/actions/diet-admin.actions';
+import { Button } from '@/components/catalyst/button';
+import { Input } from '@/components/catalyst/input';
+import {
+  Field,
+  FieldGroup,
+  Label,
+  Description,
+} from '@/components/catalyst/fieldset';
+import { Text } from '@/components/catalyst/text';
+import { Textarea } from '@/components/catalyst/textarea';
+import { Checkbox, CheckboxField } from '@/components/catalyst/checkbox';
+import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
+import {
+  Dialog,
+  DialogTitle,
+  DialogDescription,
+  DialogBody,
+  DialogActions,
+} from '@/components/catalyst/dialog';
+import { Badge } from '@/components/catalyst/badge';
 import {
   Dropdown,
   DropdownButton,
   DropdownMenu,
   DropdownItem,
   DropdownSection,
-} from "@/components/catalyst/dropdown";
+} from '@/components/catalyst/dropdown';
 import {
   Table,
   TableHead,
@@ -32,13 +43,13 @@ import {
   TableRow,
   TableBody,
   TableCell,
-} from "@/components/catalyst/table";
+} from '@/components/catalyst/table';
 import {
   PencilIcon,
   TrashIcon,
   PlusIcon,
   EllipsisVerticalIcon,
-} from "@heroicons/react/20/solid";
+} from '@heroicons/react/20/solid';
 
 export function DietTypesAdminClient() {
   const router = useRouter();
@@ -53,8 +64,8 @@ export function DietTypesAdminClient() {
 
   // Form state for creating new diet type
   const [formData, setFormData] = useState<DietTypeInput>({
-    name: "",
-    description: "",
+    name: '',
+    description: '',
     displayOrder: 0,
     isActive: true,
   });
@@ -68,13 +79,13 @@ export function DietTypesAdminClient() {
     setError(null);
     try {
       const result = await getAllDietTypes();
-      if ("error" in result) {
+      if ('error' in result) {
         setError(result.error);
       } else if (result.data) {
         setDietTypes(result.data);
       }
-    } catch (err) {
-      setError("Onverwachte fout bij laden dieettypes");
+    } catch (_err) {
+      setError('Onverwachte fout bij laden dieettypes');
     } finally {
       setIsLoading(false);
     }
@@ -86,9 +97,12 @@ export function DietTypesAdminClient() {
 
   function handleCreate() {
     setFormData({
-      name: "",
-      description: "",
-      displayOrder: dietTypes.length > 0 ? Math.max(...dietTypes.map(dt => dt.displayOrder)) + 1 : 0,
+      name: '',
+      description: '',
+      displayOrder:
+        dietTypes.length > 0
+          ? Math.max(...dietTypes.map((dt) => dt.displayOrder)) + 1
+          : 0,
       isActive: true,
     });
     setShowCreateDialog(true);
@@ -99,8 +113,8 @@ export function DietTypesAdminClient() {
   function cancelCreate() {
     setShowCreateDialog(false);
     setFormData({
-      name: "",
-      description: "",
+      name: '',
+      description: '',
       displayOrder: 0,
       isActive: true,
     });
@@ -114,22 +128,22 @@ export function DietTypesAdminClient() {
     setSuccess(null);
 
     if (!formData.name.trim()) {
-      setError("Naam is verplicht");
+      setError('Naam is verplicht');
       return;
     }
 
     startTransition(async () => {
       try {
         const result = await createDietType(formData);
-        if ("error" in result) {
+        if ('error' in result) {
           setError(result.error);
         } else {
-          setSuccess("Dieettype succesvol aangemaakt");
+          setSuccess('Dieettype succesvol aangemaakt');
           cancelCreate();
           await loadDietTypes();
         }
-      } catch (err) {
-        setError("Onverwachte fout bij opslaan");
+      } catch (_err) {
+        setError('Onverwachte fout bij opslaan');
       }
     });
   }
@@ -149,14 +163,14 @@ export function DietTypesAdminClient() {
     startTransition(async () => {
       try {
         const result = await deleteDietType(deleteDietId);
-        if ("error" in result) {
+        if ('error' in result) {
           setError(result.error);
         } else {
-          setSuccess("Dieettype succesvol verwijderd (gedeactiveerd)");
+          setSuccess('Dieettype succesvol verwijderd (gedeactiveerd)');
           await loadDietTypes();
         }
-      } catch (err) {
-        setError("Onverwachte fout bij verwijderen");
+      } catch (_err) {
+        setError('Onverwachte fout bij verwijderen');
       } finally {
         setDeleteDietId(null);
       }
@@ -166,7 +180,9 @@ export function DietTypesAdminClient() {
   if (isLoading) {
     return (
       <div className="p-6">
-        <Text className="text-zinc-500 dark:text-zinc-400">Dieettypes laden...</Text>
+        <Text className="text-zinc-500 dark:text-zinc-400">
+          Dieettypes laden...
+        </Text>
       </div>
     );
   }
@@ -179,7 +195,8 @@ export function DietTypesAdminClient() {
             Dieettypes Beheer
           </h1>
           <p className="mt-2 text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
-            Maak en beheer dieettypes die beschikbaar zijn in de onboarding en account pagina.
+            Maak en beheer dieettypes die beschikbaar zijn in de onboarding en
+            account pagina.
           </p>
         </div>
         <Button onClick={handleCreate}>
@@ -214,7 +231,10 @@ export function DietTypesAdminClient() {
             <TableBody>
               {dietTypes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-zinc-500 dark:text-zinc-400 py-8">
+                  <TableCell
+                    colSpan={4}
+                    className="text-center text-zinc-500 dark:text-zinc-400 py-8"
+                  >
                     Geen dieettypes gevonden
                   </TableCell>
                 </TableRow>
@@ -247,7 +267,9 @@ export function DietTypesAdminClient() {
                           </DropdownButton>
                           <DropdownMenu anchor="bottom end">
                             <DropdownSection>
-                              <DropdownItem onClick={() => handleEdit(dietType)}>
+                              <DropdownItem
+                                onClick={() => handleEdit(dietType)}
+                              >
                                 <PencilIcon data-slot="icon" />
                                 <span>Bewerken</span>
                               </DropdownItem>
@@ -311,7 +333,7 @@ export function DietTypesAdminClient() {
                 <Label htmlFor="description">Beschrijving</Label>
                 <Textarea
                   id="description"
-                  value={formData.description}
+                  value={formData.description ?? ''}
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
@@ -358,7 +380,7 @@ export function DietTypesAdminClient() {
               Annuleren
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? "Opslaan..." : "Aanmaken"}
+              {isPending ? 'Opslaan...' : 'Aanmaken'}
             </Button>
           </DialogActions>
         </form>

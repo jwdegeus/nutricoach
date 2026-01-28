@@ -1,16 +1,23 @@
-"use client";
+'use client';
 
-import { Link } from "@/components/catalyst/link";
-import { Text } from "@/components/catalyst/text";
+import { Link } from '@/components/catalyst/link';
+import { Text } from '@/components/catalyst/text';
+import type { ComponentType, SVGProps } from 'react';
 import {
   TagIcon,
   Squares2X2Icon,
   ArrowRightIcon,
   CheckCircleIcon,
   XCircleIcon,
-  UsersIcon,
   ChartBarIcon,
-} from "@heroicons/react/20/solid";
+} from '@heroicons/react/20/solid';
+
+type StatItem = {
+  label: string;
+  value: number | string;
+  icon?: ComponentType<SVGProps<SVGSVGElement>>;
+  iconColor?: string;
+};
 
 type AdminStats = {
   dietTypes: {
@@ -31,54 +38,63 @@ type AdminDashboardClientProps = {
 };
 
 export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
-  const adminSections = [
+  const adminSections: Array<{
+    name: string;
+    description: string;
+    href: string;
+    icon: typeof TagIcon;
+    iconBackground: string;
+    stats: StatItem[];
+  }> = [
     {
-      name: "Recept Bronnen",
-      description: "Beheer alle recept bronnen in het systeem. Wijzig, verwijder of voeg samen.",
-      href: "/admin/recipe-sources",
+      name: 'Recept Bronnen',
+      description:
+        'Beheer alle recept bronnen in het systeem. Wijzig, verwijder of voeg samen.',
+      href: '/admin/recipe-sources',
       icon: TagIcon,
-      iconBackground: "bg-blue-500",
+      iconBackground: 'bg-blue-500',
       stats: [
         {
-          label: "Totaal bronnen",
+          label: 'Totaal bronnen',
           value: stats.recipeSources.total,
         },
         {
-          label: "Systeem bronnen",
+          label: 'Systeem bronnen',
           value: stats.recipeSources.system,
         },
         {
-          label: "Gebruiker bronnen",
+          label: 'Gebruiker bronnen',
           value: stats.recipeSources.user,
         },
         {
-          label: "Totaal gebruik",
+          label: 'Totaal gebruik',
           value: stats.recipeSources.totalUsage.toLocaleString(),
         },
       ],
     },
     {
-      name: "Dieettypes",
-      description: "Maak en beheer dieettypes die beschikbaar zijn in de onboarding en account pagina.",
-      href: "/admin/diet-types",
+      name: 'Dieettypes',
+      description:
+        'Maak en beheer dieettypes die beschikbaar zijn in de onboarding en account pagina.',
+      href: '/admin/diet-types',
       icon: Squares2X2Icon,
-      iconBackground: "bg-green-500",
+      iconBackground: 'bg-green-500',
       stats: [
         {
-          label: "Totaal dieettypes",
+          label: 'Totaal dieettypes',
           value: stats.dietTypes.total,
         },
         {
-          label: "Actief",
+          label: 'Actief',
           value: stats.dietTypes.active,
           icon: CheckCircleIcon,
-          iconColor: "text-green-600 dark:text-green-400",
+          iconColor: 'text-green-600 dark:text-green-400',
         },
         {
-          label: "Inactief",
+          label: 'Inactief',
           value: stats.dietTypes.inactive,
           icon: XCircleIcon,
-          iconColor: "text-zinc-400",
+          iconColor: 'text-zinc-400',
         },
       ],
     },
@@ -128,7 +144,9 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
                 <div key={index}>
                   <dt className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
                     {stat.icon && (
-                      <stat.icon className={`h-4 w-4 ${stat.iconColor || "text-zinc-400"}`} />
+                      <stat.icon
+                        className={`h-4 w-4 ${stat.iconColor ?? 'text-zinc-400'}`}
+                      />
                     )}
                     {stat.label}
                   </dt>

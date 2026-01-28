@@ -1,23 +1,50 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useTransition } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/catalyst/table";
-import { Badge } from "@/components/catalyst/badge";
-import { Text } from "@/components/catalyst/text";
-import { Button } from "@/components/catalyst/button";
-import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "@/components/catalyst/dialog";
-import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "@/components/catalyst/dropdown";
-import { Input } from "@/components/catalyst/input";
-import { Textarea } from "@/components/catalyst/textarea";
-import { Select } from "@/components/catalyst/select";
-import { Listbox, ListboxLabel, ListboxOption } from "@/components/catalyst/listbox";
-import { Checkbox } from "@/components/catalyst/checkbox";
-import { Field, FieldGroup, Label, Description } from "@/components/catalyst/fieldset";
-import clsx from "clsx";
-import type { GuardReasonCode } from "@/src/lib/guardrails-vnext/types";
-import { getGuardReasonLabel } from "@/src/lib/guardrails-vnext/ui/reasonLabels";
-import { DIET_LOGIC_LABELS } from "@/src/lib/diet-logic/types";
-import type { DietLogicType } from "../actions/guardrails.actions";
+import { useState, useEffect, useTransition } from 'react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/catalyst/table';
+import { Badge } from '@/components/catalyst/badge';
+import { Text } from '@/components/catalyst/text';
+import { Button } from '@/components/catalyst/button';
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/catalyst/dialog';
+import {
+  Dropdown,
+  DropdownButton,
+  DropdownItem,
+  DropdownMenu,
+} from '@/components/catalyst/dropdown';
+import { Input } from '@/components/catalyst/input';
+import { Textarea } from '@/components/catalyst/textarea';
+import { Select } from '@/components/catalyst/select';
+import {
+  Listbox,
+  ListboxLabel,
+  ListboxOption,
+} from '@/components/catalyst/listbox';
+import { Checkbox } from '@/components/catalyst/checkbox';
+import {
+  Field,
+  FieldGroup,
+  Label,
+  Description,
+} from '@/components/catalyst/fieldset';
+import clsx from 'clsx';
+import type { GuardReasonCode } from '@/src/lib/guardrails-vnext/types';
+import { getGuardReasonLabel } from '@/src/lib/guardrails-vnext/ui/reasonLabels';
+import { DIET_LOGIC_LABELS } from '@/src/lib/diet-logic/types';
+import type { DietLogicType } from '../actions/guardrails.actions';
 import {
   loadDietGuardrailsRulesetAction,
   updateGuardRailRuleAction,
@@ -29,12 +56,12 @@ import {
   swapGuardRailRulePriorityAction,
   type GuardRailsRulesetViewModel,
   type GroupPolicyRow,
-} from "../actions/guardrails.actions";
+} from '../actions/guardrails.actions';
 import {
   getIngredientCategoriesForDietAction,
   updateDietCategoryConstraintAction,
-} from "../actions/ingredient-categories-admin.actions";
-import { Link } from "@/components/catalyst/link";
+} from '../actions/ingredient-categories-admin.actions';
+import { Link } from '@/components/catalyst/link';
 import {
   Bars3Icon,
   ClipboardIcon,
@@ -50,25 +77,25 @@ import {
   SparklesIcon,
   TrashIcon,
   XCircleIcon,
-} from "@heroicons/react/20/solid";
-import { useRouter } from "next/navigation";
+} from '@heroicons/react/20/solid';
+import { useRouter } from 'next/navigation';
 import {
   analyzeDietRulesWithAI,
   suggestConstraintSettingsWithAI,
   applyDietRuleAnalysisAction,
   type DietRulesAnalysis,
   type DietRuleSuggestion,
-} from "../actions/diet-rules-ai.actions";
+} from '../actions/diet-rules-ai.actions';
 
 /** Striktheid-badgekleur uit (diet_logic, strictness): DROP+Streng=rood, LIMIT+Zacht=oranje. */
 function strictnessBadgeColor(
   dietLogic: string | undefined,
-  strictness: "hard" | "soft"
-): "red" | "orange" | "amber" | "zinc" {
-  if (dietLogic === "drop" && strictness === "hard") return "red";
-  if (dietLogic === "limit" && strictness === "soft") return "orange";
-  if (strictness === "hard") return "red";
-  return "amber";
+  strictness: 'hard' | 'soft',
+): 'red' | 'orange' | 'amber' | 'zinc' {
+  if (dietLogic === 'drop' && strictness === 'hard') return 'red';
+  if (dietLogic === 'limit' && strictness === 'soft') return 'orange';
+  if (strictness === 'hard') return 'red';
+  return 'amber';
 }
 
 type GuardRailsVNextOverviewProps = {
@@ -88,16 +115,15 @@ function CopyHashButton({ hash }: { hash: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error("Failed to copy:", error);
+      console.error('Failed to copy:', error);
     }
   };
 
   return (
     <Button
       onClick={handleCopy}
-      color="zinc"
       plain
-      className="ml-2"
+      className="ml-2 text-zinc-600 dark:text-zinc-400"
     >
       {copied ? (
         <>
@@ -116,7 +142,7 @@ function CopyHashButton({ hash }: { hash: string }) {
 
 /**
  * Guard Rails vNext Overview Component
- * 
+ *
  * Displays interactive overview of Guard Rails vNext ruleset with edit, block/pause, delete, and drag-and-drop functionality.
  */
 export function GuardRailsVNextOverview({
@@ -130,78 +156,113 @@ export function GuardRailsVNextOverview({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [draggedRuleId, setDraggedRuleId] = useState<string | null>(null);
-  const [editingRule, setEditingRule] = useState<GuardRailsRulesetViewModel["rules"][0] | null>(null);
+  const [editingRule, setEditingRule] = useState<
+    GuardRailsRulesetViewModel['rules'][0] | null
+  >(null);
   const [editFormData, setEditFormData] = useState({
     priority: 50,
-    strictness: "hard" as "hard" | "soft",
-    action: "block" as "allow" | "block",
-    target: "ingredient" as "ingredient" | "step" | "metadata",
-    matchMode: "word_boundary" as "exact" | "word_boundary" | "substring" | "canonical_id",
-    matchValue: "",
-    reasonCode: "",
-    label: "",
+    strictness: 'hard' as 'hard' | 'soft',
+    action: 'block' as 'allow' | 'block',
+    target: 'ingredient' as 'ingredient' | 'step' | 'metadata' | 'category',
+    matchMode: 'word_boundary' as
+      | 'exact'
+      | 'word_boundary'
+      | 'substring'
+      | 'canonical_id',
+    matchValue: '',
+    reasonCode: '',
+    label: '',
   });
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [validationErrors, setValidationErrors] = useState<
+    Record<string, string>
+  >({});
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
-  const [createMode, setCreateMode] = useState<"recipe_rule" | "constraint" | null>(null);
+  const [createMode, setCreateMode] = useState<
+    'recipe_rule' | 'constraint' | null
+  >(null);
   const [createFormData, setCreateFormData] = useState({
     // Common
     priority: 50,
-    strictness: "hard" as "hard" | "soft",
-    action: "block" as "allow" | "block",
+    strictness: 'hard' as 'hard' | 'soft',
+    action: 'block' as 'allow' | 'block',
     // Recipe rule specific
-    target: "ingredient" as "ingredient" | "step" | "metadata",
-    matchMode: "word_boundary" as "exact" | "word_boundary" | "substring" | "canonical_id",
-    matchValue: "",
-    reasonCode: "",
-    label: "",
+    target: 'ingredient' as 'ingredient' | 'step' | 'metadata' | 'category',
+    matchMode: 'word_boundary' as
+      | 'exact'
+      | 'word_boundary'
+      | 'substring'
+      | 'canonical_id',
+    matchValue: '',
+    reasonCode: '',
+    label: '',
     // Constraint specific (Dieetregel: diet_logic + category)
-    categoryId: "",
-    dietLogic: "drop" as DietLogicType,
+    categoryId: '',
+    dietLogic: 'drop' as DietLogicType,
     minPerDay: null as number | null,
     minPerWeek: null as number | null,
     maxPerDay: null as number | null,
     maxPerWeek: null as number | null,
-    aiInstruction: "",
+    aiInstruction: '',
   });
-  const [categories, setCategories] = useState<Array<{ id: string; code: string; name_nl: string; category_type: "forbidden" | "required"; is_diet_specific: boolean }>>([]);
+  const [categories, setCategories] = useState<
+    Array<{
+      id: string;
+      code: string;
+      name_nl: string;
+      category_type: 'forbidden' | 'required';
+      is_diet_specific: boolean;
+    }>
+  >([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   // Dieetregel (groepsregel) bewerken: dialog + form
-  const [editingPolicy, setEditingPolicy] = useState<GroupPolicyRow | null>(null);
+  const [editingPolicy, setEditingPolicy] = useState<GroupPolicyRow | null>(
+    null,
+  );
   const [showPolicyEditDialog, setShowPolicyEditDialog] = useState(false);
   const [policyEditFormData, setPolicyEditFormData] = useState<{
     dietLogic: DietLogicType;
     priority: number;
-    strictness: "hard" | "soft";
+    strictness: 'hard' | 'soft';
     minPerDay: number | null;
     minPerWeek: number | null;
     maxPerDay: number | null;
     maxPerWeek: number | null;
   }>({
-    dietLogic: "drop",
+    dietLogic: 'drop',
     priority: 50,
-    strictness: "hard",
+    strictness: 'hard',
     minPerDay: null,
     minPerWeek: null,
     maxPerDay: null,
     maxPerWeek: null,
   });
-  const [deletingConstraintId, setDeletingConstraintId] = useState<string | null>(null);
+  const [deletingConstraintId, setDeletingConstraintId] = useState<
+    string | null
+  >(null);
   /** Bulk delete: lijst constraint-ids die in één keer verwijderd worden */
-  const [deletingConstraintIds, setDeletingConstraintIds] = useState<string[]>([]);
+  const [deletingConstraintIds, setDeletingConstraintIds] = useState<string[]>(
+    [],
+  );
   /** Multi-select voor dieetregels (groepsregels) */
-  const [selectedConstraintIds, setSelectedConstraintIds] = useState<Set<string>>(new Set());
-  const [draggedPolicyConstraintId, setDraggedPolicyConstraintId] = useState<string | null>(null);
+  const [selectedConstraintIds, setSelectedConstraintIds] = useState<
+    Set<string>
+  >(new Set());
+  const [draggedPolicyConstraintId, setDraggedPolicyConstraintId] = useState<
+    string | null
+  >(null);
   // AI analyse dialog
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<DietRulesAnalysis | null>(null);
+  const [analysisResult, setAnalysisResult] =
+    useState<DietRulesAnalysis | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   /** Per advies: 'accepted' = toegepast, 'dismissed' = genegeerd */
-  const [suggestionStatus, setSuggestionStatus] = useState<Record<number, "accepted" | "dismissed">>({});
+  const [suggestionStatus, setSuggestionStatus] = useState<
+    Record<number, 'accepted' | 'dismissed'>
+  >({});
   /** Index van het advies dat momenteel wordt toegepast (actie naar backend) */
   const [applyingIndex, setApplyingIndex] = useState<number | null>(null);
   // AI suggest bij nieuwe constraint
@@ -220,7 +281,7 @@ export function GuardRailsVNextOverview({
         setCategories(result.data);
       }
     } catch (err) {
-      console.error("Error loading categories:", err);
+      console.error('Error loading categories:', err);
     }
   }
 
@@ -231,28 +292,28 @@ export function GuardRailsVNextOverview({
       try {
         // Load group policies (consolidated view: only constraints)
         const policiesResult = await getDietGroupPoliciesAction(dietTypeId);
-        if ("error" in policiesResult) {
+        if ('error' in policiesResult) {
           setError(policiesResult.error);
         } else if (policiesResult.data) {
           setGroupPolicies(policiesResult.data);
         }
-        
+
         // Load full ruleset for metadata (hash, version)
         const result = await loadDietGuardrailsRulesetAction(dietTypeId);
-        if ("error" in result) {
+        if ('error' in result) {
           // Don't fail if this errors, we still have group policies
-          console.warn("Could not load full ruleset:", result.error);
+          console.warn('Could not load full ruleset:', result.error);
         } else if (result.data) {
           setData(result.data);
         }
       } catch (err) {
-        setError("Onverwachte fout bij laden guard rails ruleset");
+        setError('Onverwachte fout bij laden guard rails ruleset');
       } finally {
         setIsLoading(false);
       }
     });
   }
-  
+
   /** RuleId-formaat voor guardrail-actions (delete/swap priority) wanneer we alleen constraintId hebben */
   function ruleIdForConstraint(constraintId: string): string {
     return `db:diet_category_constraints:${constraintId}:0`;
@@ -261,7 +322,8 @@ export function GuardRailsVNextOverview({
   function handlePolicyRowClick(policy: GroupPolicyRow) {
     setEditingPolicy(policy);
     setPolicyEditFormData({
-      dietLogic: policy.dietLogic ?? (policy.action === "block" ? "drop" : "force"),
+      dietLogic:
+        policy.dietLogic ?? (policy.action === 'block' ? 'drop' : 'force'),
       priority: policy.priority,
       strictness: policy.strictness,
       minPerDay: policy.minPerDay ?? null,
@@ -277,29 +339,37 @@ export function GuardRailsVNextOverview({
     startTransition(async () => {
       try {
         setError(null);
-        const result = await updateDietCategoryConstraintAction(editingPolicy.constraintId, {
-          diet_logic: policyEditFormData.dietLogic,
-          rule_priority: policyEditFormData.priority,
-          strictness: policyEditFormData.strictness,
-          min_per_day: policyEditFormData.minPerDay,
-          min_per_week: policyEditFormData.minPerWeek,
-          max_per_day: policyEditFormData.maxPerDay,
-          max_per_week: policyEditFormData.maxPerWeek,
-        });
+        const result = await updateDietCategoryConstraintAction(
+          editingPolicy.constraintId,
+          {
+            diet_logic: policyEditFormData.dietLogic,
+            rule_priority: policyEditFormData.priority,
+            strictness: policyEditFormData.strictness,
+            min_per_day: policyEditFormData.minPerDay,
+            min_per_week: policyEditFormData.minPerWeek,
+            max_per_day: policyEditFormData.maxPerDay,
+            max_per_week: policyEditFormData.maxPerWeek,
+          },
+        );
         if (!result.ok) {
-          setError(result.error?.message ?? "Fout bij opslaan");
+          setError(result.error?.message ?? 'Fout bij opslaan');
           return;
         }
         setShowPolicyEditDialog(false);
         setEditingPolicy(null);
         await loadData();
       } catch (err) {
-        setError(`Onverwachte fout: ${err instanceof Error ? err.message : "Onbekende fout"}`);
+        setError(
+          `Onverwachte fout: ${err instanceof Error ? err.message : 'Onbekende fout'}`,
+        );
       }
     });
   }
 
-  function handleDeletePolicyClick(policy: GroupPolicyRow, e: React.MouseEvent) {
+  function handleDeletePolicyClick(
+    policy: GroupPolicyRow,
+    e: React.MouseEvent,
+  ) {
     e.stopPropagation();
     setDeletingRuleId(null);
     setDeletingConstraintId(policy.constraintId);
@@ -308,38 +378,45 @@ export function GuardRailsVNextOverview({
 
   async function handlePriorityUp(policy: GroupPolicyRow, e: React.MouseEvent) {
     e.stopPropagation();
-    const idx = groupPolicies.findIndex((p) => p.constraintId === policy.constraintId);
+    const idx = groupPolicies.findIndex(
+      (p) => p.constraintId === policy.constraintId,
+    );
     if (idx <= 0) return;
     const prev = groupPolicies[idx - 1];
     startTransition(async () => {
       try {
         const result = await swapGuardRailRulePriorityAction(
           ruleIdForConstraint(prev.constraintId),
-          ruleIdForConstraint(policy.constraintId)
+          ruleIdForConstraint(policy.constraintId),
         );
-        if ("error" in result) setError(result.error);
+        if ('error' in result) setError(result.error);
         else await loadData();
       } catch (err) {
-        setError("Onverwachte fout bij prioriteit wijzigen");
+        setError('Onverwachte fout bij prioriteit wijzigen');
       }
     });
   }
 
-  async function handlePriorityDown(policy: GroupPolicyRow, e: React.MouseEvent) {
+  async function handlePriorityDown(
+    policy: GroupPolicyRow,
+    e: React.MouseEvent,
+  ) {
     e.stopPropagation();
-    const idx = groupPolicies.findIndex((p) => p.constraintId === policy.constraintId);
+    const idx = groupPolicies.findIndex(
+      (p) => p.constraintId === policy.constraintId,
+    );
     if (idx < 0 || idx >= groupPolicies.length - 1) return;
     const next = groupPolicies[idx + 1];
     startTransition(async () => {
       try {
         const result = await swapGuardRailRulePriorityAction(
           ruleIdForConstraint(policy.constraintId),
-          ruleIdForConstraint(next.constraintId)
+          ruleIdForConstraint(next.constraintId),
         );
-        if ("error" in result) setError(result.error);
+        if ('error' in result) setError(result.error);
         else await loadData();
       } catch (err) {
-        setError("Onverwachte fout bij prioriteit wijzigen");
+        setError('Onverwachte fout bij prioriteit wijzigen');
       }
     });
   }
@@ -349,16 +426,18 @@ export function GuardRailsVNextOverview({
     startTransition(async () => {
       try {
         if (policy.isPaused) {
-          const result = await updateGuardRailRuleAction(ruleId, { isPaused: false });
-          if ("error" in result) setError(result.error);
+          const result = await updateGuardRailRuleAction(ruleId, {
+            isPaused: false,
+          });
+          if ('error' in result) setError(result.error);
           else await loadData();
         } else {
-          const result = await blockOrPauseGuardRailRuleAction(ruleId, "pause");
-          if ("error" in result) setError(result.error);
+          const result = await blockOrPauseGuardRailRuleAction(ruleId, 'pause');
+          if ('error' in result) setError(result.error);
           else await loadData();
         }
       } catch (err) {
-        setError("Onverwachte fout bij pauzeren/activeren");
+        setError('Onverwachte fout bij pauzeren/activeren');
       }
     });
   }
@@ -366,32 +445,36 @@ export function GuardRailsVNextOverview({
   function handlePolicyDragStart(e: React.DragEvent, constraintId: string) {
     e.stopPropagation();
     setDraggedPolicyConstraintId(constraintId);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", constraintId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', constraintId);
   }
 
   function handlePolicyDragOver(e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
-    e.dataTransfer.dropEffect = "move";
+    e.dataTransfer.dropEffect = 'move';
   }
 
-  async function handlePolicyDrop(e: React.DragEvent, targetConstraintId: string) {
+  async function handlePolicyDrop(
+    e: React.DragEvent,
+    targetConstraintId: string,
+  ) {
     e.preventDefault();
     e.stopPropagation();
-    const sourceId = draggedPolicyConstraintId ?? e.dataTransfer.getData("text/plain");
+    const sourceId =
+      draggedPolicyConstraintId ?? e.dataTransfer.getData('text/plain');
     setDraggedPolicyConstraintId(null);
     if (!sourceId || sourceId === targetConstraintId) return;
     startTransition(async () => {
       try {
         const result = await swapGuardRailRulePriorityAction(
           ruleIdForConstraint(sourceId),
-          ruleIdForConstraint(targetConstraintId)
+          ruleIdForConstraint(targetConstraintId),
         );
-        if ("error" in result) setError(result.error);
+        if ('error' in result) setError(result.error);
         else await loadData();
       } catch (err) {
-        setError("Onverwachte fout bij verplaatsen");
+        setError('Onverwachte fout bij verplaatsen');
       }
     });
   }
@@ -400,7 +483,7 @@ export function GuardRailsVNextOverview({
     setDraggedPolicyConstraintId(null);
   }
 
-  function handleRowClick(rule: GuardRailsRulesetViewModel["rules"][0]) {
+  function handleRowClick(rule: GuardRailsRulesetViewModel['rules'][0]) {
     setEditingRule(rule);
     setEditFormData({
       priority: rule.priority,
@@ -410,7 +493,7 @@ export function GuardRailsVNextOverview({
       matchMode: rule.matchMode,
       matchValue: rule.matchValue,
       reasonCode: rule.reasonCode,
-      label: rule.label || "",
+      label: rule.label || '',
     });
     setValidationErrors({});
     setShowEditDialog(true);
@@ -422,16 +505,24 @@ export function GuardRailsVNextOverview({
    * because recipe_adaptation_rules can also have similar labels
    */
   function isConstraintRule(ruleId: string): boolean {
-    const parts = ruleId.split(":");
-    return parts.length >= 3 && parts[0] === "db" && parts[1] === "diet_category_constraints";
+    const parts = ruleId.split(':');
+    return (
+      parts.length >= 3 &&
+      parts[0] === 'db' &&
+      parts[1] === 'diet_category_constraints'
+    );
   }
 
   /**
    * Check if a rule is a recipe adaptation rule (ingredient-based)
    */
   function isRecipeAdaptationRule(ruleId: string): boolean {
-    const parts = ruleId.split(":");
-    return parts.length >= 3 && parts[0] === "db" && parts[1] === "recipe_adaptation_rules";
+    const parts = ruleId.split(':');
+    return (
+      parts.length >= 3 &&
+      parts[0] === 'db' &&
+      parts[1] === 'recipe_adaptation_rules'
+    );
   }
 
   /**
@@ -440,15 +531,17 @@ export function GuardRailsVNextOverview({
    */
   function getTargetDisplayLabel(target: string): string {
     // The target value is already correct from the view model:
-    // - Constraints have target: "category" 
+    // - Constraints have target: "category"
     // - Recipe adaptation rules have their actual target from database
     const targetLabels: Record<string, string> = {
-      category: "Categorie",
-      ingredient: "Ingrediënt",
-      step: "Stap",
-      metadata: "Metadata",
+      category: 'Categorie',
+      ingredient: 'Ingrediënt',
+      step: 'Stap',
+      metadata: 'Metadata',
     };
-    return targetLabels[target] || target.charAt(0).toUpperCase() + target.slice(1);
+    return (
+      targetLabels[target] || target.charAt(0).toUpperCase() + target.slice(1)
+    );
   }
 
   /**
@@ -484,34 +577,39 @@ export function GuardRailsVNextOverview({
    */
   function validateForm(): boolean {
     if (!editingRule) return false;
-    
+
     const errors: Record<string, string> = {};
     const editableFields = getEditableFields(editingRule.id);
 
     // Priority validation (only if editable)
     if (editableFields.priority) {
       if (editFormData.priority < 1 || editFormData.priority > 65500) {
-        errors.priority = "Prioriteit moet tussen 1 en 65500 liggen (1 = hoogst)";
+        errors.priority =
+          'Prioriteit moet tussen 1 en 65500 liggen (1 = hoogst)';
       }
     }
 
     // Match value validation (only if field is editable)
     if (editableFields.matchValue) {
-      if (editFormData.matchMode === "canonical_id") {
-        if (!editFormData.matchValue || editFormData.matchValue.trim() === "") {
-          errors.matchValue = "Canonical ID is vereist";
+      if (editFormData.matchMode === 'canonical_id') {
+        if (!editFormData.matchValue || editFormData.matchValue.trim() === '') {
+          errors.matchValue = 'Canonical ID is vereist';
         }
       } else {
-        if (!editFormData.matchValue || editFormData.matchValue.trim() === "") {
-          errors.matchValue = "Match waarde is vereist";
+        if (!editFormData.matchValue || editFormData.matchValue.trim() === '') {
+          errors.matchValue = 'Match waarde is vereist';
         }
       }
     }
 
     // Substring + step validation (only if both fields are editable)
     if (editableFields.matchMode && editableFields.target) {
-      if (editFormData.matchMode === "substring" && editFormData.target === "step") {
-        errors.matchMode = "Substring match mode is niet toegestaan voor step target";
+      if (
+        editFormData.matchMode === 'substring' &&
+        editFormData.target === 'step'
+      ) {
+        errors.matchMode =
+          'Substring match mode is niet toegestaan voor step target';
       }
     }
 
@@ -524,34 +622,39 @@ export function GuardRailsVNextOverview({
    */
   function isFormValid(): boolean {
     if (!editingRule) return false;
-    
+
     const errors: Record<string, string> = {};
     const editableFields = getEditableFields(editingRule.id);
 
     // Priority validation (only if editable)
     if (editableFields.priority) {
       if (editFormData.priority < 1 || editFormData.priority > 65500) {
-        errors.priority = "Prioriteit moet tussen 1 en 65500 liggen (1 = hoogst)";
+        errors.priority =
+          'Prioriteit moet tussen 1 en 65500 liggen (1 = hoogst)';
       }
     }
 
     // Match value validation (only if field is editable)
     if (editableFields.matchValue) {
-      if (editFormData.matchMode === "canonical_id") {
-        if (!editFormData.matchValue || editFormData.matchValue.trim() === "") {
-          errors.matchValue = "Canonical ID is vereist";
+      if (editFormData.matchMode === 'canonical_id') {
+        if (!editFormData.matchValue || editFormData.matchValue.trim() === '') {
+          errors.matchValue = 'Canonical ID is vereist';
         }
       } else {
-        if (!editFormData.matchValue || editFormData.matchValue.trim() === "") {
-          errors.matchValue = "Match waarde is vereist";
+        if (!editFormData.matchValue || editFormData.matchValue.trim() === '') {
+          errors.matchValue = 'Match waarde is vereist';
         }
       }
     }
 
     // Substring + step validation (only if both fields are editable)
     if (editableFields.matchMode && editableFields.target) {
-      if (editFormData.matchMode === "substring" && editFormData.target === "step") {
-        errors.matchMode = "Substring match mode is niet toegestaan voor step target";
+      if (
+        editFormData.matchMode === 'substring' &&
+        editFormData.target === 'step'
+      ) {
+        errors.matchMode =
+          'Substring match mode is niet toegestaan voor step target';
       }
     }
 
@@ -563,46 +666,59 @@ export function GuardRailsVNextOverview({
    */
   function validateCreateForm(): boolean {
     if (!createMode) return false;
-    
+
     const errors: Record<string, string> = {};
 
-    if (createMode === "recipe_rule") {
+    if (createMode === 'recipe_rule') {
       // Match value is required
-      if (!createFormData.matchValue || createFormData.matchValue.trim() === "") {
-        errors.matchValue = "Match waarde is vereist";
+      if (
+        !createFormData.matchValue ||
+        createFormData.matchValue.trim() === ''
+      ) {
+        errors.matchValue = 'Match waarde is vereist';
       }
 
       // Target is required
       if (!createFormData.target) {
-        errors.target = "Target is vereist";
+        errors.target = 'Target is vereist';
       }
 
       // Match mode is required
       if (!createFormData.matchMode) {
-        errors.matchMode = "Match mode is vereist";
+        errors.matchMode = 'Match mode is vereist';
       }
 
       // Substring + step validation
-      if (createFormData.matchMode === "substring" && createFormData.target === "step") {
-        errors.matchMode = "Substring match mode is niet toegestaan voor step target";
+      if (
+        createFormData.matchMode === 'substring' &&
+        createFormData.target === 'step'
+      ) {
+        errors.matchMode =
+          'Substring match mode is niet toegestaan voor step target';
       }
 
       // Reason code is required
-      if (!createFormData.reasonCode || createFormData.reasonCode.trim() === "") {
-        errors.reasonCode = "Reason code is vereist";
+      if (
+        !createFormData.reasonCode ||
+        createFormData.reasonCode.trim() === ''
+      ) {
+        errors.reasonCode = 'Reason code is vereist';
       }
-    } else if (createMode === "constraint") {
-      if (!createFormData.categoryId || createFormData.categoryId.trim() === "") {
-        errors.categoryId = "Ingrediëntgroep is vereist";
+    } else if (createMode === 'constraint') {
+      if (
+        !createFormData.categoryId ||
+        createFormData.categoryId.trim() === ''
+      ) {
+        errors.categoryId = 'Ingrediëntgroep is vereist';
       }
       if (!createFormData.strictness) {
-        errors.strictness = "Striktheid is vereist";
+        errors.strictness = 'Striktheid is vereist';
       }
     }
 
     // Priority validation (common)
     if (createFormData.priority < 1 || createFormData.priority > 65500) {
-      errors.priority = "Prioriteit moet tussen 1 en 65500 liggen (1 = hoogst)";
+      errors.priority = 'Prioriteit moet tussen 1 en 65500 liggen (1 = hoogst)';
     }
 
     setValidationErrors(errors);
@@ -614,36 +730,49 @@ export function GuardRailsVNextOverview({
    */
   function isCreateFormValid(): boolean {
     if (!createMode) return false;
-    
+
     const errors: Record<string, string> = {};
 
-    if (createMode === "recipe_rule") {
-      if (!createFormData.matchValue || createFormData.matchValue.trim() === "") {
-        errors.matchValue = "Match waarde is vereist";
+    if (createMode === 'recipe_rule') {
+      if (
+        !createFormData.matchValue ||
+        createFormData.matchValue.trim() === ''
+      ) {
+        errors.matchValue = 'Match waarde is vereist';
       }
       if (!createFormData.target) {
-        errors.target = "Target is vereist";
+        errors.target = 'Target is vereist';
       }
       if (!createFormData.matchMode) {
-        errors.matchMode = "Match mode is vereist";
+        errors.matchMode = 'Match mode is vereist';
       }
-      if (createFormData.matchMode === "substring" && createFormData.target === "step") {
-        errors.matchMode = "Substring match mode is niet toegestaan voor step target";
+      if (
+        createFormData.matchMode === 'substring' &&
+        createFormData.target === 'step'
+      ) {
+        errors.matchMode =
+          'Substring match mode is niet toegestaan voor step target';
       }
-      if (!createFormData.reasonCode || createFormData.reasonCode.trim() === "") {
-        errors.reasonCode = "Reason code is vereist";
+      if (
+        !createFormData.reasonCode ||
+        createFormData.reasonCode.trim() === ''
+      ) {
+        errors.reasonCode = 'Reason code is vereist';
       }
-    } else if (createMode === "constraint") {
-      if (!createFormData.categoryId || createFormData.categoryId.trim() === "") {
-        errors.categoryId = "Ingrediëntgroep is vereist";
+    } else if (createMode === 'constraint') {
+      if (
+        !createFormData.categoryId ||
+        createFormData.categoryId.trim() === ''
+      ) {
+        errors.categoryId = 'Ingrediëntgroep is vereist';
       }
       if (!createFormData.strictness) {
-        errors.strictness = "Striktheid is vereist";
+        errors.strictness = 'Striktheid is vereist';
       }
     }
 
     if (createFormData.priority < 1 || createFormData.priority > 65500) {
-      errors.priority = "Prioriteit moet tussen 1 en 65500 liggen (1 = hoogst)";
+      errors.priority = 'Prioriteit moet tussen 1 en 65500 liggen (1 = hoogst)';
     }
 
     return Object.keys(errors).length === 0;
@@ -662,26 +791,30 @@ export function GuardRailsVNextOverview({
         setError(null);
         setSuccessMessage(null);
 
-        if (createMode === "recipe_rule") {
+        if (createMode === 'recipe_rule') {
           const result = await createGuardRailRuleAction({
             dietTypeId,
-            sourceType: "recipe_rule",
+            sourceType: 'recipe_rule',
             payload: {
               term: createFormData.matchValue.trim(),
               ruleCode: createFormData.reasonCode.trim(),
-              ruleLabel: createFormData.label.trim() || createFormData.reasonCode.trim(),
+              ruleLabel:
+                createFormData.label.trim() || createFormData.reasonCode.trim(),
               priority: createFormData.priority,
-              target: createFormData.target,
+              target:
+                createFormData.target === 'category'
+                  ? undefined
+                  : createFormData.target,
               matchMode: createFormData.matchMode,
             },
           });
 
-          if ("error" in result) {
+          if ('error' in result) {
             setError(result.error);
             return;
           }
 
-          setSuccessMessage("Dieetregel aangemaakt");
+          setSuccessMessage('Dieetregel aangemaakt');
           setTimeout(() => {
             setShowCreateDialog(false);
             setCreateMode(null);
@@ -690,10 +823,10 @@ export function GuardRailsVNextOverview({
             setSuccessMessage(null);
             loadData();
           }, 1000);
-        } else if (createMode === "constraint") {
+        } else if (createMode === 'constraint') {
           const result = await createGuardRailRuleAction({
             dietTypeId,
-            sourceType: "constraint",
+            sourceType: 'constraint',
             payload: {
               categoryId: createFormData.categoryId,
               dietLogic: createFormData.dietLogic,
@@ -707,12 +840,12 @@ export function GuardRailsVNextOverview({
             },
           });
 
-          if ("error" in result) {
+          if ('error' in result) {
             setError(result.error);
             return;
           }
 
-          setSuccessMessage("Dieetregel aangemaakt");
+          setSuccessMessage('Dieetregel aangemaakt');
           setTimeout(() => {
             setShowCreateDialog(false);
             setCreateMode(null);
@@ -723,8 +856,10 @@ export function GuardRailsVNextOverview({
           }, 1000);
         }
       } catch (err) {
-        console.error("Error creating rule:", err);
-        setError(`Onverwachte fout bij aanmaken: ${err instanceof Error ? err.message : "Onbekende fout"}`);
+        console.error('Error creating rule:', err);
+        setError(
+          `Onverwachte fout bij aanmaken: ${err instanceof Error ? err.message : 'Onbekende fout'}`,
+        );
       }
     });
   }
@@ -734,22 +869,22 @@ export function GuardRailsVNextOverview({
    */
   function getReasonCodeOptions(): GuardReasonCode[] {
     return [
-      "FORBIDDEN_INGREDIENT",
-      "ALLERGEN_PRESENT",
-      "DISLIKED_INGREDIENT",
-      "MISSING_REQUIRED_CATEGORY",
-      "INVALID_CATEGORY",
-      "INVALID_NEVO_CODE",
-      "INVALID_CANONICAL_ID",
-      "CALORIE_TARGET_MISS",
-      "MACRO_TARGET_MISS",
-      "MEAL_PREFERENCE_MISS",
-      "MEAL_STRUCTURE_VIOLATION",
-      "SOFT_CONSTRAINT_VIOLATION",
-      "EVALUATOR_ERROR",
-      "EVALUATOR_WARNING",
-      "RULESET_LOAD_ERROR",
-      "UNKNOWN_ERROR",
+      'FORBIDDEN_INGREDIENT',
+      'ALLERGEN_PRESENT',
+      'DISLIKED_INGREDIENT',
+      'MISSING_REQUIRED_CATEGORY',
+      'INVALID_CATEGORY',
+      'INVALID_NEVO_CODE',
+      'INVALID_CANONICAL_ID',
+      'CALORIE_TARGET_MISS',
+      'MACRO_TARGET_MISS',
+      'MEAL_PREFERENCE_MISS',
+      'MEAL_STRUCTURE_VIOLATION',
+      'SOFT_CONSTRAINT_VIOLATION',
+      'EVALUATOR_ERROR',
+      'EVALUATOR_WARNING',
+      'RULESET_LOAD_ERROR',
+      'UNKNOWN_ERROR',
     ];
   }
 
@@ -764,10 +899,10 @@ export function GuardRailsVNextOverview({
     startTransition(async () => {
       try {
         const editableFields = getEditableFields(editingRule.id);
-        
+
         // Only send fields that are editable
         const updates: Parameters<typeof updateGuardRailRuleAction>[1] = {};
-        
+
         if (editableFields.priority) {
           updates.priority = editFormData.priority;
         }
@@ -777,7 +912,7 @@ export function GuardRailsVNextOverview({
         if (editableFields.action) {
           updates.action = editFormData.action;
         }
-        if (editableFields.target) {
+        if (editableFields.target && editFormData.target !== 'category') {
           updates.target = editFormData.target;
         }
         if (editableFields.matchMode) {
@@ -794,7 +929,7 @@ export function GuardRailsVNextOverview({
         }
 
         const result = await updateGuardRailRuleAction(editingRule.id, updates);
-        if ("error" in result) {
+        if ('error' in result) {
           setError(result.error);
           return;
         }
@@ -803,23 +938,25 @@ export function GuardRailsVNextOverview({
         setValidationErrors({});
         await loadData();
       } catch (err) {
-        console.error("Error saving rule:", err);
-        setError(`Onverwachte fout bij opslaan: ${err instanceof Error ? err.message : "Onbekende fout"}`);
+        console.error('Error saving rule:', err);
+        setError(
+          `Onverwachte fout bij opslaan: ${err instanceof Error ? err.message : 'Onbekende fout'}`,
+        );
       }
     });
   }
 
-  async function handleBlockOrPause(ruleId: string, action: "block" | "pause") {
+  async function handleBlockOrPause(ruleId: string, action: 'block' | 'pause') {
     startTransition(async () => {
       try {
         const result = await blockOrPauseGuardRailRuleAction(ruleId, action);
-        if ("error" in result) {
+        if ('error' in result) {
           setError(result.error);
           return;
         }
         await loadData();
       } catch (err) {
-        setError("Onverwachte fout bij blokkeren/pauzeren");
+        setError('Onverwachte fout bij blokkeren/pauzeren');
       }
     });
   }
@@ -836,8 +973,10 @@ export function GuardRailsVNextOverview({
         try {
           setError(null);
           for (const id of deletingConstraintIds) {
-            const result = await deleteGuardRailRuleAction(ruleIdForConstraint(id));
-            if ("error" in result) {
+            const result = await deleteGuardRailRuleAction(
+              ruleIdForConstraint(id),
+            );
+            if ('error' in result) {
               setError(result.error);
               return;
             }
@@ -847,7 +986,7 @@ export function GuardRailsVNextOverview({
           setSelectedConstraintIds(new Set());
           await loadData();
         } catch (err) {
-          setError("Onverwachte fout bij verwijderen");
+          setError('Onverwachte fout bij verwijderen');
         }
       });
       return;
@@ -855,15 +994,17 @@ export function GuardRailsVNextOverview({
     if (deletingConstraintId) {
       startTransition(async () => {
         try {
-          const result = await deleteGuardRailRuleAction(ruleIdForConstraint(deletingConstraintId));
-          if ("error" in result) setError(result.error);
+          const result = await deleteGuardRailRuleAction(
+            ruleIdForConstraint(deletingConstraintId),
+          );
+          if ('error' in result) setError(result.error);
           else {
             setShowDeleteDialog(false);
             setDeletingConstraintId(null);
             await loadData();
           }
         } catch (err) {
-          setError("Onverwachte fout bij verwijderen");
+          setError('Onverwachte fout bij verwijderen');
         }
       });
       return;
@@ -872,7 +1013,7 @@ export function GuardRailsVNextOverview({
     startTransition(async () => {
       try {
         const result = await deleteGuardRailRuleAction(deletingRuleId);
-        if ("error" in result) {
+        if ('error' in result) {
           setError(result.error);
           return;
         }
@@ -880,7 +1021,7 @@ export function GuardRailsVNextOverview({
         setDeletingRuleId(null);
         await loadData();
       } catch (err) {
-        setError("Onverwachte fout bij verwijderen");
+        setError('Onverwachte fout bij verwijderen');
       }
     });
   }
@@ -898,18 +1039,20 @@ export function GuardRailsVNextOverview({
     if (selectedConstraintIds.size === groupPolicies.length) {
       setSelectedConstraintIds(new Set());
     } else {
-      setSelectedConstraintIds(new Set(groupPolicies.map((p) => p.constraintId)));
+      setSelectedConstraintIds(
+        new Set(groupPolicies.map((p) => p.constraintId)),
+      );
     }
   }
 
   function handleDragStart(e: React.DragEvent, ruleId: string) {
     setDraggedRuleId(ruleId);
-    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.effectAllowed = 'move';
   }
 
   function handleDragOver(e: React.DragEvent) {
     e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
+    e.dataTransfer.dropEffect = 'move';
   }
 
   async function handleDrop(e: React.DragEvent, targetRuleId: string) {
@@ -938,7 +1081,7 @@ export function GuardRailsVNextOverview({
     // Calculate new priority based on position
     // Rules are sorted by priority DESC (higher = first)
     let newPriority: number;
-    
+
     if (draggedIndex < targetIndex) {
       // Dragging down: place after target (lower priority)
       // We want dragged rule to appear after target, so it needs lower priority
@@ -987,9 +1130,12 @@ export function GuardRailsVNextOverview({
 
     // Ensure priority is within valid range
     newPriority = Math.max(0, Math.min(100, newPriority));
-    
+
     // If calculated priority is same as current or same as target, adjust to ensure change
-    if (newPriority === draggedRule.priority || newPriority === targetRule.priority) {
+    if (
+      newPriority === draggedRule.priority ||
+      newPriority === targetRule.priority
+    ) {
       if (draggedIndex < targetIndex) {
         // Dragging down, ensure lower than target
         newPriority = Math.max(0, targetRule.priority - 1);
@@ -1001,15 +1147,20 @@ export function GuardRailsVNextOverview({
 
     startTransition(async () => {
       try {
-        const result = await updateGuardRailRulePriorityAction(draggedRuleId, newPriority);
-        if ("error" in result) {
+        const result = await updateGuardRailRulePriorityAction(
+          draggedRuleId,
+          newPriority,
+        );
+        if ('error' in result) {
           setError(result.error);
         } else {
           await loadData();
         }
       } catch (err) {
-        console.error("Error updating priority:", err);
-        setError(`Onverwachte fout bij bijwerken prioriteit: ${err instanceof Error ? err.message : "Onbekende fout"}`);
+        console.error('Error updating priority:', err);
+        setError(
+          `Onverwachte fout bij bijwerken prioriteit: ${err instanceof Error ? err.message : 'Onbekende fout'}`,
+        );
       } finally {
         setDraggedRuleId(null);
       }
@@ -1031,7 +1182,10 @@ export function GuardRailsVNextOverview({
           <div className="p-6">
             <div className="space-y-3">
               {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-12 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+                <div
+                  key={i}
+                  className="h-12 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse"
+                />
               ))}
             </div>
           </div>
@@ -1062,14 +1216,16 @@ export function GuardRailsVNextOverview({
         <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
           <div className="space-y-3">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-12 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+              <div
+                key={i}
+                className="h-12 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse"
+              />
             ))}
           </div>
         </div>
       </div>
     );
   }
-
 
   if (!data) {
     return (
@@ -1095,7 +1251,8 @@ export function GuardRailsVNextOverview({
               Dieetregels
             </h2>
             <Text className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Diet Logic (P0–P3): DROP → FORCE → LIMIT → PASS. Guard Rails vNext voor validatie en enforcement.
+              Diet Logic (P0–P3): DROP → FORCE → LIMIT → PASS. Guard Rails vNext
+              voor validatie en enforcement.
             </Text>
             <Text className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
               Basis ruleset (mode: recipe_adaptation)
@@ -1103,15 +1260,15 @@ export function GuardRailsVNextOverview({
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center">
-              <Text className="text-sm text-zinc-500 dark:text-zinc-400">Hash:</Text>
+              <Text className="text-sm text-zinc-500 dark:text-zinc-400">
+                Hash:
+              </Text>
               <code className="ml-2 text-xs font-mono text-zinc-700 dark:text-zinc-300">
                 {shortHash}
               </code>
               <CopyHashButton hash={data.contentHash} />
             </div>
-            <Badge color="zinc">
-              Version: {data.rulesetVersion}
-            </Badge>
+            <Badge color="zinc">Version: {data.rulesetVersion}</Badge>
           </div>
         </div>
       </div>
@@ -1119,13 +1276,15 @@ export function GuardRailsVNextOverview({
       {/* Group Policies Table - Consolidated view (only constraints) */}
       <div className="rounded-lg bg-white shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
         <div className="p-6">
-            <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between">
             <div>
               <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Groepsregels ({groupPolicies.length}) – klik op een regel om dieetlogic/prioriteit te bewerken
+                Groepsregels ({groupPolicies.length}) – klik op een regel om
+                dieetlogic/prioriteit te bewerken
               </Text>
               <Text className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                Diet Logic: DROP (Geblokkeerd) / FORCE (Verplicht) / LIMIT (Beperkt) / PASS (Toegestaan).
+                Diet Logic: DROP (Geblokkeerd) / FORCE (Verplicht) / LIMIT
+                (Beperkt) / PASS (Toegestaan).
               </Text>
             </div>
             <div className="flex items-center gap-2">
@@ -1138,7 +1297,7 @@ export function GuardRailsVNextOverview({
                   setIsAnalyzing(true);
                   try {
                     const result = await analyzeDietRulesWithAI(dietTypeId);
-                    if ("error" in result) {
+                    if ('error' in result) {
                       setAnalysisError(result.error);
                     } else if (result.data) {
                       setAnalysisResult(result.data);
@@ -1152,20 +1311,20 @@ export function GuardRailsVNextOverview({
                 disabled={isAnalyzing}
               >
                 <SparklesIcon className="h-4 w-4" />
-                {isAnalyzing ? "Analyseren…" : "AI analyse"}
+                {isAnalyzing ? 'Analyseren…' : 'AI analyse'}
               </Button>
               <Button
                 onClick={() => {
-                  setCreateMode("constraint");
+                  setCreateMode('constraint');
                   setCreateFormData((prev) => ({
                     ...prev,
-                    categoryId: "",
-                    dietLogic: "drop",
+                    categoryId: '',
+                    dietLogic: 'drop',
                     minPerDay: null,
                     minPerWeek: null,
                     maxPerDay: null,
                     maxPerWeek: null,
-                    aiInstruction: "",
+                    aiInstruction: '',
                   }));
                   setShowCreateDialog(true);
                 }}
@@ -1191,7 +1350,8 @@ export function GuardRailsVNextOverview({
           </div>
           {groupPolicies.length === 0 ? (
             <div className="py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
-              Geen groepsregels geconfigureerd. Voeg een nieuwe regel toe via "Nieuwe regel".
+              Geen groepsregels geconfigureerd. Voeg een nieuwe regel toe via
+              &quot;Nieuwe regel&quot;.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -1200,13 +1360,22 @@ export function GuardRailsVNextOverview({
                   <TableRow>
                     <TableHeader className="w-10" title="Selecteer">
                       <Checkbox
-                        checked={groupPolicies.length > 0 && selectedConstraintIds.size === groupPolicies.length}
-                        indeterminate={selectedConstraintIds.size > 0 && selectedConstraintIds.size < groupPolicies.length}
+                        checked={
+                          groupPolicies.length > 0 &&
+                          selectedConstraintIds.size === groupPolicies.length
+                        }
+                        indeterminate={
+                          selectedConstraintIds.size > 0 &&
+                          selectedConstraintIds.size < groupPolicies.length
+                        }
                         onChange={toggleAllPoliciesSelection}
                         aria-label="Alles selecteren"
                       />
                     </TableHeader>
-                    <TableHeader className="w-10" title="Sleep om volgorde te wijzigen" />
+                    <TableHeader
+                      className="w-10"
+                      title="Sleep om volgorde te wijzigen"
+                    />
                     <TableHeader className="w-10" title="Actief / Gepauzeerd" />
                     <TableHeader>Categorie</TableHeader>
                     <TableHeader>Diet Logic (P0–P3)</TableHeader>
@@ -1222,30 +1391,37 @@ export function GuardRailsVNextOverview({
                     const logic: DietLogicType | undefined = policy.dietLogic;
                     const logicLabel = logic ? DIET_LOGIC_LABELS[logic] : null;
                     const logicBadgeColor =
-                      logic === "drop"
-                        ? "red"
-                        : logic === "force"
-                          ? "green"
-                          : logic === "limit"
-                            ? "amber"
-                            : "zinc";
+                      logic === 'drop'
+                        ? 'red'
+                        : logic === 'force'
+                          ? 'green'
+                          : logic === 'limit'
+                            ? 'amber'
+                            : 'zinc';
                     const isPaused = policy.isPaused;
-                    const isDragging = draggedPolicyConstraintId === policy.constraintId;
+                    const isDragging =
+                      draggedPolicyConstraintId === policy.constraintId;
                     return (
                       <TableRow
                         key={policy.constraintId}
                         draggable
-                        onDragStart={(e) => handlePolicyDragStart(e, policy.constraintId)}
+                        onDragStart={(e) =>
+                          handlePolicyDragStart(e, policy.constraintId)
+                        }
                         onDragOver={handlePolicyDragOver}
                         onDrop={(e) => handlePolicyDrop(e, policy.constraintId)}
                         onDragEnd={handlePolicyDragEnd}
-                        className={`cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${isPaused ? "opacity-60 grayscale" : ""} ${isDragging ? "opacity-50" : ""}`}
+                        className={`cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${isPaused ? 'opacity-60 grayscale' : ''} ${isDragging ? 'opacity-50' : ''}`}
                         onClick={() => handlePolicyRowClick(policy)}
                       >
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox
-                            checked={selectedConstraintIds.has(policy.constraintId)}
-                            onChange={() => togglePolicySelection(policy.constraintId)}
+                            checked={selectedConstraintIds.has(
+                              policy.constraintId,
+                            )}
+                            onChange={() =>
+                              togglePolicySelection(policy.constraintId)
+                            }
                             aria-label={`${policy.categoryName} selecteren`}
                           />
                         </TableCell>
@@ -1258,7 +1434,11 @@ export function GuardRailsVNextOverview({
                         </TableCell>
                         <TableCell
                           onClick={(e) => e.stopPropagation()}
-                          title={isPaused ? "Gepauzeerd – klik om te activeren" : "Actief – klik om regel te pauzeren"}
+                          title={
+                            isPaused
+                              ? 'Gepauzeerd – klik om te activeren'
+                              : 'Actief – klik om regel te pauzeren'
+                          }
                         >
                           <button
                             type="button"
@@ -1267,7 +1447,7 @@ export function GuardRailsVNextOverview({
                               handlePolicyPauseOrActivate(policy);
                             }}
                             className="p-0.5 rounded text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            aria-label={isPaused ? "Activeren" : "Pauzeren"}
+                            aria-label={isPaused ? 'Activeren' : 'Pauzeren'}
                           >
                             {isPaused ? (
                               <PlayIcon className="h-5 w-5 text-amber-500" />
@@ -1288,30 +1468,60 @@ export function GuardRailsVNextOverview({
                         </TableCell>
                         <TableCell>
                           {logicLabel ? (
-                            <Badge color={logicBadgeColor} title={logicLabel.description}>
+                            <Badge
+                              color={logicBadgeColor}
+                              title={logicLabel.description}
+                            >
                               {logicLabel.name}
                             </Badge>
                           ) : (
-                            <Badge color={policy.action === "block" ? "red" : "green"}>
-                              {policy.action === "block" ? "Blokkeren" : "Toestaan"}
+                            <Badge
+                              color={
+                                policy.action === 'block' ? 'red' : 'green'
+                              }
+                            >
+                              {policy.action === 'block'
+                                ? 'Blokkeren'
+                                : 'Toestaan'}
                             </Badge>
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge color={policy.action === "block" ? "red" : "green"}>
-                            {policy.action === "block" ? "Blokkeren" : "Toestaan"}
+                          <Badge
+                            color={policy.action === 'block' ? 'red' : 'green'}
+                          >
+                            {policy.action === 'block'
+                              ? 'Blokkeren'
+                              : 'Toestaan'}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <span className="inline-flex items-center gap-1">
-                            {policy.dietLogic === "drop" && policy.strictness === "hard" && (
-                              <XCircleIcon className="h-4 w-4 text-red-500" aria-hidden />
-                            )}
-                            {policy.dietLogic === "limit" && policy.strictness === "soft" && (
-                              <ExclamationTriangleIcon className="h-4 w-4 text-orange-500" aria-hidden />
-                            )}
-                            <Badge color={strictnessBadgeColor(policy.dietLogic, policy.strictness)}>
-                              {policy.strictness === "hard" ? "Streng" : "Zacht"}
+                            {policy.dietLogic === 'drop' &&
+                              policy.strictness === 'hard' && (
+                                <XCircleIcon
+                                  className="h-4 w-4 text-red-500"
+                                  aria-hidden
+                                />
+                              )}
+                            {policy.dietLogic === 'limit' &&
+                              policy.strictness === 'soft' && (
+                                <ExclamationTriangleIcon
+                                  className="h-4 w-4 text-orange-500"
+                                  aria-hidden
+                                />
+                              )}
+                            <Badge
+                              color={
+                                strictnessBadgeColor(
+                                  policy.dietLogic,
+                                  policy.strictness,
+                                ) as 'red' | 'orange' | 'amber' | 'zinc'
+                              }
+                            >
+                              {policy.strictness === 'hard'
+                                ? 'Streng'
+                                : 'Zacht'}
                             </Badge>
                           </span>
                         </TableCell>
@@ -1319,19 +1529,19 @@ export function GuardRailsVNextOverview({
                           <div className="flex items-center gap-1">
                             <Button
                               plain
-                              color="zinc"
-                              className="!p-0.5"
+                              className="!p-0.5 text-zinc-600 dark:text-zinc-400"
                               onClick={(e) => handlePriorityUp(policy, e)}
                               disabled={idx === 0}
                               title="Prioriteit omhoog"
                             >
                               <ChevronUpIcon className="h-4 w-4" />
                             </Button>
-                            <Text className="text-sm w-6 text-center">{policy.priority}</Text>
+                            <Text className="text-sm w-6 text-center">
+                              {policy.priority}
+                            </Text>
                             <Button
                               plain
-                              color="zinc"
-                              className="!p-0.5"
+                              className="!p-0.5 text-zinc-600 dark:text-zinc-400"
                               onClick={(e) => handlePriorityDown(policy, e)}
                               disabled={idx === groupPolicies.length - 1}
                               title="Prioriteit omlaag"
@@ -1371,7 +1581,7 @@ export function GuardRailsVNextOverview({
                                   handlePolicyPauseOrActivate(policy);
                                 }}
                               >
-                                {policy.isPaused ? "Activeren" : "Pauzeren"}
+                                {policy.isPaused ? 'Activeren' : 'Pauzeren'}
                               </DropdownItem>
                               <DropdownItem
                                 onClick={(e) => {
@@ -1408,12 +1618,16 @@ export function GuardRailsVNextOverview({
         <DialogTitle>Dieetregel bewerken</DialogTitle>
         <DialogBody>
           <DialogDescription>
-            Pas Diet Logic, prioriteit en striktheid aan. FORCE: min per dag/week; LIMIT: max per dag/week.
+            Pas Diet Logic, prioriteit en striktheid aan. FORCE: min per
+            dag/week; LIMIT: max per dag/week.
           </DialogDescription>
           {editingPolicy && (
             <div className="mt-4">
               <div className="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                {editingPolicy.categoryName} <code className="text-xs text-zinc-500">({editingPolicy.categorySlug})</code>
+                {editingPolicy.categoryName}{' '}
+                <code className="text-xs text-zinc-500">
+                  ({editingPolicy.categorySlug})
+                </code>
               </div>
               <FieldGroup>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1428,11 +1642,13 @@ export function GuardRailsVNextOverview({
                         })
                       }
                     >
-                      {(Object.keys(DIET_LOGIC_LABELS) as DietLogicType[]).map((key) => (
-                        <option key={key} value={key}>
-                          {DIET_LOGIC_LABELS[key].name}
-                        </option>
-                      ))}
+                      {(Object.keys(DIET_LOGIC_LABELS) as DietLogicType[]).map(
+                        (key) => (
+                          <option key={key} value={key}>
+                            {DIET_LOGIC_LABELS[key].name}
+                          </option>
+                        ),
+                      )}
                     </Select>
                   </Field>
                   <Field>
@@ -1458,7 +1674,7 @@ export function GuardRailsVNextOverview({
                       onChange={(e) =>
                         setPolicyEditFormData({
                           ...policyEditFormData,
-                          strictness: e.target.value as "hard" | "soft",
+                          strictness: e.target.value as 'hard' | 'soft',
                         })
                       }
                     >
@@ -1472,9 +1688,12 @@ export function GuardRailsVNextOverview({
                     <Input
                       type="number"
                       min={0}
-                      value={policyEditFormData.minPerDay ?? ""}
+                      value={policyEditFormData.minPerDay ?? ''}
                       onChange={(e) => {
-                        const v = e.target.value === "" ? null : parseInt(e.target.value, 10);
+                        const v =
+                          e.target.value === ''
+                            ? null
+                            : parseInt(e.target.value, 10);
                         setPolicyEditFormData({
                           ...policyEditFormData,
                           minPerDay: v ?? null,
@@ -1488,9 +1707,12 @@ export function GuardRailsVNextOverview({
                     <Input
                       type="number"
                       min={0}
-                      value={policyEditFormData.minPerWeek ?? ""}
+                      value={policyEditFormData.minPerWeek ?? ''}
                       onChange={(e) => {
-                        const v = e.target.value === "" ? null : parseInt(e.target.value, 10);
+                        const v =
+                          e.target.value === ''
+                            ? null
+                            : parseInt(e.target.value, 10);
                         setPolicyEditFormData({
                           ...policyEditFormData,
                           minPerWeek: v ?? null,
@@ -1505,9 +1727,12 @@ export function GuardRailsVNextOverview({
                     <Input
                       type="number"
                       min={0}
-                      value={policyEditFormData.maxPerDay ?? ""}
+                      value={policyEditFormData.maxPerDay ?? ''}
                       onChange={(e) => {
-                        const v = e.target.value === "" ? null : parseInt(e.target.value, 10);
+                        const v =
+                          e.target.value === ''
+                            ? null
+                            : parseInt(e.target.value, 10);
                         setPolicyEditFormData({
                           ...policyEditFormData,
                           maxPerDay: v ?? null,
@@ -1521,9 +1746,12 @@ export function GuardRailsVNextOverview({
                     <Input
                       type="number"
                       min={0}
-                      value={policyEditFormData.maxPerWeek ?? ""}
+                      value={policyEditFormData.maxPerWeek ?? ''}
                       onChange={(e) => {
-                        const v = e.target.value === "" ? null : parseInt(e.target.value, 10);
+                        const v =
+                          e.target.value === ''
+                            ? null
+                            : parseInt(e.target.value, 10);
                         setPolicyEditFormData({
                           ...policyEditFormData,
                           maxPerWeek: v ?? null,
@@ -1556,15 +1784,18 @@ export function GuardRailsVNextOverview({
           >
             Annuleren
           </Button>
-          <Button onClick={handleSavePolicyEdit} disabled={isPending || !editingPolicy}>
-            {isPending ? "Opslaan…" : "Opslaan"}
+          <Button
+            onClick={handleSavePolicyEdit}
+            disabled={isPending || !editingPolicy}
+          >
+            {isPending ? 'Opslaan…' : 'Opslaan'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Edit Dialog */}
-      <Dialog 
-        open={showEditDialog} 
+      <Dialog
+        open={showEditDialog}
         onClose={() => {
           setShowEditDialog(false);
           setEditingRule(null);
@@ -1576,220 +1807,292 @@ export function GuardRailsVNextOverview({
           <DialogDescription>
             Bewerk de eigenschappen van deze guard rail regel.
           </DialogDescription>
-          {editingRule && (() => {
-            const editableFields = getEditableFields(editingRule.id);
-            
-            return (
-              <div className="mt-4">
-                {error && (
-                  <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">
-                    <strong>Fout:</strong> {error}
-                  </div>
-                )}
-                <FieldGroup>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Label */}
-                    <Field>
-                      <Label htmlFor="edit-label">Label</Label>
-                      <Input
-                        id="edit-label"
-                        type="text"
-                        value={editFormData.label}
-                        onChange={(e) => {
-                          setEditFormData({ ...editFormData, label: e.target.value });
-                          if (validationErrors.label) {
-                            setValidationErrors({ ...validationErrors, label: "" });
+          {editingRule &&
+            (() => {
+              const editableFields = getEditableFields(editingRule.id);
+
+              return (
+                <div className="mt-4">
+                  {error && (
+                    <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">
+                      <strong>Fout:</strong> {error}
+                    </div>
+                  )}
+                  <FieldGroup>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Label */}
+                      <Field>
+                        <Label htmlFor="edit-label">Label</Label>
+                        <Input
+                          id="edit-label"
+                          type="text"
+                          value={editFormData.label}
+                          onChange={(e) => {
+                            setEditFormData({
+                              ...editFormData,
+                              label: e.target.value,
+                            });
+                            if (validationErrors.label) {
+                              setValidationErrors({
+                                ...validationErrors,
+                                label: '',
+                              });
+                            }
+                          }}
+                          placeholder="Beschrijving van de regel"
+                          disabled={!editableFields.label}
+                        />
+                      </Field>
+
+                      {/* Actie */}
+                      <Field>
+                        <Label htmlFor="edit-action">Actie</Label>
+                        <Select
+                          id="edit-action"
+                          value={editFormData.action}
+                          onChange={(e) => {
+                            setEditFormData({
+                              ...editFormData,
+                              action: e.target.value as 'allow' | 'block',
+                            });
+                          }}
+                          disabled={!editableFields.action}
+                        >
+                          <option value="allow">Allow</option>
+                          <option value="block">Block</option>
+                        </Select>
+                      </Field>
+
+                      {/* Striktheid */}
+                      <Field>
+                        <Label htmlFor="edit-strictness">Striktheid</Label>
+                        <Select
+                          id="edit-strictness"
+                          value={editFormData.strictness}
+                          onChange={(e) => {
+                            setEditFormData({
+                              ...editFormData,
+                              strictness: e.target.value as 'hard' | 'soft',
+                            });
+                          }}
+                          disabled={!editableFields.strictness}
+                        >
+                          <option value="hard">Hard</option>
+                          <option value="soft">Soft</option>
+                        </Select>
+                      </Field>
+
+                      {/* Prioriteit */}
+                      <Field>
+                        <Label htmlFor="edit-priority">Prioriteit</Label>
+                        <Input
+                          id="edit-priority"
+                          type="number"
+                          min="1"
+                          max="65500"
+                          value={editFormData.priority}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value, 10) || 0;
+                            setEditFormData({
+                              ...editFormData,
+                              priority: value,
+                            });
+                            if (validationErrors.priority) {
+                              setValidationErrors({
+                                ...validationErrors,
+                                priority: '',
+                              });
+                            }
+                          }}
+                          disabled={!editableFields.priority}
+                        />
+                        {validationErrors.priority && (
+                          <Description className="text-red-600 dark:text-red-400">
+                            {validationErrors.priority}
+                          </Description>
+                        )}
+                        {!validationErrors.priority && (
+                          <Description>1 = hoogst, 65500 = laagst</Description>
+                        )}
+                      </Field>
+
+                      {/* Target */}
+                      <Field>
+                        <Label htmlFor="edit-target">Target</Label>
+                        <Select
+                          id="edit-target"
+                          value={editFormData.target}
+                          onChange={(e) => {
+                            const newTarget = e.target.value as
+                              | 'ingredient'
+                              | 'step'
+                              | 'metadata';
+                            setEditFormData({
+                              ...editFormData,
+                              target: newTarget,
+                            });
+                            // Re-validate if matchMode is substring
+                            if (
+                              editFormData.matchMode === 'substring' &&
+                              newTarget === 'step'
+                            ) {
+                              setValidationErrors({
+                                ...validationErrors,
+                                matchMode:
+                                  'Substring match mode is niet toegestaan voor step target',
+                              });
+                            } else if (validationErrors.matchMode) {
+                              setValidationErrors({
+                                ...validationErrors,
+                                matchMode: '',
+                              });
+                            }
+                          }}
+                          disabled={!editableFields.target}
+                        >
+                          <option value="ingredient">Ingredient</option>
+                          <option value="step">Step</option>
+                          <option value="metadata">Metadata</option>
+                        </Select>
+                        {editingRule && isConstraintRule(editingRule.id) && (
+                          <Description>
+                            Categorie (afgeleid van categorie) - kan worden
+                            aangepast
+                          </Description>
+                        )}
+                      </Field>
+
+                      {/* Match Mode */}
+                      <Field>
+                        <Label htmlFor="edit-match-mode">Match Mode</Label>
+                        <Select
+                          id="edit-match-mode"
+                          value={editFormData.matchMode}
+                          onChange={(e) => {
+                            const newMode = e.target.value as
+                              | 'exact'
+                              | 'word_boundary'
+                              | 'substring'
+                              | 'canonical_id';
+                            setEditFormData({
+                              ...editFormData,
+                              matchMode: newMode,
+                            });
+                            // Validate substring + step combination
+                            if (
+                              newMode === 'substring' &&
+                              editFormData.target === 'step'
+                            ) {
+                              setValidationErrors({
+                                ...validationErrors,
+                                matchMode:
+                                  'Substring match mode is niet toegestaan voor step target',
+                              });
+                            } else if (validationErrors.matchMode) {
+                              setValidationErrors({
+                                ...validationErrors,
+                                matchMode: '',
+                              });
+                            }
+                          }}
+                          disabled={!editableFields.matchMode}
+                        >
+                          <option value="exact">Exact</option>
+                          <option value="word_boundary">Word Boundary</option>
+                          <option value="substring">Substring</option>
+                          <option value="canonical_id">Canonical ID</option>
+                        </Select>
+                        {validationErrors.matchMode && (
+                          <Description className="text-red-600 dark:text-red-400">
+                            {validationErrors.matchMode}
+                          </Description>
+                        )}
+                      </Field>
+
+                      {/* Match Value / Canonical ID */}
+                      <Field className="md:col-span-2">
+                        <Label htmlFor="edit-match-value">
+                          {editFormData.matchMode === 'canonical_id'
+                            ? 'Canonical ID'
+                            : 'Match waarde'}
+                        </Label>
+                        <Input
+                          id="edit-match-value"
+                          type="text"
+                          value={editFormData.matchValue}
+                          onChange={(e) => {
+                            setEditFormData({
+                              ...editFormData,
+                              matchValue: e.target.value,
+                            });
+                            if (validationErrors.matchValue) {
+                              setValidationErrors({
+                                ...validationErrors,
+                                matchValue: '',
+                              });
+                            }
+                          }}
+                          placeholder={
+                            editFormData.matchMode === 'canonical_id'
+                              ? 'bijv. NEVO-12345'
+                              : 'bijv. seaweed, kelp, nori'
                           }
-                        }}
-                        placeholder="Beschrijving van de regel"
-                        disabled={!editableFields.label}
-                      />
-                    </Field>
+                          disabled={!editableFields.matchValue}
+                        />
+                        {validationErrors.matchValue && (
+                          <Description className="text-red-600 dark:text-red-400">
+                            {validationErrors.matchValue}
+                          </Description>
+                        )}
+                      </Field>
 
-                    {/* Actie */}
-                    <Field>
-                      <Label htmlFor="edit-action">Actie</Label>
-                      <Select
-                        id="edit-action"
-                        value={editFormData.action}
-                        onChange={(e) => {
-                          setEditFormData({ ...editFormData, action: e.target.value as "allow" | "block" });
-                        }}
-                        disabled={!editableFields.action}
-                      >
-                        <option value="allow">Allow</option>
-                        <option value="block">Block</option>
-                      </Select>
-                    </Field>
-
-                    {/* Striktheid */}
-                    <Field>
-                      <Label htmlFor="edit-strictness">Striktheid</Label>
-                      <Select
-                        id="edit-strictness"
-                        value={editFormData.strictness}
-                        onChange={(e) => {
-                          setEditFormData({ ...editFormData, strictness: e.target.value as "hard" | "soft" });
-                        }}
-                        disabled={!editableFields.strictness}
-                      >
-                        <option value="hard">Hard</option>
-                        <option value="soft">Soft</option>
-                      </Select>
-                    </Field>
-
-                    {/* Prioriteit */}
-                    <Field>
-                      <Label htmlFor="edit-priority">Prioriteit</Label>
-                      <Input
-                        id="edit-priority"
-                        type="number"
-                        min="1"
-                        max="65500"
-                        value={editFormData.priority}
-                        onChange={(e) => {
-                          const value = parseInt(e.target.value, 10) || 0;
-                          setEditFormData({ ...editFormData, priority: value });
-                          if (validationErrors.priority) {
-                            setValidationErrors({ ...validationErrors, priority: "" });
-                          }
-                        }}
-                        disabled={!editableFields.priority}
-                      />
-                      {validationErrors.priority && (
-                        <Description className="text-red-600 dark:text-red-400">
-                          {validationErrors.priority}
+                      {/* Reason Code */}
+                      <Field className="md:col-span-2">
+                        <Label htmlFor="edit-reason-code">Reason Code</Label>
+                        <Select
+                          id="edit-reason-code"
+                          value={editFormData.reasonCode}
+                          onChange={(e) => {
+                            setEditFormData({
+                              ...editFormData,
+                              reasonCode: e.target.value,
+                            });
+                          }}
+                          disabled={!editableFields.reasonCode}
+                        >
+                          <option value="">Selecteer reason code</option>
+                          {getReasonCodeOptions().map((code) => (
+                            <option key={code} value={code} title={code}>
+                              {getGuardReasonLabel(code)}
+                            </option>
+                          ))}
+                        </Select>
+                        <Description>
+                          Selecteer de reason code voor deze regel
                         </Description>
-                      )}
-                      {!validationErrors.priority && (
-                        <Description>1 = hoogst, 65500 = laagst</Description>
-                      )}
-                    </Field>
-
-                    {/* Target */}
-                    <Field>
-                      <Label htmlFor="edit-target">Target</Label>
-                      <Select
-                        id="edit-target"
-                        value={editFormData.target}
-                        onChange={(e) => {
-                          const newTarget = e.target.value as "ingredient" | "step" | "metadata";
-                          setEditFormData({ ...editFormData, target: newTarget });
-                          // Re-validate if matchMode is substring
-                          if (editFormData.matchMode === "substring" && newTarget === "step") {
-                            setValidationErrors({ ...validationErrors, matchMode: "Substring match mode is niet toegestaan voor step target" });
-                          } else if (validationErrors.matchMode) {
-                            setValidationErrors({ ...validationErrors, matchMode: "" });
-                          }
-                        }}
-                        disabled={!editableFields.target}
-                      >
-                        <option value="ingredient">Ingredient</option>
-                        <option value="step">Step</option>
-                        <option value="metadata">Metadata</option>
-                      </Select>
-                      {editingRule && isConstraintRule(editingRule.id) && (
-                        <Description>Categorie (afgeleid van categorie) - kan worden aangepast</Description>
-                      )}
-                    </Field>
-
-                    {/* Match Mode */}
-                    <Field>
-                      <Label htmlFor="edit-match-mode">Match Mode</Label>
-                      <Select
-                        id="edit-match-mode"
-                        value={editFormData.matchMode}
-                        onChange={(e) => {
-                          const newMode = e.target.value as "exact" | "word_boundary" | "substring" | "canonical_id";
-                          setEditFormData({ ...editFormData, matchMode: newMode });
-                          // Validate substring + step combination
-                          if (newMode === "substring" && editFormData.target === "step") {
-                            setValidationErrors({ ...validationErrors, matchMode: "Substring match mode is niet toegestaan voor step target" });
-                          } else if (validationErrors.matchMode) {
-                            setValidationErrors({ ...validationErrors, matchMode: "" });
-                          }
-                        }}
-                        disabled={!editableFields.matchMode}
-                      >
-                        <option value="exact">Exact</option>
-                        <option value="word_boundary">Word Boundary</option>
-                        <option value="substring">Substring</option>
-                        <option value="canonical_id">Canonical ID</option>
-                      </Select>
-                      {validationErrors.matchMode && (
-                        <Description className="text-red-600 dark:text-red-400">
-                          {validationErrors.matchMode}
-                        </Description>
-                      )}
-                    </Field>
-
-                    {/* Match Value / Canonical ID */}
-                    <Field className="md:col-span-2">
-                      <Label htmlFor="edit-match-value">
-                        {editFormData.matchMode === "canonical_id" ? "Canonical ID" : "Match waarde"}
-                      </Label>
-                      <Input
-                        id="edit-match-value"
-                        type="text"
-                        value={editFormData.matchValue}
-                        onChange={(e) => {
-                          setEditFormData({ ...editFormData, matchValue: e.target.value });
-                          if (validationErrors.matchValue) {
-                            setValidationErrors({ ...validationErrors, matchValue: "" });
-                          }
-                        }}
-                        placeholder={editFormData.matchMode === "canonical_id" ? "bijv. NEVO-12345" : "bijv. seaweed, kelp, nori"}
-                        disabled={!editableFields.matchValue}
-                      />
-                      {validationErrors.matchValue && (
-                        <Description className="text-red-600 dark:text-red-400">
-                          {validationErrors.matchValue}
-                        </Description>
-                      )}
-                    </Field>
-
-                    {/* Reason Code */}
-                    <Field className="md:col-span-2">
-                      <Label htmlFor="edit-reason-code">Reason Code</Label>
-                      <Select
-                        id="edit-reason-code"
-                        value={editFormData.reasonCode}
-                        onChange={(e) => {
-                          setEditFormData({ ...editFormData, reasonCode: e.target.value });
-                        }}
-                        disabled={!editableFields.reasonCode}
-                      >
-                        <option value="">Selecteer reason code</option>
-                        {getReasonCodeOptions().map((code) => (
-                          <option key={code} value={code} title={code}>
-                            {getGuardReasonLabel(code)}
-                          </option>
-                        ))}
-                      </Select>
-                      <Description>Selecteer de reason code voor deze regel</Description>
-                    </Field>
-                  </div>
-                </FieldGroup>
-              </div>
-            );
-          })()}
+                      </Field>
+                    </div>
+                  </FieldGroup>
+                </div>
+              );
+            })()}
         </DialogBody>
         <DialogActions>
-          <Button 
+          <Button
             onClick={() => {
               setShowEditDialog(false);
               setEditingRule(null);
               setValidationErrors({});
-            }} 
+            }}
             color="zinc"
           >
             Annuleren
           </Button>
-          <Button 
-            onClick={handleSaveEdit} 
+          <Button
+            onClick={handleSaveEdit}
             disabled={isPending || !isFormValid()}
           >
-            {isPending ? "Opslaan..." : "Opslaan"}
+            {isPending ? 'Opslaan...' : 'Opslaan'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1830,7 +2133,10 @@ export function GuardRailsVNextOverview({
                     id="create-rule-type"
                     value=""
                     onChange={(e) => {
-                      const mode = e.target.value as "recipe_rule" | "constraint" | "";
+                      const mode = e.target.value as
+                        | 'recipe_rule'
+                        | 'constraint'
+                        | '';
                       if (mode) {
                         setCreateMode(mode);
                         setValidationErrors({});
@@ -1838,15 +2144,21 @@ export function GuardRailsVNextOverview({
                     }}
                   >
                     <option value="">Selecteer regeltype</option>
-                    <option value="recipe_rule">Ingredient/tekst regel (Recipe Adaptation Rule)</option>
-                    <option value="constraint">Category constraint (Diet Category Constraint)</option>
+                    <option value="recipe_rule">
+                      Ingredient/tekst regel (Recipe Adaptation Rule)
+                    </option>
+                    <option value="constraint">
+                      Category constraint (Diet Category Constraint)
+                    </option>
                   </Select>
                   <Description>
-                    Kies het type regel dat je wilt aanmaken. Recipe rules zijn voor specifieke ingredient/tekst matching, constraints zijn voor categorieën.
+                    Kies het type regel dat je wilt aanmaken. Recipe rules zijn
+                    voor specifieke ingredient/tekst matching, constraints zijn
+                    voor categorieën.
                   </Description>
                 </Field>
               </FieldGroup>
-            ) : createMode === "recipe_rule" ? (
+            ) : createMode === 'recipe_rule' ? (
               <FieldGroup>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Match Value */}
@@ -1857,9 +2169,15 @@ export function GuardRailsVNextOverview({
                       type="text"
                       value={createFormData.matchValue}
                       onChange={(e) => {
-                        setCreateFormData({ ...createFormData, matchValue: e.target.value });
+                        setCreateFormData({
+                          ...createFormData,
+                          matchValue: e.target.value,
+                        });
                         if (validationErrors.matchValue) {
-                          setValidationErrors({ ...validationErrors, matchValue: "" });
+                          setValidationErrors({
+                            ...validationErrors,
+                            matchValue: '',
+                          });
                         }
                       }}
                       placeholder="bijv. seaweed, kelp, nori"
@@ -1870,7 +2188,9 @@ export function GuardRailsVNextOverview({
                       </Description>
                     )}
                     {!validationErrors.matchValue && (
-                      <Description>De term om te matchen (bijv. ingredient naam)</Description>
+                      <Description>
+                        De term om te matchen (bijv. ingredient naam)
+                      </Description>
                     )}
                   </Field>
 
@@ -1881,13 +2201,29 @@ export function GuardRailsVNextOverview({
                       id="create-target"
                       value={createFormData.target}
                       onChange={(e) => {
-                        const newTarget = e.target.value as "ingredient" | "step" | "metadata";
-                        setCreateFormData({ ...createFormData, target: newTarget });
+                        const newTarget = e.target.value as
+                          | 'ingredient'
+                          | 'step'
+                          | 'metadata';
+                        setCreateFormData({
+                          ...createFormData,
+                          target: newTarget,
+                        });
                         // Re-validate if matchMode is substring
-                        if (createFormData.matchMode === "substring" && newTarget === "step") {
-                          setValidationErrors({ ...validationErrors, matchMode: "Substring match mode is niet toegestaan voor step target" });
+                        if (
+                          createFormData.matchMode === 'substring' &&
+                          newTarget === 'step'
+                        ) {
+                          setValidationErrors({
+                            ...validationErrors,
+                            matchMode:
+                              'Substring match mode is niet toegestaan voor step target',
+                          });
                         } else if (validationErrors.matchMode) {
-                          setValidationErrors({ ...validationErrors, matchMode: "" });
+                          setValidationErrors({
+                            ...validationErrors,
+                            matchMode: '',
+                          });
                         }
                       }}
                     >
@@ -1909,13 +2245,30 @@ export function GuardRailsVNextOverview({
                       id="create-match-mode"
                       value={createFormData.matchMode}
                       onChange={(e) => {
-                        const newMode = e.target.value as "exact" | "word_boundary" | "substring" | "canonical_id";
-                        setCreateFormData({ ...createFormData, matchMode: newMode });
+                        const newMode = e.target.value as
+                          | 'exact'
+                          | 'word_boundary'
+                          | 'substring'
+                          | 'canonical_id';
+                        setCreateFormData({
+                          ...createFormData,
+                          matchMode: newMode,
+                        });
                         // Validate substring + step combination
-                        if (newMode === "substring" && createFormData.target === "step") {
-                          setValidationErrors({ ...validationErrors, matchMode: "Substring match mode is niet toegestaan voor step target" });
+                        if (
+                          newMode === 'substring' &&
+                          createFormData.target === 'step'
+                        ) {
+                          setValidationErrors({
+                            ...validationErrors,
+                            matchMode:
+                              'Substring match mode is niet toegestaan voor step target',
+                          });
                         } else if (validationErrors.matchMode) {
-                          setValidationErrors({ ...validationErrors, matchMode: "" });
+                          setValidationErrors({
+                            ...validationErrors,
+                            matchMode: '',
+                          });
                         }
                       }}
                     >
@@ -1938,9 +2291,15 @@ export function GuardRailsVNextOverview({
                       id="create-reason-code"
                       value={createFormData.reasonCode}
                       onChange={(e) => {
-                        setCreateFormData({ ...createFormData, reasonCode: e.target.value });
+                        setCreateFormData({
+                          ...createFormData,
+                          reasonCode: e.target.value,
+                        });
                         if (validationErrors.reasonCode) {
-                          setValidationErrors({ ...validationErrors, reasonCode: "" });
+                          setValidationErrors({
+                            ...validationErrors,
+                            reasonCode: '',
+                          });
                         }
                       }}
                     >
@@ -1966,11 +2325,16 @@ export function GuardRailsVNextOverview({
                       type="text"
                       value={createFormData.label}
                       onChange={(e) => {
-                        setCreateFormData({ ...createFormData, label: e.target.value });
+                        setCreateFormData({
+                          ...createFormData,
+                          label: e.target.value,
+                        });
                       }}
                       placeholder="Beschrijving van de regel (optioneel)"
                     />
-                    <Description>Human-readable label voor deze regel (optioneel)</Description>
+                    <Description>
+                      Human-readable label voor deze regel (optioneel)
+                    </Description>
                   </Field>
 
                   {/* Priority */}
@@ -1984,9 +2348,15 @@ export function GuardRailsVNextOverview({
                       value={createFormData.priority}
                       onChange={(e) => {
                         const value = parseInt(e.target.value, 10) || 0;
-                        setCreateFormData({ ...createFormData, priority: value });
+                        setCreateFormData({
+                          ...createFormData,
+                          priority: value,
+                        });
                         if (validationErrors.priority) {
-                          setValidationErrors({ ...validationErrors, priority: "" });
+                          setValidationErrors({
+                            ...validationErrors,
+                            priority: '',
+                          });
                         }
                       }}
                     />
@@ -2008,12 +2378,17 @@ export function GuardRailsVNextOverview({
                   <Field className="md:col-span-2">
                     <Label htmlFor="create-category">Ingrediëntgroep *</Label>
                     <Listbox
-                      id="create-category"
-                      value={createFormData.categoryId || ""}
+                      value={createFormData.categoryId || ''}
                       onChange={(value) => {
-                        setCreateFormData({ ...createFormData, categoryId: value ?? "" });
+                        setCreateFormData({
+                          ...createFormData,
+                          categoryId: value ?? '',
+                        });
                         if (validationErrors.categoryId) {
-                          setValidationErrors({ ...validationErrors, categoryId: "" });
+                          setValidationErrors({
+                            ...validationErrors,
+                            categoryId: '',
+                          });
                         }
                       }}
                       placeholder="Selecteer ingrediëntgroep"
@@ -2021,8 +2396,17 @@ export function GuardRailsVNextOverview({
                       className="w-full"
                     >
                       {categories
-                        .filter((cat) => !groupPolicies.some((p) => p.categoryId === cat.id))
-                        .sort((a, b) => (a.is_diet_specific === b.is_diet_specific ? 0 : a.is_diet_specific ? -1 : 1))
+                        .filter(
+                          (cat) =>
+                            !groupPolicies.some((p) => p.categoryId === cat.id),
+                        )
+                        .sort((a, b) =>
+                          a.is_diet_specific === b.is_diet_specific
+                            ? 0
+                            : a.is_diet_specific
+                              ? -1
+                              : 1,
+                        )
                         .map((cat) => (
                           <ListboxOption key={cat.id} value={cat.id}>
                             <ListboxLabel>{cat.name_nl}</ListboxLabel>
@@ -2035,7 +2419,8 @@ export function GuardRailsVNextOverview({
                       </Description>
                     )}
                     <Description>
-                      Alleen ingrediëntgroepen zonder bestaande dieetregel. Termen beheer je in{" "}
+                      Alleen ingrediëntgroepen zonder bestaande dieetregel.
+                      Termen beheer je in{' '}
                       <Link
                         href={`/settings/diets/${dietTypeId}/edit?tab=ingredient-groups`}
                         className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline"
@@ -2044,9 +2429,12 @@ export function GuardRailsVNextOverview({
                       </Link>
                       .
                     </Description>
-                    {categories.filter((c) => !groupPolicies.some((p) => p.categoryId === c.id)).length === 0 && (
+                    {categories.filter(
+                      (c) => !groupPolicies.some((p) => p.categoryId === c.id),
+                    ).length === 0 && (
                       <Text className="mt-2 text-sm text-amber-600 dark:text-amber-400">
-                        Alle ingrediëntgroepen hebben al een dieetregel. Bewerk bestaande regels via de tabel.
+                        Alle ingrediëntgroepen hebben al een dieetregel. Bewerk
+                        bestaande regels via de tabel.
                       </Text>
                     )}
                     {createFormData.categoryId && (
@@ -2057,11 +2445,12 @@ export function GuardRailsVNextOverview({
                             setSuggestError(null);
                             setIsSuggesting(true);
                             try {
-                              const result = await suggestConstraintSettingsWithAI({
-                                dietTypeId,
-                                categoryId: createFormData.categoryId,
-                              });
-                              if ("error" in result) {
+                              const result =
+                                await suggestConstraintSettingsWithAI({
+                                  dietTypeId,
+                                  categoryId: createFormData.categoryId,
+                                });
+                              if ('error' in result) {
                                 setSuggestError(result.error);
                               } else if (result.data) {
                                 const s = result.data;
@@ -2085,21 +2474,27 @@ export function GuardRailsVNextOverview({
                           disabled={isSuggesting}
                         >
                           <SparklesIcon className="h-4 w-4" />
-                          {isSuggesting ? "Bezig…" : "AI invullen"}
+                          {isSuggesting ? 'Bezig…' : 'AI invullen'}
                         </Button>
                         <Text className="text-xs text-zinc-500 dark:text-zinc-400">
-                          Vul Diet Logic, striktheid, prioriteit en min/max voor deze groep in op basis van bestaande regels en richtlijnen.
+                          Vul Diet Logic, striktheid, prioriteit en min/max voor
+                          deze groep in op basis van bestaande regels en
+                          richtlijnen.
                         </Text>
                       </div>
                     )}
                     {suggestError && (
-                      <Description className="text-red-600 dark:text-red-400">{suggestError}</Description>
+                      <Description className="text-red-600 dark:text-red-400">
+                        {suggestError}
+                      </Description>
                     )}
                   </Field>
 
                   {/* Diet Logic (P0–P3) */}
                   <Field>
-                    <Label htmlFor="create-diet-logic">Diet Logic (P0–P3) *</Label>
+                    <Label htmlFor="create-diet-logic">
+                      Diet Logic (P0–P3) *
+                    </Label>
                     <Select
                       id="create-diet-logic"
                       value={createFormData.dietLogic}
@@ -2110,13 +2505,18 @@ export function GuardRailsVNextOverview({
                         });
                       }}
                     >
-                      {(Object.keys(DIET_LOGIC_LABELS) as DietLogicType[]).map((key) => (
-                        <option key={key} value={key}>
-                          {DIET_LOGIC_LABELS[key].name}
-                        </option>
-                      ))}
+                      {(Object.keys(DIET_LOGIC_LABELS) as DietLogicType[]).map(
+                        (key) => (
+                          <option key={key} value={key}>
+                            {DIET_LOGIC_LABELS[key].name}
+                          </option>
+                        ),
+                      )}
                     </Select>
-                    <Description>DROP (blokkeren), FORCE (verplicht), LIMIT (beperkt), PASS (toegestaan)</Description>
+                    <Description>
+                      DROP (blokkeren), FORCE (verplicht), LIMIT (beperkt), PASS
+                      (toegestaan)
+                    </Description>
                   </Field>
 
                   {/* Strictness */}
@@ -2126,7 +2526,10 @@ export function GuardRailsVNextOverview({
                       id="create-strictness"
                       value={createFormData.strictness}
                       onChange={(e) => {
-                        setCreateFormData({ ...createFormData, strictness: e.target.value as "hard" | "soft" });
+                        setCreateFormData({
+                          ...createFormData,
+                          strictness: e.target.value as 'hard' | 'soft',
+                        });
                       }}
                     >
                       <option value="hard">Streng</option>
@@ -2136,7 +2539,9 @@ export function GuardRailsVNextOverview({
 
                   {/* Priority */}
                   <Field>
-                    <Label htmlFor="create-priority-constraint">Prioriteit *</Label>
+                    <Label htmlFor="create-priority-constraint">
+                      Prioriteit *
+                    </Label>
                     <Input
                       id="create-priority-constraint"
                       type="number"
@@ -2145,9 +2550,15 @@ export function GuardRailsVNextOverview({
                       value={createFormData.priority}
                       onChange={(e) => {
                         const value = parseInt(e.target.value, 10) || 0;
-                        setCreateFormData({ ...createFormData, priority: value });
+                        setCreateFormData({
+                          ...createFormData,
+                          priority: value,
+                        });
                         if (validationErrors.priority) {
-                          setValidationErrors({ ...validationErrors, priority: "" });
+                          setValidationErrors({
+                            ...validationErrors,
+                            priority: '',
+                          });
                         }
                       }}
                     />
@@ -2168,28 +2579,38 @@ export function GuardRailsVNextOverview({
                       id="create-ai-instruction"
                       value={createFormData.aiInstruction}
                       onChange={(e) =>
-                        setCreateFormData({ ...createFormData, aiInstruction: e.target.value })
+                        setCreateFormData({
+                          ...createFormData,
+                          aiInstruction: e.target.value,
+                        })
                       }
                       placeholder="bijv. Uitzondering: gefermenteerde zuivel mag wel. Of: Alleen strenge fase Wahls."
                       rows={3}
                     />
                     <Description>
-                      Optioneel: extra instructie voor AI zodat de regel beter begrepen wordt (context, uitzonderingen, toelichting).
+                      Optioneel: extra instructie voor AI zodat de regel beter
+                      begrepen wordt (context, uitzonderingen, toelichting).
                     </Description>
                   </Field>
 
                   {/* FORCE: min per dag/week */}
-                  {createFormData.dietLogic === "force" && (
+                  {createFormData.dietLogic === 'force' && (
                     <>
                       <Field>
                         <Label>Min per dag</Label>
                         <Input
                           type="number"
                           min={0}
-                          value={createFormData.minPerDay ?? ""}
+                          value={createFormData.minPerDay ?? ''}
                           onChange={(e) => {
-                            const v = e.target.value === "" ? null : parseInt(e.target.value, 10);
-                            setCreateFormData({ ...createFormData, minPerDay: v ?? null });
+                            const v =
+                              e.target.value === ''
+                                ? null
+                                : parseInt(e.target.value, 10);
+                            setCreateFormData({
+                              ...createFormData,
+                              minPerDay: v ?? null,
+                            });
                           }}
                           placeholder="—"
                         />
@@ -2199,10 +2620,16 @@ export function GuardRailsVNextOverview({
                         <Input
                           type="number"
                           min={0}
-                          value={createFormData.minPerWeek ?? ""}
+                          value={createFormData.minPerWeek ?? ''}
                           onChange={(e) => {
-                            const v = e.target.value === "" ? null : parseInt(e.target.value, 10);
-                            setCreateFormData({ ...createFormData, minPerWeek: v ?? null });
+                            const v =
+                              e.target.value === ''
+                                ? null
+                                : parseInt(e.target.value, 10);
+                            setCreateFormData({
+                              ...createFormData,
+                              minPerWeek: v ?? null,
+                            });
                           }}
                           placeholder="—"
                         />
@@ -2211,17 +2638,23 @@ export function GuardRailsVNextOverview({
                   )}
 
                   {/* LIMIT: max per dag/week */}
-                  {createFormData.dietLogic === "limit" && (
+                  {createFormData.dietLogic === 'limit' && (
                     <>
                       <Field>
                         <Label>Max per dag</Label>
                         <Input
                           type="number"
                           min={0}
-                          value={createFormData.maxPerDay ?? ""}
+                          value={createFormData.maxPerDay ?? ''}
                           onChange={(e) => {
-                            const v = e.target.value === "" ? null : parseInt(e.target.value, 10);
-                            setCreateFormData({ ...createFormData, maxPerDay: v ?? null });
+                            const v =
+                              e.target.value === ''
+                                ? null
+                                : parseInt(e.target.value, 10);
+                            setCreateFormData({
+                              ...createFormData,
+                              maxPerDay: v ?? null,
+                            });
                           }}
                           placeholder="—"
                         />
@@ -2231,10 +2664,16 @@ export function GuardRailsVNextOverview({
                         <Input
                           type="number"
                           min={0}
-                          value={createFormData.maxPerWeek ?? ""}
+                          value={createFormData.maxPerWeek ?? ''}
                           onChange={(e) => {
-                            const v = e.target.value === "" ? null : parseInt(e.target.value, 10);
-                            setCreateFormData({ ...createFormData, maxPerWeek: v ?? null });
+                            const v =
+                              e.target.value === ''
+                                ? null
+                                : parseInt(e.target.value, 10);
+                            setCreateFormData({
+                              ...createFormData,
+                              maxPerWeek: v ?? null,
+                            });
                           }}
                           placeholder="—"
                         />
@@ -2265,7 +2704,7 @@ export function GuardRailsVNextOverview({
               onClick={handleCreate}
               disabled={isPending || !isCreateFormValid()}
             >
-              {isPending ? "Aanmaken..." : "Aanmaken"}
+              {isPending ? 'Aanmaken...' : 'Aanmaken'}
             </Button>
           )}
         </DialogActions>
@@ -2285,7 +2724,8 @@ export function GuardRailsVNextOverview({
         <DialogTitle>AI-analyse van dieetregels</DialogTitle>
         <DialogBody>
           <DialogDescription>
-            Gemini heeft de huidige dieetregels geanalyseerd op basis van de dieetrichtlijnen.
+            Gemini heeft de huidige dieetregels geanalyseerd op basis van de
+            dieetrichtlijnen.
           </DialogDescription>
           {isAnalyzing && (
             <div className="mt-4 flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
@@ -2299,12 +2739,12 @@ export function GuardRailsVNextOverview({
               <div className="flex flex-wrap items-center gap-3">
                 <div
                   className={clsx(
-                    "rounded-lg px-3 py-1.5 text-sm font-semibold",
+                    'rounded-lg px-3 py-1.5 text-sm font-semibold',
                     (analysisResult.complianceScore ?? 0) >= 90
-                      ? "bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300"
+                      ? 'bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300'
                       : (analysisResult.complianceScore ?? 0) >= 70
-                        ? "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
-                        : "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300"
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
+                        : 'bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300',
                   )}
                 >
                   Compliance: {Math.round(analysisResult.complianceScore ?? 0)}%
@@ -2320,7 +2760,9 @@ export function GuardRailsVNextOverview({
                 {(analysisResult.complianceScore ?? 0) >= 90 &&
                   (analysisResult.suggestions?.length ?? 0) > 0 &&
                   analysisResult.suggestions.every(
-                    (_, i) => suggestionStatus[i] === "accepted" || suggestionStatus[i] === "dismissed"
+                    (_, i) =>
+                      suggestionStatus[i] === 'accepted' ||
+                      suggestionStatus[i] === 'dismissed',
                   ) && (
                     <div className="flex items-center gap-1.5 rounded-lg bg-green-100 px-3 py-1.5 text-sm font-medium text-green-800 dark:bg-green-950/50 dark:text-green-300">
                       <CheckIcon className="h-4 w-4" />
@@ -2329,126 +2771,154 @@ export function GuardRailsVNextOverview({
                   )}
               </div>
               <div>
-                <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Samenvatting</Text>
-                <Text className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{analysisResult.summary}</Text>
+                <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Samenvatting
+                </Text>
+                <Text className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                  {analysisResult.summary}
+                </Text>
               </div>
-              {analysisResult.strengths && analysisResult.strengths.length > 0 && (
-                <div>
-                  <Text className="text-sm font-medium text-green-700 dark:text-green-400">Sterke punten</Text>
-                  <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm text-zinc-600 dark:text-zinc-400">
-                    {analysisResult.strengths.map((s, i) => (
-                      <li key={i}>{s}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {analysisResult.weaknesses && analysisResult.weaknesses.length > 0 && (
-                <div>
-                  <Text className="text-sm font-medium text-amber-700 dark:text-amber-400">Zwakke punten</Text>
-                  <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm text-zinc-600 dark:text-zinc-400">
-                    {analysisResult.weaknesses.map((w, i) => (
-                      <li key={i}>{w}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {analysisResult.suggestions && analysisResult.suggestions.length > 0 && (
-                <div>
-                  <Text className="text-sm font-medium text-blue-700 dark:text-blue-400">Verbeteradviezen</Text>
-                  <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                    Klik op Toepassen om het advies door te voeren, of Negeren om het te verwerpen.
-                  </p>
-                  <ul className="mt-2 space-y-2">
-                    {analysisResult.suggestions.map((s, i) => {
-                      const suggestion: DietRuleSuggestion =
-                        typeof s === "string" ? { text: s } : (s as DietRuleSuggestion);
-                      const status = suggestionStatus[i];
-                      const isApplying = applyingIndex === i;
-                      return (
-                        <li
-                          key={i}
-                          className={clsx(
-                            "flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2.5 text-sm",
-                            status === "accepted"
-                              ? "border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
-                              : status === "dismissed"
-                                ? "border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50"
-                                : "border-zinc-200 dark:border-zinc-700"
-                          )}
-                        >
-                          <span className="min-w-0 flex-1 text-zinc-700 dark:text-zinc-300">
-                            {suggestion.text}
-                          </span>
-                          <span className="flex shrink-0 gap-1.5">
-                            {status === "accepted" ? (
-                              <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                                <CheckIcon className="h-4 w-4" />
-                                Toegepast
-                              </span>
-                            ) : status === "dismissed" ? (
-                              <span className="flex items-center gap-1 text-zinc-500 dark:text-zinc-400">
-                                <XCircleIcon className="h-4 w-4" />
-                                Genegeerd
-                              </span>
-                            ) : (
-                              <>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  disabled={isApplying}
-                                  onClick={async (e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    if (suggestion.action) {
-                                      setApplyingIndex(i);
-                                      setAnalysisError(null);
-                                      try {
-                                        const result = await applyDietRuleAnalysisAction(
-                                          dietTypeId,
-                                          suggestion.action
-                                        );
-                                        if ("error" in result) {
-                                          setAnalysisError(result.error);
-                                        } else {
-                                          setSuggestionStatus((prev) => ({ ...prev, [i]: "accepted" }));
-                                          loadData();
-                                        }
-                                      } finally {
-                                        setApplyingIndex(null);
-                                      }
-                                    } else {
-                                      setSuggestionStatus((prev) => ({ ...prev, [i]: "accepted" }));
-                                    }
-                                  }}
-                                >
-                                  {isApplying ? "Bezig…" : "Toepassen"}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  color="zinc"
-                                  disabled={isApplying}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setSuggestionStatus((prev) => ({ ...prev, [i]: "dismissed" }));
-                                  }}
-                                >
-                                  Negeren
-                                </Button>
-                              </>
+              {analysisResult.strengths &&
+                analysisResult.strengths.length > 0 && (
+                  <div>
+                    <Text className="text-sm font-medium text-green-700 dark:text-green-400">
+                      Sterke punten
+                    </Text>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm text-zinc-600 dark:text-zinc-400">
+                      {analysisResult.strengths.map((s, i) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              {analysisResult.weaknesses &&
+                analysisResult.weaknesses.length > 0 && (
+                  <div>
+                    <Text className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                      Zwakke punten
+                    </Text>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm text-zinc-600 dark:text-zinc-400">
+                      {analysisResult.weaknesses.map((w, i) => (
+                        <li key={i}>{w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              {analysisResult.suggestions &&
+                analysisResult.suggestions.length > 0 && (
+                  <div>
+                    <Text className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                      Verbeteradviezen
+                    </Text>
+                    <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                      Klik op Toepassen om het advies door te voeren, of Negeren
+                      om het te verwerpen.
+                    </p>
+                    <ul className="mt-2 space-y-2">
+                      {analysisResult.suggestions.map((s, i) => {
+                        const suggestion: DietRuleSuggestion =
+                          typeof s === 'string'
+                            ? { text: s }
+                            : (s as DietRuleSuggestion);
+                        const status = suggestionStatus[i];
+                        const isApplying = applyingIndex === i;
+                        return (
+                          <li
+                            key={i}
+                            className={clsx(
+                              'flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2.5 text-sm',
+                              status === 'accepted'
+                                ? 'border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950/30'
+                                : status === 'dismissed'
+                                  ? 'border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50'
+                                  : 'border-zinc-200 dark:border-zinc-700',
                             )}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
+                          >
+                            <span className="min-w-0 flex-1 text-zinc-700 dark:text-zinc-300">
+                              {suggestion.text}
+                            </span>
+                            <span className="flex shrink-0 gap-1.5">
+                              {status === 'accepted' ? (
+                                <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                                  <CheckIcon className="h-4 w-4" />
+                                  Toegepast
+                                </span>
+                              ) : status === 'dismissed' ? (
+                                <span className="flex items-center gap-1 text-zinc-500 dark:text-zinc-400">
+                                  <XCircleIcon className="h-4 w-4" />
+                                  Genegeerd
+                                </span>
+                              ) : (
+                                <>
+                                  <Button
+                                    type="button"
+                                    className="text-sm"
+                                    disabled={isApplying}
+                                    onClick={async (e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      if (suggestion.action) {
+                                        setApplyingIndex(i);
+                                        setAnalysisError(null);
+                                        try {
+                                          const result =
+                                            await applyDietRuleAnalysisAction(
+                                              dietTypeId,
+                                              suggestion.action,
+                                            );
+                                          if ('error' in result) {
+                                            setAnalysisError(result.error);
+                                          } else {
+                                            setSuggestionStatus((prev) => ({
+                                              ...prev,
+                                              [i]: 'accepted',
+                                            }));
+                                            loadData();
+                                          }
+                                        } finally {
+                                          setApplyingIndex(null);
+                                        }
+                                      } else {
+                                        setSuggestionStatus((prev) => ({
+                                          ...prev,
+                                          [i]: 'accepted',
+                                        }));
+                                      }
+                                    }}
+                                  >
+                                    {isApplying ? 'Bezig…' : 'Toepassen'}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    className="text-sm"
+                                    color="zinc"
+                                    disabled={isApplying}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setSuggestionStatus((prev) => ({
+                                        ...prev,
+                                        [i]: 'dismissed',
+                                      }));
+                                    }}
+                                  >
+                                    Negeren
+                                  </Button>
+                                </>
+                              )}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
             </div>
           )}
           {!isAnalyzing && !analysisResult && analysisError && (
-            <Text className="mt-4 text-sm text-red-600 dark:text-red-400">{analysisError}</Text>
+            <Text className="mt-4 text-sm text-red-600 dark:text-red-400">
+              {analysisError}
+            </Text>
           )}
         </DialogBody>
         <DialogActions>
@@ -2481,14 +2951,14 @@ export function GuardRailsVNextOverview({
           {deletingConstraintIds.length > 0
             ? `Dieetregels verwijderen (${deletingConstraintIds.length})`
             : deletingConstraintId
-              ? "Dieetregel verwijderen"
-              : "Regel verwijderen"}
+              ? 'Dieetregel verwijderen'
+              : 'Regel verwijderen'}
         </DialogTitle>
         <DialogBody>
           <DialogDescription>
             {deletingConstraintIds.length > 0
-              ? `Weet je zeker dat je ${deletingConstraintIds.length} dieetregel${deletingConstraintIds.length === 1 ? "" : "s"} wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.`
-              : `Weet je zeker dat je ${deletingConstraintId ? "deze dieetregel" : "deze regel"} wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.`}
+              ? `Weet je zeker dat je ${deletingConstraintIds.length} dieetregel${deletingConstraintIds.length === 1 ? '' : 's'} wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.`
+              : `Weet je zeker dat je ${deletingConstraintId ? 'deze dieetregel' : 'deze regel'} wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.`}
           </DialogDescription>
         </DialogBody>
         <DialogActions>

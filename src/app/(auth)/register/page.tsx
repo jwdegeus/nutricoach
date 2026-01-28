@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
-import { RegisterForm } from "./register-form";
+import type { Metadata } from 'next';
+import { RegisterForm } from './register-form';
 
 export const metadata: Metadata = {
-  title: "Registreer | NutriCoach",
-  description: "Maak een nieuw NutriCoach account aan",
+  title: 'Registreer | NutriCoach',
+  description: 'Maak een nieuw NutriCoach account aan',
 };
 
 export default function RegisterPage() {

@@ -4,30 +4,35 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - Supabase CLI (`npm install -g supabase`)
 - A Supabase project (remote only - no local database)
 
 ### Setup
 
 1. **Install dependencies:**
+
    ```bash
    npm install
    ```
 
 2. **Configure environment variables:**
+
    ```bash
    cp ENV.example .env.local
    ```
+
    Fill in your Supabase credentials from your project dashboard.
 
 3. **Link to remote Supabase project:**
+
    ```bash
    supabase login
    supabase link --project-ref <your-project-ref>
    ```
 
 4. **Push database migrations:**
+
    ```bash
    npm run db:push
    # or

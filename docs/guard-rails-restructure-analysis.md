@@ -30,6 +30,7 @@
 ### Gebruik door AI Magician
 
 De `RecipeAdaptationService.loadDietRuleset()` laadt:
+
 - `diet_category_constraints` met `priority DESC` sortering
 - Alleen `constraint_type === "forbidden"` wordt gebruikt voor `DietRuleset.forbidden[]`
 - `strictness` wordt gebruikt voor `ruleCode`: "GUARD_RAIL_HARD" of "GUARD_RAIL_SOFT"
@@ -46,12 +47,14 @@ De `RecipeAdaptationService.loadDietRuleset()` laadt:
 #### Optie 1: Uitbreiden huidige structuur (Aanbevolen)
 
 **Wijzigingen aan `diet_category_constraints`**:
+
 - Hernoem `constraint_type` naar `rule_action`: "allow" | "block"
 - Voeg `rule_priority` toe (expliciete prioriteit voor sortering)
 - Behoud `strictness` voor backward compatibility
 - Behoud `priority` maar gebruik `rule_priority` voor sortering
 
 **Nieuwe tabel: `diet_firewall_rules`** (alternatief):
+
 ```sql
 CREATE TABLE diet_firewall_rules (
   id UUID PRIMARY KEY,
@@ -82,7 +85,7 @@ Vervang `diet_category_constraints` volledig met `diet_firewall_rules` en migree
 
 ### UI Wijzigingen
 
-1. **GuardRailsManager**: 
+1. **GuardRailsManager**:
    - Toon regels als firewall rules (allow/block)
    - Drag & drop voor prioriteit sortering
    - Mogelijkheid om zowel allow als block te hebben voorzelfde categorie
@@ -95,6 +98,7 @@ Vervang `diet_category_constraints` volledig met `diet_firewall_rules` en migree
 ### Impact op AI Magician
 
 De `RecipeAdaptationService` moet:
+
 1. Regels laden gesorteerd op prioriteit
 2. Evalueren in volgorde (eerste match wint)
 3. Block regels toevoegen aan `DietRuleset.forbidden[]`
@@ -103,22 +107,26 @@ De `RecipeAdaptationService` moet:
 ## Implementatie Plan
 
 ### Fase 1: Database Migratie
+
 1. Voeg `rule_action` kolom toe aan `diet_category_constraints`
 2. Migreer bestaande data: `constraint_type === "forbidden"` → `rule_action === "block"`
 3. Migreer bestaande data: `constraint_type === "required"` → `rule_action === "allow"`
 4. Voeg `rule_priority` toe (kopieer van `priority`)
 
 ### Fase 2: Backend Updates
+
 1. Update `ingredient-categories-admin.actions.ts` voor nieuwe velden
 2. Update `RecipeAdaptationService.loadDietRuleset()` voor firewall logica
 3. Implementeer firewall evaluatie functie
 
 ### Fase 3: UI Updates
+
 1. Update `GuardRailsManager` voor allow/block selectie
 2. Voeg drag & drop toe voor prioriteit sortering
 3. Update `GuardRailsOverview` voor nieuwe weergave
 
 ### Fase 4: Testing
+
 1. Test met bestaande diëten
 2. Test AI Magician met nieuwe regels
 3. Test edge cases (conflicterende regels, etc.)
@@ -133,6 +141,7 @@ De `RecipeAdaptationService` moet:
 ## Aanbeveling
 
 **Optie 1 met uitbreidingen**:
+
 - Behoud bestaande structuur voor backward compatibility
 - Voeg `rule_action` toe als nieuwe kolom
 - Voeg `rule_priority` toe voor expliciete sortering

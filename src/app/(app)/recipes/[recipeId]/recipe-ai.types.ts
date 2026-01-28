@@ -41,13 +41,29 @@ export type RecipeAIData = {
 };
 
 export type RecipeAIState =
-  | { type: "idle" }
-  | { type: "loading" }
-  | { type: "analysis_only"; data: { violations: ViolationDetail[]; summary: string; recipeName: string; noRulesConfigured?: boolean } }
-  | { type: "loading_rewrite"; data: { violations: ViolationDetail[]; summary: string; recipeName: string; noRulesConfigured?: boolean } }
-  | { type: "error"; message: string }
-  | { type: "empty"; reason: string }
-  | { type: "success"; data: RecipeAIData };
+  | { type: 'idle' }
+  | { type: 'loading' }
+  | {
+      type: 'analysis_only';
+      data: {
+        violations: ViolationDetail[];
+        summary: string;
+        recipeName: string;
+        noRulesConfigured?: boolean;
+      };
+    }
+  | {
+      type: 'loading_rewrite';
+      data: {
+        violations: ViolationDetail[];
+        summary: string;
+        recipeName: string;
+        noRulesConfigured?: boolean;
+      };
+    }
+  | { type: 'error'; message: string }
+  | { type: 'empty'; reason: string }
+  | { type: 'success'; data: RecipeAIData };
 
 // ============================================================================
 // Server Contract Types (for API/Server Action)
@@ -80,7 +96,15 @@ export type GetRecipeAnalysisInput = {
  * noRulesConfigured: true wanneer het dieet geen dieetregels heeft → UI toont "N.v.t." i.p.v. afwijkingen.
  */
 export type GetRecipeAnalysisResult =
-  | { ok: true; data: { violations: ViolationDetail[]; summary: string; recipeName: string; noRulesConfigured?: boolean } }
+  | {
+      ok: true;
+      data: {
+        violations: ViolationDetail[];
+        summary: string;
+        recipeName: string;
+        noRulesConfigured?: boolean;
+      };
+    }
   | { ok: false; error: { code: string; message: string } };
 
 /**
@@ -162,16 +186,16 @@ export type AdaptationMeta = {
  */
 export type RequestRecipeAdaptationResult =
   | {
-      outcome: "success";
+      outcome: 'success';
       adaptation: RecipeAdaptationDraft;
       meta: AdaptationMeta;
     }
   | {
-      outcome: "empty";
-      reason: "NO_DIET_SELECTED";
+      outcome: 'empty';
+      reason: 'NO_DIET_SELECTED';
     }
   | {
-      outcome: "error";
+      outcome: 'error';
       message: string;
-      code: "INVALID_INPUT" | "INTERNAL_ERROR";
+      code: 'INVALID_INPUT' | 'INTERNAL_ERROR';
     };

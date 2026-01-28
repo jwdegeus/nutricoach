@@ -1,12 +1,15 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Input } from "@/components/catalyst/input";
-import { Button } from "@/components/catalyst/button";
-import { upsertUserPantryItemAction, deletePantryItemAction } from "../actions/pantry-ui.actions";
-import { Loader2, Save, X, Trash2 } from "lucide-react";
-import type { NutriScoreGrade } from "@/src/lib/nevo/nutrition-calculator";
-import { ConfirmDialog } from "@/components/catalyst/confirm-dialog";
+import { useState } from 'react';
+import { Input } from '@/components/catalyst/input';
+import { Button } from '@/components/catalyst/button';
+import {
+  upsertUserPantryItemAction,
+  deletePantryItemAction,
+} from '../actions/pantry-ui.actions';
+import { Loader2, Save, X, Trash2 } from 'lucide-react';
+import type { NutriScoreGrade } from '@/src/lib/nevo/nutrition-calculator';
+import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
 
 export type PantryItemRowProps = {
   item: {
@@ -23,7 +26,7 @@ export type PantryItemRowProps = {
 export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
   const [isAvailable, setIsAvailable] = useState(item.isAvailable);
   const [availableG, setAvailableG] = useState<string>(
-    item.availableG?.toString() || ""
+    item.availableG?.toString() || '',
   );
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,10 +53,10 @@ export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
 
     try {
       const parsedG =
-        availableG.trim() === "" ? null : parseFloat(availableG.trim());
+        availableG.trim() === '' ? null : parseFloat(availableG.trim());
 
       if (parsedG !== null && (isNaN(parsedG) || parsedG < 0)) {
-        setError("Hoeveelheid moet een positief getal zijn");
+        setError('Hoeveelheid moet een positief getal zijn');
         setIsSaving(false);
         return;
       }
@@ -71,9 +74,7 @@ export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
         setError(result.error.message);
       }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Fout bij opslaan"
-      );
+      setError(err instanceof Error ? err.message : 'Fout bij opslaan');
     } finally {
       setIsSaving(false);
     }
@@ -93,9 +94,7 @@ export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
         setError(result.error.message);
       }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Fout bij verwijderen"
-      );
+      setError(err instanceof Error ? err.message : 'Fout bij verwijderen');
     } finally {
       setIsDeleting(false);
     }
@@ -103,20 +102,20 @@ export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
 
   // NutriScore color mapping
   const getNutriScoreColor = (grade: NutriScoreGrade | null): string => {
-    if (!grade) return "text-muted-foreground";
+    if (!grade) return 'text-muted-foreground';
     switch (grade) {
       case 'A':
-        return "text-green-600 dark:text-green-500";
+        return 'text-green-600 dark:text-green-500';
       case 'B':
-        return "text-lime-600 dark:text-lime-500";
+        return 'text-lime-600 dark:text-lime-500';
       case 'C':
-        return "text-yellow-600 dark:text-yellow-500";
+        return 'text-yellow-600 dark:text-yellow-500';
       case 'D':
-        return "text-orange-600 dark:text-orange-500";
+        return 'text-orange-600 dark:text-orange-500';
       case 'E':
-        return "text-red-600 dark:text-red-500";
+        return 'text-red-600 dark:text-red-500';
       default:
-        return "text-muted-foreground";
+        return 'text-muted-foreground';
     }
   };
 
@@ -126,7 +125,12 @@ export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
         <div className="font-medium">{item.name}</div>
         {item.nutriscore && (
           <div className="text-sm">
-            NutriScore: <span className={`font-semibold ${getNutriScoreColor(item.nutriscore)}`}>{item.nutriscore}</span>
+            NutriScore:{' '}
+            <span
+              className={`font-semibold ${getNutriScoreColor(item.nutriscore)}`}
+            >
+              {item.nutriscore}
+            </span>
           </div>
         )}
       </div>
@@ -157,10 +161,7 @@ export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
       </div>
 
       {hasChanges && (
-        <Button
-          onClick={handleSave}
-          disabled={isSaving}
-        >
+        <Button onClick={handleSave} disabled={isSaving}>
           {isSaving ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (

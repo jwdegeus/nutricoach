@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import type { MealPlanResponse } from "@/src/lib/diets";
-import type { MealPlanEnrichmentResponse } from "@/src/lib/agents/meal-planner/mealPlannerEnrichment.types";
-import { MealPlanCards } from "./MealPlanCards";
+import type { MealPlanResponse } from '@/src/lib/diets';
+import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
+import { MealPlanCards } from './MealPlanCards';
 
 type MealPlanPageClientProps = {
   planId: string;

@@ -1,24 +1,28 @@
-"use client";
+'use client';
 
-import { Badge } from "@/components/catalyst/badge";
-import { Text } from "@/components/catalyst/text";
-import { ClockIcon, UserGroupIcon } from "@heroicons/react/20/solid";
-import type { CustomMealRecord } from "@/src/lib/custom-meals/customMeals.service";
+import { Badge } from '@/components/catalyst/badge';
+import { Text } from '@/components/catalyst/text';
+import { ClockIcon, UserGroupIcon } from '@heroicons/react/20/solid';
+import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
 
 type MealDetailProps = {
   meal: CustomMealRecord | any;
-  mealSource: "custom" | "gemini";
+  mealSource: 'custom' | 'gemini';
   nevoFoodNamesByCode: Record<string, string>;
 };
 
-export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetailProps) {
+export function MealDetail({
+  meal,
+  mealSource,
+  nevoFoodNamesByCode,
+}: MealDetailProps) {
   const formatMealSlot = (slot: string) => {
     const slotMap: Record<string, string> = {
-      breakfast: "Ontbijt",
-      lunch: "Lunch",
-      dinner: "Diner",
-      snack: "Snack",
-      smoothie: "Smoothie",
+      breakfast: 'Ontbijt',
+      lunch: 'Lunch',
+      dinner: 'Diner',
+      snack: 'Snack',
+      smoothie: 'Smoothie',
     };
     return slotMap[slot] || slot;
   };
@@ -26,10 +30,10 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
     const date = new Date(dateStr);
-    return date.toLocaleDateString("nl-NL", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+    return date.toLocaleDateString('nl-NL', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
     });
   };
 
@@ -39,10 +43,23 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
   const mealSlot = meal.mealSlot || meal.meal_slot;
   const sourceImageUrl = meal.sourceImageUrl || meal.source_image_url;
   const aiAnalysis = meal.aiAnalysis || meal.ai_analysis;
-  const consumptionCount = meal.consumptionCount || meal.consumption_count || meal.usageCount || meal.usage_count || 0;
+  const consumptionCount =
+    meal.consumptionCount ||
+    meal.consumption_count ||
+    meal.usageCount ||
+    meal.usage_count ||
+    0;
   const createdAt = meal.createdAt || meal.created_at;
-  const firstConsumedAt = meal.firstConsumedAt || meal.first_consumed_at || meal.firstUsedAt || meal.first_used_at;
-  const lastConsumedAt = meal.lastConsumedAt || meal.last_consumed_at || meal.lastUsedAt || meal.last_used_at;
+  const firstConsumedAt =
+    meal.firstConsumedAt ||
+    meal.first_consumed_at ||
+    meal.firstUsedAt ||
+    meal.first_used_at;
+  const lastConsumedAt =
+    meal.lastConsumedAt ||
+    meal.last_consumed_at ||
+    meal.lastUsedAt ||
+    meal.last_used_at;
   const userRating = meal.userRating || meal.user_rating;
   const nutritionScore = meal.nutritionScore || meal.nutrition_score;
 
@@ -56,12 +73,10 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
               {mealName}
             </h2>
             <div className="flex items-center gap-3 mb-2">
-              <Badge color={mealSource === "custom" ? "blue" : "zinc"}>
-                {mealSource === "custom" ? "Custom" : "Gemini"}
+              <Badge color={mealSource === 'custom' ? 'blue' : 'zinc'}>
+                {mealSource === 'custom' ? 'Custom' : 'Gemini'}
               </Badge>
-              <Badge color="zinc">
-                {formatMealSlot(mealSlot)}
-              </Badge>
+              <Badge color="zinc">{formatMealSlot(mealSlot)}</Badge>
             </div>
           </div>
         </div>
@@ -83,7 +98,8 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
             <div className="flex items-center gap-2">
               <ClockIcon className="h-4 w-4 text-zinc-500" />
               <span className="text-zinc-600 dark:text-zinc-400">
-                Bereidingstijd: <span className="font-medium">{mealData.prepTime} minuten</span>
+                Bereidingstijd:{' '}
+                <span className="font-medium">{mealData.prepTime} minuten</span>
               </span>
             </div>
           )}
@@ -92,7 +108,8 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
             <div className="flex items-center gap-2">
               <UserGroupIcon className="h-4 w-4 text-zinc-500" />
               <span className="text-zinc-600 dark:text-zinc-400">
-                Porties: <span className="font-medium">{mealData.servings}</span>
+                Porties:{' '}
+                <span className="font-medium">{mealData.servings}</span>
               </span>
             </div>
           )}
@@ -100,7 +117,8 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
           {consumptionCount > 0 && (
             <div className="flex items-center gap-2">
               <span className="text-zinc-600 dark:text-zinc-400">
-                {mealSource === "custom" ? "Geconsumeerd" : "Gebruikt"}: <span className="font-medium">{consumptionCount}x</span>
+                {mealSource === 'custom' ? 'Geconsumeerd' : 'Gebruikt'}:{' '}
+                <span className="font-medium">{consumptionCount}x</span>
               </span>
             </div>
           )}
@@ -108,7 +126,8 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
           {userRating && (
             <div className="flex items-center gap-2">
               <span className="text-zinc-600 dark:text-zinc-400">
-                Beoordeling: <span className="font-medium">{userRating}/5 ⭐</span>
+                Beoordeling:{' '}
+                <span className="font-medium">{userRating}/5 ⭐</span>
               </span>
             </div>
           )}
@@ -116,19 +135,17 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
 
         {/* Dates */}
         <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-400 space-y-1">
-          {createdAt && (
-            <div>
-              Toegevoegd: {formatDate(createdAt)}
-            </div>
-          )}
+          {createdAt && <div>Toegevoegd: {formatDate(createdAt)}</div>}
           {firstConsumedAt && (
             <div>
-              Eerst {mealSource === "custom" ? "geconsumeerd" : "gebruikt"}: {formatDate(firstConsumedAt)}
+              Eerst {mealSource === 'custom' ? 'geconsumeerd' : 'gebruikt'}:{' '}
+              {formatDate(firstConsumedAt)}
             </div>
           )}
           {lastConsumedAt && (
             <div>
-              Laatst {mealSource === "custom" ? "geconsumeerd" : "gebruikt"}: {formatDate(lastConsumedAt)}
+              Laatst {mealSource === 'custom' ? 'geconsumeerd' : 'gebruikt'}:{' '}
+              {formatDate(lastConsumedAt)}
             </div>
           )}
         </div>
@@ -142,9 +159,11 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
           </h3>
           {aiAnalysis.instructions && Array.isArray(aiAnalysis.instructions) ? (
             <ol className="space-y-2 list-decimal list-inside text-sm text-zinc-600 dark:text-zinc-400">
-              {aiAnalysis.instructions.map((instruction: string, idx: number) => (
-                <li key={idx}>{instruction}</li>
-              ))}
+              {aiAnalysis.instructions.map(
+                (instruction: string, idx: number) => (
+                  <li key={idx}>{instruction}</li>
+                ),
+              )}
             </ol>
           ) : aiAnalysis.instructions ? (
             <Text className="text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-line">
@@ -166,10 +185,16 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
           </h3>
           <ul className="space-y-2 text-sm">
             {mealData.ingredientRefs.map((ref: any, idx: number) => {
-              const name = ref.displayName || nevoFoodNamesByCode[ref.nevoCode] || `NEVO ${ref.nevoCode}`;
+              const name =
+                ref.displayName ||
+                nevoFoodNamesByCode[ref.nevoCode] ||
+                `NEVO ${ref.nevoCode}`;
               return (
                 <li key={idx} className="text-zinc-600 dark:text-zinc-400">
-                  <span className="font-medium text-zinc-900 dark:text-white">{name}</span>: {ref.quantityG}g
+                  <span className="font-medium text-zinc-900 dark:text-white">
+                    {name}
+                  </span>
+                  : {ref.quantityG}g
                 </li>
               );
             })}
@@ -184,49 +209,78 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
             Voedingswaarden
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-            {(mealData.estimatedMacros || mealData.nutrition)?.calories !== undefined && (
+            {(mealData.estimatedMacros || mealData.nutrition)?.calories !==
+              undefined && (
               <div>
-                <span className="text-zinc-600 dark:text-zinc-400">Calorieën:</span>{" "}
+                <span className="text-zinc-600 dark:text-zinc-400">
+                  Calorieën:
+                </span>{' '}
                 <span className="font-medium text-zinc-900 dark:text-white">
-                  {Math.round((mealData.estimatedMacros || mealData.nutrition).calories)} kcal
+                  {Math.round(
+                    (mealData.estimatedMacros || mealData.nutrition).calories,
+                  )}{' '}
+                  kcal
                 </span>
               </div>
             )}
-            {(mealData.estimatedMacros || mealData.nutrition)?.protein !== undefined && (
+            {(mealData.estimatedMacros || mealData.nutrition)?.protein !==
+              undefined && (
               <div>
-                <span className="text-zinc-600 dark:text-zinc-400">Eiwit:</span>{" "}
+                <span className="text-zinc-600 dark:text-zinc-400">Eiwit:</span>{' '}
                 <span className="font-medium text-zinc-900 dark:text-white">
-                  {Math.round((mealData.estimatedMacros || mealData.nutrition).protein)}g
+                  {Math.round(
+                    (mealData.estimatedMacros || mealData.nutrition).protein,
+                  )}
+                  g
                 </span>
               </div>
             )}
-            {(mealData.estimatedMacros || mealData.nutrition)?.carbs !== undefined && (
+            {(mealData.estimatedMacros || mealData.nutrition)?.carbs !==
+              undefined && (
               <div>
-                <span className="text-zinc-600 dark:text-zinc-400">Koolhydraten:</span>{" "}
+                <span className="text-zinc-600 dark:text-zinc-400">
+                  Koolhydraten:
+                </span>{' '}
                 <span className="font-medium text-zinc-900 dark:text-white">
-                  {Math.round((mealData.estimatedMacros || mealData.nutrition).carbs)}g
+                  {Math.round(
+                    (mealData.estimatedMacros || mealData.nutrition).carbs,
+                  )}
+                  g
                 </span>
               </div>
             )}
-            {(mealData.estimatedMacros || mealData.nutrition)?.fat !== undefined && (
+            {(mealData.estimatedMacros || mealData.nutrition)?.fat !==
+              undefined && (
               <div>
-                <span className="text-zinc-600 dark:text-zinc-400">Vet:</span>{" "}
+                <span className="text-zinc-600 dark:text-zinc-400">Vet:</span>{' '}
                 <span className="font-medium text-zinc-900 dark:text-white">
-                  {Math.round((mealData.estimatedMacros || mealData.nutrition).fat)}g
+                  {Math.round(
+                    (mealData.estimatedMacros || mealData.nutrition).fat,
+                  )}
+                  g
                 </span>
               </div>
             )}
-            {(mealData.estimatedMacros || mealData.nutrition)?.saturatedFat !== undefined && (
+            {(mealData.estimatedMacros || mealData.nutrition)?.saturatedFat !==
+              undefined && (
               <div>
-                <span className="text-zinc-600 dark:text-zinc-400">Verzadigd vet:</span>{" "}
+                <span className="text-zinc-600 dark:text-zinc-400">
+                  Verzadigd vet:
+                </span>{' '}
                 <span className="font-medium text-zinc-900 dark:text-white">
-                  {Math.round((mealData.estimatedMacros || mealData.nutrition).saturatedFat)}g
+                  {Math.round(
+                    (mealData.estimatedMacros || mealData.nutrition)
+                      .saturatedFat,
+                  )}
+                  g
                 </span>
               </div>
             )}
             {nutritionScore !== null && nutritionScore !== undefined && (
               <div>
-                <span className="text-zinc-600 dark:text-zinc-400">Voedingsscore:</span>{" "}
+                <span className="text-zinc-600 dark:text-zinc-400">
+                  Voedingsscore:
+                </span>{' '}
                 <span className="font-medium text-zinc-900 dark:text-white">
                   {Math.round(nutritionScore)}/100
                 </span>

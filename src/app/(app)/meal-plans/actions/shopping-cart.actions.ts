@@ -1,9 +1,9 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { MealPlansService } from "@/src/lib/meal-plans/mealPlans.service";
-import { MealPlannerShoppingService } from "@/src/lib/agents/meal-planner";
-import type { ShoppingListResponse } from "@/src/lib/agents/meal-planner";
+import { createClient } from '@/src/lib/supabase/server';
+import { MealPlansService } from '@/src/lib/meal-plans/mealPlans.service';
+import { MealPlannerShoppingService } from '@/src/lib/agents/meal-planner';
+import type { ShoppingListResponse } from '@/src/lib/agents/meal-planner';
 
 /**
  * Action result type
@@ -13,7 +13,7 @@ type ActionResult<T> =
   | {
       ok: false;
       error: {
-        code: "AUTH_ERROR" | "DB_ERROR" | "NOT_FOUND";
+        code: 'AUTH_ERROR' | 'DB_ERROR' | 'NOT_FOUND';
         message: string;
       };
     };
@@ -35,8 +35,8 @@ export async function getShoppingCartAction(): Promise<
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om de shopping cart te bekijken",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om de shopping cart te bekijken',
         },
       };
     }
@@ -58,7 +58,7 @@ export async function getShoppingCartAction(): Promise<
     const shoppingService = new MealPlannerShoppingService();
     const shoppingList = await shoppingService.buildShoppingListWithPantry(
       plan.planSnapshot,
-      user.id
+      user.id,
     );
 
     return {
@@ -69,15 +69,15 @@ export async function getShoppingCartAction(): Promise<
       },
     };
   } catch (error) {
-    console.error("Error getting shopping cart:", error);
+    console.error('Error getting shopping cart:', error);
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
+        code: 'DB_ERROR',
         message:
           error instanceof Error
             ? error.message
-            : "Fout bij ophalen shopping cart",
+            : 'Fout bij ophalen shopping cart',
       },
     };
   }

@@ -1,10 +1,7 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { Button } from "@/components/catalyst/button";
-import { Heading } from "@/components/catalyst/heading";
-import { Text } from "@/components/catalyst/text";
-import type { MealPlanRecord } from "@/src/lib/meal-plans/mealPlans.types";
+import { Heading } from '@/components/catalyst/heading';
+import type { MealPlanRecord } from '@/src/lib/meal-plans/mealPlans.types';
 type MealPlanSummaryProps = {
   plan: MealPlanRecord;
   dietTypeName: string;
@@ -15,12 +12,12 @@ export function MealPlanSummary({ plan, dietTypeName }: MealPlanSummaryProps) {
   const startDate = new Date(plan.dateFrom);
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + plan.days - 1);
-  const endDateStr = endDate.toISOString().split("T")[0];
+  const endDateStr = endDate.toISOString().split('T')[0];
 
   // Count total meals
   const totalMeals = plan.planSnapshot.days.reduce(
     (sum, day) => sum + day.meals.length,
-    0
+    0,
   );
 
   // Check if enrichment exists
@@ -39,7 +36,7 @@ export function MealPlanSummary({ plan, dietTypeName }: MealPlanSummaryProps) {
       });
       return acc;
     },
-    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    { calories: 0, protein: 0, carbs: 0, fat: 0 },
   );
 
   return (
@@ -60,12 +57,12 @@ export function MealPlanSummary({ plan, dietTypeName }: MealPlanSummaryProps) {
             </div>
             <div>
               <div className="text-sm text-muted-foreground">Dieet Type</div>
-              <div className="font-medium">
-                {dietTypeName}
-              </div>
+              <div className="font-medium">{dietTypeName}</div>
             </div>
             <div>
-              <div className="text-sm text-muted-foreground">Totaal Maaltijden</div>
+              <div className="text-sm text-muted-foreground">
+                Totaal Maaltijden
+              </div>
               <div className="font-medium">{totalMeals} maaltijden</div>
             </div>
           </div>
@@ -108,7 +105,9 @@ export function MealPlanSummary({ plan, dietTypeName }: MealPlanSummaryProps) {
             <div className="pt-4 border-t">
               <div className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
                 <span className="font-medium">✓</span>
-                <span>Enrichment beschikbaar (titels, instructies, cook plan)</span>
+                <span>
+                  Enrichment beschikbaar (titels, instructies, cook plan)
+                </span>
               </div>
             </div>
           )}
@@ -116,11 +115,11 @@ export function MealPlanSummary({ plan, dietTypeName }: MealPlanSummaryProps) {
           {!hasEnrichment && (
             <div className="pt-4 border-t">
               <div className="text-sm text-muted-foreground">
-                ⚠ Enrichment nog niet beschikbaar (titels en instructies worden gegenereerd)
+                ⚠ Enrichment nog niet beschikbaar (titels en instructies worden
+                gegenereerd)
               </div>
             </div>
           )}
-
         </div>
       </div>
     </div>

@@ -5,6 +5,7 @@
 ## Intent
 
 Unified guard rails implementation voor alle flows:
+
 - Recipe Adaptation
 - Meal Planner
 - Plan Chat
@@ -12,6 +13,7 @@ Unified guard rails implementation voor alle flows:
 ## Documentation
 
 **Policy Semantics**: Zie [`docs/guardrails-vnext-semantics.md`](../../../docs/guardrails-vnext-semantics.md) voor:
+
 - Expliciete evaluatieregels (sorting, conflicts, defaults)
 - Match targets & matching modes
 - Remediation contract
@@ -36,12 +38,14 @@ guardrails-vnext/
 ## Public API
 
 **Types**: Alle types zijn geëxporteerd via `index.ts`:
+
 - `GuardRule`, `GuardrailsRuleset`, `GuardDecision`, `DecisionTrace`
 - `EvaluationContext`, `EvaluationResult`
 - `RuleAction`, `Strictness`, `MatchTarget`, `MatchMode`
 - `GuardReasonCode`, `RemediationHint`
 
 **Functions** (placeholders, nog niet geïmplementeerd):
+
 - `evaluateGuardrails()` - Main evaluation entry point
 - `loadGuardrailsRuleset()` - Load from database
 - `compileConstraintsForAI()` - Format for LLM prompts

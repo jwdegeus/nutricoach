@@ -1,25 +1,25 @@
 /**
  * Gemini Recipe URL Import Service
- * 
+ *
  * Service for processing recipe URLs with Gemini API.
  * Fetches HTML and uses Gemini to extract recipe information.
  */
 
-import "server-only";
-import { z } from "zod";
-import { getGeminiClient } from "@/src/lib/ai/gemini/gemini.client";
+import 'server-only';
+import { z } from 'zod';
+import { getGeminiClient } from '@/src/lib/ai/gemini/gemini.client';
 import {
   geminiExtractedRecipeSchema,
   type GeminiExtractedRecipe,
-} from "../recipeImport.gemini.schemas";
-import type { RecipeDraft } from "../recipeDraft.types";
+} from '../recipeImport.gemini.schemas';
+import type { RecipeDraft } from '../recipeDraft.types';
 
 /**
  * Check if a URL is a tracking pixel or non-image URL
  */
 function isTrackingPixelOrNonImage(url: string): boolean {
   const lowerUrl = url.toLowerCase();
-  
+
   // Check for tracking pixels and analytics
   const trackingPatterns = [
     'facebook.com/tr',
@@ -33,20 +33,28 @@ function isTrackingPixelOrNonImage(url: string): boolean {
     'noscript',
     'amp;', // HTML entities
   ];
-  
-  if (trackingPatterns.some(pattern => lowerUrl.includes(pattern))) {
+
+  if (trackingPatterns.some((pattern) => lowerUrl.includes(pattern))) {
     return true;
   }
-  
+
   // Check if URL has query params but no image extension
-  if (url.includes('?') && !url.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?|$)/i)) {
+  if (
+    url.includes('?') &&
+    !url.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?|$)/i)
+  ) {
     // Might be a tracking pixel, but allow if it's from a known image CDN
-    const imageCdnPatterns = ['imgur.com', 'cloudinary.com', 'unsplash.com', 'pexels.com'];
-    if (!imageCdnPatterns.some(cdn => lowerUrl.includes(cdn))) {
+    const imageCdnPatterns = [
+      'imgur.com',
+      'cloudinary.com',
+      'unsplash.com',
+      'pexels.com',
+    ];
+    if (!imageCdnPatterns.some((cdn) => lowerUrl.includes(cdn))) {
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -57,11 +65,16 @@ function isTrackingPixelOrNonImage(url: string): boolean {
  */
 function extractImageUrlFromHtml(html: string): string | undefined {
   // Try og:image meta tag first
-  const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
+  const ogImageMatch = html.match(
+    /<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i,
+  );
   if (ogImageMatch && ogImageMatch[1]) {
     const url = ogImageMatch[1];
     // Decode HTML entities
-    const decodedUrl = url.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    const decodedUrl = url
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
     if (!isTrackingPixelOrNonImage(decodedUrl)) {
       return decodedUrl;
     }
@@ -69,10 +82,15 @@ function extractImageUrlFromHtml(html: string): string | undefined {
 
   // Try recipe image in JSON-LD (we'll extract this separately, but also check HTML)
   // Look for common image patterns
-  const imgTagMatch = html.match(/<img[^>]*class=["'][^"]*recipe[^"]*["'][^>]*src=["']([^"']+)["']/i);
+  const imgTagMatch = html.match(
+    /<img[^>]*class=["'][^"]*recipe[^"]*["'][^>]*src=["']([^"']+)["']/i,
+  );
   if (imgTagMatch && imgTagMatch[1]) {
     const url = imgTagMatch[1];
-    const decodedUrl = url.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    const decodedUrl = url
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
     if (!isTrackingPixelOrNonImage(decodedUrl)) {
       return decodedUrl;
     }
@@ -84,8 +102,11 @@ function extractImageUrlFromHtml(html: string): string | undefined {
   for (const match of imgTagMatches) {
     if (match[1]) {
       const url = match[1];
-      const decodedUrl = url.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-      
+      const decodedUrl = url
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'");
+
       // Filter out small icons, logos, tracking pixels, etc.
       const lowerUrl = decodedUrl.toLowerCase();
       if (
@@ -149,7 +170,10 @@ function extractRelevantHtmlContent(html: string): string {
     // Try to keep both start (for JSON-LD) and end (for recipe content)
     const startPortion = cleaned.substring(0, maxSize / 2);
     const endPortion = cleaned.substring(cleaned.length - maxSize / 2);
-    cleaned = startPortion + "\n... [middle content removed for size] ...\n" + endPortion;
+    cleaned =
+      startPortion +
+      '\n... [middle content removed for size] ...\n' +
+      endPortion;
   }
 
   return cleaned;
@@ -158,12 +182,10 @@ function extractRelevantHtmlContent(html: string): string {
 /**
  * Build prompt for Gemini to extract recipe from HTML
  */
-function buildRecipeExtractionFromHtmlPrompt(
-  html: string
-): string {
+function buildRecipeExtractionFromHtmlPrompt(html: string): string {
   // Clean and extract relevant HTML content
   const cleanedHtml = extractRelevantHtmlContent(html);
-  
+
   return `Extract recipe information from the HTML below.
 
 HTML:
@@ -243,7 +265,7 @@ function extractJsonFromResponse(rawResponse: string): string {
  */
 function parseGeminiResponse(
   rawResponse: string,
-  attemptRecovery: boolean = true
+  attemptRecovery: boolean = true,
 ): GeminiExtractedRecipe {
   // First attempt: direct parse
   let jsonString = rawResponse.trim();
@@ -260,15 +282,15 @@ function parseGeminiResponse(
       } catch (recoveryError) {
         throw new Error(
           `Failed to parse JSON from Gemini response. ` +
-            `Parse error: ${parseError instanceof Error ? parseError.message : "Unknown"}. ` +
-            `Recovery attempt also failed: ${recoveryError instanceof Error ? recoveryError.message : "Unknown"}. ` +
-            `Raw response preview: ${rawResponse.substring(0, 500)}`
+            `Parse error: ${parseError instanceof Error ? parseError.message : 'Unknown'}. ` +
+            `Recovery attempt also failed: ${recoveryError instanceof Error ? recoveryError.message : 'Unknown'}. ` +
+            `Raw response preview: ${rawResponse.substring(0, 500)}`,
         );
       }
     } else {
       throw new Error(
-        `Invalid JSON from Gemini: ${parseError instanceof Error ? parseError.message : "Unknown parse error"}. ` +
-          `Raw response preview: ${rawResponse.substring(0, 500)}`
+        `Invalid JSON from Gemini: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}. ` +
+          `Raw response preview: ${rawResponse.substring(0, 500)}`,
       );
     }
   }
@@ -279,69 +301,77 @@ function parseGeminiResponse(
   } catch (validationError) {
     // Check if this is a case where no recipe was found (empty ingredients/instructions)
     const parsedData = parsed as any;
-    const hasWarnings = parsedData?.warnings && Array.isArray(parsedData.warnings) && parsedData.warnings.length > 0;
-    const hasAccessDenied = hasWarnings && parsedData.warnings.some((w: string) => 
-      w.toLowerCase().includes("access denied") || 
-      w.toLowerCase().includes("toegang geweigerd") ||
-      w.toLowerCase().includes("geen receptinformatie")
-    );
-    const isEmptyRecipe = (
+    const hasWarnings =
+      parsedData?.warnings &&
+      Array.isArray(parsedData.warnings) &&
+      parsedData.warnings.length > 0;
+    const hasAccessDenied =
+      hasWarnings &&
+      parsedData.warnings.some(
+        (w: string) =>
+          w.toLowerCase().includes('access denied') ||
+          w.toLowerCase().includes('toegang geweigerd') ||
+          w.toLowerCase().includes('geen receptinformatie'),
+      );
+    const isEmptyRecipe =
       (!parsedData?.ingredients || parsedData.ingredients.length === 0) &&
-      (!parsedData?.instructions || parsedData.instructions.length === 0)
-    );
+      (!parsedData?.instructions || parsedData.instructions.length === 0);
 
     if (hasAccessDenied || (isEmptyRecipe && hasWarnings)) {
-      const warningMessage = hasAccessDenied 
-        ? "De website blokkeert toegang tot deze pagina. Probeer een andere URL of controleer of de pagina publiek toegankelijk is."
-        : parsedData.warnings?.[0] || "Geen receptinformatie gevonden op deze pagina.";
-      
+      const warningMessage = hasAccessDenied
+        ? 'De website blokkeert toegang tot deze pagina. Probeer een andere URL of controleer of de pagina publiek toegankelijk is.'
+        : parsedData.warnings?.[0] ||
+          'Geen receptinformatie gevonden op deze pagina.';
+
       throw new Error(warningMessage);
     }
 
     const errorDetails =
       validationError instanceof z.ZodError
-        ? validationError.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ")
+        ? validationError.errors
+            .map((e) => `${e.path.join('.')}: ${e.message}`)
+            .join('; ')
         : validationError instanceof Error
-        ? validationError.message
-        : "Unknown validation error";
+          ? validationError.message
+          : 'Unknown validation error';
 
     throw new Error(
       `Schema validation failed: ${errorDetails}. ` +
-        `Parsed data preview: ${JSON.stringify(parsed, null, 2).substring(0, 1000)}`
+        `Parsed data preview: ${JSON.stringify(parsed, null, 2).substring(0, 1000)}`,
     );
   }
 }
 
 /**
  * Map Gemini extracted recipe to RecipeDraft
- * 
+ *
  * IMPORTANT: Uses the TRANSLATED values (name, text) not original_line
  * The original_line is kept for reference but the translated name should be used
  */
 function mapGeminiRecipeToDraft(
   extracted: GeminiExtractedRecipe,
-  sourceUrl: string
+  sourceUrl: string,
 ): RecipeDraft {
   // Build ingredient text from translated name, quantity, unit, and note
   const ingredients = extracted.ingredients.map((ing) => {
     // Use the TRANSLATED name, not original_line
     let text = ing.name; // This should be translated
-    
+
     // Add quantity and unit if present (units should already be converted)
     if (ing.quantity !== null && ing.quantity !== undefined) {
       text = `${ing.quantity}${ing.unit ? ` ${ing.unit}` : ''} ${text}`;
     } else if (ing.unit) {
       text = `${ing.unit} ${text}`;
     }
-    
+
     // Add note if present (should also be translated)
     if (ing.note) {
       text = `${text} (${ing.note})`;
     }
-    
+
     return { text };
   });
-  
+
   return {
     title: extracted.title, // Should be translated
     description: undefined, // Gemini schema doesn't include description
@@ -357,7 +387,7 @@ function mapGeminiRecipeToDraft(
 
 /**
  * Process recipe URL with Gemini API
- * 
+ *
  * @param args - Configuration for URL processing
  * @returns Extracted recipe draft
  */
@@ -370,115 +400,131 @@ export async function processRecipeUrlWithGemini(args: {
   rawResponse: string;
 }> {
   const { html, url } = args;
-  
-  console.log(`[processRecipeUrlWithGemini] URL: "${url}", HTML size: ${html.length} bytes`);
-  
+
+  console.log(
+    `[processRecipeUrlWithGemini] URL: "${url}", HTML size: ${html.length} bytes`,
+  );
+
   // Build prompt for extraction only (no translation)
   const prompt = buildRecipeExtractionFromHtmlPrompt(html);
-  
+
   const gemini = getGeminiClient();
 
   // Convert Zod schema to JSON schema for Gemini with explicit translation requirements
   const jsonSchema = {
-    type: "object",
+    type: 'object',
     properties: {
-      title: { 
-        type: "string",
-        description: "Recipe title in original language"
+      title: {
+        type: 'string',
+        description: 'Recipe title in original language',
       },
-      language_detected: { 
-        type: ["string", "null"],
-        description: "Source language code (e.g., 'en', 'nl', 'de')"
+      language_detected: {
+        type: ['string', 'null'],
+        description: "Source language code (e.g., 'en', 'nl', 'de')",
       },
-      translated_to: { 
-        type: ["string", "null"],
-        description: "Not used - set to null"
+      translated_to: {
+        type: ['string', 'null'],
+        description: 'Not used - set to null',
       },
-      servings: { type: ["number", "null"] },
+      servings: { type: ['number', 'null'] },
       times: {
-        type: "object",
+        type: 'object',
         properties: {
-          prep_minutes: { type: ["number", "null"] },
-          cook_minutes: { type: ["number", "null"] },
-          total_minutes: { type: ["number", "null"] },
+          prep_minutes: { type: ['number', 'null'] },
+          cook_minutes: { type: ['number', 'null'] },
+          total_minutes: { type: ['number', 'null'] },
         },
         required: [],
       },
       ingredients: {
-        type: "array",
+        type: 'array',
         items: {
-          type: "object",
+          type: 'object',
           properties: {
-            original_line: { 
-              type: "string",
-              description: "Original text from HTML (keep as-is)"
+            original_line: {
+              type: 'string',
+              description: 'Original text from HTML (keep as-is)',
             },
-            quantity: { 
-              type: ["number", "null"],
-              description: "Quantity. Convert if needed: 1 cup = 240 ml, 1 oz = 28 g, 1 lb = 450 g"
+            quantity: {
+              type: ['number', 'null'],
+              description:
+                'Quantity. Convert if needed: 1 cup = 240 ml, 1 oz = 28 g, 1 lb = 450 g',
             },
-            unit: { 
-              type: ["string", "null"],
-              description: "Unit. Convert English units to metric: cups → ml, tablespoons → el, teaspoons → tl, oz → g, lb → g"
+            unit: {
+              type: ['string', 'null'],
+              description:
+                'Unit. Convert English units to metric: cups → ml, tablespoons → el, teaspoons → tl, oz → g, lb → g',
             },
-            name: { 
-              type: "string",
-              description: "Ingredient name in original language"
+            name: {
+              type: 'string',
+              description: 'Ingredient name in original language',
             },
-            note: { 
-              type: ["string", "null"],
-              description: "Note in original language if present"
+            note: {
+              type: ['string', 'null'],
+              description: 'Note in original language if present',
             },
           },
-          required: ["original_line", "name"],
+          required: ['original_line', 'name'],
         },
         minItems: 1,
       },
       instructions: {
-        type: "array",
+        type: 'array',
         items: {
-          type: "object",
+          type: 'object',
           properties: {
-            step: { type: "number" },
-            text: { 
-              type: "string",
-              description: "Instruction text in original language"
+            step: { type: 'number' },
+            text: {
+              type: 'string',
+              description: 'Instruction text in original language',
             },
           },
-          required: ["step", "text"],
+          required: ['step', 'text'],
         },
         minItems: 1,
       },
       confidence: {
-        type: "object",
+        type: 'object',
         properties: {
-          overall: { type: ["number", "null"] },
-          fields: { type: "object" },
+          overall: { type: ['number', 'null'] },
+          fields: { type: 'object' },
         },
         required: [],
       },
       warnings: {
-        type: "array",
-        items: { type: "string" },
+        type: 'array',
+        items: { type: 'string' },
       },
     },
-    required: ["title", "language_detected", "translated_to", "servings", "times", "ingredients", "instructions"],
+    required: [
+      'title',
+      'language_detected',
+      'translated_to',
+      'servings',
+      'times',
+      'ingredients',
+      'instructions',
+    ],
   };
 
   try {
-    console.log(`[GeminiRecipeUrlImport] Calling Gemini API with HTML size: ${html.length} bytes`);
+    console.log(
+      `[GeminiRecipeUrlImport] Calling Gemini API with HTML size: ${html.length} bytes`,
+    );
     const startTime = Date.now();
-    
+
     // Call Gemini API with JSON schema to enforce structure
     const rawResponse = await gemini.generateJson({
       prompt,
       jsonSchema,
       temperature: 0.4,
-      purpose: "plan",
+      purpose: 'plan',
     });
-    
+
     const duration = Date.now() - startTime;
-    console.log(`[GeminiRecipeUrlImport] API call completed in ${duration}ms, response length: ${rawResponse.length} chars`);
+    console.log(
+      `[GeminiRecipeUrlImport] API call completed in ${duration}ms, response length: ${rawResponse.length} chars`,
+    );
 
     // Parse and validate response (generateJson already returns valid JSON)
     let extracted: GeminiExtractedRecipe;
@@ -486,16 +532,23 @@ export async function processRecipeUrlWithGemini(args: {
       const parsed = JSON.parse(rawResponse);
       extracted = geminiExtractedRecipeSchema.parse(parsed);
     } catch (parseError) {
-      console.error(`[GeminiRecipeUrlImport] Failed to parse JSON from generateJson, trying fallback parser:`, parseError);
+      console.error(
+        `[GeminiRecipeUrlImport] Failed to parse JSON from generateJson, trying fallback parser:`,
+        parseError,
+      );
       // Fallback to old parsing method if needed
       extracted = parseGeminiResponse(rawResponse, true);
     }
-    
-    console.log(`[GeminiRecipeUrlImport] Extraction completed. Language detected: ${extracted.language_detected}`);
+
+    console.log(
+      `[GeminiRecipeUrlImport] Extraction completed. Language detected: ${extracted.language_detected}`,
+    );
 
     // Extract image URL from HTML
     const imageUrl = extractImageUrlFromHtml(html);
-    console.log(`[GeminiRecipeUrlImport] Extracted image URL: ${imageUrl || 'none'}`);
+    console.log(
+      `[GeminiRecipeUrlImport] Extracted image URL: ${imageUrl || 'none'}`,
+    );
 
     // Convert relative URLs to absolute URLs
     let absoluteImageUrl = imageUrl;
@@ -505,15 +558,23 @@ export async function processRecipeUrlWithGemini(args: {
         if (imageUrl.startsWith('/')) {
           // Relative URL - resolve against base URL
           absoluteImageUrl = new URL(imageUrl, baseUrl.origin).toString();
-        } else if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+        } else if (
+          !imageUrl.startsWith('http://') &&
+          !imageUrl.startsWith('https://')
+        ) {
           // Protocol-relative URL (//example.com/image.jpg)
           absoluteImageUrl = `https:${imageUrl}`;
         } else {
           absoluteImageUrl = imageUrl;
         }
-        console.log(`[GeminiRecipeUrlImport] Resolved image URL: ${absoluteImageUrl}`);
+        console.log(
+          `[GeminiRecipeUrlImport] Resolved image URL: ${absoluteImageUrl}`,
+        );
       } catch (urlError) {
-        console.error(`[GeminiRecipeUrlImport] Error resolving image URL:`, urlError);
+        console.error(
+          `[GeminiRecipeUrlImport] Error resolving image URL:`,
+          urlError,
+        );
         // Keep original URL if resolution fails
         absoluteImageUrl = imageUrl;
       }
@@ -521,7 +582,7 @@ export async function processRecipeUrlWithGemini(args: {
 
     // Map to RecipeDraft
     const draft = mapGeminiRecipeToDraft(extracted, url);
-    
+
     // Add image URL and times to draft (use absolute URL)
     draft.imageUrl = absoluteImageUrl;
     draft.prepTimeMinutes = extracted.times?.prep_minutes || undefined;
@@ -537,9 +598,9 @@ export async function processRecipeUrlWithGemini(args: {
     // Re-throw with context
     if (error instanceof Error) {
       throw new Error(
-        `Gemini recipe extraction from URL failed: ${error.message}`
+        `Gemini recipe extraction from URL failed: ${error.message}`,
       );
     }
-    throw new Error("Unknown error during Gemini recipe extraction from URL");
+    throw new Error('Unknown error during Gemini recipe extraction from URL');
   }
 }

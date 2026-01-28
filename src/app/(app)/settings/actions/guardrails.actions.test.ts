@@ -1,9 +1,9 @@
 /**
  * Guard Rails Actions - Swap Priority Tests
- * 
+ *
  * Tests for swapGuardRailRulePriorityAction to ensure deterministic,
  * transactional priority swapping.
- * 
+ *
  * Note: These are integration tests that require database access.
  * For true unit tests, mock the Supabase client.
  */
@@ -27,11 +27,13 @@ async function createTestDietType(name: string): Promise<string> {
     })
     .select('id')
     .single();
-  
+
   if (error || !data) {
-    throw new Error(`Failed to create test diet: ${error?.message || 'Unknown error'}`);
+    throw new Error(
+      `Failed to create test diet: ${error?.message || 'Unknown error'}`,
+    );
   }
-  
+
   return data.id;
 }
 
@@ -42,19 +44,19 @@ async function createTestAdmin(): Promise<string> {
   // Note: In real tests, you'd mock isAdmin() or use test auth
   // For now, we'll assume tests run with proper admin setup
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
     throw new Error('Test requires authenticated user');
   }
-  
+
   // Ensure admin role
-  await supabase
-    .from('user_roles')
-    .upsert({
-      user_id: user.id,
-      role: 'admin',
-    });
-  
+  await supabase.from('user_roles').upsert({
+    user_id: user.id,
+    role: 'admin',
+  });
+
   return user.id;
 }
 
@@ -63,10 +65,10 @@ async function createTestAdmin(): Promise<string> {
  */
 async function createTestConstraint(
   dietTypeId: string,
-  priority: number
+  priority: number,
 ): Promise<string> {
   const supabase = await createClient();
-  
+
   // First create a category
   const { data: category, error: catError } = await supabase
     .from('ingredient_categories')
@@ -78,11 +80,13 @@ async function createTestConstraint(
     })
     .select('id')
     .single();
-  
+
   if (catError || !category) {
-    throw new Error(`Failed to create test category: ${catError?.message || 'Unknown error'}`);
+    throw new Error(
+      `Failed to create test category: ${catError?.message || 'Unknown error'}`,
+    );
   }
-  
+
   // Create category item
   const { data: item, error: itemError } = await supabase
     .from('ingredient_category_items')
@@ -93,11 +97,13 @@ async function createTestConstraint(
     })
     .select('id')
     .single();
-  
+
   if (itemError || !item) {
-    throw new Error(`Failed to create test item: ${itemError?.message || 'Unknown error'}`);
+    throw new Error(
+      `Failed to create test item: ${itemError?.message || 'Unknown error'}`,
+    );
   }
-  
+
   // Create constraint
   const { data: constraint, error: constraintError } = await supabase
     .from('diet_category_constraints')
@@ -113,11 +119,13 @@ async function createTestConstraint(
     })
     .select('id')
     .single();
-  
+
   if (constraintError || !constraint) {
-    throw new Error(`Failed to create test constraint: ${constraintError?.message || 'Unknown error'}`);
+    throw new Error(
+      `Failed to create test constraint: ${constraintError?.message || 'Unknown error'}`,
+    );
   }
-  
+
   return constraint.id;
 }
 
@@ -126,10 +134,10 @@ async function createTestConstraint(
  */
 async function createTestRecipeRule(
   dietTypeId: string,
-  priority: number
+  priority: number,
 ): Promise<string> {
   const supabase = await createClient();
-  
+
   const { data: rule, error } = await supabase
     .from('recipe_adaptation_rules')
     .insert({
@@ -144,11 +152,13 @@ async function createTestRecipeRule(
     })
     .select('id')
     .single();
-  
+
   if (error || !rule) {
-    throw new Error(`Failed to create test rule: ${error?.message || 'Unknown error'}`);
+    throw new Error(
+      `Failed to create test rule: ${error?.message || 'Unknown error'}`,
+    );
   }
-  
+
   return rule.id;
 }
 
@@ -157,24 +167,21 @@ async function createTestRecipeRule(
  */
 async function cleanupTestData(dietTypeId: string) {
   const supabase = await createClient();
-  
+
   // Delete constraints
   await supabase
     .from('diet_category_constraints')
     .delete()
     .eq('diet_type_id', dietTypeId);
-  
+
   // Delete recipe rules
   await supabase
     .from('recipe_adaptation_rules')
     .delete()
     .eq('diet_type_id', dietTypeId);
-  
+
   // Delete diet type
-  await supabase
-    .from('diet_types')
-    .delete()
-    .eq('id', dietTypeId);
+  await supabase.from('diet_types').delete().eq('id', dietTypeId);
 }
 
 describe('swapGuardRailRulePriorityAction', () => {
@@ -196,57 +203,76 @@ describe('swapGuardRailRulePriorityAction', () => {
     it('should reject swap with same rule ID', async () => {
       const constraintId = await createTestConstraint(testDietTypeId, 50);
       const ruleId = `db:diet_category_constraints:${constraintId}:0`;
-      
+
       const result = await swapGuardRailRulePriorityAction(ruleId, ruleId);
-      
-      assert.strictEqual(result.error, 'Kan niet dezelfde regel met zichzelf verwisselen');
+
+      assert('error' in result);
+      assert.strictEqual(
+        result.error,
+        'Kan niet dezelfde regel met zichzelf verwisselen',
+      );
     });
 
     it('should reject swap with missing rule A', async () => {
       const constraintIdB = await createTestConstraint(testDietTypeId, 60);
-      const ruleIdA = 'db:diet_category_constraints:00000000-0000-0000-0000-000000000000:0';
+      const ruleIdA =
+        'db:diet_category_constraints:00000000-0000-0000-0000-000000000000:0';
       const ruleIdB = `db:diet_category_constraints:${constraintIdB}:0`;
-      
+
       const result = await swapGuardRailRulePriorityAction(ruleIdA, ruleIdB);
-      
-      assert(result.error?.includes('Regel A niet gevonden'));
+
+      assert(
+        'error' in result && result.error.includes('Regel A niet gevonden'),
+      );
     });
 
     it('should reject swap with missing rule B', async () => {
       const constraintIdA = await createTestConstraint(testDietTypeId, 50);
       const ruleIdA = `db:diet_category_constraints:${constraintIdA}:0`;
-      const ruleIdB = 'db:diet_category_constraints:00000000-0000-0000-0000-000000000000:0';
-      
+      const ruleIdB =
+        'db:diet_category_constraints:00000000-0000-0000-0000-000000000000:0';
+
       const result = await swapGuardRailRulePriorityAction(ruleIdA, ruleIdB);
-      
-      assert(result.error?.includes('Regel B niet gevonden'));
+
+      assert(
+        'error' in result && result.error.includes('Regel B niet gevonden'),
+      );
     });
 
     it('should reject swap between different source types', async () => {
       const constraintId = await createTestConstraint(testDietTypeId, 50);
       const recipeRuleId = await createTestRecipeRule(testDietTypeId, 60);
-      
+
       const ruleIdA = `db:diet_category_constraints:${constraintId}:0`;
       const ruleIdB = `db:recipe_adaptation_rules:${recipeRuleId}`;
-      
+
       const result = await swapGuardRailRulePriorityAction(ruleIdA, ruleIdB);
-      
-      assert(result.error?.includes('Kan alleen regels van hetzelfde type verwisselen'));
+
+      assert(
+        'error' in result &&
+          result.error.includes(
+            'Kan alleen regels van hetzelfde type verwisselen',
+          ),
+      );
     });
 
     it('should reject swap between different diets', async () => {
       const otherDietId = await createTestDietType(`other_diet_${Date.now()}`);
-      
+
       try {
         const constraintIdA = await createTestConstraint(testDietTypeId, 50);
         const constraintIdB = await createTestConstraint(otherDietId, 60);
-        
+
         const ruleIdA = `db:diet_category_constraints:${constraintIdA}:0`;
         const ruleIdB = `db:diet_category_constraints:${constraintIdB}:0`;
-        
+
         const result = await swapGuardRailRulePriorityAction(ruleIdA, ruleIdB);
-        
-        assert.strictEqual(result.error, 'Regels moeten tot hetzelfde dieettype behoren');
+
+        assert('error' in result);
+        assert.strictEqual(
+          result.error,
+          'Regels moeten tot hetzelfde dieettype behoren',
+        );
       } finally {
         await cleanupTestData(otherDietId);
       }
@@ -257,24 +283,25 @@ describe('swapGuardRailRulePriorityAction', () => {
     it('should swap priorities for diet_category_constraints', async () => {
       const constraintIdA = await createTestConstraint(testDietTypeId, 50);
       const constraintIdB = await createTestConstraint(testDietTypeId, 80);
-      
+
       const ruleIdA = `db:diet_category_constraints:${constraintIdA}:0`;
       const ruleIdB = `db:diet_category_constraints:${constraintIdB}:0`;
-      
+
       const result = await swapGuardRailRulePriorityAction(ruleIdA, ruleIdB);
-      
+
+      assert('data' in result);
       assert.strictEqual(result.data, undefined);
-      
+
       // Verify swap by loading ruleset
       const ruleset = await loadGuardrailsRuleset({
         dietId: testDietTypeId,
         mode: 'recipe_adaptation',
         locale: 'nl',
       });
-      
+
       const ruleA = ruleset.rules.find((r) => r.id === ruleIdA);
       const ruleB = ruleset.rules.find((r) => r.id === ruleIdB);
-      
+
       assert(ruleA, 'Rule A should exist');
       assert(ruleB, 'Rule B should exist');
       assert.strictEqual(ruleA.priority, 80, 'Rule A should have priority 80');
@@ -284,24 +311,28 @@ describe('swapGuardRailRulePriorityAction', () => {
     it('should swap priorities for recipe_adaptation_rules', async () => {
       const ruleIdA = await createTestRecipeRule(testDietTypeId, 50);
       const ruleIdB = await createTestRecipeRule(testDietTypeId, 80);
-      
+
       const ruleIdAStr = `db:recipe_adaptation_rules:${ruleIdA}`;
       const ruleIdBStr = `db:recipe_adaptation_rules:${ruleIdB}`;
-      
-      const result = await swapGuardRailRulePriorityAction(ruleIdAStr, ruleIdBStr);
-      
+
+      const result = await swapGuardRailRulePriorityAction(
+        ruleIdAStr,
+        ruleIdBStr,
+      );
+
+      assert('data' in result);
       assert.strictEqual(result.data, undefined);
-      
+
       // Verify swap by loading ruleset
       const ruleset = await loadGuardrailsRuleset({
         dietId: testDietTypeId,
         mode: 'recipe_adaptation',
         locale: 'nl',
       });
-      
+
       const ruleA = ruleset.rules.find((r) => r.id === ruleIdAStr);
       const ruleB = ruleset.rules.find((r) => r.id === ruleIdBStr);
-      
+
       assert(ruleA, 'Rule A should exist');
       assert(ruleB, 'Rule B should exist');
       assert.strictEqual(ruleA.priority, 80, 'Rule A should have priority 80');
@@ -312,22 +343,23 @@ describe('swapGuardRailRulePriorityAction', () => {
       const constraintIdA = await createTestConstraint(testDietTypeId, 50);
       const constraintIdB = await createTestConstraint(testDietTypeId, 80);
       const constraintIdC = await createTestConstraint(testDietTypeId, 60);
-      
+
       const ruleIdA = `db:diet_category_constraints:${constraintIdA}:0`;
       const ruleIdB = `db:diet_category_constraints:${constraintIdB}:0`;
       const ruleIdC = `db:diet_category_constraints:${constraintIdC}:0`;
-      
+
       // Swap A and B (50 <-> 80)
       const result = await swapGuardRailRulePriorityAction(ruleIdA, ruleIdB);
+      assert('data' in result);
       assert.strictEqual(result.data, undefined);
-      
+
       // Load ruleset and verify ordering
       const ruleset = await loadGuardrailsRuleset({
         dietId: testDietTypeId,
         mode: 'recipe_adaptation',
         locale: 'nl',
       });
-      
+
       // Rules should be sorted by priority DESC
       const sortedRules = [...ruleset.rules].sort((a, b) => {
         if (a.priority !== b.priority) {
@@ -335,21 +367,21 @@ describe('swapGuardRailRulePriorityAction', () => {
         }
         return a.id.localeCompare(b.id);
       });
-      
+
       // Verify priorities after swap
       const ruleA = ruleset.rules.find((r) => r.id === ruleIdA);
       const ruleB = ruleset.rules.find((r) => r.id === ruleIdB);
       const ruleC = ruleset.rules.find((r) => r.id === ruleIdC);
-      
+
       assert.strictEqual(ruleA?.priority, 80);
       assert.strictEqual(ruleB?.priority, 50);
       assert.strictEqual(ruleC?.priority, 60);
-      
+
       // Verify ordering: A (80) > C (60) > B (50)
       const priorities = sortedRules
         .filter((r) => [ruleIdA, ruleIdB, ruleIdC].includes(r.id))
         .map((r) => r.priority);
-      
+
       assert.deepStrictEqual(priorities, [80, 60, 50]);
     });
   });

@@ -1,12 +1,12 @@
 /**
  * Meal Planner Shopping Types
- * 
+ *
  * Types for pantry coverage and shopping list generation based on meal plan ingredientRefs.
  */
 
 /**
  * Pantry availability for an ingredient
- * 
+ *
  * Supports both binary (isAvailable) and quantity-based (availableG) pantry models.
  * - If availableG is provided: use exact quantity
  * - Else if isAvailable === true: treat as "sufficient" (missingG = 0)

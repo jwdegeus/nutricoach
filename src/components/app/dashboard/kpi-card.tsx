@@ -1,5 +1,5 @@
-import { ArrowUp, ArrowDown, Minus } from "lucide-react";
-import { cn } from "@/src/lib/utils";
+import { ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { cn } from '@/src/lib/utils';
 
 export type KPICardProps = {
   name: string;
@@ -25,8 +25,8 @@ export function KPICard({ name, stat, delta, isLoading }: KPICardProps) {
     ? delta.value > 0
       ? ArrowUp
       : delta.value < 0
-      ? ArrowDown
-      : Minus
+        ? ArrowDown
+        : Minus
     : null;
 
   return (
@@ -36,10 +36,10 @@ export function KPICard({ name, stat, delta, isLoading }: KPICardProps) {
         {DeltaIcon && delta && (
           <DeltaIcon
             className={cn(
-              "h-4 w-4 shrink-0 ml-2",
-              delta.value > 0 && "text-green-600 dark:text-green-400",
-              delta.value < 0 && "text-red-600 dark:text-red-400",
-              delta.value === 0 && "text-gray-400 dark:text-gray-500"
+              'h-4 w-4 shrink-0 ml-2',
+              delta.value > 0 && 'text-green-600 dark:text-green-400',
+              delta.value < 0 && 'text-red-600 dark:text-red-400',
+              delta.value === 0 && 'text-gray-400 dark:text-gray-500',
             )}
           />
         )}
@@ -49,12 +49,14 @@ export function KPICard({ name, stat, delta, isLoading }: KPICardProps) {
       </dd>
       {delta && (
         <dd className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          <span className={cn(
-            delta.value > 0 && "text-green-600 dark:text-green-400",
-            delta.value < 0 && "text-red-600 dark:text-red-400",
-            delta.value === 0 && "text-gray-500 dark:text-gray-400"
-          )}>
-            {delta.value > 0 ? "+" : ""}
+          <span
+            className={cn(
+              delta.value > 0 && 'text-green-600 dark:text-green-400',
+              delta.value < 0 && 'text-red-600 dark:text-red-400',
+              delta.value === 0 && 'text-gray-500 dark:text-gray-400',
+            )}
+          >
+            {delta.value > 0 ? '+' : ''}
             {delta.value}% {delta.label}
           </span>
         </dd>

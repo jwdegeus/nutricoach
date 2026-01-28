@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/src/lib/supabase/server";
-import { storageService } from "@/src/lib/storage/storage.service";
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/src/lib/supabase/server';
+import { storageService } from '@/src/lib/storage/storage.service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,11 +14,11 @@ export async function POST(request: NextRequest) {
         {
           ok: false,
           error: {
-            code: "AUTH_ERROR",
-            message: "Je moet ingelogd zijn om afbeeldingen te uploaden",
+            code: 'AUTH_ERROR',
+            message: 'Je moet ingelogd zijn om afbeeldingen te uploaden',
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -30,11 +30,11 @@ export async function POST(request: NextRequest) {
         {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Meal ID, source en afbeelding zijn vereist",
+            code: 'VALIDATION_ERROR',
+            message: 'Meal ID, source en afbeelding zijn vereist',
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -45,11 +45,11 @@ export async function POST(request: NextRequest) {
         {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Ongeldig afbeelding formaat",
+            code: 'VALIDATION_ERROR',
+            message: 'Ongeldig afbeelding formaat',
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -59,31 +59,31 @@ export async function POST(request: NextRequest) {
     // Upload to storage
     const uploadResult = await storageService.uploadImage(
       base64Data,
-      filename || "recipe-image.jpg",
-      user.id
+      filename || 'recipe-image.jpg',
+      user.id,
     );
 
     // Update meal record
-    if (source === "custom") {
+    if (source === 'custom') {
       const { error } = await supabase
-        .from("custom_meals")
+        .from('custom_meals')
         .update({
           source_image_url: uploadResult.url,
           source_image_path: uploadResult.path,
         })
-        .eq("id", mealId)
-        .eq("user_id", user.id);
+        .eq('id', mealId)
+        .eq('user_id', user.id);
 
       if (error) {
         return NextResponse.json(
           {
             ok: false,
             error: {
-              code: "DB_ERROR",
+              code: 'DB_ERROR',
               message: error.message,
             },
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
     } else {
@@ -101,16 +101,19 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Error uploading image:", error);
+    console.error('Error uploading image:', error);
     return NextResponse.json(
       {
         ok: false,
         error: {
-          code: "UPLOAD_ERROR",
-          message: error instanceof Error ? error.message : "Onbekende fout bij uploaden",
+          code: 'UPLOAD_ERROR',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Onbekende fout bij uploaden',
         },
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

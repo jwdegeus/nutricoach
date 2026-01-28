@@ -1,11 +1,11 @@
 /**
  * Meal Planner Enrichment Types
- * 
+ *
  * Types for enriching meal plans with titles, instructions, and cook plans.
  * This is a presentation layer that adds cooking instructions without adding new ingredients.
  */
 
-import type { MealSlot } from "@/src/lib/diets";
+import type { MealSlot } from '@/src/lib/diets';
 
 /**
  * Enriched meal with title, instructions, and timing

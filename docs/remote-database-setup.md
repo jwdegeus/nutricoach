@@ -58,16 +58,19 @@ supabase db reset --linked
 ## Troubleshooting
 
 ### "Access token not provided"
+
 ```bash
 supabase login
 ```
 
 ### "Project not linked"
+
 ```bash
 supabase link --project-ref <your-project-ref>
 ```
 
 ### Migraties niet toegepast
+
 ```bash
 # Check status
 supabase db remote commit

@@ -1,19 +1,18 @@
 /**
  * Calendar View Component
- * 
+ *
  * Shows all meals from all meal plans organized by date
  */
 
-"use client";
+'use client';
 
-import { useState, useMemo, useEffect } from "react";
-import type { MealPlanRecord } from "@/src/lib/meal-plans/mealPlans.types";
-import type { Meal, MealPlanResponse } from "@/src/lib/diets";
-import { Badge } from "@/components/catalyst/badge";
-import { Button } from "@/components/catalyst/button";
-import { Lock, ChevronLeft, ChevronRight } from "lucide-react";
-import { MealDetailDialog } from "@/src/app/(app)/meal-plans/[planId]/components/MealDetailDialog";
-import { getMealPlanCalendarAction } from "@/src/app/(app)/meal-plans/actions/mealPlanCalendar.actions";
+import { useState, useMemo, useEffect } from 'react';
+import type { MealPlanRecord } from '@/src/lib/meal-plans/mealPlans.types';
+import type { Meal } from '@/src/lib/diets';
+import { Button } from '@/components/catalyst/button';
+import { Lock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MealDetailDialog } from '@/src/app/(app)/meal-plans/[planId]/components/MealDetailDialog';
+import { getMealPlanCalendarAction } from '@/src/app/(app)/meal-plans/actions/mealPlanCalendar.actions';
 
 type DayMeals = {
   date: string; // YYYY-MM-DD
@@ -36,9 +35,9 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
     planId: string;
     date: string;
   } | null>(null);
-  const [calendarData, setCalendarData] = useState<
-    Map<string, DayMeals>
-  >(new Map());
+  const [calendarData, setCalendarData] = useState<Map<string, DayMeals>>(
+    new Map(),
+  );
 
   // Load calendar data for all plans
   useEffect(() => {
@@ -58,15 +57,23 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
             };
 
             // Add meals from this plan
-            for (const { meal, canEdit, canDelete, isLocked, lockReason } of
-              calendarDay.meals) {
+            for (const {
+              meal,
+              canEdit,
+              canDelete,
+              isLocked,
+              lockReason,
+            } of calendarDay.meals) {
               existing.meals.push({
                 meal,
                 planId: plan.id,
-                planName: `${new Date(plan.dateFrom).toLocaleDateString("nl-NL", {
-                  day: "numeric",
-                  month: "short",
-                })} - ${plan.days} dagen`,
+                planName: `${new Date(plan.dateFrom).toLocaleDateString(
+                  'nl-NL',
+                  {
+                    day: 'numeric',
+                    month: 'short',
+                  },
+                )} - ${plan.days} dagen`,
                 canEdit,
                 canDelete,
                 isLocked,
@@ -100,12 +107,13 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; // Monday = 0
+    const startingDayOfWeek =
+      firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; // Monday = 0
 
     const days: Array<{
       date: Date;
       dateStr: string;
-      meals: DayMeals["meals"];
+      meals: DayMeals['meals'];
       hasLocks: boolean;
     }> = [];
 
@@ -113,7 +121,7 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
     for (let i = 0; i < startingDayOfWeek; i++) {
       days.push({
         date: new Date(year, month, -i),
-        dateStr: "",
+        dateStr: '',
         meals: [],
         hasLocks: false,
       });
@@ -122,7 +130,7 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
     // Add days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
-      const dateStr = date.toISOString().split("T")[0];
+      const dateStr = date.toISOString().split('T')[0];
       const dayData = calendarData.get(dateStr);
 
       days.push({
@@ -137,33 +145,36 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
   }, [currentMonth, calendarData]);
 
   const mealSlotLabels: Record<string, string> = {
-    breakfast: "Ontbijt",
-    lunch: "Lunch",
-    dinner: "Diner",
-    snack: "Snack",
+    breakfast: 'Ontbijt',
+    lunch: 'Lunch',
+    dinner: 'Diner',
+    snack: 'Snack',
   };
 
   const mealSlotColors: Record<string, string> = {
-    breakfast: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200",
-    lunch: "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200",
-    dinner: "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200",
-    snack: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200",
+    breakfast:
+      'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200',
+    lunch: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200',
+    dinner:
+      'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200',
+    snack:
+      'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200',
   };
 
-  const monthName = currentMonth.toLocaleDateString("nl-NL", {
-    month: "long",
-    year: "numeric",
+  const monthName = currentMonth.toLocaleDateString('nl-NL', {
+    month: 'long',
+    year: 'numeric',
   });
 
   const goToPreviousMonth = () => {
     setCurrentMonth(
-      new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1)
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1),
     );
   };
 
   const goToNextMonth = () => {
     setCurrentMonth(
-      new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1)
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1),
     );
   };
 
@@ -176,17 +187,17 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
       {/* Month navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button onClick={goToPreviousMonth} outline size="sm">
+          <Button onClick={goToPreviousMonth} outline className="text-sm">
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <h2 className="text-xl font-semibold min-w-[200px] text-center">
             {monthName}
           </h2>
-          <Button onClick={goToNextMonth} outline size="sm">
+          <Button onClick={goToNextMonth} outline className="text-sm">
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <Button onClick={goToToday} outline size="sm">
+        <Button onClick={goToToday} outline className="text-sm">
           Vandaag
         </Button>
       </div>
@@ -195,7 +206,7 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
       <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         {/* Day headers */}
         <div className="grid grid-cols-7 bg-zinc-50 dark:bg-zinc-900/50">
-          {["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"].map((day) => (
+          {['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'].map((day) => (
             <div
               key={day}
               className="p-3 text-center text-sm font-medium text-zinc-700 dark:text-zinc-300 border-r border-zinc-200 dark:border-zinc-800 last:border-r-0"
@@ -209,16 +220,17 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
         <div className="grid grid-cols-7">
           {monthDays.map((day, index) => {
             const isToday =
-              day.dateStr === new Date().toISOString().split("T")[0];
-            const isCurrentMonth = day.date.getMonth() === currentMonth.getMonth();
+              day.dateStr === new Date().toISOString().split('T')[0];
+            const isCurrentMonth =
+              day.date.getMonth() === currentMonth.getMonth();
 
             return (
               <div
                 key={index}
                 className={`
                   min-h-[120px] border-r border-b border-zinc-200 dark:border-zinc-800
-                  ${isCurrentMonth ? "bg-white dark:bg-zinc-900" : "bg-zinc-50 dark:bg-zinc-950"}
-                  ${isToday ? "ring-2 ring-blue-500" : ""}
+                  ${isCurrentMonth ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-950'}
+                  ${isToday ? 'ring-2 ring-blue-500' : ''}
                   p-2
                 `}
               >
@@ -228,8 +240,8 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
                       <span
                         className={`
                           text-sm font-medium
-                          ${isToday ? "text-blue-600 dark:text-blue-400" : "text-zinc-700 dark:text-zinc-300"}
-                          ${!isCurrentMonth ? "opacity-50" : ""}
+                          ${isToday ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-700 dark:text-zinc-300'}
+                          ${!isCurrentMonth ? 'opacity-50' : ''}
                         `}
                       >
                         {day.date.getDate()}
@@ -250,9 +262,9 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
                           className={`
                             w-full text-left px-2 py-1 rounded text-xs
                             transition-colors
-                            ${mealSlotColors[meal.slot] || "bg-zinc-100 dark:bg-zinc-800"}
+                            ${mealSlotColors[meal.slot] || 'bg-zinc-100 dark:bg-zinc-800'}
                             hover:opacity-80
-                            ${isLocked ? "opacity-60" : ""}
+                            ${isLocked ? 'opacity-60' : ''}
                           `}
                         >
                           <div className="font-medium truncate">
@@ -278,8 +290,8 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
           open={!!selectedMeal}
           onClose={() => setSelectedMeal(null)}
           meal={selectedMeal.meal}
-          enrichedMeal={null} // Could be loaded if needed
-          cookPlanDay={null} // Could be loaded if needed
+          enrichedMeal={undefined} // Could be loaded if needed
+          cookPlanDay={undefined} // Could be loaded if needed
           nevoFoodNamesByCode={{}}
         />
       )}

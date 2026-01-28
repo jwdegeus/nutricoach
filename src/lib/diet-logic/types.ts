@@ -6,7 +6,7 @@
  */
 
 /** Diet Logic actie: P0 drop, P1 force, P2 limit, P3 pass */
-export type DietLogic = "drop" | "force" | "limit" | "pass";
+export type DietLogic = 'drop' | 'force' | 'limit' | 'pass';
 
 /** Priority nummer voor sortering (P0=0 … P3=3) */
 export const DIET_LOGIC_PRIORITY: Record<DietLogic, number> = {
@@ -17,29 +17,32 @@ export const DIET_LOGIC_PRIORITY: Record<DietLogic, number> = {
 };
 
 /** Label per Diet Logic (voor Dieetregels UI) – Nederlandse vertalingen */
-export const DIET_LOGIC_LABELS: Record<DietLogic, { name: string; action: string; description: string }> = {
+export const DIET_LOGIC_LABELS: Record<
+  DietLogic,
+  { name: string; action: string; description: string }
+> = {
   drop: {
-    name: "DROP (Geblokkeerd)",
-    action: "Verwijder",
+    name: 'DROP (Geblokkeerd)',
+    action: 'Verwijder',
     description:
-      "Als een item in een geblokkeerde categorie zit voor het gekozen niveau → Maaltijd/recept ongeldig.",
+      'Als een item in een geblokkeerde categorie zit voor het gekozen niveau → Maaltijd/recept ongeldig.',
   },
   force: {
-    name: "FORCE (Verplicht)",
-    action: "Verplicht",
+    name: 'FORCE (Verplicht)',
+    action: 'Verplicht',
     description:
-      "AI moet een ingrediënt uit deze groep selecteren om aan het dag-quotum te voldoen.",
+      'AI moet een ingrediënt uit deze groep selecteren om aan het dag-quotum te voldoen.',
   },
   limit: {
-    name: "LIMIT (Beperkt)",
-    action: "Beperk",
+    name: 'LIMIT (Beperkt)',
+    action: 'Beperk',
     description:
-      "AI mag dit gebruiken, maar met een harde limiet (bijv. max 1x per dag of x gram).",
+      'AI mag dit gebruiken, maar met een harde limiet (bijv. max 1x per dag of x gram).',
   },
   pass: {
-    name: "PASS (Toegestaan)",
-    action: "Optioneel",
-    description: "Vrije invulling op basis van caloriebehoefte en smaak.",
+    name: 'PASS (Toegestaan)',
+    action: 'Optioneel',
+    description: 'Vrije invulling op basis van caloriebehoefte en smaak.',
   },
 };
 
@@ -56,7 +59,7 @@ export type DietLogicConstraint = {
   minPerWeek: number | null;
   maxPerDay: number | null;
   maxPerWeek: number | null;
-  strictness: "hard" | "soft";
+  strictness: 'hard' | 'soft';
   isActive: boolean;
   /** 1 = hoogst, 65500 = laagst. Gebruikt voor conflictresolutie wanneer één ingrediënt onder meerdere regels valt. */
   priority: number;
@@ -107,7 +110,12 @@ export type DietLogicPhaseResult = {
   /** Soft-overtredingen (waarschuwing, fase niet gefaald) */
   warnings?: string[];
   /** Fase 2: welke FORCE-quota nog niet gehaald */
-  forceDeficits?: Array<{ categoryCode: string; categoryNameNl: string; minPerDay?: number; minPerWeek?: number }>;
+  forceDeficits?: Array<{
+    categoryCode: string;
+    categoryNameNl: string;
+    minPerDay?: number;
+    minPerWeek?: number;
+  }>;
   /** Fase 3: welke LIMIT-overschrijdingen */
   limitExcesses?: Array<{
     categoryCode: string;

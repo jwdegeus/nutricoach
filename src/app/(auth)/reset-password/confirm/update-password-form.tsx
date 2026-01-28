@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { useState, useTransition } from "react";
-import { updatePassword } from "../../actions";
-import { Button } from "@/components/catalyst/button";
-import { Input } from "@/components/catalyst/input";
-import { Field, Label, Description } from "@/components/catalyst/fieldset";
+import { useState, useTransition } from 'react';
+import { updatePassword } from '../../actions';
+import { Button } from '@/components/catalyst/button';
+import { Input } from '@/components/catalyst/input';
+import { Field, Label, Description } from '@/components/catalyst/fieldset';
 
 export function UpdatePasswordForm() {
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export function UpdatePasswordForm() {
       </Field>
 
       <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? "Wachtwoord bijwerken..." : "Wachtwoord bijwerken"}
+        {isPending ? 'Wachtwoord bijwerken...' : 'Wachtwoord bijwerken'}
       </Button>
     </form>
   );

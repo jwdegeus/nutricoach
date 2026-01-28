@@ -1,10 +1,16 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 // Recipe thumbnail component with placeholder
-function RecipeThumbnail({ imageUrl, alt }: { imageUrl: string | null; alt: string }) {
+function RecipeThumbnail({
+  imageUrl,
+  alt,
+}: {
+  imageUrl: string | null;
+  alt: string;
+}) {
   const [imageError, setImageError] = useState(false);
 
   if (!imageUrl || imageError) {
@@ -24,8 +30,7 @@ function RecipeThumbnail({ imageUrl, alt }: { imageUrl: string | null; alt: stri
     />
   );
 }
-import { Badge } from "@/components/catalyst/badge";
-import { Button } from "@/components/catalyst/button";
+import { Badge } from '@/components/catalyst/badge';
 import {
   Dropdown,
   DropdownButton,
@@ -33,7 +38,7 @@ import {
   DropdownItem,
   DropdownSection,
   DropdownDivider,
-} from "@/components/catalyst/dropdown";
+} from '@/components/catalyst/dropdown';
 import {
   Table,
   TableBody,
@@ -41,7 +46,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/catalyst/table";
+} from '@/components/catalyst/table';
 import {
   Pagination,
   PaginationGap,
@@ -49,7 +54,7 @@ import {
   PaginationNext,
   PaginationPage,
   PaginationPrevious,
-} from "@/components/catalyst/pagination";
+} from '@/components/catalyst/pagination';
 import {
   ClockIcon,
   UserGroupIcon,
@@ -61,18 +66,23 @@ import {
   PlusIcon,
   TagIcon,
   PhotoIcon,
-} from "@heroicons/react/20/solid";
-import { logMealConsumptionAction, updateMealDietTypeAction, deleteMealAction } from "../actions/meals.actions";
-import { SelectDietTypeDialog } from "./SelectDietTypeDialog";
-import { RecipeRatingDialog } from "./RecipeRatingDialog";
-import { ConfirmDialog } from "@/components/catalyst/confirm-dialog";
-import { StarIcon } from "@heroicons/react/20/solid";
-import type { CustomMealRecord } from "@/src/lib/custom-meals/customMeals.service";
-import type { MealSlot } from "@/src/lib/diets";
-import { getRecipeRatingAction } from "../actions/meals.actions";
-import type { RecipeComplianceResult } from "../actions/recipe-compliance.actions";
+} from '@heroicons/react/20/solid';
+import {
+  logMealConsumptionAction,
+  updateMealDietTypeAction,
+  deleteMealAction,
+} from '../actions/meals.actions';
+import { SelectDietTypeDialog } from './SelectDietTypeDialog';
+import { RecipeRatingDialog } from './RecipeRatingDialog';
+import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
+import { StarIcon } from '@heroicons/react/20/solid';
+import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
+import type { MealSlot } from '@/src/lib/diets';
+import type { RecipeComplianceResult } from '../actions/recipe-compliance.actions';
 
-type MealItem = (CustomMealRecord & { source: "custom" }) | (any & { source: "gemini" });
+type MealItem =
+  | (CustomMealRecord & { source: 'custom' })
+  | (any & { source: 'gemini' });
 
 type RecipesListProps = {
   meals: MealItem[];
@@ -83,17 +93,28 @@ type RecipesListProps = {
   /** Compliance scores per meal id (0–100% volgens dieetregels) */
   complianceScores?: Record<string, RecipeComplianceResult>;
   onPageChange?: (page: number) => void;
-  onConsumptionLogged?: (mealId: string, source: "custom" | "gemini") => void;
-  onDietTypeUpdated?: (mealId: string, source: "custom" | "gemini", dietTypeName: string | null) => void;
-  onMealDeleted?: (mealId: string, source: "custom" | "gemini") => void;
-  onRatingUpdated?: (mealId: string, source: "custom" | "gemini", rating: number | null) => void;
+  onConsumptionLogged?: (mealId: string, source: 'custom' | 'gemini') => void;
+  onDietTypeUpdated?: (
+    mealId: string,
+    source: 'custom' | 'gemini',
+    dietTypeName: string | null,
+  ) => void;
+  onMealDeleted?: (mealId: string, source: 'custom' | 'gemini') => void;
+  onRatingUpdated?: (
+    mealId: string,
+    source: 'custom' | 'gemini',
+    rating: number | null,
+  ) => void;
 };
 
 // Helper function to generate pagination page numbers
-function generatePaginationPages(currentPage: number, totalPages: number): (number | 'gap')[] {
+function generatePaginationPages(
+  currentPage: number,
+  totalPages: number,
+): (number | 'gap')[] {
   const pages: (number | 'gap')[] = [];
   const maxVisiblePages = 7; // Show up to 7 page numbers
-  
+
   if (totalPages <= maxVisiblePages) {
     // Show all pages if total is less than max
     for (let i = 1; i <= totalPages; i++) {
@@ -102,7 +123,7 @@ function generatePaginationPages(currentPage: number, totalPages: number): (numb
   } else {
     // Always show first page
     pages.push(1);
-    
+
     if (currentPage <= 4) {
       // Near the beginning: show 1, 2, 3, 4, 5, gap, last
       for (let i = 2; i <= 5; i++) {
@@ -126,40 +147,49 @@ function generatePaginationPages(currentPage: number, totalPages: number): (numb
       pages.push(totalPages);
     }
   }
-  
+
   return pages;
 }
 
 function ComplianceScoreBadge({ score }: { score: RecipeComplianceResult }) {
   if (score.noRulesConfigured) {
     return (
-      <Badge color="zinc" className="text-xs" title="Geen dieetregels geconfigureerd voor dit dieet">
+      <Badge
+        color="zinc"
+        className="text-xs"
+        title="Geen dieetregels geconfigureerd voor dit dieet"
+      >
         N.v.t.
       </Badge>
     );
   }
   const p = score.scorePercent;
-  const color =
-    p >= 80 ? "green" : p >= 50 ? "amber" : p >= 20 ? "red" : "red";
+  const color = p >= 80 ? 'green' : p >= 50 ? 'amber' : p >= 20 ? 'red' : 'red';
   return (
-    <Badge color={color} className="font-mono text-xs" title={score.ok ? "Voldoet aan dieetregels" : "Schendt één of meer dieetregels"}>
+    <Badge
+      color={color}
+      className="font-mono text-xs"
+      title={
+        score.ok ? 'Voldoet aan dieetregels' : 'Schendt één of meer dieetregels'
+      }
+    >
       {p}%
     </Badge>
   );
 }
 
-export function RecipesList({ 
-  meals, 
+export function RecipesList({
+  meals,
   totalItems,
   currentPage = 1,
   totalPages = 1,
-  itemsPerPage = 15,
+  itemsPerPage: _itemsPerPage = 15,
   complianceScores = {},
   onPageChange,
-  onConsumptionLogged, 
-  onDietTypeUpdated, 
-  onMealDeleted, 
-  onRatingUpdated 
+  onConsumptionLogged,
+  onDietTypeUpdated,
+  onMealDeleted,
+  onRatingUpdated,
 }: RecipesListProps) {
   const router = useRouter();
   const [loggingMealId, setLoggingMealId] = useState<string | null>(null);
@@ -181,8 +211,8 @@ export function RecipesList({
 
     try {
       const result = await logMealConsumptionAction({
-        customMealId: meal.source === "custom" ? meal.id : undefined,
-        mealHistoryId: meal.source === "gemini" ? meal.id : undefined,
+        customMealId: meal.source === 'custom' ? meal.id : undefined,
+        mealHistoryId: meal.source === 'gemini' ? meal.id : undefined,
         mealName: meal.name || meal.meal_name,
         mealSlot: (meal.mealSlot || meal.meal_slot) as MealSlot,
       });
@@ -196,7 +226,9 @@ export function RecipesList({
         alert(`Fout: ${result.error.message}`);
       }
     } catch (error) {
-      alert(`Fout: ${error instanceof Error ? error.message : "Unknown error"}`);
+      alert(
+        `Fout: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     } finally {
       setLoggingMealId(null);
     }
@@ -204,28 +236,30 @@ export function RecipesList({
 
   const formatMealSlot = (slot: string) => {
     const slotMap: Record<string, string> = {
-      breakfast: "Ontbijt",
-      lunch: "Lunch",
-      dinner: "Diner",
-      snack: "Snack",
-      smoothie: "Smoothie",
+      breakfast: 'Ontbijt',
+      lunch: 'Lunch',
+      dinner: 'Diner',
+      snack: 'Snack',
+      smoothie: 'Smoothie',
     };
     return slotMap[slot] || slot;
   };
 
-  const formatDietTypeName = (dietKey: string | null | undefined): string | null => {
+  const formatDietTypeName = (
+    dietKey: string | null | undefined,
+  ): string | null => {
     if (!dietKey) return null;
     // Replace underscores with spaces and capitalize first letter of each word
     return dietKey
-      .replace(/_/g, " ")
-      .split(" ")
+      .replace(/_/g, ' ')
+      .split(' ')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(" ");
+      .join(' ');
   };
 
   const handleView = (meal: MealItem) => {
-    if (!meal.id || meal.id === "undefined") {
-      alert("Recept ID ontbreekt");
+    if (!meal.id || meal.id === 'undefined') {
+      alert('Recept ID ontbreekt');
       return;
     }
     router.push(`/recipes/${meal.id}?source=${meal.source}`);
@@ -258,7 +292,9 @@ export function RecipesList({
         setDeleteDialogOpen(false);
       }
     } catch (error) {
-      alert(`Fout: ${error instanceof Error ? error.message : "Unknown error"}`);
+      alert(
+        `Fout: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
       setDeleteDialogOpen(false);
     } finally {
       setIsDeleting(false);
@@ -267,7 +303,7 @@ export function RecipesList({
 
   const handleAddToMealPlan = (meal: MealItem) => {
     // TODO: Implement add to meal plan functionality
-    console.log("Add to meal plan:", meal.id);
+    console.log('Add to meal plan:', meal.id);
   };
 
   const handleRateRecipe = (meal: MealItem) => {
@@ -299,23 +335,28 @@ export function RecipesList({
         alert(`Fout: ${result.error.message}`);
       }
     } catch (error) {
-      alert(`Fout: ${error instanceof Error ? error.message : "Unknown error"}`);
+      alert(
+        `Fout: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     } finally {
       setSelectedMeal(null);
     }
   };
 
   // Filter out invalid meals
-  const validMeals = meals.filter((meal) => meal.id && meal.id !== "undefined");
-  
+  const validMeals = meals.filter((meal) => meal.id && meal.id !== 'undefined');
+
   // Check if there are no meals at all (not just on this page)
-  const hasNoMeals = (totalItems !== undefined && totalItems === 0) || (totalItems === undefined && validMeals.length === 0);
-  
+  const hasNoMeals =
+    (totalItems !== undefined && totalItems === 0) ||
+    (totalItems === undefined && validMeals.length === 0);
+
   if (hasNoMeals) {
     return (
       <div className="text-center py-12">
         <p className="text-zinc-500 dark:text-zinc-400">
-          Nog geen recepten. Voeg je eerste recept toe via een foto, screenshot of bestand.
+          Nog geen recepten. Voeg je eerste recept toe via een foto, screenshot
+          of bestand.
         </p>
       </div>
     );
@@ -342,155 +383,194 @@ export function RecipesList({
                 <TableHeader className="w-0"></TableHeader>
                 <TableHeader>Naam</TableHeader>
                 <TableHeader className="whitespace-nowrap">Slot</TableHeader>
-                <TableHeader className="whitespace-nowrap">Bereidingstijd</TableHeader>
+                <TableHeader className="whitespace-nowrap">
+                  Bereidingstijd
+                </TableHeader>
                 <TableHeader className="whitespace-nowrap">Porties</TableHeader>
-                <TableHeader className="whitespace-nowrap">Gebruikt</TableHeader>
-                <TableHeader className="whitespace-nowrap">Beoordeling</TableHeader>
-                <TableHeader className="whitespace-nowrap">Compliance</TableHeader>
+                <TableHeader className="whitespace-nowrap">
+                  Gebruikt
+                </TableHeader>
+                <TableHeader className="whitespace-nowrap">
+                  Beoordeling
+                </TableHeader>
+                <TableHeader className="whitespace-nowrap">
+                  Compliance
+                </TableHeader>
                 <TableHeader className="relative w-0">
                   <span className="sr-only">Acties</span>
                 </TableHeader>
               </TableRow>
             </TableHead>
-        <TableBody>
-          {validMeals.map((meal) => {
-            const imageUrl = meal.sourceImageUrl || meal.source_image_url || null;
-            return (
-              <TableRow key={meal.id} href={`/recipes/${meal.id}?source=${meal.source}`}>
-              <TableCell>
-                <RecipeThumbnail imageUrl={imageUrl} alt={meal.name || meal.meal_name || "Recept"} />
-              </TableCell>
-              <TableCell className="font-medium min-w-[180px]">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span>{meal.name || meal.meal_name}</span>
-                  {formatDietTypeName(meal.dietKey || meal.diet_key) && (
-                    <Badge color="green" className="text-xs">
-                      {formatDietTypeName(meal.dietKey || meal.diet_key)}
-                    </Badge>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell className="capitalize whitespace-nowrap text-sm">
-                {formatMealSlot(meal.mealSlot || meal.meal_slot)}
-              </TableCell>
-              <TableCell className="whitespace-nowrap">
-                {meal.mealData?.prepTime ? (
-                  <div className="flex items-center gap-1">
-                    <ClockIcon className="h-3.5 w-3.5 text-zinc-500" />
-                    <span className="text-sm">{meal.mealData.prepTime} min</span>
-                  </div>
-                ) : (
-                  <span className="text-zinc-400 text-sm">-</span>
-                )}
-              </TableCell>
-              <TableCell className="whitespace-nowrap">
-                {meal.mealData?.servings ? (
-                  <div className="flex items-center gap-1">
-                    <UserGroupIcon className="h-3.5 w-3.5 text-zinc-500" />
-                    <span className="text-sm">{meal.mealData.servings}</span>
-                  </div>
-                ) : (
-                  <span className="text-zinc-400 text-sm">-</span>
-                )}
-              </TableCell>
-              <TableCell className="whitespace-nowrap">
-                {meal.source === "custom" ? (
-                  <div className="flex items-center gap-1">
-                    <CheckIcon className="h-3.5 w-3.5 text-green-600" />
-                    <span className="text-sm">{meal.consumptionCount || 0}x</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1">
-                    <CheckIcon className="h-3.5 w-3.5 text-green-600" />
-                    <span className="text-sm">{meal.usage_count || 0}x</span>
-                  </div>
-                )}
-              </TableCell>
-              <TableCell className="whitespace-nowrap">
-                {meal.userRating || meal.user_rating ? (
-                  <div className="flex items-center gap-0.5">
-                    <div className="flex gap-0.5">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <StarIcon
-                          key={star}
-                          className={`h-3.5 w-3.5 ${
-                            star <= (meal.userRating || meal.user_rating || 0)
-                              ? "text-yellow-400 fill-yellow-400"
-                              : "text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700"
-                          }`}
+            <TableBody>
+              {validMeals.map((meal) => {
+                const imageUrl =
+                  meal.sourceImageUrl || meal.source_image_url || null;
+                return (
+                  <TableRow
+                    key={meal.id}
+                    href={`/recipes/${meal.id}?source=${meal.source}`}
+                  >
+                    <TableCell>
+                      <RecipeThumbnail
+                        imageUrl={imageUrl}
+                        alt={meal.name || meal.meal_name || 'Recept'}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium min-w-[180px]">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span>{meal.name || meal.meal_name}</span>
+                        {formatDietTypeName(meal.dietKey || meal.diet_key) && (
+                          <Badge color="green" className="text-xs">
+                            {formatDietTypeName(meal.dietKey || meal.diet_key)}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="capitalize whitespace-nowrap text-sm">
+                      {formatMealSlot(meal.mealSlot || meal.meal_slot)}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {meal.mealData?.prepTime ? (
+                        <div className="flex items-center gap-1">
+                          <ClockIcon className="h-3.5 w-3.5 text-zinc-500" />
+                          <span className="text-sm">
+                            {meal.mealData.prepTime} min
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-zinc-400 text-sm">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {meal.mealData?.servings ? (
+                        <div className="flex items-center gap-1">
+                          <UserGroupIcon className="h-3.5 w-3.5 text-zinc-500" />
+                          <span className="text-sm">
+                            {meal.mealData.servings}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-zinc-400 text-sm">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {meal.source === 'custom' ? (
+                        <div className="flex items-center gap-1">
+                          <CheckIcon className="h-3.5 w-3.5 text-green-600" />
+                          <span className="text-sm">
+                            {meal.consumptionCount || 0}x
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <CheckIcon className="h-3.5 w-3.5 text-green-600" />
+                          <span className="text-sm">
+                            {meal.usage_count || 0}x
+                          </span>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {meal.userRating || meal.user_rating ? (
+                        <div className="flex items-center gap-0.5">
+                          <div className="flex gap-0.5">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <StarIcon
+                                key={star}
+                                className={`h-3.5 w-3.5 ${
+                                  star <=
+                                  (meal.userRating || meal.user_rating || 0)
+                                    ? 'text-yellow-400 fill-yellow-400'
+                                    : 'text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-xs text-zinc-600 dark:text-zinc-400 ml-0.5">
+                            {meal.userRating || meal.user_rating}/5
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-zinc-400 text-sm">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {complianceScores[meal.id] ? (
+                        <ComplianceScoreBadge
+                          score={complianceScores[meal.id]}
                         />
-                      ))}
-                    </div>
-                    <span className="text-xs text-zinc-600 dark:text-zinc-400 ml-0.5">
-                      {meal.userRating || meal.user_rating}/5
-                    </span>
-                  </div>
-                ) : (
-                  <span className="text-zinc-400 text-sm">-</span>
-                )}
-              </TableCell>
-              <TableCell className="whitespace-nowrap">
-                {complianceScores[meal.id] ? (
-                  <ComplianceScoreBadge score={complianceScores[meal.id]} />
-                ) : (
-                  <span className="text-zinc-400 text-sm">-</span>
-                )}
-              </TableCell>
-              <TableCell>
-                <Dropdown>
-                  <DropdownButton plain>
-                    <EllipsisVerticalIcon />
-                    <span className="sr-only">Acties</span>
-                  </DropdownButton>
-                  <DropdownMenu anchor="bottom end">
-                    <DropdownSection>
-                      <DropdownItem onClick={() => handleView(meal)}>
-                        <EyeIcon data-slot="icon" />
-                        <span>Bekijken</span>
-                      </DropdownItem>
-                      <DropdownItem onClick={() => handleLogConsumption(meal)} disabled={!!loggingMealId}>
-                        <CalendarIcon data-slot="icon" />
-                        <span>{loggingMealId === meal.id ? "Loggen..." : "Log consumptie"}</span>
-                      </DropdownItem>
-                    </DropdownSection>
-                    <DropdownDivider />
-                    <DropdownSection>
-                      <DropdownItem onClick={() => handleAddToMealPlan(meal)}>
-                        <PlusIcon data-slot="icon" />
-                        <span>Toevoegen aan receptenplan</span>
-                      </DropdownItem>
-                    <DropdownItem onClick={() => handleLabelDietType(meal)}>
-                      <TagIcon data-slot="icon" />
-                      <span>Label met dieettype</span>
-                    </DropdownItem>
-                    <DropdownItem onClick={() => handleRateRecipe(meal)}>
-                      <StarIcon data-slot="icon" />
-                      <span>Beoordelen</span>
-                    </DropdownItem>
-                      <DropdownItem 
-                        onClick={() => handleDelete(meal)}
-                        className="text-red-600 data-focus:text-white data-focus:bg-red-600 dark:text-red-400"
-                      >
-                        <TrashIcon data-slot="icon" />
-                        <span>Verwijderen</span>
-                      </DropdownItem>
-                    </DropdownSection>
-                  </DropdownMenu>
-                </Dropdown>
-              </TableCell>
-            </TableRow>
-          );
-          })}
-        </TableBody>
+                      ) : (
+                        <span className="text-zinc-400 text-sm">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Dropdown>
+                        <DropdownButton plain>
+                          <EllipsisVerticalIcon />
+                          <span className="sr-only">Acties</span>
+                        </DropdownButton>
+                        <DropdownMenu anchor="bottom end">
+                          <DropdownSection>
+                            <DropdownItem onClick={() => handleView(meal)}>
+                              <EyeIcon data-slot="icon" />
+                              <span>Bekijken</span>
+                            </DropdownItem>
+                            <DropdownItem
+                              onClick={() => handleLogConsumption(meal)}
+                              disabled={!!loggingMealId}
+                            >
+                              <CalendarIcon data-slot="icon" />
+                              <span>
+                                {loggingMealId === meal.id
+                                  ? 'Loggen...'
+                                  : 'Log consumptie'}
+                              </span>
+                            </DropdownItem>
+                          </DropdownSection>
+                          <DropdownDivider />
+                          <DropdownSection>
+                            <DropdownItem
+                              onClick={() => handleAddToMealPlan(meal)}
+                            >
+                              <PlusIcon data-slot="icon" />
+                              <span>Toevoegen aan receptenplan</span>
+                            </DropdownItem>
+                            <DropdownItem
+                              onClick={() => handleLabelDietType(meal)}
+                            >
+                              <TagIcon data-slot="icon" />
+                              <span>Label met dieettype</span>
+                            </DropdownItem>
+                            <DropdownItem
+                              onClick={() => handleRateRecipe(meal)}
+                            >
+                              <StarIcon data-slot="icon" />
+                              <span>Beoordelen</span>
+                            </DropdownItem>
+                            <DropdownItem
+                              onClick={() => handleDelete(meal)}
+                              className="text-red-600 data-focus:text-white data-focus:bg-red-600 dark:text-red-400"
+                            >
+                              <TrashIcon data-slot="icon" />
+                              <span>Verwijderen</span>
+                            </DropdownItem>
+                          </DropdownSection>
+                        </DropdownMenu>
+                      </Dropdown>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
           </Table>
         </div>
       </div>
-      
+
       {/* Pagination */}
       {totalItems !== undefined && totalPages > 1 && (
         <div className="mt-6 flex justify-center">
           <Pagination aria-label="Recepten paginering">
-            <PaginationPrevious 
+            <PaginationPrevious
               href={currentPage > 1 ? undefined : null}
               onClick={(e) => {
                 e.preventDefault();
@@ -502,25 +582,27 @@ export function RecipesList({
               Vorige
             </PaginationPrevious>
             <PaginationList>
-              {generatePaginationPages(currentPage, totalPages).map((page, index) => {
-                if (page === 'gap') {
-                  return <PaginationGap key={`gap-${index}`} />;
-                }
-                return (
-                  <PaginationPage
-                    key={page}
-                    current={page === currentPage}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (onPageChange && page !== currentPage) {
-                        onPageChange(page);
-                      }
-                    }}
-                  >
-                    {page}
-                  </PaginationPage>
-                );
-              })}
+              {generatePaginationPages(currentPage, totalPages).map(
+                (page, index) => {
+                  if (page === 'gap') {
+                    return <PaginationGap key={`gap-${index}`} />;
+                  }
+                  return (
+                    <PaginationPage
+                      key={page}
+                      current={page === currentPage}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (onPageChange && page !== currentPage) {
+                          onPageChange(page);
+                        }
+                      }}
+                    >
+                      {page}
+                    </PaginationPage>
+                  );
+                },
+              )}
             </PaginationList>
             <PaginationNext
               href={currentPage < totalPages ? undefined : null}
@@ -536,7 +618,7 @@ export function RecipesList({
           </Pagination>
         </div>
       )}
-      
+
       {selectedMeal && (
         <SelectDietTypeDialog
           open={dietTypeDialogOpen}
@@ -545,7 +627,9 @@ export function RecipesList({
             setSelectedMeal(null);
           }}
           onSelect={handleDietTypeSelected}
-          currentDietTypeName={selectedMeal.dietKey || selectedMeal.diet_key || null}
+          currentDietTypeName={
+            selectedMeal.dietKey || selectedMeal.diet_key || null
+          }
           mealName={selectedMeal.name || selectedMeal.meal_name}
         />
       )}

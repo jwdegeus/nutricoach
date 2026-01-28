@@ -1,13 +1,18 @@
-"use client";
+'use client';
 
-import { useState, useTransition } from "react";
-import { updatePassword } from "@/src/app/(auth)/actions";
-import { setCurrentUserAsAdmin } from "./actions/set-admin.action";
-import { Button } from "@/components/catalyst/button";
-import { Input } from "@/components/catalyst/input";
-import { Field, FieldGroup, Label, Description } from "@/components/catalyst/fieldset";
-import { Text } from "@/components/catalyst/text";
-import type { User } from "@supabase/supabase-js";
+import { useState, useTransition } from 'react';
+import { updatePassword } from '@/src/app/(auth)/actions';
+import { setCurrentUserAsAdmin } from './actions/set-admin.action';
+import { Button } from '@/components/catalyst/button';
+import { Input } from '@/components/catalyst/input';
+import {
+  Field,
+  FieldGroup,
+  Label,
+  Description,
+} from '@/components/catalyst/fieldset';
+import { Text } from '@/components/catalyst/text';
+import type { User } from '@supabase/supabase-js';
 
 interface SettingsFormProps {
   user: User;
@@ -50,7 +55,8 @@ export function SettingsForm({ user }: SettingsFormProps) {
             Wachtwoord wijzigen
           </h2>
           <Text className="mt-1">
-            Wijzig je wachtwoord om je account veilig te houden. Gebruik minimaal 6 tekens.
+            Wijzig je wachtwoord om je account veilig te houden. Gebruik
+            minimaal 6 tekens.
           </Text>
         </div>
         <form action={handlePasswordSubmit}>
@@ -84,7 +90,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
 
             <div className="flex justify-end">
               <Button type="submit" disabled={isPending}>
-                {isPending ? "Wachtwoord bijwerken..." : "Wachtwoord bijwerken"}
+                {isPending ? 'Wachtwoord bijwerken...' : 'Wachtwoord bijwerken'}
               </Button>
             </div>
           </FieldGroup>
@@ -96,9 +102,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
           <h2 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
             Account acties
           </h2>
-          <Text className="mt-1">
-            Beheer je account en sessies.
-          </Text>
+          <Text className="mt-1">Beheer je account en sessies.</Text>
         </div>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -119,13 +123,15 @@ export function SettingsForm({ user }: SettingsFormProps) {
                   if (result.error) {
                     setError(result.error);
                   } else if (result.success) {
-                    setSuccess("Je hebt nu admin rechten! Ververs de pagina om de admin functies te zien.");
+                    setSuccess(
+                      'Je hebt nu admin rechten! Ververs de pagina om de admin functies te zien.',
+                    );
                   }
                 });
               }}
               disabled={isPending}
             >
-              {isPending ? "Bezig..." : "Maak mij admin"}
+              {isPending ? 'Bezig...' : 'Maak mij admin'}
             </Button>
           </div>
           <div className="flex items-center justify-between">
@@ -137,9 +143,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
                 Verwijder permanent je account en alle bijbehorende gegevens.
               </p>
             </div>
-            <Button color="red">
-              Account verwijderen
-            </Button>
+            <Button color="red">Account verwijderen</Button>
           </div>
         </div>
       </div>

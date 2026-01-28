@@ -66,7 +66,7 @@ END $$;
 
 ```sql
 -- Check of een specifieke gebruiker admin is
-SELECT 
+SELECT
   u.email,
   ur.role
 FROM auth.users u
@@ -77,7 +77,7 @@ WHERE u.email = 'USER_EMAIL';
 ## Alle Admins Lijsten
 
 ```sql
-SELECT 
+SELECT
   u.email,
   u.created_at,
   ur.created_at as admin_since

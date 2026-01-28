@@ -1,18 +1,18 @@
-"use client";
+'use client';
 
-import dynamic from "next/dynamic";
+import dynamic from 'next/dynamic';
 
 const RecipeDetailPageClient = dynamic(
   () =>
-    import("./MealDetailPageClient").then((mod) => ({
+    import('./MealDetailPageClient').then((mod) => ({
       default: mod.RecipeDetailPageClient,
     })),
-  { ssr: false }
+  { ssr: false },
 );
 
 type Props = {
   mealId: string;
-  mealSource: "custom" | "gemini";
+  mealSource: 'custom' | 'gemini';
 };
 
 export function RecipeDetailPageClientLoader({ mealId, mealSource }: Props) {

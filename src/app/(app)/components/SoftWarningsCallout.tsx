@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { Badge } from "@/components/catalyst/badge";
-import { Text } from "@/components/catalyst/text";
-import { Link } from "@/components/catalyst/link";
-import { ExclamationTriangleIcon } from "@heroicons/react/20/solid";
-import { formatReasonForBadge } from "@/src/lib/guardrails-vnext/ui/reasonLabels";
+import { Badge } from '@/components/catalyst/badge';
+import { Text } from '@/components/catalyst/text';
+import { Link } from '@/components/catalyst/link';
+import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
+import { formatReasonForBadge } from '@/src/lib/guardrails-vnext/ui/reasonLabels';
 
 type SoftWarningsCalloutProps = {
   reasonCodes: string[];
@@ -14,14 +14,14 @@ type SoftWarningsCalloutProps = {
 
 /**
  * Soft Warnings Callout Component
- * 
+ *
  * Displays non-blocking warnings when guardrails detect soft constraint violations.
  * These warnings inform users but do not prevent actions from proceeding.
  */
 export function SoftWarningsCallout({
   reasonCodes,
   dietTypeId,
-  contentHash,
+  contentHash: _contentHash,
 }: SoftWarningsCalloutProps) {
   if (reasonCodes.length === 0) {
     return null;
@@ -43,9 +43,9 @@ export function SoftWarningsCallout({
               {displayReasonCodes.map((code, idx) => {
                 const { label, code: reasonCode } = formatReasonForBadge(code);
                 return (
-                  <Badge 
-                    key={idx} 
-                    color="amber" 
+                  <Badge
+                    key={idx}
+                    color="amber"
                     className="text-xs"
                     title={reasonCode}
                   >

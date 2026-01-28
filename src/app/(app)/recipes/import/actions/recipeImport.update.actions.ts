@@ -1,8 +1,8 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { z } from "zod";
-import type { GeminiExtractedRecipe } from "../recipeImport.gemini.schemas";
+import { createClient } from '@/src/lib/supabase/server';
+import { z } from 'zod';
+import type { GeminiExtractedRecipe } from '../recipeImport.gemini.schemas';
 
 /**
  * Action result type
@@ -12,7 +12,12 @@ type ActionResult<T> =
   | {
       ok: false;
       error: {
-        code: "AUTH_ERROR" | "VALIDATION_ERROR" | "DB_ERROR" | "NOT_FOUND" | "FORBIDDEN";
+        code:
+          | 'AUTH_ERROR'
+          | 'VALIDATION_ERROR'
+          | 'DB_ERROR'
+          | 'NOT_FOUND'
+          | 'FORBIDDEN';
         message: string;
       };
     };
@@ -21,30 +26,38 @@ type ActionResult<T> =
  * Update recipe import input schema
  */
 const updateRecipeImportInputSchema = z.object({
-  jobId: z.string().uuid("jobId must be a valid UUID"),
+  jobId: z.string().uuid('jobId must be a valid UUID'),
   updates: z.object({
     title: z.string().min(1).optional(),
     servings: z.number().positive().nullable().optional(),
-    ingredients: z.array(z.object({
-      name: z.string().min(1),
-      quantity: z.number().nullable().optional(),
-      unit: z.string().nullable().optional(),
-      note: z.string().nullable().optional(),
-    })).optional(),
-    instructions: z.array(z.object({
-      step: z.number().positive(),
-      text: z.string().min(1),
-    })).optional(),
+    ingredients: z
+      .array(
+        z.object({
+          name: z.string().min(1),
+          quantity: z.number().nullable().optional(),
+          unit: z.string().nullable().optional(),
+          note: z.string().nullable().optional(),
+        }),
+      )
+      .optional(),
+    instructions: z
+      .array(
+        z.object({
+          step: z.number().positive(),
+          text: z.string().min(1),
+        }),
+      )
+      .optional(),
   }),
 });
 
 /**
  * Update recipe import extracted data
- * 
+ *
  * Allows users to edit the extracted recipe before finalizing
  */
 export async function updateRecipeImportAction(
-  raw: unknown
+  raw: unknown,
 ): Promise<ActionResult<void>> {
   try {
     // Get authenticated user
@@ -57,8 +70,8 @@ export async function updateRecipeImportAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om recipe imports bij te werken",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om recipe imports bij te werken',
         },
       };
     }
@@ -71,40 +84,41 @@ export async function updateRecipeImportAction(
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
+          code: 'VALIDATION_ERROR',
           message:
             error instanceof Error
               ? error.message
-              : "Ongeldige input voor recipe import update",
+              : 'Ongeldige input voor recipe import update',
         },
       };
     }
 
     // Load job to check ownership and get current data
     const { data: job, error: loadError } = await supabase
-      .from("recipe_imports")
-      .select("extracted_recipe_json, status")
-      .eq("id", input.jobId)
-      .eq("user_id", user.id)
+      .from('recipe_imports')
+      .select('extracted_recipe_json, status')
+      .eq('id', input.jobId)
+      .eq('user_id', user.id)
       .single();
 
     if (loadError || !job) {
       return {
         ok: false,
         error: {
-          code: "NOT_FOUND",
-          message: "Recipe import job niet gevonden of geen toegang",
+          code: 'NOT_FOUND',
+          message: 'Recipe import job niet gevonden of geen toegang',
         },
       };
     }
 
     // Check status - only allow updates when ready_for_review
-    if (job.status !== "ready_for_review") {
+    if (job.status !== 'ready_for_review') {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Recept kan alleen worden bewerkt wanneer het klaar is voor review",
+          code: 'VALIDATION_ERROR',
+          message:
+            'Recept kan alleen worden bewerkt wanneer het klaar is voor review',
         },
       };
     }
@@ -116,8 +130,8 @@ export async function updateRecipeImportAction(
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Geen geëxtraheerd recept gevonden",
+          code: 'VALIDATION_ERROR',
+          message: 'Geen geëxtraheerd recept gevonden',
         },
       };
     }
@@ -156,19 +170,19 @@ export async function updateRecipeImportAction(
 
     // Update job with modified recipe
     const { error: updateError } = await supabase
-      .from("recipe_imports")
+      .from('recipe_imports')
       .update({
         extracted_recipe_json: updatedRecipe,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", input.jobId)
-      .eq("user_id", user.id);
+      .eq('id', input.jobId)
+      .eq('user_id', user.id);
 
     if (updateError) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: `Fout bij bijwerken recipe import: ${updateError.message}`,
         },
       };
@@ -179,15 +193,15 @@ export async function updateRecipeImportAction(
       data: undefined,
     };
   } catch (error) {
-    console.error("Unexpected error in updateRecipeImportAction:", error);
+    console.error('Unexpected error in updateRecipeImportAction:', error);
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
+        code: 'DB_ERROR',
         message:
           error instanceof Error
             ? error.message
-            : "Onbekende fout bij bijwerken recipe import",
+            : 'Onbekende fout bij bijwerken recipe import',
       },
     };
   }

@@ -1,11 +1,11 @@
 /**
  * Meal Planner Agent Service
- * 
+ *
  * End-to-end service for generating meal plans using Gemini AI
  * with structured output and Zod validation.
  */
 
-import { getGeminiClient } from "@/src/lib/ai/gemini/gemini.client";
+import { getGeminiClient } from '@/src/lib/ai/gemini/gemini.client';
 import {
   mealPlanRequestSchema,
   mealPlanResponseSchema,
@@ -18,28 +18,39 @@ import {
   type MealPlanDayResponse,
   type Meal,
   type MealResponse,
-} from "@/src/lib/diets";
-import { buildMealPlanPrompt, buildMealPlanDayPrompt, buildMealPrompt } from "./mealPlannerAgent.prompts";
-import { buildRepairPrompt } from "./mealPlannerAgent.repair";
+} from '@/src/lib/diets';
+import {
+  buildMealPlanPrompt,
+  buildMealPlanDayPrompt,
+  buildMealPrompt,
+} from './mealPlannerAgent.prompts';
+import { buildRepairPrompt } from './mealPlannerAgent.repair';
 import {
   validateHardConstraints,
   validateAndAdjustDayMacros,
   validateDayHardConstraints,
-} from "./mealPlannerAgent.validate";
+} from './mealPlannerAgent.validate';
 import {
   buildCandidatePool,
   type CandidatePool,
-} from "./mealPlannerAgent.tools";
-import { zodToJsonSchema } from "zod-to-json-schema";
+} from './mealPlannerAgent.tools';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 // vNext guard rails (shadow mode + enforcement) + Diet Logic (Dieetregels)
-import { loadRulesetWithDietLogic, evaluateGuardrails } from "@/src/lib/guardrails-vnext";
+import {
+  loadRulesetWithDietLogic,
+  evaluateGuardrails,
+} from '@/src/lib/guardrails-vnext';
 import {
   mapMealPlanToGuardrailsTargets,
   getMealPlanIngredientsPerDay,
-} from "@/src/lib/guardrails-vnext/adapters/meal-planner";
-import type { EvaluationContext, GuardDecision, GuardrailsRuleset } from "@/src/lib/guardrails-vnext/types";
-import { evaluateDietLogic } from "@/src/lib/diet-logic";
-import { AppError } from "@/src/lib/errors/app-error";
+} from '@/src/lib/guardrails-vnext/adapters/meal-planner';
+import type {
+  EvaluationContext,
+  GuardDecision,
+  GuardrailsRuleset,
+} from '@/src/lib/guardrails-vnext/types';
+import { evaluateDietLogic } from '@/src/lib/diet-logic';
+import { AppError } from '@/src/lib/errors/app-error';
 
 /**
  * Simple in-memory cache for candidate pools
@@ -58,9 +69,9 @@ const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
  */
 async function getCandidatePool(
   dietKey: string,
-  excludeTerms: string[]
+  excludeTerms: string[],
 ): Promise<CandidatePool> {
-  const cacheKey = `${dietKey}:${excludeTerms.sort().join(",")}`;
+  const cacheKey = `${dietKey}:${excludeTerms.sort().join(',')}`;
   const cached = candidatePoolCache.get(cacheKey);
 
   // Check if cache is valid
@@ -82,9 +93,9 @@ async function getCandidatePool(
 
 /**
  * Meal Planner Agent Service
- * 
+ *
  * Generates meal plans using Gemini AI with strict schema validation.
- * 
+ *
  * @example
  * ```ts
  * const service = new MealPlannerAgentService();
@@ -98,23 +109,26 @@ async function getCandidatePool(
 export class MealPlannerAgentService {
   /**
    * Generate a meal plan from raw input
-   * 
+   *
    * Validates input, builds prompt, calls Gemini API with schema,
    * validates output, and attempts one repair if needed.
-   * 
+   *
    * @param raw - Raw input (will be validated against MealPlanRequestSchema)
    * @param language - User language preference ('nl' or 'en'), defaults to 'nl'
    * @returns Validated MealPlanResponse
    * @throws Error if validation fails or API call fails after repair attempt
    */
-  async generateMealPlan(raw: unknown, language: 'nl' | 'en' = 'nl'): Promise<MealPlanResponse> {
+  async generateMealPlan(
+    raw: unknown,
+    language: 'nl' | 'en' = 'nl',
+  ): Promise<MealPlanResponse> {
     // Step 1: Validate input request
     let request: MealPlanRequest;
     try {
       request = mealPlanRequestSchema.parse(raw);
     } catch (error) {
       throw new Error(
-        `Invalid meal plan request: ${error instanceof Error ? error.message : "Unknown validation error"}`
+        `Invalid meal plan request: ${error instanceof Error ? error.message : 'Unknown validation error'}`,
       );
     }
 
@@ -130,7 +144,7 @@ export class MealPlannerAgentService {
     ];
     const candidates = await getCandidatePool(
       request.profile.dietKey,
-      excludeTerms
+      excludeTerms,
     );
 
     // Step 4: Build original prompt with candidates
@@ -143,8 +157,8 @@ export class MealPlannerAgentService {
 
     // Step 5: Convert Zod schema to JSON schema
     const jsonSchema = zodToJsonSchema(mealPlanResponseSchema, {
-      name: "MealPlanResponse",
-      target: "openApi3",
+      name: 'MealPlanResponse',
+      target: 'openApi3',
     });
 
     // Step 6: Generate attempt #1
@@ -155,11 +169,11 @@ export class MealPlannerAgentService {
         prompt: originalPrompt,
         jsonSchema,
         temperature: 0.4,
-        purpose: "plan",
+        purpose: 'plan',
       });
     } catch (error) {
       throw new Error(
-        `Failed to generate meal plan from Gemini API: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Failed to generate meal plan from Gemini API: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
 
@@ -167,23 +181,24 @@ export class MealPlannerAgentService {
     const firstAttemptResult = await this.parseAndValidate(
       rawJson,
       request,
-      rules
+      rules,
     );
 
     // Step 8: If successful, enforce vNext guard rails (if enabled). Bij FORCE-deficit: max 1 retry met deficit-hint in prompt.
     if (firstAttemptResult.success) {
-      const enforceVNext = process.env.ENFORCE_VNEXT_GUARDRAILS_MEAL_PLANNER === "true";
+      const enforceVNext =
+        process.env.ENFORCE_VNEXT_GUARDRAILS_MEAL_PLANNER === 'true';
       if (enforceVNext) {
         try {
           await this.enforceVNextMealPlannerGuardrails(
             firstAttemptResult.response!,
             request.profile.dietKey,
-            language
+            language,
           );
         } catch (guardError) {
           const forceDeficits =
             guardError instanceof AppError &&
-            guardError.code === "GUARDRAILS_VIOLATION" &&
+            guardError.code === 'GUARDRAILS_VIOLATION' &&
             guardError.guardrailsDetails?.forceDeficits;
           if (forceDeficits && forceDeficits.length > 0) {
             const retryPrompt = buildMealPlanPrompt({
@@ -191,7 +206,9 @@ export class MealPlannerAgentService {
               rules,
               candidates,
               language,
-              forceDeficitHint: { categoryNames: forceDeficits.map((d) => d.categoryNameNl) },
+              forceDeficitHint: {
+                categoryNames: forceDeficits.map((d) => d.categoryNameNl),
+              },
             });
             let retryRawJson: string;
             try {
@@ -199,19 +216,23 @@ export class MealPlannerAgentService {
                 prompt: retryPrompt,
                 jsonSchema,
                 temperature: 0.3,
-                purpose: "plan",
+                purpose: 'plan',
               });
             } catch {
               throw guardError;
             }
-            const retryResult = await this.parseAndValidate(retryRawJson, request, rules);
+            const retryResult = await this.parseAndValidate(
+              retryRawJson,
+              request,
+              rules,
+            );
             if (!retryResult.success) {
               throw guardError;
             }
             await this.enforceVNextMealPlannerGuardrails(
               retryResult.response!,
               request.profile.dietKey,
-              language
+              language,
             );
             return retryResult.response!;
           }
@@ -222,7 +243,7 @@ export class MealPlannerAgentService {
     }
 
     // Step 9: Repair attempt (max 1 attempt)
-    const issues = firstAttemptResult.issues.join("\n");
+    const issues = firstAttemptResult.issues.join('\n');
     const repairPrompt = buildRepairPrompt({
       originalPrompt,
       badOutput: rawJson,
@@ -237,11 +258,11 @@ export class MealPlannerAgentService {
         prompt: repairPrompt,
         jsonSchema,
         temperature: 0.2, // Lower temperature for more deterministic repair
-        purpose: "repair",
+        purpose: 'repair',
       });
     } catch (error) {
       throw new Error(
-        `Meal plan generation failed after repair attempt: API error - ${error instanceof Error ? error.message : "Unknown error"}`
+        `Meal plan generation failed after repair attempt: API error - ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
 
@@ -249,17 +270,18 @@ export class MealPlannerAgentService {
     const repairResult = await this.parseAndValidate(
       repairRawJson,
       request,
-      rules
+      rules,
     );
 
     // Step 11: If repair successful, enforce vNext guard rails (if enabled). Geen extra deficit-retry hier (max 1 deficit-retry per aanroep, die gebeurt na eerste poging).
     if (repairResult.success) {
-      const enforceVNext = process.env.ENFORCE_VNEXT_GUARDRAILS_MEAL_PLANNER === "true";
+      const enforceVNext =
+        process.env.ENFORCE_VNEXT_GUARDRAILS_MEAL_PLANNER === 'true';
       if (enforceVNext) {
         await this.enforceVNextMealPlannerGuardrails(
           repairResult.response!,
           request.profile.dietKey,
-          language
+          language,
         );
       }
       return repairResult.response!;
@@ -267,13 +289,13 @@ export class MealPlannerAgentService {
 
     // Step 12: Repair failed - throw error
     throw new Error(
-      `Meal plan generation failed after repair attempt: ${repairResult.issues.join("; ")}`
+      `Meal plan generation failed after repair attempt: ${repairResult.issues.join('; ')}`,
     );
   }
 
   /**
    * Parse JSON and validate against schema and hard constraints
-   * 
+   *
    * @param rawJson - Raw JSON string from API
    * @param request - Original meal plan request
    * @param rules - Diet rule set
@@ -282,7 +304,7 @@ export class MealPlannerAgentService {
   private async parseAndValidate(
     rawJson: string,
     request: MealPlanRequest,
-    rules: ReturnType<typeof deriveDietRuleSet>
+    rules: ReturnType<typeof deriveDietRuleSet>,
   ): Promise<{
     success: boolean;
     response?: MealPlanResponse;
@@ -296,7 +318,7 @@ export class MealPlannerAgentService {
       parsed = JSON.parse(rawJson);
     } catch (error) {
       issues.push(
-        `JSON parse error: ${error instanceof Error ? error.message : "Unknown parse error"}`
+        `JSON parse error: ${error instanceof Error ? error.message : 'Unknown parse error'}`,
       );
       return { success: false, issues };
     }
@@ -307,7 +329,7 @@ export class MealPlannerAgentService {
       response = mealPlanResponseSchema.parse(parsed);
     } catch (error) {
       issues.push(
-        `Schema validation error: ${error instanceof Error ? error.message : "Unknown validation error"}`
+        `Schema validation error: ${error instanceof Error ? error.message : 'Unknown validation error'}`,
       );
       return { success: false, issues };
     }
@@ -327,13 +349,20 @@ export class MealPlannerAgentService {
     }
 
     // Shadow mode: vNext guard rails evaluation (feature flag)
-    const useVNextGuardrails = process.env.USE_VNEXT_GUARDRAILS === "true";
+    const useVNextGuardrails = process.env.USE_VNEXT_GUARDRAILS === 'true';
     if (useVNextGuardrails) {
       try {
-        await this.evaluateVNextGuardrails(response, request, rules, constraintIssues);
+        await this.enforceVNextMealPlannerGuardrails(
+          response,
+          request.profile.dietKey,
+          'nl',
+        );
       } catch (error) {
         // Don't fail the request if vNext evaluation fails
-        console.error("[MealPlanner] vNext guard rails evaluation failed:", error);
+        console.error(
+          '[MealPlanner] vNext guard rails evaluation failed:',
+          error,
+        );
       }
     }
 
@@ -342,11 +371,11 @@ export class MealPlannerAgentService {
 
   /**
    * Generate a single day of meals
-   * 
+   *
    * Generates meals for one specific date. Supports minimal-change
    * objective if existingDay is provided. Uses deterministic macro
    * adjustment before repair attempts to reduce LLM calls.
-   * 
+   *
    * @param args - Day generation arguments
    * @returns Generated day with optional adjustments metadata
    */
@@ -372,7 +401,7 @@ export class MealPlannerAgentService {
     ];
     const candidates = await getCandidatePool(
       request.profile.dietKey,
-      excludeTerms
+      excludeTerms,
     );
 
     // Step 3: Build day prompt with minimal-change instructions if existingDay provided
@@ -387,8 +416,8 @@ export class MealPlannerAgentService {
 
     // Step 4: Convert Zod schema to JSON schema for single day
     const jsonSchema = zodToJsonSchema(mealPlanDayResponseSchema, {
-      name: "MealPlanDayResponse",
-      target: "openApi3",
+      name: 'MealPlanDayResponse',
+      target: 'openApi3',
     });
 
     // Step 5: Generate attempt #1
@@ -399,11 +428,11 @@ export class MealPlannerAgentService {
         prompt: dayPrompt,
         jsonSchema,
         temperature: 0.4,
-        purpose: "plan",
+        purpose: 'plan',
       });
     } catch (error) {
       throw new Error(
-        `Failed to generate meal plan day from Gemini API: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Failed to generate meal plan day from Gemini API: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
 
@@ -411,14 +440,15 @@ export class MealPlannerAgentService {
     let day: MealPlanDay;
     try {
       const parsed = JSON.parse(rawJson);
-      const dayResponse: MealPlanDayResponse = mealPlanDayResponseSchema.parse(parsed);
+      const dayResponse: MealPlanDayResponse =
+        mealPlanDayResponseSchema.parse(parsed);
       day = {
         date: dayResponse.date,
         meals: dayResponse.meals,
       };
     } catch (error) {
       throw new Error(
-        `Failed to parse meal plan day: ${error instanceof Error ? error.message : "Unknown parse error"}`
+        `Failed to parse meal plan day: ${error instanceof Error ? error.message : 'Unknown parse error'}`,
       );
     }
 
@@ -445,12 +475,12 @@ export class MealPlannerAgentService {
     // Step 8: If still has issues, attempt repair (max 1 attempt)
     if (validationResult.issues.length > 0) {
       const issues = validationResult.issues.map(
-        (issue) => `${issue.code}: ${issue.message} (path: ${issue.path})`
+        (issue) => `${issue.code}: ${issue.message} (path: ${issue.path})`,
       );
       const repairPrompt = buildRepairPrompt({
         originalPrompt: dayPrompt,
         badOutput: rawJson,
-        issues: issues.join("\n"),
+        issues: issues.join('\n'),
         responseJsonSchema: jsonSchema,
       });
 
@@ -461,25 +491,26 @@ export class MealPlannerAgentService {
           prompt: repairPrompt,
           jsonSchema,
           temperature: 0.2,
-          purpose: "repair",
+          purpose: 'repair',
         });
       } catch (error) {
         throw new Error(
-          `Meal plan day generation failed after repair attempt: API error - ${error instanceof Error ? error.message : "Unknown error"}`
+          `Meal plan day generation failed after repair attempt: API error - ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
       }
 
       // Parse repair attempt
       try {
         const parsed = JSON.parse(repairRawJson);
-        const dayResponse: MealPlanDayResponse = mealPlanDayResponseSchema.parse(parsed);
+        const dayResponse: MealPlanDayResponse =
+          mealPlanDayResponseSchema.parse(parsed);
         day = {
           date: dayResponse.date,
           meals: dayResponse.meals,
         };
       } catch (error) {
         throw new Error(
-          `Failed to parse repaired meal plan day: ${error instanceof Error ? error.message : "Unknown parse error"}`
+          `Failed to parse repaired meal plan day: ${error instanceof Error ? error.message : 'Unknown parse error'}`,
         );
       }
 
@@ -499,10 +530,10 @@ export class MealPlannerAgentService {
       // If still has issues after repair, throw error
       if (repairValidationResult.issues.length > 0) {
         const remainingIssues = repairValidationResult.issues.map(
-          (issue) => `${issue.code}: ${issue.message}`
+          (issue) => `${issue.code}: ${issue.message}`,
         );
         throw new Error(
-          `Meal plan day generation failed after repair attempt: ${remainingIssues.join("; ")}`
+          `Meal plan day generation failed after repair attempt: ${remainingIssues.join('; ')}`,
         );
       }
 
@@ -522,11 +553,11 @@ export class MealPlannerAgentService {
 
   /**
    * Generate a single meal (slot-only)
-   * 
+   *
    * Generates one meal for a specific date and slot. Supports minimal-change
    * objective if existingMeal is provided. Validates hard constraints and
    * optionally adjusts macros for calorie target.
-   * 
+   *
    * @param args - Meal generation arguments
    * @returns Generated meal with optional adjustments metadata
    */
@@ -547,7 +578,14 @@ export class MealPlannerAgentService {
     meal: Meal;
     adjustments?: Array<{ nevoCode: string; oldG: number; newG: number }>;
   }> {
-    const { request, date, mealSlot, existingMeal, constraints, language = 'nl' } = args;
+    const {
+      request,
+      date,
+      mealSlot,
+      existingMeal,
+      constraints,
+      language = 'nl',
+    } = args;
 
     // Step 1: Derive rules from profile
     const rules = deriveDietRuleSet(request.profile);
@@ -561,7 +599,7 @@ export class MealPlannerAgentService {
     ];
     const candidates = await getCandidatePool(
       request.profile.dietKey,
-      excludeTerms
+      excludeTerms,
     );
 
     // Step 3: Build meal prompt
@@ -578,8 +616,8 @@ export class MealPlannerAgentService {
 
     // Step 4: Convert Zod schema to JSON schema for single meal
     const jsonSchema = zodToJsonSchema(mealResponseSchema, {
-      name: "MealResponse",
-      target: "openApi3",
+      name: 'MealResponse',
+      target: 'openApi3',
     });
 
     // Step 5: Generate attempt #1
@@ -590,11 +628,11 @@ export class MealPlannerAgentService {
         prompt: mealPrompt,
         jsonSchema,
         temperature: 0.4,
-        purpose: "plan",
+        purpose: 'plan',
       });
     } catch (error) {
       throw new Error(
-        `Failed to generate meal from Gemini API: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Failed to generate meal from Gemini API: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
 
@@ -605,7 +643,7 @@ export class MealPlannerAgentService {
       mealResponse = mealResponseSchema.parse(parsed);
     } catch (error) {
       throw new Error(
-        `Failed to parse meal: ${error instanceof Error ? error.message : "Unknown parse error"}`
+        `Failed to parse meal: ${error instanceof Error ? error.message : 'Unknown parse error'}`,
       );
     }
 
@@ -628,26 +666,34 @@ export class MealPlannerAgentService {
     // Step 8: If only calorie/macro issues and constraints.targetCalories is set, attempt adjustment
     if (validationResult.length > 0 && constraints?.targetCalories) {
       const macroOnlyIssues = validationResult.filter(
-        (issue) => issue.code === "CALORIE_TARGET_MISS" || issue.code === "MACRO_TARGET_MISS"
+        (issue) =>
+          issue.code === 'CALORIE_TARGET_MISS' ||
+          issue.code === 'MACRO_TARGET_MISS',
       );
       const nonMacroIssues = validationResult.filter(
-        (issue) => issue.code !== "CALORIE_TARGET_MISS" && issue.code !== "MACRO_TARGET_MISS"
+        (issue) =>
+          issue.code !== 'CALORIE_TARGET_MISS' &&
+          issue.code !== 'MACRO_TARGET_MISS',
       );
 
       // If only macro issues, try to adjust quantities
       if (macroOnlyIssues.length > 0 && nonMacroIssues.length === 0) {
-        const { calcMealMacros } = await import("./mealPlannerAgent.tools");
+        const { calcMealMacros } = await import('./mealPlannerAgent.tools');
         const currentMacros = await calcMealMacros(
           meal.ingredientRefs.map((ref) => ({
             nevoCode: ref.nevoCode,
             quantityG: ref.quantityG,
-          }))
+          })),
         );
 
         // Simple scaling: adjust all quantities proportionally to meet calorie target
         if (currentMacros.calories > 0) {
           const scale = constraints.targetCalories / currentMacros.calories;
-          const adjustments: Array<{ nevoCode: string; oldG: number; newG: number }> = [];
+          const adjustments: Array<{
+            nevoCode: string;
+            oldG: number;
+            newG: number;
+          }> = [];
 
           meal = {
             ...meal,
@@ -682,12 +728,12 @@ export class MealPlannerAgentService {
     // Step 9: If still has issues, attempt repair (max 1 attempt)
     if (validationResult.length > 0) {
       const issues = validationResult.map(
-        (issue) => `${issue.code}: ${issue.message} (path: ${issue.path})`
+        (issue) => `${issue.code}: ${issue.message} (path: ${issue.path})`,
       );
       const repairPrompt = buildRepairPrompt({
         originalPrompt: mealPrompt,
         badOutput: rawJson,
-        issues: issues.join("\n"),
+        issues: issues.join('\n'),
         responseJsonSchema: jsonSchema,
       });
 
@@ -698,11 +744,11 @@ export class MealPlannerAgentService {
           prompt: repairPrompt,
           jsonSchema,
           temperature: 0.2,
-          purpose: "repair",
+          purpose: 'repair',
         });
       } catch (error) {
         throw new Error(
-          `Meal generation failed after repair attempt: API error - ${error instanceof Error ? error.message : "Unknown error"}`
+          `Meal generation failed after repair attempt: API error - ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
       }
 
@@ -713,7 +759,7 @@ export class MealPlannerAgentService {
         meal = mealResponse.meal;
       } catch (error) {
         throw new Error(
-          `Failed to parse repaired meal: ${error instanceof Error ? error.message : "Unknown parse error"}`
+          `Failed to parse repaired meal: ${error instanceof Error ? error.message : 'Unknown parse error'}`,
         );
       }
 
@@ -732,10 +778,10 @@ export class MealPlannerAgentService {
       // If still has issues after repair, throw error
       if (repairValidationResult.length > 0) {
         const remainingIssues = repairValidationResult.map(
-          (issue) => `${issue.code}: ${issue.message}`
+          (issue) => `${issue.code}: ${issue.message}`,
         );
         throw new Error(
-          `Meal generation failed after repair attempt: ${remainingIssues.join("; ")}`
+          `Meal generation failed after repair attempt: ${remainingIssues.join('; ')}`,
         );
       }
     }
@@ -760,7 +806,7 @@ export class MealPlannerAgentService {
     plan: MealPlanResponse,
     dietKey: string,
     locale: 'nl' | 'en' = 'nl',
-    userId?: string
+    userId?: string,
   ): Promise<void> {
     try {
       const targets = mapMealPlanToGuardrailsTargets(plan, locale);
@@ -786,12 +832,23 @@ export class MealPlannerAgentService {
       });
 
       // Diet Logic: DROP/LIMIT per plan; FORCE-quotum per dag (dag-aggregatie)
-      let dietResult: { ok: boolean; summary: string; warnings?: string[] } | null = null;
-      let forceDeficits: Array<{ categoryCode: string; categoryNameNl: string; minPerDay?: number; minPerWeek?: number }> | undefined;
+      let dietResult: {
+        ok: boolean;
+        summary: string;
+        warnings?: string[];
+      } | null = null;
+      let forceDeficits:
+        | Array<{
+            categoryCode: string;
+            categoryNameNl: string;
+            minPerDay?: number;
+            minPerWeek?: number;
+          }>
+        | undefined;
       if (dietLogic) {
         const ingredientsPerDay = getMealPlanIngredientsPerDay(plan);
         const dayResults = ingredientsPerDay.map((dayIngredients) =>
-          evaluateDietLogic(dietLogic, { ingredients: dayIngredients })
+          evaluateDietLogic(dietLogic, { ingredients: dayIngredients }),
         );
         const firstFail = dayResults.findIndex((r) => !r.ok);
         if (firstFail >= 0) {
@@ -811,7 +868,7 @@ export class MealPlannerAgentService {
           const allWarnings = dayResults.flatMap((r) => r.warnings ?? []);
           dietResult = {
             ok: true,
-            summary: "Dieetregels: alle fases geslaagd.",
+            summary: 'Dieetregels: alle fases geslaagd.',
             warnings: allWarnings.length ? allWarnings : undefined,
           };
         }
@@ -823,18 +880,18 @@ export class MealPlannerAgentService {
       if (blockedByGuardrails || blockedByDietLogic) {
         const reasonCodes = blockedByGuardrails
           ? decision.reasonCodes
-          : [...decision.reasonCodes, "DIET_LOGIC_VIOLATION"];
+          : [...decision.reasonCodes, 'DIET_LOGIC_VIOLATION'];
         const message =
           blockedByDietLogic && dietResult
             ? dietResult.summary
-            : "Het gegenereerde meal plan voldoet niet aan de dieetregels";
+            : 'Het gegenereerde meal plan voldoet niet aan de dieetregels';
 
         console.log(
-          `[MealPlanner] vNext guard rails blocked plan: dietKey=${dietKey}, outcome=${decision.outcome}, reasonCodes=${reasonCodes.slice(0, 5).join(',')}, hash=${guardrails.contentHash}`
+          `[MealPlanner] vNext guard rails blocked plan: dietKey=${dietKey}, outcome=${decision.outcome}, reasonCodes=${reasonCodes.slice(0, 5).join(',')}, hash=${guardrails.contentHash}`,
         );
 
-        throw new AppError("GUARDRAILS_VIOLATION", message, {
-          outcome: "blocked",
+        throw new AppError('GUARDRAILS_VIOLATION', message, {
+          outcome: 'blocked',
           reasonCodes,
           contentHash: guardrails.contentHash,
           rulesetVersion: guardrails.version,
@@ -847,14 +904,18 @@ export class MealPlannerAgentService {
       }
 
       console.error(
-        `[MealPlanner] vNext guard rails evaluation error: dietKey=${dietKey}, error=${error instanceof Error ? error.message : String(error)}`
+        `[MealPlanner] vNext guard rails evaluation error: dietKey=${dietKey}, error=${error instanceof Error ? error.message : String(error)}`,
       );
 
-      throw new AppError('GUARDRAILS_VIOLATION', 'Fout bij evalueren dieetregels', {
-        outcome: 'blocked',
-        reasonCodes: ['EVALUATOR_ERROR'],
-        contentHash: '',
-      });
+      throw new AppError(
+        'GUARDRAILS_VIOLATION',
+        'Fout bij evalueren dieetregels',
+        {
+          outcome: 'blocked',
+          reasonCodes: ['EVALUATOR_ERROR'],
+          contentHash: '',
+        },
+      );
     }
   }
 }

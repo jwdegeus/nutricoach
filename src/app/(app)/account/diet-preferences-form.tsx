@@ -1,18 +1,30 @@
-"use client";
+'use client';
 
-import { useState, useTransition, useEffect } from "react";
-import { saveOnboardingAction, loadOnboardingStatusAction } from "@/src/app/(app)/onboarding/actions/onboarding.actions";
-import { Step1DietType } from "@/src/app/(app)/onboarding/components/Step1DietType";
-import { Step2AllergiesDislikes } from "@/src/app/(app)/onboarding/components/Step2AllergiesDislikes";
-import { Step3Practical } from "@/src/app/(app)/onboarding/components/Step3Practical";
-import { Step4Goal } from "@/src/app/(app)/onboarding/components/Step4Goal";
-import { Button } from "@/components/catalyst/button";
-import { FieldGroup, Field, Label, Description } from "@/components/catalyst/fieldset";
-import { Input } from "@/components/catalyst/input";
-import { Badge } from "@/components/catalyst/badge";
-import { Text } from "@/components/catalyst/text";
-import { XMarkIcon } from "@heroicons/react/24/outline";
-import type { OnboardingInput, DietStrictness, VarietyLevel } from "@/src/app/(app)/onboarding/onboarding.types";
+import { useState, useTransition, useEffect } from 'react';
+import {
+  saveOnboardingAction,
+  loadOnboardingStatusAction,
+} from '@/src/app/(app)/onboarding/actions/onboarding.actions';
+import { Step1DietType } from '@/src/app/(app)/onboarding/components/Step1DietType';
+import { Step2AllergiesDislikes } from '@/src/app/(app)/onboarding/components/Step2AllergiesDislikes';
+import { Step3Practical } from '@/src/app/(app)/onboarding/components/Step3Practical';
+import { Step4Goal } from '@/src/app/(app)/onboarding/components/Step4Goal';
+import { Button } from '@/components/catalyst/button';
+import {
+  FieldGroup,
+  Field,
+  Label,
+  Description,
+} from '@/components/catalyst/fieldset';
+import { Input } from '@/components/catalyst/input';
+import { Badge } from '@/components/catalyst/badge';
+import { Text } from '@/components/catalyst/text';
+import { XMarkIcon } from '@heroicons/react/24/outline';
+import type {
+  OnboardingInput,
+  DietStrictness,
+  VarietyLevel,
+} from '@/src/app/(app)/onboarding/onboarding.types';
 
 export function DietPreferencesForm() {
   const [error, setError] = useState<string | null>(null);
@@ -21,24 +33,26 @@ export function DietPreferencesForm() {
   const [isLoading, setIsLoading] = useState(true);
 
   // Form state
-  const [dietTypeId, setDietTypeId] = useState<string>("");
+  const [dietTypeId, setDietTypeId] = useState<string>('');
   const [allergies, setAllergies] = useState<string[]>([]);
   const [dislikes, setDislikes] = useState<string[]>([]);
   const [maxPrepMinutes, setMaxPrepMinutes] = useState<number>(30);
   const [servingsDefault, setServingsDefault] = useState<number>(2);
   const [kcalTarget, setKcalTarget] = useState<number | null>(null);
-  const [varietyLevel, setVarietyLevel] = useState<VarietyLevel>("std");
-  const [strictness, setStrictness] = useState<DietStrictness | undefined>(undefined);
+  const [varietyLevel, setVarietyLevel] = useState<VarietyLevel>('std');
+  const [strictness, setStrictness] = useState<DietStrictness | undefined>(
+    undefined,
+  );
   const [mealPreferences, setMealPreferences] = useState<{
     breakfast?: string[];
     lunch?: string[];
     dinner?: string[];
   }>({});
-  
+
   // Input states for meal preferences
-  const [breakfastInput, setBreakfastInput] = useState("");
-  const [lunchInput, setLunchInput] = useState("");
-  const [dinnerInput, setDinnerInput] = useState("");
+  const [breakfastInput, setBreakfastInput] = useState('');
+  const [lunchInput, setLunchInput] = useState('');
+  const [dinnerInput, setDinnerInput] = useState('');
 
   // Load current preferences
   useEffect(() => {
@@ -46,12 +60,14 @@ export function DietPreferencesForm() {
       setIsLoading(true);
       try {
         const result = await loadOnboardingStatusAction();
-        if ("data" in result && result.data) {
+        if ('data' in result && result.data) {
           const { summary } = result.data;
           if (summary.dietTypeId) setDietTypeId(summary.dietTypeId);
           if (summary.maxPrepMinutes) setMaxPrepMinutes(summary.maxPrepMinutes);
-          if (summary.servingsDefault) setServingsDefault(summary.servingsDefault);
-          if (summary.kcalTarget !== undefined) setKcalTarget(summary.kcalTarget);
+          if (summary.servingsDefault)
+            setServingsDefault(summary.servingsDefault);
+          if (summary.kcalTarget !== undefined)
+            setKcalTarget(summary.kcalTarget);
           if (summary.varietyLevel) setVarietyLevel(summary.varietyLevel);
           if (summary.strictness) setStrictness(summary.strictness);
           if (summary.allergies) setAllergies(summary.allergies);
@@ -59,13 +75,17 @@ export function DietPreferencesForm() {
           if (summary.mealPreferences) {
             // Ensure arrays are always arrays (defensive check)
             // Also handle legacy string values by converting to arrays
-            const normalizeToArray = (value: string | string[] | undefined): string[] | undefined => {
+            const normalizeToArray = (
+              value: string | string[] | undefined,
+            ): string[] | undefined => {
               if (!value) return undefined;
-              if (Array.isArray(value)) return value.length > 0 ? value : undefined;
-              if (typeof value === 'string' && value.trim()) return [value.trim()];
+              if (Array.isArray(value))
+                return value.length > 0 ? value : undefined;
+              if (typeof value === 'string' && value.trim())
+                return [value.trim()];
               return undefined;
             };
-            
+
             setMealPreferences({
               breakfast: normalizeToArray(summary.mealPreferences.breakfast),
               lunch: normalizeToArray(summary.mealPreferences.lunch),
@@ -74,7 +94,7 @@ export function DietPreferencesForm() {
           }
         }
       } catch (error) {
-        console.error("Fout bij laden voorkeuren:", error);
+        console.error('Fout bij laden voorkeuren:', error);
       } finally {
         setIsLoading(false);
       }
@@ -86,16 +106,12 @@ export function DietPreferencesForm() {
   // Helper functions for tag management
   const addTag = (
     value: string,
-    mealSlot: "breakfast" | "lunch" | "dinner",
-    maxItems: number = 20
+    mealSlot: 'breakfast' | 'lunch' | 'dinner',
+    maxItems: number = 20,
   ) => {
     const trimmed = value.trim();
     const current = mealPreferences[mealSlot] || [];
-    if (
-      trimmed &&
-      !current.includes(trimmed) &&
-      current.length < maxItems
-    ) {
+    if (trimmed && !current.includes(trimmed) && current.length < maxItems) {
       setMealPreferences({
         ...mealPreferences,
         [mealSlot]: [...current, trimmed],
@@ -105,7 +121,7 @@ export function DietPreferencesForm() {
 
   const removeTag = (
     tag: string,
-    mealSlot: "breakfast" | "lunch" | "dinner"
+    mealSlot: 'breakfast' | 'lunch' | 'dinner',
   ) => {
     const current = mealPreferences[mealSlot] || [];
     setMealPreferences({
@@ -115,26 +131,26 @@ export function DietPreferencesForm() {
   };
 
   const handleBreakfastKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       e.preventDefault();
-      addTag(breakfastInput, "breakfast");
-      setBreakfastInput("");
+      addTag(breakfastInput, 'breakfast');
+      setBreakfastInput('');
     }
   };
 
   const handleLunchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       e.preventDefault();
-      addTag(lunchInput, "lunch");
-      setLunchInput("");
+      addTag(lunchInput, 'lunch');
+      setLunchInput('');
     }
   };
 
   const handleDinnerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       e.preventDefault();
-      addTag(dinnerInput, "dinner");
-      setDinnerInput("");
+      addTag(dinnerInput, 'dinner');
+      setDinnerInput('');
     }
   };
 
@@ -144,7 +160,7 @@ export function DietPreferencesForm() {
     setSuccess(null);
 
     if (!dietTypeId) {
-      setError("Selecteer een dieettype");
+      setError('Selecteer een dieettype');
       return;
     }
 
@@ -162,10 +178,10 @@ export function DietPreferencesForm() {
 
     startTransition(async () => {
       const result = await saveOnboardingAction(input);
-      if ("error" in result) {
+      if ('error' in result) {
         setError(result.error);
       } else {
-        setSuccess("Dieetvoorkeuren succesvol bijgewerkt!");
+        setSuccess('Dieetvoorkeuren succesvol bijgewerkt!');
       }
     });
   }
@@ -187,7 +203,8 @@ export function DietPreferencesForm() {
           Dieetvoorkeuren
         </h2>
         <Text className="mt-1">
-          Pas je dieetvoorkeuren aan. Deze instellingen worden gebruikt voor het plannen van je maaltijden.
+          Pas je dieetvoorkeuren aan. Deze instellingen worden gebruikt voor het
+          plannen van je maaltijden.
         </Text>
       </div>
 
@@ -249,7 +266,9 @@ export function DietPreferencesForm() {
                 Maaltijdvoorkeuren
               </h3>
               <Text className="mt-1">
-                Geef je voorkeuren op voor ontbijt, lunch en diner. Je kunt meerdere voorkeuren toevoegen door op Enter te drukken. Deze worden gebruikt bij het genereren van je maaltijdplan.
+                Geef je voorkeuren op voor ontbijt, lunch en diner. Je kunt
+                meerdere voorkeuren toevoegen door op Enter te drukken. Deze
+                worden gebruikt bij het genereren van je maaltijdplan.
               </Text>
             </div>
 
@@ -258,7 +277,8 @@ export function DietPreferencesForm() {
               <Field>
                 <Label>Ontbijt voorkeuren</Label>
                 <Description>
-                  Bijvoorbeeld: "eiwit shake", "groene smoothie", "omelet"
+                  Bijvoorbeeld: &quot;eiwit shake&quot;, &quot;groene
+                  smoothie&quot;, &quot;omelet&quot;
                 </Description>
                 <Input
                   type="text"
@@ -267,34 +287,36 @@ export function DietPreferencesForm() {
                   onKeyDown={handleBreakfastKeyDown}
                   placeholder="Typ en druk op Enter om toe te voegen"
                 />
-                {Array.isArray(mealPreferences.breakfast) && mealPreferences.breakfast.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {mealPreferences.breakfast.map((tag) => (
-                      <Badge
-                        key={tag}
-                        color="blue"
-                        className="group/item flex items-center gap-1.5"
-                      >
-                        <span>{tag}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeTag(tag, "breakfast")}
-                          className="rounded-full hover:bg-blue-600/20 dark:hover:bg-blue-500/20"
-                          aria-label={`Verwijder ${tag}`}
+                {Array.isArray(mealPreferences.breakfast) &&
+                  mealPreferences.breakfast.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {mealPreferences.breakfast.map((tag) => (
+                        <Badge
+                          key={tag}
+                          color="blue"
+                          className="group/item flex items-center gap-1.5"
                         >
-                          <XMarkIcon className="size-3.5" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
+                          <span>{tag}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeTag(tag, 'breakfast')}
+                            className="rounded-full hover:bg-blue-600/20 dark:hover:bg-blue-500/20"
+                            aria-label={`Verwijder ${tag}`}
+                          >
+                            <XMarkIcon className="size-3.5" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
               </Field>
 
               {/* Lunch */}
               <Field>
                 <Label>Lunch voorkeuren</Label>
                 <Description>
-                  Bijvoorbeeld: "groene smoothie", "salade", "soep"
+                  Bijvoorbeeld: &quot;groene smoothie&quot;, &quot;salade&quot;,
+                  &quot;soep&quot;
                 </Description>
                 <Input
                   type="text"
@@ -303,34 +325,36 @@ export function DietPreferencesForm() {
                   onKeyDown={handleLunchKeyDown}
                   placeholder="Typ en druk op Enter om toe te voegen"
                 />
-                {Array.isArray(mealPreferences.lunch) && mealPreferences.lunch.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {mealPreferences.lunch.map((tag) => (
-                      <Badge
-                        key={tag}
-                        color="green"
-                        className="group/item flex items-center gap-1.5"
-                      >
-                        <span>{tag}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeTag(tag, "lunch")}
-                          className="rounded-full hover:bg-green-600/20 dark:hover:bg-green-500/20"
-                          aria-label={`Verwijder ${tag}`}
+                {Array.isArray(mealPreferences.lunch) &&
+                  mealPreferences.lunch.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {mealPreferences.lunch.map((tag) => (
+                        <Badge
+                          key={tag}
+                          color="green"
+                          className="group/item flex items-center gap-1.5"
                         >
-                          <XMarkIcon className="size-3.5" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
+                          <span>{tag}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeTag(tag, 'lunch')}
+                            className="rounded-full hover:bg-green-600/20 dark:hover:bg-green-500/20"
+                            aria-label={`Verwijder ${tag}`}
+                          >
+                            <XMarkIcon className="size-3.5" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
               </Field>
 
               {/* Dinner */}
               <Field>
                 <Label>Diner voorkeuren</Label>
                 <Description>
-                  Bijvoorbeeld: "kip met groente", "vis", "vegetarisch"
+                  Bijvoorbeeld: &quot;kip met groente&quot;, &quot;vis&quot;,
+                  &quot;vegetarisch&quot;
                 </Description>
                 <Input
                   type="text"
@@ -339,34 +363,35 @@ export function DietPreferencesForm() {
                   onKeyDown={handleDinnerKeyDown}
                   placeholder="Typ en druk op Enter om toe te voegen"
                 />
-                {Array.isArray(mealPreferences.dinner) && mealPreferences.dinner.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {mealPreferences.dinner.map((tag) => (
-                      <Badge
-                        key={tag}
-                        color="purple"
-                        className="group/item flex items-center gap-1.5"
-                      >
-                        <span>{tag}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeTag(tag, "dinner")}
-                          className="rounded-full hover:bg-purple-600/20 dark:hover:bg-purple-500/20"
-                          aria-label={`Verwijder ${tag}`}
+                {Array.isArray(mealPreferences.dinner) &&
+                  mealPreferences.dinner.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {mealPreferences.dinner.map((tag) => (
+                        <Badge
+                          key={tag}
+                          color="purple"
+                          className="group/item flex items-center gap-1.5"
                         >
-                          <XMarkIcon className="size-3.5" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
+                          <span>{tag}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeTag(tag, 'dinner')}
+                            className="rounded-full hover:bg-purple-600/20 dark:hover:bg-purple-500/20"
+                            aria-label={`Verwijder ${tag}`}
+                          >
+                            <XMarkIcon className="size-3.5" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
               </Field>
             </div>
           </div>
 
           <div className="flex justify-end pt-6 border-t border-zinc-200 dark:border-zinc-800">
             <Button type="submit" disabled={isPending || !dietTypeId}>
-              {isPending ? "Opslaan..." : "Voorkeuren opslaan"}
+              {isPending ? 'Opslaan...' : 'Voorkeuren opslaan'}
             </Button>
           </div>
         </FieldGroup>

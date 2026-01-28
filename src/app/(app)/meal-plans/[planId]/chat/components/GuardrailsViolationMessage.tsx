@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Badge } from "@/components/catalyst/badge";
-import { Button } from "@/components/catalyst/button";
-import { Text } from "@/components/catalyst/text";
-import { Link } from "@/components/catalyst/link";
-import { ClipboardIcon, CheckIcon } from "@heroicons/react/20/solid";
-import { formatReasonForBadge } from "@/src/lib/guardrails-vnext/ui/reasonLabels";
+import { useState } from 'react';
+import { Badge } from '@/components/catalyst/badge';
+import { Button } from '@/components/catalyst/button';
+import { Text } from '@/components/catalyst/text';
+import { Link } from '@/components/catalyst/link';
+import { ClipboardIcon, CheckIcon } from '@heroicons/react/20/solid';
+import { formatReasonForBadge } from '@/src/lib/guardrails-vnext/ui/reasonLabels';
 
 type GuardrailsViolationMessageProps = {
   reasonCodes: string[];
@@ -29,7 +29,7 @@ export function GuardrailsViolationMessage({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error("Failed to copy:", error);
+      console.error('Failed to copy:', error);
     }
   };
 
@@ -54,9 +54,9 @@ export function GuardrailsViolationMessage({
             {displayReasonCodes.map((code, idx) => {
               const { label, code: reasonCode } = formatReasonForBadge(code);
               return (
-                <Badge 
-                  key={idx} 
-                  color="red" 
+                <Badge
+                  key={idx}
+                  color="red"
                   className="text-xs"
                   title={reasonCode}
                 >
@@ -80,12 +80,7 @@ export function GuardrailsViolationMessage({
           <code className="rounded bg-red-100 px-2 py-0.5 font-mono text-xs text-red-900 dark:bg-red-900/50 dark:text-red-100">
             {shortHash}
           </code>
-          <Button
-            onClick={handleCopy}
-            color="zinc"
-            plain
-            className="h-6 px-2 text-xs"
-          >
+          <Button onClick={handleCopy} plain className="h-6 px-2 text-xs">
             {copied ? (
               <>
                 <CheckIcon className="h-3 w-3" />

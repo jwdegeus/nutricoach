@@ -7,11 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "check-all": "prettier --check . && eslint . --max-warnings 9999 && tsc --noEmit",
     "db:push": "supabase db push",
     "db:reset": "supabase db reset --linked",
     "db:status": "supabase db remote commit",
     "db:migration": "supabase migration new",
-    "import:nevo": "tsx scripts/import-nevo-data.ts"
+    "import:nevo": "tsx scripts/import-nevo-data.ts",
+    "prepare": "husky"
   },
   "dependencies": {
     "@google/genai": "^1.38.0",
@@ -45,8 +47,21 @@
     "dotenv": "^16.4.5",
     "eslint": "^9",
     "eslint-config-next": "16.1.4",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.8.1",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.7.0",
     "typescript": "^5"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{ts,tsx}": [
+      "bash -c 'tsc --noEmit'"
+    ]
   }
 }

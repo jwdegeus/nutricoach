@@ -1,13 +1,13 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { searchNevoFoods } from "@/src/lib/nevo/nutrition-calculator";
-import { PantryService } from "@/src/lib/pantry/pantry.service";
-import type { PantryItem } from "@/src/lib/pantry/pantry.types";
+import { createClient } from '@/src/lib/supabase/server';
+import { searchNevoFoods } from '@/src/lib/nevo/nutrition-calculator';
+import { PantryService } from '@/src/lib/pantry/pantry.service';
+import type { PantryItem } from '@/src/lib/pantry/pantry.types';
 import {
   upsertPantryItemAction,
   bulkUpsertPantryItemsAction,
-} from "./pantry.actions";
+} from './pantry.actions';
 
 /**
  * Action result type
@@ -17,22 +17,20 @@ type ActionResult<T> =
   | {
       ok: false;
       error: {
-        code: "AUTH_ERROR" | "VALIDATION_ERROR" | "DB_ERROR";
+        code: 'AUTH_ERROR' | 'VALIDATION_ERROR' | 'DB_ERROR';
         message: string;
       };
     };
 
 /**
  * Search NEVO foods by query
- * 
+ *
  * @param query - Search term
  * @returns Array of NEVO foods with nevoCode and name
  */
 export async function searchNevoFoodsAction(
-  query: string
-): Promise<
-  ActionResult<Array<{ nevoCode: string; name: string }>>
-> {
+  query: string,
+): Promise<ActionResult<Array<{ nevoCode: string; name: string }>>> {
   try {
     // Get authenticated user (for consistency, though search doesn't require auth)
     const supabase = await createClient();
@@ -44,8 +42,8 @@ export async function searchNevoFoodsAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om te zoeken",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om te zoeken',
         },
       };
     }
@@ -71,15 +69,15 @@ export async function searchNevoFoodsAction(
       data: formatted,
     };
   } catch (error) {
-    console.error("Error searching NEVO foods:", error);
+    console.error('Error searching NEVO foods:', error);
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
+        code: 'DB_ERROR',
         message:
           error instanceof Error
             ? error.message
-            : "Fout bij zoeken naar voedingsmiddelen",
+            : 'Fout bij zoeken naar voedingsmiddelen',
       },
     };
   }
@@ -87,7 +85,7 @@ export async function searchNevoFoodsAction(
 
 /**
  * Load all pantry items for current user
- * 
+ *
  * @returns Array of pantry items
  */
 export async function loadUserPantryAction(): Promise<
@@ -104,28 +102,28 @@ export async function loadUserPantryAction(): Promise<
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om pantry data op te halen",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om pantry data op te halen',
         },
       };
     }
 
     // Load all pantry items for user
-    const service = new PantryService();
+    const _service = new PantryService();
     const supabaseClient = await createClient();
 
     const { data, error } = await supabaseClient
-      .from("pantry_items")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("updated_at", { ascending: false });
+      .from('pantry_items')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false });
 
     if (error) {
-      console.error("Error loading pantry items:", error);
+      console.error('Error loading pantry items:', error);
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: `Fout bij ophalen pantry: ${error.message}`,
         },
       };
@@ -146,15 +144,15 @@ export async function loadUserPantryAction(): Promise<
       data: items,
     };
   } catch (error) {
-    console.error("Error loading user pantry:", error);
+    console.error('Error loading user pantry:', error);
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
+        code: 'DB_ERROR',
         message:
           error instanceof Error
             ? error.message
-            : "Fout bij ophalen pantry data",
+            : 'Fout bij ophalen pantry data',
       },
     };
   }
@@ -164,7 +162,7 @@ export async function loadUserPantryAction(): Promise<
  * Upsert a single pantry item (wrapper)
  */
 export async function upsertUserPantryItemAction(
-  raw: unknown
+  raw: unknown,
 ): Promise<ActionResult<void>> {
   return upsertPantryItemAction(raw);
 }
@@ -173,18 +171,18 @@ export async function upsertUserPantryItemAction(
  * Bulk upsert pantry items (wrapper)
  */
 export async function bulkUpsertUserPantryItemsAction(
-  raw: unknown
+  raw: unknown,
 ): Promise<ActionResult<void>> {
   return bulkUpsertPantryItemsAction(raw);
 }
 
 /**
  * Delete a single pantry item
- * 
+ *
  * @param nevoCode - NEVO code of item to delete
  */
 export async function deletePantryItemAction(
-  nevoCode: string
+  nevoCode: string,
 ): Promise<ActionResult<void>> {
   try {
     const supabase = await createClient();
@@ -196,8 +194,8 @@ export async function deletePantryItemAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om pantry items te verwijderen",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om pantry items te verwijderen',
         },
       };
     }
@@ -206,8 +204,8 @@ export async function deletePantryItemAction(
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "NEVO code is vereist",
+          code: 'VALIDATION_ERROR',
+          message: 'NEVO code is vereist',
         },
       };
     }
@@ -220,15 +218,15 @@ export async function deletePantryItemAction(
       data: undefined,
     };
   } catch (error) {
-    console.error("Error deleting pantry item:", error);
+    console.error('Error deleting pantry item:', error);
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
+        code: 'DB_ERROR',
         message:
           error instanceof Error
             ? error.message
-            : "Fout bij verwijderen pantry item",
+            : 'Fout bij verwijderen pantry item',
       },
     };
   }
@@ -237,7 +235,9 @@ export async function deletePantryItemAction(
 /**
  * Delete all pantry items for current user
  */
-export async function deleteAllPantryItemsAction(): Promise<ActionResult<void>> {
+export async function deleteAllPantryItemsAction(): Promise<
+  ActionResult<void>
+> {
   try {
     const supabase = await createClient();
     const {
@@ -248,8 +248,8 @@ export async function deleteAllPantryItemsAction(): Promise<ActionResult<void>> 
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om pantry items te verwijderen",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om pantry items te verwijderen',
         },
       };
     }
@@ -262,15 +262,13 @@ export async function deleteAllPantryItemsAction(): Promise<ActionResult<void>> 
       data: undefined,
     };
   } catch (error) {
-    console.error("Error deleting all pantry items:", error);
+    console.error('Error deleting all pantry items:', error);
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
+        code: 'DB_ERROR',
         message:
-          error instanceof Error
-            ? error.message
-            : "Fout bij leegmaken pantry",
+          error instanceof Error ? error.message : 'Fout bij leegmaken pantry',
       },
     };
   }

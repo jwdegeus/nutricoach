@@ -1,13 +1,13 @@
-import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { createClient } from "@/src/lib/supabase/server";
-import { isAdmin } from "@/src/lib/auth/roles";
-import { getAllDietTypes } from "../../../actions/diet-admin.actions";
-import { DietEditPageClient } from "./diet-edit-page-client";
+import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/src/lib/supabase/server';
+import { isAdmin } from '@/src/lib/auth/roles';
+import { getAllDietTypes } from '../../../actions/diet-admin.actions';
+import { DietEditPageClient } from './diet-edit-page-client';
 
 export const metadata: Metadata = {
-  title: "Dieettype bewerken | NutriCoach",
-  description: "Bewerk dieettype en regels",
+  title: 'Dieettype bewerken | NutriCoach',
+  description: 'Bewerk dieettype en regels',
 };
 
 type PageProps = {
@@ -22,23 +22,23 @@ export default async function EditDietPage({ params }: PageProps) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   const admin = await isAdmin();
   if (!admin) {
-    redirect("/settings");
+    redirect('/settings');
   }
 
   // Fetch diet type to verify it exists
   const dietTypesResult = await getAllDietTypes();
-  if ("error" in dietTypesResult || !dietTypesResult.data) {
-    redirect("/settings");
+  if ('error' in dietTypesResult || !dietTypesResult.data) {
+    redirect('/settings');
   }
 
   const dietType = dietTypesResult.data.find((dt) => dt.id === id);
   if (!dietType) {
-    redirect("/settings");
+    redirect('/settings');
   }
 
   return <DietEditPageClient dietType={dietType} />;

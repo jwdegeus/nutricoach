@@ -1,15 +1,26 @@
-"use client";
+'use client';
 
-import { useState, useTransition, useEffect, useRef } from "react";
-import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "@/components/catalyst/dialog";
-import { Input } from "@/components/catalyst/input";
-import { Textarea } from "@/components/catalyst/textarea";
-import { Text } from "@/components/catalyst/text";
-import { Badge } from "@/components/catalyst/badge";
-import { Button } from "@/components/catalyst/button";
-import { Field, Label, Description } from "@/components/catalyst/fieldset";
-import { PlusIcon, TrashIcon, PencilIcon, SparklesIcon } from "@heroicons/react/20/solid";
-import { ArrowPathIcon } from "@heroicons/react/16/solid";
+import { useState, useTransition, useEffect, useRef } from 'react';
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/catalyst/dialog';
+import { Input } from '@/components/catalyst/input';
+import { Textarea } from '@/components/catalyst/textarea';
+import { Text } from '@/components/catalyst/text';
+import { Badge } from '@/components/catalyst/badge';
+import { Button } from '@/components/catalyst/button';
+import { Field, Label, Description } from '@/components/catalyst/fieldset';
+import {
+  PlusIcon,
+  TrashIcon,
+  PencilIcon,
+  SparklesIcon,
+} from '@heroicons/react/20/solid';
+import { ArrowPathIcon } from '@heroicons/react/16/solid';
 import {
   addIngredientCategoryItemAction,
   deleteIngredientCategoryItemAction,
@@ -17,7 +28,7 @@ import {
   updateIngredientCategoryAction,
   updateIngredientCategoryOriginAction,
   updateIngredientCategoryItemAction,
-} from "../actions/ingredient-categories-admin.actions";
+} from '../actions/ingredient-categories-admin.actions';
 
 type IngredientGroupDetailModalProps = {
   open: boolean;
@@ -60,44 +71,48 @@ export function IngredientGroupDetailModal({
   onItemsChanged,
 }: IngredientGroupDetailModalProps) {
   const [isPending, startTransition] = useTransition();
-  
+
   // Edit category name state
   const [isEditingName, setIsEditingName] = useState(false);
-  const [editName, setEditName] = useState("");
+  const [editName, setEditName] = useState('');
   const [editNameError, setEditNameError] = useState<string | null>(null);
-  
+
   // Edit category code (slug) state
   const [isEditingCode, setIsEditingCode] = useState(false);
-  const [editCode, setEditCode] = useState("");
+  const [editCode, setEditCode] = useState('');
   const [editCodeError, setEditCodeError] = useState<string | null>(null);
 
   // Herkomst (origin) change state
   const [originError, setOriginError] = useState<string | null>(null);
-  
+
   // Tag-based add state
-  const [newTagInput, setNewTagInput] = useState("");
+  const [newTagInput, setNewTagInput] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState<Array<{
-    term: string;
-    termNl: string | null;
-    synonyms: string[];
-  }>>([]);
-  const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
+  const [aiSuggestions, setAiSuggestions] = useState<
+    Array<{
+      term: string;
+      termNl: string | null;
+      synonyms: string[];
+    }>
+  >([]);
+  const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Edit item (term_nl, synonyms) state – clicking a tag opens this
   type Item = (typeof items)[number];
   const [editingItem, setEditingItem] = useState<Item | null>(null);
-  const [editTermNl, setEditTermNl] = useState("");
-  const [editSynonymsStr, setEditSynonymsStr] = useState("");
+  const [editTermNl, setEditTermNl] = useState('');
+  const [editSynonymsStr, setEditSynonymsStr] = useState('');
   const [itemEditError, setItemEditError] = useState<string | null>(null);
 
   // Internal items state for live updates (prevents flicker when parent reloads)
   const [internalItems, setInternalItems] = useState(items);
   const prevItemsRef = useRef(items);
   const prevCategoryIdRef = useRef(category?.id);
-  
+
   // Clear item edit when modal closes
   useEffect(() => {
     if (!open) setEditingItem(null);
@@ -108,7 +123,7 @@ export function IngredientGroupDetailModal({
   useEffect(() => {
     const categoryId = category?.id ?? null;
     const categoryChanged = categoryId !== prevCategoryIdRef.current;
-    
+
     if (categoryChanged) {
       // Category changed, reset items and close item edit
       setEditingItem(null);
@@ -116,7 +131,7 @@ export function IngredientGroupDetailModal({
         setInternalItems(items);
         prevItemsRef.current = items;
       }
-      prevCategoryIdRef.current = categoryId;
+      prevCategoryIdRef.current = categoryId ?? undefined;
     } else if (items && items.length > 0 && items !== prevItemsRef.current) {
       // Items changed (different reference), update internal state
       setInternalItems(items);
@@ -125,23 +140,23 @@ export function IngredientGroupDetailModal({
     // If items prop is empty but we have internal items, keep internal items
     // (this prevents flicker during reload)
   }, [category?.id ?? null, items.length]); // Use stable dependencies: always 2 items in array
-  
+
   // Use internal items for display
   const filteredItems = internalItems;
 
   // Handle add tag (single term) - only Dutch
   function handleAddTag() {
     if (!category) return;
-    
+
     setAddError(null);
     setAddSuccess(null);
-    
+
     const term = newTagInput.trim();
     if (!term) {
-      setAddError("Voer een term in");
+      setAddError('Voer een term in');
       return;
     }
-    
+
     startTransition(async () => {
       try {
         const result = await addIngredientCategoryItemAction({
@@ -151,15 +166,15 @@ export function IngredientGroupDetailModal({
           termNl: term, // Dutch term
           synonyms: [],
         });
-        
+
         if (!result.ok) {
           setAddError(result.error.message);
           return;
         }
-        
+
         // Optimistically add item to internal state
         if (result.data) {
-          setInternalItems(prevItems => [
+          setInternalItems((prevItems) => [
             ...prevItems,
             {
               id: result.data!.id,
@@ -169,16 +184,16 @@ export function IngredientGroupDetailModal({
               display_order: 0,
               is_active: true,
               subgroup_id: null,
-            }
+            },
           ]);
         }
-        
+
         setAddSuccess(`"${term}" toegevoegd`);
-        setNewTagInput("");
+        setNewTagInput('');
         // Trigger parent reload in background (but don't wait for it)
         onItemsChanged?.();
       } catch (err) {
-        setAddError("Onverwachte fout bij toevoegen");
+        setAddError('Onverwachte fout bij toevoegen');
         // Revert on error by reloading from parent
         onItemsChanged?.();
       }
@@ -188,18 +203,18 @@ export function IngredientGroupDetailModal({
   // Handle add selected AI suggestions
   function handleAddSelectedSuggestions() {
     if (!category || selectedSuggestions.size === 0) return;
-    
+
     setAddError(null);
     setAddSuccess(null);
-    
+
     const toAdd = aiSuggestions.filter((s) => selectedSuggestions.has(s.term));
     if (toAdd.length === 0) return;
-    
+
     startTransition(async () => {
       try {
         let added = 0;
-        let errors: string[] = [];
-        
+        const errors: string[] = [];
+
         for (const suggestion of toAdd) {
           // Use Dutch term as primary, fallback to English if no Dutch
           const termNl = suggestion.termNl || suggestion.term;
@@ -210,26 +225,28 @@ export function IngredientGroupDetailModal({
             termNl: termNl, // Dutch term
             synonyms: suggestion.synonyms,
           });
-          
+
           if (result.ok) {
             added++;
           } else {
             errors.push(`${suggestion.term}: ${result.error.message}`);
           }
         }
-        
+
         if (added > 0) {
           setAddSuccess(`${added} ingrediënt(en) toegevoegd`);
         }
         if (errors.length > 0) {
-          setAddError(`${errors.length} fout(en): ${errors.slice(0, 3).join(", ")}`);
+          setAddError(
+            `${errors.length} fout(en): ${errors.slice(0, 3).join(', ')}`,
+          );
         }
-        
+
         setSelectedSuggestions(new Set());
         setAiSuggestions([]);
         onItemsChanged?.();
       } catch (err) {
-        setAddError("Onverwachte fout bij toevoegen");
+        setAddError('Onverwachte fout bij toevoegen');
       }
     });
   }
@@ -237,18 +254,18 @@ export function IngredientGroupDetailModal({
   // Handle add all AI suggestions
   function handleAddAllSuggestions() {
     if (!category || aiSuggestions.length === 0) return;
-    
+
     setAddError(null);
     setAddSuccess(null);
-    
-    const allTerms = new Set(aiSuggestions.map(s => s.term));
+
+    const allTerms = new Set(aiSuggestions.map((s) => s.term));
     setSelectedSuggestions(allTerms);
-    
+
     startTransition(async () => {
       try {
         let added = 0;
-        let errors: string[] = [];
-        
+        const errors: string[] = [];
+
         for (const suggestion of aiSuggestions) {
           const termNl = suggestion.termNl || suggestion.term;
           const result = await addIngredientCategoryItemAction({
@@ -258,26 +275,28 @@ export function IngredientGroupDetailModal({
             termNl: termNl,
             synonyms: suggestion.synonyms,
           });
-          
+
           if (result.ok) {
             added++;
           } else {
             errors.push(`${suggestion.term}: ${result.error.message}`);
           }
         }
-        
+
         if (added > 0) {
           setAddSuccess(`${added} ingrediënt(en) toegevoegd`);
         }
         if (errors.length > 0) {
-          setAddError(`${errors.length} fout(en): ${errors.slice(0, 3).join(", ")}`);
+          setAddError(
+            `${errors.length} fout(en): ${errors.slice(0, 3).join(', ')}`,
+          );
         }
-        
+
         setSelectedSuggestions(new Set());
         setAiSuggestions([]);
         onItemsChanged?.();
       } catch (err) {
-        setAddError("Onverwachte fout bij toevoegen");
+        setAddError('Onverwachte fout bij toevoegen');
       }
     });
   }
@@ -285,14 +304,14 @@ export function IngredientGroupDetailModal({
   // Generate ingredient suggestions (no subgroup). append = "Meer suggesties": voeg toe aan bestaande.
   async function handleAIGenerateIngredients(append = false) {
     if (!category) return;
-    
+
     setIsGeneratingAI(true);
     setAddError(null);
     if (!append) {
       setAiSuggestions([]);
       setSelectedSuggestions(new Set());
     }
-    
+
     try {
       const result = await generateIngredientSuggestionsAction({
         categoryId: category.id,
@@ -301,12 +320,12 @@ export function IngredientGroupDetailModal({
         limit: 30,
         excludeTerms: append ? aiSuggestions.map((s) => s.term) : undefined,
       });
-      
+
       if (!result.ok) {
         setAddError(result.error.message);
         return;
       }
-      
+
       if (result.data && result.data.suggestions.length > 0) {
         if (append) {
           setAiSuggestions((prev) => [...prev, ...result.data!.suggestions]);
@@ -314,11 +333,13 @@ export function IngredientGroupDetailModal({
           setAiSuggestions(result.data.suggestions);
         }
       } else if (!append) {
-        setAddError("Geen nieuwe suggesties gevonden (mogelijk zijn alle relevante ingrediënten al toegevoegd)");
+        setAddError(
+          'Geen nieuwe suggesties gevonden (mogelijk zijn alle relevante ingrediënten al toegevoegd)',
+        );
       }
       // bij append en 0 nieuwe: geen fout, gewoon niets toegevoegd
     } catch (err) {
-      setAddError("Onverwachte fout bij AI generatie");
+      setAddError('Onverwachte fout bij AI generatie');
     } finally {
       setIsGeneratingAI(false);
     }
@@ -335,13 +356,11 @@ export function IngredientGroupDetailModal({
     setSelectedSuggestions(newSelected);
   }
 
-
-
   // Open item edit (term_nl, synonyms)
   function handleOpenItemEdit(item: Item) {
     setEditingItem(item);
-    setEditTermNl(item.term_nl ?? "");
-    setEditSynonymsStr(item.synonyms.join("\n"));
+    setEditTermNl(item.term_nl ?? '');
+    setEditSynonymsStr(item.synonyms.join('\n'));
     setItemEditError(null);
   }
 
@@ -355,10 +374,13 @@ export function IngredientGroupDetailModal({
           .split(/\r?\n/)
           .map((s) => s.trim())
           .filter(Boolean);
-        const result = await updateIngredientCategoryItemAction(editingItem.id, {
-          term_nl: editTermNl.trim() || null,
-          synonyms,
-        });
+        const result = await updateIngredientCategoryItemAction(
+          editingItem.id,
+          {
+            term_nl: editTermNl.trim() || null,
+            synonyms,
+          },
+        );
         if (!result.ok) {
           setItemEditError(result.error.message);
           return;
@@ -366,7 +388,7 @@ export function IngredientGroupDetailModal({
         setEditingItem(null);
         onItemsChanged?.();
       } catch {
-        setItemEditError("Onverwachte fout bij opslaan");
+        setItemEditError('Onverwachte fout bij opslaan');
       }
     });
   }
@@ -382,8 +404,10 @@ export function IngredientGroupDetailModal({
     startTransition(async () => {
       try {
         // Optimistically remove item from internal state
-        setInternalItems(prevItems => prevItems.filter(item => item.id !== itemId));
-        
+        setInternalItems((prevItems) =>
+          prevItems.filter((item) => item.id !== itemId),
+        );
+
         const result = await deleteIngredientCategoryItemAction(itemId);
         if (!result.ok) {
           setAddError(result.error.message);
@@ -392,7 +416,7 @@ export function IngredientGroupDetailModal({
         }
         onItemsChanged?.();
       } catch (err) {
-        setAddError("Onverwachte fout bij verwijderen");
+        setAddError('Onverwachte fout bij verwijderen');
         onItemsChanged?.();
       }
     });
@@ -413,29 +437,29 @@ export function IngredientGroupDetailModal({
   // Handle save category name
   function handleSaveCategoryName() {
     if (!category) return;
-    
+
     if (!editName.trim()) {
-      setEditNameError("Groepsnaam is verplicht");
+      setEditNameError('Groepsnaam is verplicht');
       return;
     }
-    
+
     setEditNameError(null);
     startTransition(async () => {
       try {
         const result = await updateIngredientCategoryAction(category.id, {
           name_nl: editName.trim(),
         });
-        
+
         if (!result.ok) {
           setEditNameError(result.error.message);
           return;
         }
-        
+
         setIsEditingName(false);
         // Refresh category data via callback
         onItemsChanged?.();
       } catch (err) {
-        setEditNameError("Onverwachte fout bij opslaan");
+        setEditNameError('Onverwachte fout bij opslaan');
       }
     });
   }
@@ -443,44 +467,46 @@ export function IngredientGroupDetailModal({
   // Handle save category code (slug)
   function handleSaveCategoryCode() {
     if (!category) return;
-    
+
     if (!editCode.trim()) {
-      setEditCodeError("Slug is verplicht");
+      setEditCodeError('Slug is verplicht');
       return;
     }
-    
+
     // Validate slug format (lowercase, alphanumeric and underscores only)
     const slugPattern = /^[a-z0-9_]+$/;
     if (!slugPattern.test(editCode.trim())) {
-      setEditCodeError("Slug mag alleen kleine letters, cijfers en underscores bevatten");
+      setEditCodeError(
+        'Slug mag alleen kleine letters, cijfers en underscores bevatten',
+      );
       return;
     }
-    
+
     setEditCodeError(null);
     startTransition(async () => {
       try {
         const result = await updateIngredientCategoryAction(category.id, {
           code: editCode.trim().toLowerCase(),
         });
-        
+
         if (!result.ok) {
           setEditCodeError(result.error.message);
           return;
         }
-        
+
         setIsEditingCode(false);
         // Refresh category data via callback
         onItemsChanged?.();
       } catch (err) {
-        setEditCodeError("Onverwachte fout bij opslaan");
+        setEditCodeError('Onverwachte fout bij opslaan');
       }
     });
   }
 
   // Handle change herkomst (origin): "Dit dieet" vs "Algemeen"
-  function handleChangeOrigin(origin: "diet_specific" | "general") {
+  function handleChangeOrigin(origin: 'diet_specific' | 'general') {
     if (!category || !dietTypeId) return;
-    const current = category.is_diet_specific ? "diet_specific" : "general";
+    const current = category.is_diet_specific ? 'diet_specific' : 'general';
     if (origin === current) return;
     setOriginError(null);
     startTransition(async () => {
@@ -488,7 +514,7 @@ export function IngredientGroupDetailModal({
         const result = await updateIngredientCategoryOriginAction(
           category.id,
           dietTypeId,
-          origin
+          origin,
         );
         if (!result.ok) {
           setOriginError(result.error.message);
@@ -497,7 +523,7 @@ export function IngredientGroupDetailModal({
         setEditCode(result.data.code);
         onItemsChanged?.();
       } catch {
-        setOriginError("Onverwachte fout bij wijzigen herkomst");
+        setOriginError('Onverwachte fout bij wijzigen herkomst');
       }
     });
   }
@@ -518,9 +544,9 @@ export function IngredientGroupDetailModal({
                 setEditNameError(null);
               }}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
+                if (e.key === 'Enter') {
                   handleSaveCategoryName();
-                } else if (e.key === "Escape") {
+                } else if (e.key === 'Escape') {
                   setIsEditingName(false);
                   setEditName(category.name_nl);
                   setEditNameError(null);
@@ -532,7 +558,7 @@ export function IngredientGroupDetailModal({
             <Button
               onClick={handleSaveCategoryName}
               disabled={isPending || !editName.trim()}
-              size="sm"
+              className="text-sm"
             >
               Opslaan
             </Button>
@@ -543,7 +569,7 @@ export function IngredientGroupDetailModal({
                 setEditNameError(null);
               }}
               color="zinc"
-              size="sm"
+              className="text-sm"
               disabled={isPending}
             >
               Annuleren
@@ -555,7 +581,7 @@ export function IngredientGroupDetailModal({
             <Button
               onClick={() => setIsEditingName(true)}
               plain
-              size="sm"
+              className="text-sm"
               disabled={isPending}
             >
               <PencilIcon className="h-4 w-4" />
@@ -565,7 +591,8 @@ export function IngredientGroupDetailModal({
       </DialogTitle>
       <DialogBody>
         <DialogDescription>
-          Overzicht van ingrediënttermen in deze categorie. Voeg items toe of verwijder ze.
+          Overzicht van ingrediënttermen in deze categorie. Voeg items toe of
+          verwijder ze.
         </DialogDescription>
 
         {/* Slug (Code) - Editable, positioned right after title */}
@@ -582,9 +609,9 @@ export function IngredientGroupDetailModal({
                   setEditCodeError(null);
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
+                  if (e.key === 'Enter') {
                     handleSaveCategoryCode();
-                  } else if (e.key === "Escape") {
+                  } else if (e.key === 'Escape') {
                     setIsEditingCode(false);
                     setEditCode(category.code);
                     setEditCodeError(null);
@@ -597,7 +624,7 @@ export function IngredientGroupDetailModal({
               <Button
                 onClick={handleSaveCategoryCode}
                 disabled={isPending || !editCode.trim()}
-                size="sm"
+                className="text-sm"
               >
                 Opslaan
               </Button>
@@ -608,7 +635,7 @@ export function IngredientGroupDetailModal({
                   setEditCodeError(null);
                 }}
                 color="zinc"
-                size="sm"
+                className="text-sm"
                 disabled={isPending}
               >
                 Annuleren
@@ -625,7 +652,7 @@ export function IngredientGroupDetailModal({
               <Button
                 onClick={() => setIsEditingCode(true)}
                 plain
-                size="sm"
+                className="text-sm"
                 disabled={isPending}
               >
                 <PencilIcon className="h-3 w-3" />
@@ -646,23 +673,42 @@ export function IngredientGroupDetailModal({
               Herkomst
             </Text>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                outline={!category.is_diet_specific}
-                disabled={isPending}
-                onClick={() => handleChangeOrigin("diet_specific")}
-              >
-                {dietTypeName ? `${dietTypeName} (dit dieet)` : "Dit dieet"}
-              </Button>
-              <Button
-                size="sm"
-                outline={!!category.is_diet_specific}
-                color="zinc"
-                disabled={isPending}
-                onClick={() => handleChangeOrigin("general")}
-              >
-                Algemeen
-              </Button>
+              {!category.is_diet_specific ? (
+                <Button
+                  className="text-sm"
+                  outline
+                  disabled={isPending}
+                  onClick={() => handleChangeOrigin('diet_specific')}
+                >
+                  {dietTypeName ? `${dietTypeName} (dit dieet)` : 'Dit dieet'}
+                </Button>
+              ) : (
+                <Button
+                  className="text-sm"
+                  disabled={isPending}
+                  onClick={() => handleChangeOrigin('diet_specific')}
+                >
+                  {dietTypeName ? `${dietTypeName} (dit dieet)` : 'Dit dieet'}
+                </Button>
+              )}
+              {category.is_diet_specific ? (
+                <Button
+                  className="text-sm"
+                  outline
+                  disabled={isPending}
+                  onClick={() => handleChangeOrigin('general')}
+                >
+                  Algemeen
+                </Button>
+              ) : (
+                <Button
+                  className="text-sm"
+                  disabled={isPending}
+                  onClick={() => handleChangeOrigin('general')}
+                >
+                  Algemeen
+                </Button>
+              )}
             </div>
             {originError && (
               <div className="mt-1 rounded-lg bg-red-50 p-2 text-xs text-red-600 dark:bg-red-950/50 dark:text-red-400">
@@ -687,7 +733,7 @@ export function IngredientGroupDetailModal({
                 setAddSuccess(null);
               }}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && newTagInput.trim()) {
+                if (e.key === 'Enter' && newTagInput.trim()) {
                   e.preventDefault();
                   handleAddTag();
                 }
@@ -713,7 +759,9 @@ export function IngredientGroupDetailModal({
               ) : (
                 <SparklesIcon className="h-4 w-4" />
               )}
-              {isGeneratingAI ? "AI zoekt ingrediënten..." : "AI: Vind ingrediënten"}
+              {isGeneratingAI
+                ? 'AI zoekt ingrediënten...'
+                : 'AI: Vind ingrediënten'}
             </Button>
           </div>
 
@@ -729,14 +777,17 @@ export function IngredientGroupDetailModal({
                   return (
                     <Badge
                       key={suggestion.term}
-                      color={isSelected ? "blue" : "zinc"}
+                      color={isSelected ? 'blue' : 'zinc'}
                       className="cursor-pointer text-xs"
                       onClick={() => handleToggleSuggestion(suggestion.term)}
                     >
                       {suggestion.term}
-                      {suggestion.termNl && suggestion.termNl !== suggestion.term && (
-                        <span className="ml-1 opacity-75">({suggestion.termNl})</span>
-                      )}
+                      {suggestion.termNl &&
+                        suggestion.termNl !== suggestion.term && (
+                          <span className="ml-1 opacity-75">
+                            ({suggestion.termNl})
+                          </span>
+                        )}
                       {suggestion.synonyms.length > 0 && (
                         <span className="ml-1 opacity-60">
                           +{suggestion.synonyms.length} syn.
@@ -751,7 +802,7 @@ export function IngredientGroupDetailModal({
                   <Button
                     onClick={handleAddSelectedSuggestions}
                     disabled={isPending}
-                    size="sm"
+                    className="text-sm"
                   >
                     <PlusIcon className="h-3 w-3" />
                     {selectedSuggestions.size} geselecteerde toevoegen
@@ -761,7 +812,7 @@ export function IngredientGroupDetailModal({
                   <Button
                     onClick={handleAddAllSuggestions}
                     disabled={isPending}
-                    size="sm"
+                    className="text-sm"
                     color="blue"
                   >
                     <PlusIcon className="h-3 w-3" />
@@ -771,8 +822,7 @@ export function IngredientGroupDetailModal({
                 <Button
                   onClick={() => handleAIGenerateIngredients(true)}
                   disabled={isGeneratingAI || isPending}
-                  size="sm"
-                  color="zinc"
+                  className="text-sm text-zinc-600 dark:text-zinc-400"
                   plain
                 >
                   <SparklesIcon className="h-3 w-3" />
@@ -844,7 +894,7 @@ export function IngredientGroupDetailModal({
                         <Textarea
                           value={editSynonymsStr}
                           onChange={(e) => setEditSynonymsStr(e.target.value)}
-                          placeholder={"spaghetti\npenne\nfusilli"}
+                          placeholder={'spaghetti\npenne\nfusilli'}
                           disabled={isPending}
                           rows={4}
                           className="mt-1"
@@ -857,15 +907,14 @@ export function IngredientGroupDetailModal({
                       )}
                       <div className="flex gap-2">
                         <Button
-                          size="sm"
+                          className="text-sm"
                           onClick={handleSaveItemEdit}
                           disabled={isPending}
                         >
                           Opslaan
                         </Button>
                         <Button
-                          size="sm"
-                          color="zinc"
+                          className="text-sm"
                           outline
                           onClick={handleCancelItemEdit}
                           disabled={isPending}
@@ -885,7 +934,7 @@ export function IngredientGroupDetailModal({
                         tabIndex={0}
                         onClick={() => handleOpenItemEdit(item)}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
+                          if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
                             handleOpenItemEdit(item);
                           }
@@ -913,7 +962,7 @@ export function IngredientGroupDetailModal({
                         ×
                       </button>
                     </Badge>
-                  )
+                  ),
                 )}
               </div>
             </div>
@@ -923,7 +972,6 @@ export function IngredientGroupDetailModal({
             </div>
           )}
         </div>
-
       </DialogBody>
       <DialogActions>
         <Button onClick={onClose} color="zinc">

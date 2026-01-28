@@ -1,8 +1,8 @@
 /**
  * Guard Rails vNext - Evaluator Tests
- * 
+ *
  * Comprehensive unit tests for the evaluator module.
- * 
+ *
  * Run with: node --test evaluator.test.ts
  * Or with tsx: tsx evaluator.test.ts
  */
@@ -32,7 +32,9 @@ function createRuleset(rules: GuardRule[]): GuardrailsRuleset {
 }
 
 // Helper to create evaluation context
-function createContext(overrides?: Partial<EvaluationContext>): EvaluationContext {
+function createContext(
+  overrides?: Partial<EvaluationContext>,
+): EvaluationContext {
   return {
     locale: 'nl',
     mode: 'recipe_adaptation',
@@ -42,7 +44,11 @@ function createContext(overrides?: Partial<EvaluationContext>): EvaluationContex
 }
 
 // Helper to create text atom
-function createTextAtom(text: string, path: string, overrides?: Partial<TextAtom>): TextAtom {
+function createTextAtom(
+  text: string,
+  path: string,
+  overrides?: Partial<TextAtom>,
+): TextAtom {
   return {
     text: text.toLowerCase(),
     path,
@@ -61,7 +67,11 @@ describe('evaluateGuardrails', () => {
           priority: 50,
           target: 'ingredient',
           match: { term: 'pasta' },
-          metadata: { ruleCode: 'FORBIDDEN_INGREDIENT', label: 'Pasta', specificity: 'diet' },
+          metadata: {
+            ruleCode: 'FORBIDDEN_INGREDIENT',
+            label: 'Pasta',
+            specificity: 'diet',
+          },
         },
         {
           id: 'rule-a',
@@ -70,7 +80,11 @@ describe('evaluateGuardrails', () => {
           priority: 50, // Same priority
           target: 'ingredient',
           match: { term: 'gluten' },
-          metadata: { ruleCode: 'FORBIDDEN_INGREDIENT', label: 'Gluten', specificity: 'user' }, // Higher specificity
+          metadata: {
+            ruleCode: 'FORBIDDEN_INGREDIENT',
+            label: 'Gluten',
+            specificity: 'user',
+          }, // Higher specificity
         },
         {
           id: 'rule-b',
@@ -79,7 +93,11 @@ describe('evaluateGuardrails', () => {
           priority: 100, // Higher priority
           target: 'ingredient',
           match: { term: 'dairy' },
-          metadata: { ruleCode: 'FORBIDDEN_INGREDIENT', label: 'Dairy', specificity: 'diet' },
+          metadata: {
+            ruleCode: 'FORBIDDEN_INGREDIENT',
+            label: 'Dairy',
+            specificity: 'diet',
+          },
         },
       ];
 
@@ -102,7 +120,11 @@ describe('evaluateGuardrails', () => {
           priority: 50,
           target: 'ingredient',
           match: { term: 'pasta' },
-          metadata: { ruleCode: 'FORBIDDEN_INGREDIENT', label: 'Pasta', specificity: 'diet' },
+          metadata: {
+            ruleCode: 'FORBIDDEN_INGREDIENT',
+            label: 'Pasta',
+            specificity: 'diet',
+          },
         },
         {
           id: 'rule-a',
@@ -111,7 +133,11 @@ describe('evaluateGuardrails', () => {
           priority: 50, // Same priority
           target: 'ingredient',
           match: { term: 'gluten' },
-          metadata: { ruleCode: 'FORBIDDEN_INGREDIENT', label: 'Gluten', specificity: 'diet' }, // Same specificity
+          metadata: {
+            ruleCode: 'FORBIDDEN_INGREDIENT',
+            label: 'Gluten',
+            specificity: 'diet',
+          }, // Same specificity
         },
       ];
 
@@ -202,7 +228,10 @@ describe('evaluateGuardrails', () => {
           priority: 50,
           target: 'ingredient',
           match: { term: 'pasta' },
-          metadata: { ruleCode: 'SOFT_CONSTRAINT_VIOLATION', label: 'Pasta (soft)' },
+          metadata: {
+            ruleCode: 'SOFT_CONSTRAINT_VIOLATION',
+            label: 'Pasta (soft)',
+          },
         },
       ]);
 
@@ -236,7 +265,10 @@ describe('evaluateGuardrails', () => {
           priority: 50,
           target: 'ingredient',
           match: { term: 'mushroom' },
-          metadata: { ruleCode: 'SOFT_CONSTRAINT_VIOLATION', label: 'Mushroom (disliked)' },
+          metadata: {
+            ruleCode: 'SOFT_CONSTRAINT_VIOLATION',
+            label: 'Mushroom (disliked)',
+          },
         },
       ]);
 
@@ -301,7 +333,10 @@ describe('evaluateGuardrails', () => {
           priority: 50,
           target: 'ingredient',
           match: { term: 'pasta' },
-          metadata: { ruleCode: 'ALLOWED_INGREDIENT', label: 'Pasta (allowed)' },
+          metadata: {
+            ruleCode: 'ALLOWED_INGREDIENT',
+            label: 'Pasta (allowed)',
+          },
         },
       ]);
 
@@ -333,7 +368,10 @@ describe('evaluateGuardrails', () => {
           priority: 50,
           target: 'ingredient',
           match: { term: 'pasta' },
-          metadata: { ruleCode: 'ALLOWED_INGREDIENT', label: 'Pasta (allowed)' },
+          metadata: {
+            ruleCode: 'ALLOWED_INGREDIENT',
+            label: 'Pasta (allowed)',
+          },
         },
         {
           id: 'rule-block',
@@ -342,7 +380,10 @@ describe('evaluateGuardrails', () => {
           priority: 60, // Higher priority
           target: 'ingredient',
           match: { term: 'pasta' },
-          metadata: { ruleCode: 'FORBIDDEN_INGREDIENT', label: 'Pasta (blocked)' },
+          metadata: {
+            ruleCode: 'FORBIDDEN_INGREDIENT',
+            label: 'Pasta (blocked)',
+          },
         },
       ]);
 
@@ -447,7 +488,9 @@ describe('evaluateGuardrails', () => {
         ruleset,
         context: createContext(),
         targets: {
-          ingredient: [createTextAtom('spaghetti pasta', 'ingredients[0].name')],
+          ingredient: [
+            createTextAtom('spaghetti pasta', 'ingredients[0].name'),
+          ],
           step: [],
           metadata: [],
         },
@@ -468,7 +511,11 @@ describe('evaluateGuardrails', () => {
           strictness: 'hard',
           priority: 50,
           target: 'metadata',
-          match: { term: 'NEVO-123', canonicalId: 'NEVO-123', preferredMatchMode: 'canonical_id' },
+          match: {
+            term: 'NEVO-123',
+            canonicalId: 'NEVO-123',
+            preferredMatchMode: 'canonical_id',
+          },
           metadata: { ruleCode: 'INVALID_NEVO_CODE', label: 'Invalid NEVO' },
         },
       ]);
@@ -479,7 +526,11 @@ describe('evaluateGuardrails', () => {
         targets: {
           ingredient: [],
           step: [],
-          metadata: [createTextAtom('some text', 'metadata[0].code', { canonicalId: 'NEVO-123' })],
+          metadata: [
+            createTextAtom('some text', 'metadata[0].code', {
+              canonicalId: 'NEVO-123',
+            }),
+          ],
         },
       };
 
@@ -533,7 +584,10 @@ describe('evaluateGuardrails', () => {
           priority: 50,
           target: 'step',
           match: { term: 'pasta', preferredMatchMode: 'substring' }, // Invalid: substring on steps
-          metadata: { ruleCode: 'SOFT_CONSTRAINT_VIOLATION', label: 'Pasta (soft)' },
+          metadata: {
+            ruleCode: 'SOFT_CONSTRAINT_VIOLATION',
+            label: 'Pasta (soft)',
+          },
         },
       ]);
 
@@ -593,7 +647,10 @@ describe('evaluateGuardrails', () => {
       const result = evaluateGuardrails(input);
 
       // Trace should include all rules
-      assert.strictEqual(result.trace.evaluationSteps.length, ruleset.rules.length);
+      assert.strictEqual(
+        result.trace.evaluationSteps.length,
+        ruleset.rules.length,
+      );
       assert.strictEqual(result.trace.evaluationSteps[0].ruleId, 'rule-1');
       assert.strictEqual(result.trace.evaluationSteps[1].ruleId, 'rule-2');
     });
@@ -626,8 +683,14 @@ describe('evaluateGuardrails', () => {
       const result2 = evaluateGuardrails(input);
 
       // Same input should produce same trace
-      assert.deepStrictEqual(result1.trace.evaluationSteps, result2.trace.evaluationSteps);
-      assert.strictEqual(result1.trace.finalOutcome, result2.trace.finalOutcome);
+      assert.deepStrictEqual(
+        result1.trace.evaluationSteps,
+        result2.trace.evaluationSteps,
+      );
+      assert.strictEqual(
+        result1.trace.finalOutcome,
+        result2.trace.finalOutcome,
+      );
     });
   });
 });

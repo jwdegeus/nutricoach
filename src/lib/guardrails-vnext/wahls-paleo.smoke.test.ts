@@ -1,11 +1,11 @@
 /**
  * Guard Rails vNext - Wahls Paleo Smoke Tests
- * 
+ *
  * Smoke tests to verify Wahls Paleo ruleset is correctly loaded and evaluated.
- * 
+ *
  * Run with: node --test wahls-paleo.smoke.test.ts
  * Or with tsx: tsx wahls-paleo.smoke.test.ts
- * 
+ *
  * These tests verify:
  * - Ruleset loads successfully from database (or mock)
  * - Critical forbidden terms are blocked (hard)
@@ -22,10 +22,7 @@ import type {
   GuardrailsRepo,
   LoadGuardrailsRulesetInput,
 } from './ruleset-loader';
-import type {
-  EvaluationContext,
-  TextAtom,
-} from './types';
+import type { EvaluationContext, TextAtom } from './types';
 
 // ============================================================================
 // Fixture: Wahls Paleo Ruleset (based on migration)
@@ -57,13 +54,27 @@ function createWahlsPaleoMockRepo(): GuardrailsRepo {
                 {
                   term: 'wheat',
                   term_nl: 'tarwe',
-                  synonyms: ['tarwe', 'tarwebloem', 'tarwemeel', 'bloem', 'meel', 'wheat flour'],
+                  synonyms: [
+                    'tarwe',
+                    'tarwebloem',
+                    'tarwemeel',
+                    'bloem',
+                    'meel',
+                    'wheat flour',
+                  ],
                   is_active: true,
                 },
                 {
                   term: 'pasta',
                   term_nl: 'pasta',
-                  synonyms: ['spaghetti', 'penne', 'fusilli', 'macaroni', 'orzo', 'couscous'],
+                  synonyms: [
+                    'spaghetti',
+                    'penne',
+                    'fusilli',
+                    'macaroni',
+                    'orzo',
+                    'couscous',
+                  ],
                   is_active: true,
                 },
                 {
@@ -307,6 +318,8 @@ function createWahlsPaleoMockRepo(): GuardrailsRepo {
             rule_label: 'Gluten verboden (Wahls Paleo)',
             substitution_suggestions: [],
             priority: 100,
+            target: 'ingredient',
+            match_mode: 'word_boundary',
             updated_at: '2026-01-31T00:00:00Z',
             is_active: true,
           },
@@ -319,6 +332,8 @@ function createWahlsPaleoMockRepo(): GuardrailsRepo {
             rule_label: 'Zuivel verboden (Wahls Paleo)',
             substitution_suggestions: [],
             priority: 100,
+            target: 'ingredient',
+            match_mode: 'word_boundary',
             updated_at: '2026-01-31T00:00:00Z',
             is_active: true,
           },
@@ -343,7 +358,9 @@ function createTextAtom(text: string, path: string): TextAtom {
   };
 }
 
-function createEvaluationContext(overrides?: Partial<EvaluationContext>): EvaluationContext {
+function createEvaluationContext(
+  overrides?: Partial<EvaluationContext>,
+): EvaluationContext {
   return {
     dietId: 'wahls-paleo-uuid',
     locale: 'nl',
@@ -375,8 +392,14 @@ describe('Wahls Paleo Ruleset Smoke Tests', () => {
       assert.strictEqual(ruleset.dietId, 'wahls-paleo-uuid');
       assert(ruleset.rules.length > 0, 'Ruleset should have rules');
       assert.strictEqual(ruleset.provenance.source, 'database');
-      assert(typeof ruleset.contentHash === 'string', 'Content hash should be a string');
-      assert(ruleset.contentHash.length > 0, 'Content hash should not be empty');
+      assert(
+        typeof ruleset.contentHash === 'string',
+        'Content hash should be a string',
+      );
+      assert(
+        ruleset.contentHash.length > 0,
+        'Content hash should not be empty',
+      );
     });
 
     it('should have stable content hash', async () => {
@@ -396,7 +419,7 @@ describe('Wahls Paleo Ruleset Smoke Tests', () => {
       assert.strictEqual(
         ruleset1.contentHash,
         ruleset2.contentHash,
-        'Content hash should be deterministic'
+        'Content hash should be deterministic',
       );
     });
 
@@ -414,20 +437,20 @@ describe('Wahls Paleo Ruleset Smoke Tests', () => {
 
       // Check that we have rules from constraints
       const constraintRules = ruleset.rules.filter((r) =>
-        r.id.startsWith('db:diet_category_constraints:')
+        r.id.startsWith('db:diet_category_constraints:'),
       );
       assert(
         constraintRules.length > 0,
-        `Should have constraint rules, got ${constraintRules.length}`
+        `Should have constraint rules, got ${constraintRules.length}`,
       );
 
       // Check that we have rules from recipe adaptation rules
       const recipeRules = ruleset.rules.filter((r) =>
-        r.id.startsWith('db:recipe_adaptation_rules:')
+        r.id.startsWith('db:recipe_adaptation_rules:'),
       );
       assert(
         recipeRules.length > 0,
-        `Should have recipe adaptation rules, got ${recipeRules.length}`
+        `Should have recipe adaptation rules, got ${recipeRules.length}`,
       );
     });
   });
@@ -456,10 +479,10 @@ describe('Wahls Paleo Ruleset Smoke Tests', () => {
       assert.strictEqual(decision.ok, false, 'Should not be ok');
       assert(decision.matches.length > 0, 'Should have matches');
       assert(
-        decision.reasonCodes.some((code) =>
-          code.includes('FORBIDDEN') || code.includes('GLUTEN')
+        decision.reasonCodes.some(
+          (code) => code.includes('FORBIDDEN') || code.includes('GLUTEN'),
         ),
-        `Should have forbidden reason code, got: ${decision.reasonCodes.join(', ')}`
+        `Should have forbidden reason code, got: ${decision.reasonCodes.join(', ')}`,
       );
     });
 
@@ -508,10 +531,10 @@ describe('Wahls Paleo Ruleset Smoke Tests', () => {
       assert.strictEqual(decision.outcome, 'blocked', 'Should be blocked');
       assert.strictEqual(decision.ok, false, 'Should not be ok');
       assert(
-        decision.reasonCodes.some((code) =>
-          code.includes('FORBIDDEN') || code.includes('DAIRY')
+        decision.reasonCodes.some(
+          (code) => code.includes('FORBIDDEN') || code.includes('DAIRY'),
         ),
-        `Should have forbidden reason code, got: ${decision.reasonCodes.join(', ')}`
+        `Should have forbidden reason code, got: ${decision.reasonCodes.join(', ')}`,
       );
     });
 
@@ -586,10 +609,10 @@ describe('Wahls Paleo Ruleset Smoke Tests', () => {
       assert.strictEqual(decision.ok, true, 'Should be ok (soft never blocks)');
       assert(decision.matches.length > 0, 'Should have matches');
       assert(
-        decision.reasonCodes.some((code) =>
-          code.includes('DISCOURAGED') || code.includes('LIMITED')
+        decision.reasonCodes.some(
+          (code) => code.includes('DISCOURAGED') || code.includes('LIMITED'),
         ),
-        `Should have discouraged/limited reason code, got: ${decision.reasonCodes.join(', ')}`
+        `Should have discouraged/limited reason code, got: ${decision.reasonCodes.join(', ')}`,
       );
     });
 
@@ -688,11 +711,11 @@ describe('Wahls Paleo Ruleset Smoke Tests', () => {
       assert(decision.reasonCodes.length > 0, 'Should have reason codes');
       // Should have FORBIDDEN or GLUTEN in reason codes
       const hasForbiddenCode = decision.reasonCodes.some(
-        (code) => code.includes('FORBIDDEN') || code.includes('GLUTEN')
+        (code) => code.includes('FORBIDDEN') || code.includes('GLUTEN'),
       );
       assert(
         hasForbiddenCode,
-        `Should have forbidden reason code, got: ${decision.reasonCodes.join(', ')}`
+        `Should have forbidden reason code, got: ${decision.reasonCodes.join(', ')}`,
       );
     });
 
@@ -718,11 +741,11 @@ describe('Wahls Paleo Ruleset Smoke Tests', () => {
       assert(decision.reasonCodes.length > 0, 'Should have reason codes');
       // Should have DISCOURAGED or LIMITED in reason codes
       const hasLimitedCode = decision.reasonCodes.some(
-        (code) => code.includes('DISCOURAGED') || code.includes('LIMITED')
+        (code) => code.includes('DISCOURAGED') || code.includes('LIMITED'),
       );
       assert(
         hasLimitedCode,
-        `Should have discouraged/limited reason code, got: ${decision.reasonCodes.join(', ')}`
+        `Should have discouraged/limited reason code, got: ${decision.reasonCodes.join(', ')}`,
       );
     });
   });
@@ -743,13 +766,17 @@ describe('Wahls Paleo Ruleset Smoke Tests', () => {
           r.match.term === 'wheat' ||
           r.match.term === 'pasta' ||
           r.match.term === 'bread' ||
-          r.match.synonyms?.some((s) => ['tarwe', 'brood', 'spaghetti'].includes(s))
+          r.match.synonyms?.some((s) =>
+            ['tarwe', 'brood', 'spaghetti'].includes(s),
+          ),
       );
 
       assert(glutenRules.length > 0, 'Should have gluten blocking rules');
       assert(
-        glutenRules.every((r) => r.action === 'block' && r.strictness === 'hard'),
-        'All gluten rules should be hard blocks'
+        glutenRules.every(
+          (r) => r.action === 'block' && r.strictness === 'hard',
+        ),
+        'All gluten rules should be hard blocks',
       );
     });
 
@@ -768,13 +795,15 @@ describe('Wahls Paleo Ruleset Smoke Tests', () => {
           r.match.term === 'milk' ||
           r.match.term === 'cheese' ||
           r.match.term === 'butter' ||
-          r.match.synonyms?.some((s) => ['melk', 'kaas', 'boter'].includes(s))
+          r.match.synonyms?.some((s) => ['melk', 'kaas', 'boter'].includes(s)),
       );
 
       assert(dairyRules.length > 0, 'Should have dairy blocking rules');
       assert(
-        dairyRules.every((r) => r.action === 'block' && r.strictness === 'hard'),
-        'All dairy rules should be hard blocks'
+        dairyRules.every(
+          (r) => r.action === 'block' && r.strictness === 'hard',
+        ),
+        'All dairy rules should be hard blocks',
       );
     });
 
@@ -792,13 +821,15 @@ describe('Wahls Paleo Ruleset Smoke Tests', () => {
         (r) =>
           r.match.term === 'lentils' ||
           r.match.term === 'beans' ||
-          r.match.synonyms?.some((s) => ['linzen', 'bonen'].includes(s))
+          r.match.synonyms?.some((s) => ['linzen', 'bonen'].includes(s)),
       );
 
       assert(legumesRules.length > 0, 'Should have legumes warning rules');
       assert(
-        legumesRules.every((r) => r.action === 'block' && r.strictness === 'soft'),
-        'All legumes rules should be soft warnings'
+        legumesRules.every(
+          (r) => r.action === 'block' && r.strictness === 'soft',
+        ),
+        'All legumes rules should be soft warnings',
       );
     });
   });

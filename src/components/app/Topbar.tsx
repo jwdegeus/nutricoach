@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Search, User, Settings, LogOut, ChevronRight } from "lucide-react";
-import { cn } from "@/src/lib/utils";
-import { getPageTitle, getBreadcrumbs } from "@/src/lib/nav";
-import { Input } from "@/components/catalyst/input";
-import { MobileSidebar } from "@/src/components/app/MobileSidebar";
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Search, User, Settings, LogOut, ChevronRight } from 'lucide-react';
+import { cn } from '@/src/lib/utils';
+import { getPageTitle, getBreadcrumbs } from '@/src/lib/nav';
+import { Input } from '@/components/catalyst/input';
+import { MobileSidebar } from '@/src/components/app/MobileSidebar';
 import {
   Dropdown,
   DropdownButton,
@@ -14,8 +14,8 @@ import {
   DropdownItem,
   DropdownHeader,
   DropdownDivider,
-} from "@/components/catalyst/dropdown";
-import { useTranslations } from "next-intl";
+} from '@/components/catalyst/dropdown';
+import { useTranslations } from 'next-intl';
 
 export function Topbar() {
   const pathname = usePathname();
@@ -34,7 +34,7 @@ export function Topbar() {
           <div className="md:hidden">
             <MobileSidebar />
           </div>
-          
+
           {/* Breadcrumbs */}
           <nav className="hidden md:flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
             {breadcrumbs.map((crumb, index) => (
@@ -43,8 +43,9 @@ export function Topbar() {
                 <Link
                   href={crumb.href}
                   className={cn(
-                    "hover:text-gray-900 dark:hover:text-white transition-colors",
-                    index === breadcrumbs.length - 1 && "text-gray-900 dark:text-white font-medium"
+                    'hover:text-gray-900 dark:hover:text-white transition-colors',
+                    index === breadcrumbs.length - 1 &&
+                      'text-gray-900 dark:text-white font-medium',
                   )}
                 >
                   {crumb.label}
@@ -52,7 +53,7 @@ export function Topbar() {
               </div>
             ))}
           </nav>
-          
+
           {/* Page title (mobile) */}
           <h2 className="text-sm font-medium text-gray-500 md:hidden dark:text-gray-400">
             {pageTitle}
@@ -93,7 +94,7 @@ export function Topbar() {
               <DropdownItem
                 onClick={() => {
                   // TODO: Implement logout logic
-                  console.log("Logout clicked");
+                  console.log('Logout clicked');
                 }}
               >
                 <LogOut className="h-4 w-4" />

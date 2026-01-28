@@ -1,17 +1,17 @@
-import type { Metadata } from "next";
-import { redirect, notFound } from "next/navigation";
-import { createClient } from "@/src/lib/supabase/server";
-import { loadMealPlanAction } from "../../actions/mealPlans.actions";
-import { ShoppingListView } from "../../shopping/components/ShoppingListView";
-import { MissingIngredientsPanel } from "../../shopping/components/MissingIngredientsPanel";
-import { MealPlannerShoppingService } from "@/src/lib/agents/meal-planner";
-import { PantryService } from "@/src/lib/pantry/pantry.service";
-import { Heading } from "@/components/catalyst/heading";
-import { Text } from "@/components/catalyst/text";
+import type { Metadata } from 'next';
+import { redirect, notFound } from 'next/navigation';
+import { createClient } from '@/src/lib/supabase/server';
+import { loadMealPlanAction } from '../../actions/mealPlans.actions';
+import { ShoppingListView } from '../../shopping/components/ShoppingListView';
+import { MealPlannerShoppingService } from '@/src/lib/agents/meal-planner';
+import { PantryService } from '@/src/lib/pantry/pantry.service';
+import { Heading } from '@/components/catalyst/heading';
+import { Text } from '@/components/catalyst/text';
 
 export const metadata: Metadata = {
-  title: "Wekelijkse Boodschappen | NutriCoach",
-  description: "Bekijk je wekelijkse boodschappenlijst op basis van je meal plan",
+  title: 'Wekelijkse Boodschappen | NutriCoach',
+  description:
+    'Bekijk je wekelijkse boodschappenlijst op basis van je meal plan',
 };
 
 type PageProps = {
@@ -21,9 +21,7 @@ type PageProps = {
 /**
  * Shopping page for a persisted meal plan
  */
-export default async function PlanShoppingPage({
-  params,
-}: PageProps) {
+export default async function PlanShoppingPage({ params }: PageProps) {
   const { planId } = await params;
 
   // Check authentication
@@ -33,15 +31,15 @@ export default async function PlanShoppingPage({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   // Load meal plan
   const planResult = await loadMealPlanAction(planId);
 
   if (!planResult.ok) {
-    if (planResult.error.code === "AUTH_ERROR") {
-      redirect("/login");
+    if (planResult.error.code === 'AUTH_ERROR') {
+      redirect('/login');
     }
     notFound();
   }
@@ -58,16 +56,19 @@ export default async function PlanShoppingPage({
 
   // Load pantry availability for all items to show what's in pantry
   const pantryService = new PantryService();
-  const allNevoCodes = shoppingList.groups.flatMap(group => 
-    group.items.map(item => item.nevoCode)
+  const allNevoCodes = shoppingList.groups.flatMap((group) =>
+    group.items.map((item) => item.nevoCode),
   );
   const pantryAvailability = await pantryService.loadAvailabilityByNevoCodes(
     user.id,
-    allNevoCodes
+    allNevoCodes,
   );
-  
+
   // Create an object for quick lookup (serializable for client component)
-  const pantryMap: Record<string, { availableG?: number; isAvailable?: boolean }> = {};
+  const pantryMap: Record<
+    string,
+    { availableG?: number; isAvailable?: boolean }
+  > = {};
   for (const item of pantryAvailability) {
     pantryMap[item.nevoCode] = {
       availableG: item.availableG,
@@ -79,22 +80,24 @@ export default async function PlanShoppingPage({
   const startDate = new Date(planRecord.dateFrom);
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + planRecord.days - 1);
-  const endDateStr = endDate.toISOString().split("T")[0];
+  const endDateStr = endDate.toISOString().split('T')[0];
 
   return (
     <div className="space-y-6">
       <div>
         <Heading level={1}>Wekelijkse Boodschappen</Heading>
         <Text className="mt-2 text-zinc-500 dark:text-zinc-400">
-          Periode: {planRecord.dateFrom} tot {endDateStr} ({planRecord.days} dagen)
+          Periode: {planRecord.dateFrom} tot {endDateStr} ({planRecord.days}{' '}
+          dagen)
         </Text>
         <Text className="mt-1 text-sm text-zinc-400 dark:text-zinc-500">
-          Deze lijst toont alleen items die je nog moet kopen. Items die al in je pantry zitten worden automatisch uitgesloten.
+          Deze lijst toont alleen items die je nog moet kopen. Items die al in
+          je pantry zitten worden automatisch uitgesloten.
         </Text>
       </div>
 
-      <ShoppingListView 
-        shoppingList={shoppingList} 
+      <ShoppingListView
+        shoppingList={shoppingList}
         coverage={coverage}
         pantryMap={pantryMap}
       />

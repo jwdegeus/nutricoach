@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { Button } from "@/components/catalyst/button";
-import { Link } from "@/components/catalyst/link";
-import { TagIcon, Squares2X2Icon } from "@heroicons/react/20/solid";
+import { Button } from '@/components/catalyst/button';
+import { Link } from '@/components/catalyst/link';
+import { TagIcon, Squares2X2Icon } from '@heroicons/react/20/solid';
 
 export function AdminLinks() {
   return (

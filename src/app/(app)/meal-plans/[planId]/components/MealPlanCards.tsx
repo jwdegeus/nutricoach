@@ -1,11 +1,10 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import type { MealPlanResponse, MealPlanDay } from "@/src/lib/diets";
-import type { MealPlanEnrichmentResponse } from "@/src/lib/agents/meal-planner/mealPlannerEnrichment.types";
-import { MealCard } from "./MealCard";
-import { QuickEditBar } from "./QuickEditBar";
-import { Heading } from "@/components/catalyst/heading";
+import type { MealPlanResponse, MealPlanDay } from '@/src/lib/diets';
+import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
+import { MealCard } from './MealCard';
+import { QuickEditBar } from './QuickEditBar';
+import { Heading } from '@/components/catalyst/heading';
 
 type MealPlanCardsProps = {
   planId: string;
@@ -21,7 +20,10 @@ export function MealPlanCards({
   nevoFoodNamesByCode,
 }: MealPlanCardsProps) {
   // Create enrichment map for quick lookup
-  const enrichmentMap = new Map<string, MealPlanEnrichmentResponse["meals"][0]>();
+  const enrichmentMap = new Map<
+    string,
+    MealPlanEnrichmentResponse['meals'][0]
+  >();
   if (enrichment) {
     for (const meal of enrichment.meals) {
       const key = `${meal.date}:${meal.mealSlot}`;
@@ -37,18 +39,18 @@ export function MealPlanCards({
   // Helper to format date
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString("nl-NL", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+    return date.toLocaleDateString('nl-NL', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
     });
   };
 
   // Helper to get meal summary (ingredients or enrichment)
-  const getMealSummary = (meal: MealPlanDay["meals"][0]) => {
+  const getMealSummary = (meal: MealPlanDay['meals'][0]) => {
     const enriched = getEnrichedMeal(meal.date, meal.slot);
-    
+
     if (enriched) {
       // Use enrichment: show first 2 instructions
       return enriched.instructions.slice(0, 2);
@@ -58,27 +60,27 @@ export function MealPlanCards({
         return meal.ingredientRefs
           .slice(0, 5) // Limit to 5 ingredients
           .map((ref) => {
-            const name = ref.displayName || nevoFoodNamesByCode[ref.nevoCode] || `NEVO ${ref.nevoCode}`;
+            const name =
+              ref.displayName ||
+              nevoFoodNamesByCode[ref.nevoCode] ||
+              `NEVO ${ref.nevoCode}`;
             return `${name} (${ref.quantityG}g)`;
           });
       }
-      return ["Geen ingrediënten beschikbaar"];
+      return ['Geen ingrediënten beschikbaar'];
     }
   };
 
   return (
     <div className="space-y-6">
       <Heading>Maaltijden</Heading>
-      
+
       {plan.days.map((day) => (
         <div key={day.date} className="space-y-4">
           {/* Day Header */}
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">{formatDate(day.date)}</h2>
-            <QuickEditBar
-              planId={planId}
-              date={day.date}
-            />
+            <QuickEditBar planId={planId} date={day.date} />
           </div>
 
           {/* Meal Cards Grid */}
@@ -89,7 +91,7 @@ export function MealPlanCards({
 
               // Get cook plan for this day
               const cookPlan = enrichment?.cookPlanDays?.find(
-                (cp) => cp.date === meal.date
+                (cp) => cp.date === meal.date,
               );
 
               return (

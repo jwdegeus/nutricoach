@@ -1,27 +1,32 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { Heading } from "@/components/catalyst/heading";
-import { Button } from "@/components/catalyst/button";
-import { ArrowLeftIcon } from "@heroicons/react/20/solid";
-import Link from "next/link";
-import { MealDetail } from "./MealDetail";
-import { getMealByIdAction } from "../../actions/meals.actions";
-import { getNevoFoodByCode } from "@/src/lib/nevo/nutrition-calculator";
-import { getRecipeComplianceScoresAction } from "../../actions/recipe-compliance.actions";
-import type { RecipeComplianceResult } from "../../actions/recipe-compliance.actions";
+import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { Heading } from '@/components/catalyst/heading';
+import { Button } from '@/components/catalyst/button';
+import { ArrowLeftIcon } from '@heroicons/react/20/solid';
+import Link from 'next/link';
+import { MealDetail } from './MealDetail';
+import { getMealByIdAction } from '../../actions/meals.actions';
+import { getRecipeComplianceScoresAction } from '../../actions/recipe-compliance.actions';
+import type { RecipeComplianceResult } from '../../actions/recipe-compliance.actions';
 
 type RecipeDetailPageClientProps = {
   mealId: string;
-  mealSource: "custom" | "gemini";
+  mealSource: 'custom' | 'gemini';
 };
 
-export function RecipeDetailPageClient({ mealId, mealSource }: RecipeDetailPageClientProps) {
+export function RecipeDetailPageClient({
+  mealId,
+  mealSource,
+}: RecipeDetailPageClientProps) {
   const router = useRouter();
   const [meal, setMeal] = useState<any>(null);
-  const [nevoFoodNamesByCode, setNevoFoodNamesByCode] = useState<Record<string, string>>({});
-  const [complianceScore, setComplianceScore] = useState<RecipeComplianceResult | null>(null);
+  const [nevoFoodNamesByCode, setNevoFoodNamesByCode] = useState<
+    Record<string, string>
+  >({});
+  const [complianceScore, setComplianceScore] =
+    useState<RecipeComplianceResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,8 +40,8 @@ export function RecipeDetailPageClient({ mealId, mealSource }: RecipeDetailPageC
       const mealResult = await getMealByIdAction(mealId, mealSource);
 
       if (!mealResult.ok) {
-        if (mealResult.error.code === "AUTH_ERROR") {
-          router.push("/login");
+        if (mealResult.error.code === 'AUTH_ERROR') {
+          router.push('/login');
           return;
         }
         setError(mealResult.error.message);
@@ -45,7 +50,7 @@ export function RecipeDetailPageClient({ mealId, mealSource }: RecipeDetailPageC
       }
 
       const loadedMeal = mealResult.data;
-      console.log("[MealDetailPageClient] Meal loaded:", {
+      console.log('[MealDetailPageClient] Meal loaded:', {
         id: loadedMeal.id,
         name: loadedMeal.name,
         sourceImageUrl: loadedMeal.sourceImageUrl,
@@ -61,10 +66,14 @@ export function RecipeDetailPageClient({ mealId, mealSource }: RecipeDetailPageC
       const base = loadedMeal.mealData ?? loadedMeal.meal_data ?? {};
       const instructions =
         loadedMeal.aiAnalysis?.instructions ??
-        (loadedMeal as { ai_analysis?: { instructions?: unknown } }).ai_analysis?.instructions;
+        (loadedMeal as { ai_analysis?: { instructions?: unknown } }).ai_analysis
+          ?.instructions;
       const mealPayload =
         Array.isArray(instructions) && instructions.length > 0
-          ? { ...(typeof base === "object" && base !== null ? base : {}), instructions }
+          ? {
+              ...(typeof base === 'object' && base !== null ? base : {}),
+              instructions,
+            }
           : base;
       const complianceResult = await getRecipeComplianceScoresAction([
         { id: loadedMeal.id, source: mealSource, mealData: mealPayload },
@@ -112,7 +121,7 @@ export function RecipeDetailPageClient({ mealId, mealSource }: RecipeDetailPageC
       setNevoFoodNamesByCode(namesMap);
       setLoading(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Onbekende fout");
+      setError(err instanceof Error ? err.message : 'Onbekende fout');
       setLoading(false);
     }
   }, [mealId, mealSource, router]);
@@ -123,36 +132,43 @@ export function RecipeDetailPageClient({ mealId, mealSource }: RecipeDetailPageC
 
     const handleSourceUpdate = (event?: CustomEvent | MessageEvent) => {
       // Reload meal data when source is updated
-      const detail = (event as CustomEvent)?.detail || (event as MessageEvent)?.data;
-      console.log("Recipe source updated event received, reloading meal data...", detail);
-      
+      const detail =
+        (event as CustomEvent)?.detail || (event as MessageEvent)?.data;
+      console.log(
+        'Recipe source updated event received, reloading meal data...',
+        detail,
+      );
+
       // Force reload after a short delay to ensure database is updated
       setTimeout(() => {
-        console.log("Reloading meal data after source update...");
+        console.log('Reloading meal data after source update...');
         loadMeal();
       }, 1000);
     };
 
     // Use BroadcastChannel for cross-tab communication
     let broadcastChannel: BroadcastChannel | null = null;
-    
-    if (typeof window !== "undefined") {
+
+    if (typeof window !== 'undefined') {
       // Listen to custom event
       const eventHandler = handleSourceUpdate as EventListener;
-      window.addEventListener("recipeSourceUpdated", eventHandler);
-      
+      window.addEventListener('recipeSourceUpdated', eventHandler);
+
       // Also listen to BroadcastChannel
       try {
-        broadcastChannel = new BroadcastChannel("recipe-source-updates");
+        broadcastChannel = new BroadcastChannel('recipe-source-updates');
         broadcastChannel.onmessage = handleSourceUpdate;
-      } catch (e) {
-        console.log("BroadcastChannel not supported, using events only");
+      } catch (_e) {
+        console.log('BroadcastChannel not supported, using events only');
       }
     }
 
     return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("recipeSourceUpdated", handleSourceUpdate as EventListener);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener(
+          'recipeSourceUpdated',
+          handleSourceUpdate as EventListener,
+        );
       }
       if (broadcastChannel) {
         broadcastChannel.close();
@@ -163,13 +179,15 @@ export function RecipeDetailPageClient({ mealId, mealSource }: RecipeDetailPageC
   // Initial load
   useEffect(() => {
     // Validate mealId
-    if (!mealId || mealId === "undefined" || mealId.trim() === "") {
-      setError("Recept ID is vereist");
-      setLoading(false);
+    if (!mealId || mealId === 'undefined' || mealId.trim() === '') {
+      queueMicrotask(() => {
+        setError('Recept ID is vereist');
+        setLoading(false);
+      });
       return;
     }
 
-    loadMeal();
+    queueMicrotask(() => loadMeal());
   }, [mealId, mealSource, loadMeal]);
 
   if (loading) {
@@ -185,7 +203,9 @@ export function RecipeDetailPageClient({ mealId, mealSource }: RecipeDetailPageC
           <Heading level={1}>Laden...</Heading>
         </div>
         <div className="text-center py-12">
-          <p className="text-zinc-500 dark:text-zinc-400">Recept details worden geladen...</p>
+          <p className="text-zinc-500 dark:text-zinc-400">
+            Recept details worden geladen...
+          </p>
         </div>
       </div>
     );
@@ -205,7 +225,7 @@ export function RecipeDetailPageClient({ mealId, mealSource }: RecipeDetailPageC
         </div>
         <div className="text-center py-12">
           <p className="text-red-600 dark:text-red-400">
-            {error || "Recept niet gevonden"}
+            {error || 'Recept niet gevonden'}
           </p>
         </div>
       </div>
@@ -222,12 +242,12 @@ export function RecipeDetailPageClient({ mealId, mealSource }: RecipeDetailPageC
           </Button>
         </Link>
         <Heading level={1}>
-          {meal.name || meal.mealName || meal.meal_name || "Recept Details"}
+          {meal.name || meal.mealName || meal.meal_name || 'Recept Details'}
         </Heading>
       </div>
 
-      <MealDetail 
-        meal={meal} 
+      <MealDetail
+        meal={meal}
         mealSource={mealSource}
         nevoFoodNamesByCode={nevoFoodNamesByCode}
         complianceScore={complianceScore}

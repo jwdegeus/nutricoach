@@ -1,20 +1,15 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { revalidatePath } from "next/cache";
-import type {
-  OnboardingInput,
-  OnboardingStatus,
-  DietStrictness,
-  VarietyLevel,
-} from "../onboarding.types";
+import { createClient } from '@/src/lib/supabase/server';
+import { revalidatePath } from 'next/cache';
+import type { OnboardingInput, OnboardingStatus } from '../onboarding.types';
 import {
   mapVarietyLevelToDays,
   mapStrictnessToNumber,
   mapNumberToStrictness,
   mapDaysToVarietyLevel,
-} from "../onboarding.types";
-import { validateDietType } from "../queries/diet-rules.queries";
+} from '../onboarding.types';
+import { validateDietType } from '../queries/diet-rules.queries';
 
 /**
  * Validation error response type
@@ -35,41 +30,43 @@ type ActionResult<T> = ActionError | ActionSuccess<T>;
 /**
  * Validates onboarding input data
  */
-async function validateOnboardingInput(input: OnboardingInput): Promise<string | null> {
+async function validateOnboardingInput(
+  input: OnboardingInput,
+): Promise<string | null> {
   // Validate dietTypeId exists and is active
   if (!input.dietTypeId) {
-    return "dietTypeId is verplicht";
+    return 'dietTypeId is verplicht';
   }
 
   const isValidDietType = await validateDietType(input.dietTypeId);
   if (!isValidDietType) {
-    return "Geselecteerd dieettype is niet geldig of niet beschikbaar";
+    return 'Geselecteerd dieettype is niet geldig of niet beschikbaar';
   }
 
   // Validate maxPrepMinutes
   const validPrepMinutes = [15, 30, 45, 60];
   if (!validPrepMinutes.includes(input.maxPrepMinutes)) {
-    return `maxPrepMinutes moet een van de volgende waarden zijn: ${validPrepMinutes.join(", ")}`;
+    return `maxPrepMinutes moet een van de volgende waarden zijn: ${validPrepMinutes.join(', ')}`;
   }
 
   // Validate servingsDefault
   if (input.servingsDefault < 1 || input.servingsDefault > 6) {
-    return "servingsDefault moet tussen 1 en 6 liggen";
+    return 'servingsDefault moet tussen 1 en 6 liggen';
   }
 
   // Validate kcalTarget (if provided)
   if (input.kcalTarget !== null && input.kcalTarget !== undefined) {
     if (input.kcalTarget < 800 || input.kcalTarget > 6000) {
-      return "kcalTarget moet tussen 800 en 6000 liggen (of null zijn)";
+      return 'kcalTarget moet tussen 800 en 6000 liggen (of null zijn)';
     }
   }
 
   // Validate arrays (max 50 items)
   if (input.allergies.length > 50) {
-    return "allergies mag maximaal 50 items bevatten";
+    return 'allergies mag maximaal 50 items bevatten';
   }
   if (input.dislikes.length > 50) {
-    return "dislikes mag maximaal 50 items bevatten";
+    return 'dislikes mag maximaal 50 items bevatten';
   }
 
   return null;
@@ -89,15 +86,15 @@ export async function loadOnboardingStatusAction(): Promise<
 
   if (!user) {
     return {
-      error: "Je moet ingelogd zijn om je onboarding status te bekijken",
+      error: 'Je moet ingelogd zijn om je onboarding status te bekijken',
     };
   }
 
   // Load user preferences
   const { data: preferences, error: prefsError } = await supabase
-    .from("user_preferences")
-    .select("*")
-    .eq("user_id", user.id)
+    .from('user_preferences')
+    .select('*')
+    .eq('user_id', user.id)
     .maybeSingle();
 
   if (prefsError) {
@@ -108,10 +105,10 @@ export async function loadOnboardingStatusAction(): Promise<
 
   // Load active diet profile (ends_on is null)
   const { data: activeProfile, error: profileError } = await supabase
-    .from("user_diet_profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .is("ends_on", null)
+    .from('user_diet_profiles')
+    .select('*')
+    .eq('user_id', user.id)
+    .is('ends_on', null)
     .maybeSingle();
 
   if (profileError) {
@@ -139,17 +136,19 @@ export async function loadOnboardingStatusAction(): Promise<
       dislikes: preferences?.dislikes ?? [],
       mealPreferences: (() => {
         // Normalize to arrays, handling both string (legacy) and array values
-        const normalizeToArray = (value: string | string[] | null | undefined): string[] | undefined => {
+        const normalizeToArray = (
+          value: string | string[] | null | undefined,
+        ): string[] | undefined => {
           if (!value) return undefined;
           if (Array.isArray(value)) return value.length > 0 ? value : undefined;
           if (typeof value === 'string' && value.trim()) return [value.trim()];
           return undefined;
         };
-        
+
         const breakfast = normalizeToArray(preferences?.breakfast_preference);
         const lunch = normalizeToArray(preferences?.lunch_preference);
         const dinner = normalizeToArray(preferences?.dinner_preference);
-        
+
         // Only include mealPreferences if at least one has values
         if (breakfast || lunch || dinner) {
           return { breakfast, lunch, dinner };
@@ -166,7 +165,7 @@ export async function loadOnboardingStatusAction(): Promise<
  * Saves onboarding data for the authenticated user
  */
 export async function saveOnboardingAction(
-  input: OnboardingInput
+  input: OnboardingInput,
 ): Promise<ActionResult<OnboardingStatus>> {
   const supabase = await createClient();
 
@@ -176,7 +175,7 @@ export async function saveOnboardingAction(
 
   if (!user) {
     return {
-      error: "Je moet ingelogd zijn om je onboarding op te slaan",
+      error: 'Je moet ingelogd zijn om je onboarding op te slaan',
     };
   }
 
@@ -214,9 +213,9 @@ export async function saveOnboardingAction(
   };
 
   const { error: prefsError } = await supabase
-    .from("user_preferences")
+    .from('user_preferences')
     .upsert(preferencesData, {
-      onConflict: "user_id",
+      onConflict: 'user_id',
     });
 
   if (prefsError) {
@@ -227,10 +226,10 @@ export async function saveOnboardingAction(
 
   // Handle diet profile: update existing active profile or create new one
   const { data: existingActiveProfile, error: checkError } = await supabase
-    .from("user_diet_profiles")
-    .select("id")
-    .eq("user_id", user.id)
-    .is("ends_on", null)
+    .from('user_diet_profiles')
+    .select('id')
+    .eq('user_id', user.id)
+    .is('ends_on', null)
     .maybeSingle();
 
   if (checkError) {
@@ -242,12 +241,12 @@ export async function saveOnboardingAction(
   if (existingActiveProfile) {
     // Update existing active profile
     const { error: updateError } = await supabase
-      .from("user_diet_profiles")
+      .from('user_diet_profiles')
       .update({
         diet_type_id: input.dietTypeId || null,
         strictness: strictnessNumber,
       })
-      .eq("id", existingActiveProfile.id);
+      .eq('id', existingActiveProfile.id);
 
     if (updateError) {
       return {
@@ -257,10 +256,10 @@ export async function saveOnboardingAction(
   } else {
     // Create new active profile
     const { error: insertError } = await supabase
-      .from("user_diet_profiles")
+      .from('user_diet_profiles')
       .insert({
         user_id: user.id,
-        starts_on: new Date().toISOString().split("T")[0], // Current date as YYYY-MM-DD
+        starts_on: new Date().toISOString().split('T')[0], // Current date as YYYY-MM-DD
         ends_on: null,
         diet_type_id: input.dietTypeId || null,
         strictness: strictnessNumber,
@@ -274,9 +273,9 @@ export async function saveOnboardingAction(
   }
 
   // Revalidate paths to ensure middleware picks up the new onboarding status
-  revalidatePath("/onboarding");
-  revalidatePath("/account");
-  revalidatePath("/", "layout");
+  revalidatePath('/onboarding');
+  revalidatePath('/account');
+  revalidatePath('/', 'layout');
 
   // Return updated status (construct directly to avoid another query)
   const status: OnboardingStatus = {

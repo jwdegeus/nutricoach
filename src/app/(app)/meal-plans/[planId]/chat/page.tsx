@@ -1,14 +1,14 @@
-import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { createClient } from "@/src/lib/supabase/server";
-import { loadMealPlanAction } from "../../actions/mealPlans.actions";
-import { PlanChatClient } from "./components/PlanChatClient";
-import { Heading } from "@/components/catalyst/heading";
-import { Text } from "@/components/catalyst/text";
+import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/src/lib/supabase/server';
+import { loadMealPlanAction } from '../../actions/mealPlans.actions';
+import { PlanChatClient } from './components/PlanChatClient';
+import { Heading } from '@/components/catalyst/heading';
+import { Text } from '@/components/catalyst/text';
 
 export const metadata: Metadata = {
-  title: "Plan Chat | NutriCoach",
-  description: "Chat met je meal plan om aanpassingen te maken",
+  title: 'Plan Chat | NutriCoach',
+  description: 'Chat met je meal plan om aanpassingen te maken',
 };
 
 type PageProps = {
@@ -18,9 +18,7 @@ type PageProps = {
 /**
  * Plan chat page
  */
-export default async function PlanChatPage({
-  params,
-}: PageProps) {
+export default async function PlanChatPage({ params }: PageProps) {
   const { planId } = await params;
 
   // Check authentication
@@ -30,15 +28,15 @@ export default async function PlanChatPage({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   // Load meal plan to verify access
   const planResult = await loadMealPlanAction(planId);
 
   if (!planResult.ok) {
-    if (planResult.error.code === "AUTH_ERROR") {
-      redirect("/login");
+    if (planResult.error.code === 'AUTH_ERROR') {
+      redirect('/login');
     }
     redirect(`/meal-plans/${planId}`);
   }

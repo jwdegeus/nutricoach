@@ -1,8 +1,8 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { isAdmin } from "@/src/lib/auth/roles";
-import type { ActionResult } from "@/src/lib/types";
+import { createClient } from '@/src/lib/supabase/server';
+import { isAdmin } from '@/src/lib/auth/roles';
+import type { ActionResult } from '@/src/lib/types';
 
 export type RecipeAdaptationRuleInput = {
   dietTypeId: string;
@@ -13,8 +13,8 @@ export type RecipeAdaptationRuleInput = {
   substitutionSuggestions: string[];
   priority?: number;
   isActive?: boolean;
-  target?: "ingredient" | "step" | "metadata";
-  matchMode?: "exact" | "word_boundary" | "substring" | "canonical_id";
+  target?: 'ingredient' | 'step' | 'metadata';
+  matchMode?: 'exact' | 'word_boundary' | 'substring' | 'canonical_id';
 };
 
 export type RecipeAdaptationRuleOutput = {
@@ -27,8 +27,8 @@ export type RecipeAdaptationRuleOutput = {
   substitutionSuggestions: string[];
   priority: number;
   isActive: boolean;
-  target: "ingredient" | "step" | "metadata";
-  matchMode: "exact" | "word_boundary" | "substring" | "canonical_id";
+  target: 'ingredient' | 'step' | 'metadata';
+  matchMode: 'exact' | 'word_boundary' | 'substring' | 'canonical_id';
   createdAt: string;
   updatedAt: string;
 };
@@ -54,25 +54,29 @@ export type RecipeAdaptationHeuristicOutput = {
  * Get all recipe adaptation rules for a diet type (admin only)
  */
 export async function getRecipeAdaptationRulesForAdmin(
-  dietTypeId: string
+  dietTypeId: string,
 ): Promise<ActionResult<RecipeAdaptationRuleOutput[]>> {
   const admin = await isAdmin();
   if (!admin) {
-    return { error: "Geen toegang: alleen admins kunnen recipe adaptation rules zien" };
+    return {
+      error: 'Geen toegang: alleen admins kunnen recipe adaptation rules zien',
+    };
   }
 
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from("recipe_adaptation_rules")
-    .select("*")
-    .eq("diet_type_id", dietTypeId)
-    .order("priority", { ascending: false })
-    .order("term", { ascending: true });
+    .from('recipe_adaptation_rules')
+    .select('*')
+    .eq('diet_type_id', dietTypeId)
+    .order('priority', { ascending: false })
+    .order('term', { ascending: true });
 
   if (error) {
-    console.error("Error fetching recipe adaptation rules:", error);
-    return { error: `Fout bij ophalen recipe adaptation rules: ${error.message}` };
+    console.error('Error fetching recipe adaptation rules:', error);
+    return {
+      error: `Fout bij ophalen recipe adaptation rules: ${error.message}`,
+    };
   }
 
   return {
@@ -87,8 +91,14 @@ export async function getRecipeAdaptationRulesForAdmin(
         substitutionSuggestions: rule.substitution_suggestions || [],
         priority: rule.priority,
         isActive: rule.is_active,
-        target: (rule.target as "ingredient" | "step" | "metadata") || "ingredient",
-        matchMode: (rule.match_mode as "exact" | "word_boundary" | "substring" | "canonical_id") || "word_boundary",
+        target:
+          (rule.target as 'ingredient' | 'step' | 'metadata') || 'ingredient',
+        matchMode:
+          (rule.match_mode as
+            | 'exact'
+            | 'word_boundary'
+            | 'substring'
+            | 'canonical_id') || 'word_boundary',
         createdAt: rule.created_at,
         updatedAt: rule.updated_at,
       })) ?? [],
@@ -99,32 +109,37 @@ export async function getRecipeAdaptationRulesForAdmin(
  * Create a new recipe adaptation rule (admin only)
  */
 export async function createRecipeAdaptationRule(
-  input: RecipeAdaptationRuleInput
+  input: RecipeAdaptationRuleInput,
 ): Promise<ActionResult<RecipeAdaptationRuleOutput>> {
   const admin = await isAdmin();
   if (!admin) {
-    return { error: "Geen toegang: alleen admins kunnen recipe adaptation rules aanmaken" };
+    return {
+      error:
+        'Geen toegang: alleen admins kunnen recipe adaptation rules aanmaken',
+    };
   }
 
   if (!input.dietTypeId || !input.term || !input.ruleCode || !input.ruleLabel) {
-    return { error: "Dieettype ID, term, ruleCode en ruleLabel zijn verplicht" };
+    return {
+      error: 'Dieettype ID, term, ruleCode en ruleLabel zijn verplicht',
+    };
   }
 
   const supabase = await createClient();
 
   // Verify diet type exists
   const { data: dietType, error: dietError } = await supabase
-    .from("diet_types")
-    .select("id")
-    .eq("id", input.dietTypeId)
+    .from('diet_types')
+    .select('id')
+    .eq('id', input.dietTypeId)
     .single();
 
   if (dietError || !dietType) {
-    return { error: "Dieettype niet gevonden" };
+    return { error: 'Dieettype niet gevonden' };
   }
 
   const { data, error } = await supabase
-    .from("recipe_adaptation_rules")
+    .from('recipe_adaptation_rules')
     .insert({
       diet_type_id: input.dietTypeId,
       term: input.term.trim().toLowerCase(),
@@ -134,20 +149,22 @@ export async function createRecipeAdaptationRule(
       substitution_suggestions: input.substitutionSuggestions || [],
       priority: input.priority ?? 50,
       is_active: input.isActive ?? true,
-      target: input.target ?? "ingredient",
-      match_mode: input.matchMode ?? "word_boundary",
+      target: input.target ?? 'ingredient',
+      match_mode: input.matchMode ?? 'word_boundary',
     })
-    .select("*")
+    .select('*')
     .single();
 
   if (error) {
-    console.error("Error creating recipe adaptation rule:", error);
-    if (error.code === "23505") {
+    console.error('Error creating recipe adaptation rule:', error);
+    if (error.code === '23505') {
       return {
-        error: "Een regel met deze term bestaat al voor dit dieettype",
+        error: 'Een regel met deze term bestaat al voor dit dieettype',
       };
     }
-    return { error: `Fout bij aanmaken recipe adaptation rule: ${error.message}` };
+    return {
+      error: `Fout bij aanmaken recipe adaptation rule: ${error.message}`,
+    };
   }
 
   return {
@@ -161,6 +178,15 @@ export async function createRecipeAdaptationRule(
       substitutionSuggestions: data.substitution_suggestions || [],
       priority: data.priority,
       isActive: data.is_active,
+      target: (data.target ?? 'ingredient') as
+        | 'ingredient'
+        | 'step'
+        | 'metadata',
+      matchMode: (data.match_mode ?? 'word_boundary') as
+        | 'exact'
+        | 'word_boundary'
+        | 'substring'
+        | 'canonical_id',
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     },
@@ -172,11 +198,14 @@ export async function createRecipeAdaptationRule(
  */
 export async function updateRecipeAdaptationRule(
   id: string,
-  input: Partial<RecipeAdaptationRuleInput>
+  input: Partial<RecipeAdaptationRuleInput>,
 ): Promise<ActionResult<RecipeAdaptationRuleOutput>> {
   const admin = await isAdmin();
   if (!admin) {
-    return { error: "Geen toegang: alleen admins kunnen recipe adaptation rules bewerken" };
+    return {
+      error:
+        'Geen toegang: alleen admins kunnen recipe adaptation rules bewerken',
+    };
   }
 
   const supabase = await createClient();
@@ -211,24 +240,26 @@ export async function updateRecipeAdaptationRule(
   }
 
   if (Object.keys(updateData).length === 0) {
-    return { error: "Geen wijzigingen opgegeven" };
+    return { error: 'Geen wijzigingen opgegeven' };
   }
 
   const { data, error } = await supabase
-    .from("recipe_adaptation_rules")
+    .from('recipe_adaptation_rules')
     .update(updateData)
-    .eq("id", id)
-    .select("*")
+    .eq('id', id)
+    .select('*')
     .single();
 
   if (error) {
-    console.error("Error updating recipe adaptation rule:", error);
-    if (error.code === "23505") {
+    console.error('Error updating recipe adaptation rule:', error);
+    if (error.code === '23505') {
       return {
-        error: "Een regel met deze term bestaat al voor dit dieettype",
+        error: 'Een regel met deze term bestaat al voor dit dieettype',
       };
     }
-    return { error: `Fout bij bijwerken recipe adaptation rule: ${error.message}` };
+    return {
+      error: `Fout bij bijwerken recipe adaptation rule: ${error.message}`,
+    };
   }
 
   return {
@@ -242,8 +273,14 @@ export async function updateRecipeAdaptationRule(
       substitutionSuggestions: data.substitution_suggestions || [],
       priority: data.priority,
       isActive: data.is_active,
-      target: (data.target as "ingredient" | "step" | "metadata") || "ingredient",
-      matchMode: (data.match_mode as "exact" | "word_boundary" | "substring" | "canonical_id") || "word_boundary",
+      target:
+        (data.target as 'ingredient' | 'step' | 'metadata') || 'ingredient',
+      matchMode:
+        (data.match_mode as
+          | 'exact'
+          | 'word_boundary'
+          | 'substring'
+          | 'canonical_id') || 'word_boundary',
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     },
@@ -254,23 +291,28 @@ export async function updateRecipeAdaptationRule(
  * Delete a recipe adaptation rule (soft delete by setting is_active = false)
  */
 export async function deleteRecipeAdaptationRule(
-  id: string
+  id: string,
 ): Promise<ActionResult<void>> {
   const admin = await isAdmin();
   if (!admin) {
-    return { error: "Geen toegang: alleen admins kunnen recipe adaptation rules verwijderen" };
+    return {
+      error:
+        'Geen toegang: alleen admins kunnen recipe adaptation rules verwijderen',
+    };
   }
 
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from("recipe_adaptation_rules")
+    .from('recipe_adaptation_rules')
     .update({ is_active: false })
-    .eq("id", id);
+    .eq('id', id);
 
   if (error) {
-    console.error("Error deleting recipe adaptation rule:", error);
-    return { error: `Fout bij verwijderen recipe adaptation rule: ${error.message}` };
+    console.error('Error deleting recipe adaptation rule:', error);
+    return {
+      error: `Fout bij verwijderen recipe adaptation rule: ${error.message}`,
+    };
   }
 
   return { data: undefined };
@@ -280,23 +322,23 @@ export async function deleteRecipeAdaptationRule(
  * Get heuristics for a diet type (admin only)
  */
 export async function getRecipeAdaptationHeuristicsForAdmin(
-  dietTypeId: string
+  dietTypeId: string,
 ): Promise<ActionResult<RecipeAdaptationHeuristicOutput[]>> {
   const admin = await isAdmin();
   if (!admin) {
-    return { error: "Geen toegang: alleen admins kunnen heuristics zien" };
+    return { error: 'Geen toegang: alleen admins kunnen heuristics zien' };
   }
 
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from("recipe_adaptation_heuristics")
-    .select("*")
-    .eq("diet_type_id", dietTypeId)
-    .order("heuristic_type", { ascending: true });
+    .from('recipe_adaptation_heuristics')
+    .select('*')
+    .eq('diet_type_id', dietTypeId)
+    .order('heuristic_type', { ascending: true });
 
   if (error) {
-    console.error("Error fetching heuristics:", error);
+    console.error('Error fetching heuristics:', error);
     return { error: `Fout bij ophalen heuristics: ${error.message}` };
   }
 
@@ -318,17 +360,17 @@ export async function getRecipeAdaptationHeuristicsForAdmin(
  * Create or update a heuristic (admin only)
  */
 export async function upsertRecipeAdaptationHeuristic(
-  input: RecipeAdaptationHeuristicInput
+  input: RecipeAdaptationHeuristicInput,
 ): Promise<ActionResult<RecipeAdaptationHeuristicOutput>> {
   const admin = await isAdmin();
   if (!admin) {
-    return { error: "Geen toegang: alleen admins kunnen heuristics bewerken" };
+    return { error: 'Geen toegang: alleen admins kunnen heuristics bewerken' };
   }
 
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from("recipe_adaptation_heuristics")
+    .from('recipe_adaptation_heuristics')
     .upsert(
       {
         diet_type_id: input.dietTypeId,
@@ -337,14 +379,14 @@ export async function upsertRecipeAdaptationHeuristic(
         is_active: input.isActive ?? true,
       },
       {
-        onConflict: "diet_type_id,heuristic_type",
-      }
+        onConflict: 'diet_type_id,heuristic_type',
+      },
     )
-    .select("*")
+    .select('*')
     .single();
 
   if (error) {
-    console.error("Error upserting heuristic:", error);
+    console.error('Error upserting heuristic:', error);
     return { error: `Fout bij opslaan heuristic: ${error.message}` };
   }
 

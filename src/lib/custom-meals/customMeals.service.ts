@@ -1,13 +1,13 @@
 /**
  * Custom Meals Service
- * 
+ *
  * Manages custom meals that users add via photo/screenshot upload.
  */
 
-import "server-only";
-import { createClient } from "@/src/lib/supabase/server";
-import type { Meal } from "@/src/lib/diets";
-import type { MealSlot, DietKey } from "@/src/lib/diets";
+import 'server-only';
+import { createClient } from '@/src/lib/supabase/server';
+import type { Meal } from '@/src/lib/diets';
+import type { MealSlot, DietKey } from '@/src/lib/diets';
 
 /**
  * Custom meal record from database
@@ -18,7 +18,7 @@ export type CustomMealRecord = {
   name: string;
   mealSlot: MealSlot;
   dietKey: DietKey | null;
-  sourceType: "photo" | "screenshot" | "file" | "gemini";
+  sourceType: 'photo' | 'screenshot' | 'file' | 'gemini';
   sourceImageUrl: string | null;
   sourceImagePath: string | null;
   source: string | null;
@@ -42,7 +42,7 @@ export type CreateCustomMealInput = {
   name: string;
   mealSlot: MealSlot;
   dietKey?: DietKey;
-  sourceType: "photo" | "screenshot" | "file" | "gemini";
+  sourceType: 'photo' | 'screenshot' | 'file' | 'gemini';
   sourceImageUrl?: string;
   sourceImagePath?: string;
   aiAnalysis?: any;
@@ -62,7 +62,7 @@ export class CustomMealsService {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("custom_meals")
+      .from('custom_meals')
       .insert({
         user_id: input.userId,
         name: input.name,
@@ -94,10 +94,10 @@ export class CustomMealsService {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("custom_meals")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
+      .from('custom_meals')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
 
     if (error) {
       throw new Error(`Failed to fetch custom meals: ${error.message}`);
@@ -109,14 +109,17 @@ export class CustomMealsService {
   /**
    * Get a single custom meal by ID
    */
-  async getMealById(mealId: string, userId: string): Promise<CustomMealRecord | null> {
+  async getMealById(
+    mealId: string,
+    userId: string,
+  ): Promise<CustomMealRecord | null> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("custom_meals")
-      .select("*")
-      .eq("id", mealId)
-      .eq("user_id", userId)
+      .from('custom_meals')
+      .select('*')
+      .eq('id', mealId)
+      .eq('user_id', userId)
       .maybeSingle();
 
     if (error) {
@@ -129,15 +132,18 @@ export class CustomMealsService {
   /**
    * Get top consumed meals for a user
    */
-  async getTopConsumedMeals(userId: string, limit: number = 5): Promise<CustomMealRecord[]> {
+  async getTopConsumedMeals(
+    userId: string,
+    limit: number = 5,
+  ): Promise<CustomMealRecord[]> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("custom_meals")
-      .select("*")
-      .eq("user_id", userId)
-      .order("consumption_count", { ascending: false })
-      .order("last_consumed_at", { ascending: false, nullsFirst: false })
+      .from('custom_meals')
+      .select('*')
+      .eq('user_id', userId)
+      .order('consumption_count', { ascending: false })
+      .order('last_consumed_at', { ascending: false, nullsFirst: false })
       .limit(limit);
 
     if (error) {
@@ -160,16 +166,14 @@ export class CustomMealsService {
   }): Promise<void> {
     const supabase = await createClient();
 
-    const { error } = await supabase
-      .from("meal_consumption_log")
-      .insert({
-        user_id: args.userId,
-        custom_meal_id: args.customMealId || null,
-        meal_history_id: args.mealHistoryId || null,
-        meal_name: args.mealName,
-        meal_slot: args.mealSlot,
-        notes: args.notes || null,
-      });
+    const { error } = await supabase.from('meal_consumption_log').insert({
+      user_id: args.userId,
+      custom_meal_id: args.customMealId || null,
+      meal_history_id: args.mealHistoryId || null,
+      meal_name: args.mealName,
+      meal_slot: args.mealSlot,
+      notes: args.notes || null,
+    });
 
     if (error) {
       throw new Error(`Failed to log meal consumption: ${error.message}`);
@@ -188,10 +192,10 @@ export class CustomMealsService {
 
     if (args.customMealId) {
       const { data } = await supabase
-        .from("custom_meals")
-        .select("consumption_count")
-        .eq("id", args.customMealId)
-        .eq("user_id", args.userId)
+        .from('custom_meals')
+        .select('consumption_count')
+        .eq('id', args.customMealId)
+        .eq('user_id', args.userId)
         .single();
 
       return data?.consumption_count || 0;
@@ -199,10 +203,10 @@ export class CustomMealsService {
 
     if (args.mealHistoryId) {
       const { data } = await supabase
-        .from("meal_history")
-        .select("usage_count")
-        .eq("id", args.mealHistoryId)
-        .eq("user_id", args.userId)
+        .from('meal_history')
+        .select('usage_count')
+        .eq('id', args.mealHistoryId)
+        .eq('user_id', args.userId)
         .single();
 
       return data?.usage_count || 0;

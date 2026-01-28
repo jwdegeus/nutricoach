@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { Dialog, DialogBody } from "@/components/catalyst/dialog";
-import { XMarkIcon } from "@heroicons/react/20/solid";
-import { Button } from "@/components/catalyst/button";
+import { Dialog, DialogBody } from '@/components/catalyst/dialog';
+import { XMarkIcon } from '@heroicons/react/20/solid';
+import { Button } from '@/components/catalyst/button';
 
 type ImageLightboxProps = {
   open: boolean;

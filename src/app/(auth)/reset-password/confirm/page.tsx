@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
-import { UpdatePasswordForm } from "./update-password-form";
+import type { Metadata } from 'next';
+import { UpdatePasswordForm } from './update-password-form';
 
 export const metadata: Metadata = {
-  title: "Nieuw wachtwoord instellen | NutriCoach",
-  description: "Stel een nieuw wachtwoord in",
+  title: 'Nieuw wachtwoord instellen | NutriCoach',
+  description: 'Stel een nieuw wachtwoord in',
 };
 
 export default function ConfirmResetPasswordPage() {

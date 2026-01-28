@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useState, useTransition } from "react";
-import Link from "next/link";
-import { signUp } from "../actions";
-import { Button } from "@/components/catalyst/button";
-import { Input } from "@/components/catalyst/input";
-import { Field, Label, Description } from "@/components/catalyst/fieldset";
+import { useState, useTransition } from 'react';
+import Link from 'next/link';
+import { signUp } from '../actions';
+import { Button } from '@/components/catalyst/button';
+import { Input } from '@/components/catalyst/input';
+import { Field, Label, Description } from '@/components/catalyst/fieldset';
 
 export function RegisterForm() {
   const [error, setError] = useState<string | null>(null);
@@ -79,12 +79,15 @@ export function RegisterForm() {
       </Field>
 
       <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? "Registreren..." : "Registreer"}
+        {isPending ? 'Registreren...' : 'Registreer'}
       </Button>
 
       <div className="text-center text-sm text-zinc-500 dark:text-zinc-400">
-        Al een account?{" "}
-        <Link href="/login" className="font-medium text-blue-600 dark:text-blue-400 hover:underline">
+        Al een account?{' '}
+        <Link
+          href="/login"
+          className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+        >
           Log hier in
         </Link>
       </div>

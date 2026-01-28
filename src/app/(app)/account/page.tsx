@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { createClient } from "@/src/lib/supabase/server";
-import { AccountProfile } from "./account-profile";
-import { DietPreferencesForm } from "./diet-preferences-form";
-import { getTranslations } from "next-intl/server";
+import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/src/lib/supabase/server';
+import { AccountProfile } from './account-profile';
+import { DietPreferencesForm } from './diet-preferences-form';
+import { getTranslations } from 'next-intl/server';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('metadata');
@@ -20,7 +20,7 @@ export default async function AccountPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   const t = await getTranslations('account');
@@ -37,7 +37,7 @@ export default async function AccountPage() {
       </div>
 
       <AccountProfile user={user} />
-      
+
       <DietPreferencesForm />
     </div>
   );

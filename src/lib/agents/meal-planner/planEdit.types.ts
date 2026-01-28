@@ -1,6 +1,6 @@
 /**
  * Plan Edit Types
- * 
+ *
  * Types for editing meal plans via chat/composer interface.
  * Uses structured output from Gemini to ensure deterministic edits.
  */
@@ -9,11 +9,11 @@
  * Plan edit action types
  */
 export type PlanEditAction =
-  | "REPLACE_MEAL" // Replace one meal in a plan
-  | "REGENERATE_DAY" // Regenerate one day
-  | "ADD_SNACK" // Add snack/smoothie to a day
-  | "REMOVE_MEAL" // Remove a meal slot/snack
-  | "UPDATE_PANTRY"; // Mark items as available / set availableG
+  | 'REPLACE_MEAL' // Replace one meal in a plan
+  | 'REGENERATE_DAY' // Regenerate one day
+  | 'ADD_SNACK' // Add snack/smoothie to a day
+  | 'REMOVE_MEAL' // Remove a meal slot/snack
+  | 'UPDATE_PANTRY'; // Mark items as available / set availableG
 
 /**
  * Plan edit constraints (optional overrides)
@@ -37,7 +37,7 @@ export type PlanEditPantryUpdate = {
 
 /**
  * Plan edit - Structured edit instruction from chat
- * 
+ *
  * This is the output from Gemini's structured generation.
  * It's a strict object, not a freeform command.
  */

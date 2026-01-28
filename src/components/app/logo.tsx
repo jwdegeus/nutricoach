@@ -1,4 +1,7 @@
-export function Logo({ className, ...props }: React.ComponentPropsWithoutRef<'svg'>) {
+export function Logo({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<'svg'>) {
   return (
     <svg
       fill="none"
@@ -20,14 +23,7 @@ export function Logo({ className, ...props }: React.ComponentPropsWithoutRef<'sv
         fill="currentColor"
       />
       {/* Apple highlight */}
-      <ellipse
-        cx="85"
-        cy="80"
-        rx="15"
-        ry="20"
-        fill="white"
-        opacity="0.3"
-      />
+      <ellipse cx="85" cy="80" rx="15" ry="20" fill="white" opacity="0.3" />
     </svg>
-  )
+  );
 }

@@ -1,11 +1,14 @@
-"use server";
+'use server';
 
-import { isAdmin } from "@/src/lib/auth/roles";
-import type { ActionResult } from "@/src/lib/types";
-import { createClient } from "@/src/lib/supabase/server";
-import { getGeminiClient } from "@/src/lib/ai/gemini/gemini.client";
-import { getDietGroupPoliciesAction, type GroupPolicyRow } from "./guardrails.actions";
-import type { DietLogicType } from "./guardrails.actions";
+import { isAdmin } from '@/src/lib/auth/roles';
+import type { ActionResult } from '@/src/lib/types';
+import { createClient } from '@/src/lib/supabase/server';
+import { getGeminiClient } from '@/src/lib/ai/gemini/gemini.client';
+import {
+  getDietGroupPoliciesAction,
+  type GroupPolicyRow,
+} from './guardrails.actions';
+import type { DietLogicType } from './guardrails.actions';
 
 const DIET_GUIDELINES_CONTEXT = `
 Dieetregels volgen Diet Logic (P0–P3):
@@ -30,7 +33,7 @@ function extractJsonFromResponse(raw: string): string {
     trimmed = jsonBlock[1].trim();
   }
   // Negeer tekst vóór het eerste { (bijv. "Hier is de analyse:")
-  const firstBrace = trimmed.indexOf("{");
+  const firstBrace = trimmed.indexOf('{');
   if (firstBrace === -1) {
     return trimmed;
   }
@@ -39,8 +42,8 @@ function extractJsonFromResponse(raw: string): string {
   let end = -1;
   for (let i = 0; i < trimmed.length; i++) {
     const c = trimmed[i];
-    if (c === "{") depth++;
-    else if (c === "}") {
+    if (c === '{') depth++;
+    else if (c === '}') {
       depth--;
       if (depth === 0) {
         end = i;
@@ -53,7 +56,7 @@ function extractJsonFromResponse(raw: string): string {
 
 /** Uitvoerbare actie: prioriteit van alle regels met een bepaalde diet_logic zetten */
 export type SetPriorityByDietLogicAction = {
-  type: "set_priority_by_diet_logic";
+  type: 'set_priority_by_diet_logic';
   dietLogic: DietLogicType;
   value: number;
 };
@@ -77,30 +80,30 @@ export type DietRulesAnalysis = {
  * Alleen voor admin.
  */
 export async function analyzeDietRulesWithAI(
-  dietTypeId: string
+  dietTypeId: string,
 ): Promise<ActionResult<DietRulesAnalysis>> {
   const ok = await isAdmin();
   if (!ok) {
-    return { error: "Geen toegang: alleen admins kunnen AI-analyse uitvoeren" };
+    return { error: 'Geen toegang: alleen admins kunnen AI-analyse uitvoeren' };
   }
   if (!dietTypeId) {
-    return { error: "Diet type ID is vereist" };
+    return { error: 'Diet type ID is vereist' };
   }
 
   try {
     const supabase = await createClient();
     const { data: dietType, error: dietError } = await supabase
-      .from("diet_types")
-      .select("id, name")
-      .eq("id", dietTypeId)
+      .from('diet_types')
+      .select('id, name')
+      .eq('id', dietTypeId)
       .single();
 
     if (dietError || !dietType) {
-      return { error: "Dieettype niet gevonden" };
+      return { error: 'Dieettype niet gevonden' };
     }
 
     const policiesResult = await getDietGroupPoliciesAction(dietTypeId);
-    if ("error" in policiesResult) {
+    if ('error' in policiesResult) {
       return { error: policiesResult.error };
     }
     const policies: GroupPolicyRow[] = policiesResult.data ?? [];
@@ -136,78 +139,120 @@ Analyseer deze regels en geef een JSON-object met exact deze velden: complianceS
 Belangrijk: antwoord ALLEEN met één geldig JSON-object. Geen tekst vóór of na het object, geen "Hier is de analyse" of uitleg.`;
 
     const jsonSchema = {
-      type: "object",
+      type: 'object',
       properties: {
-        complianceScore: { type: "number" },
-        summary: { type: "string" },
-        strengths: { type: "array", items: { type: "string" } },
-        weaknesses: { type: "array", items: { type: "string" } },
+        complianceScore: { type: 'number' },
+        summary: { type: 'string' },
+        strengths: { type: 'array', items: { type: 'string' } },
+        weaknesses: { type: 'array', items: { type: 'string' } },
         suggestions: {
-          type: "array",
+          type: 'array',
           items: {
-            type: "object",
+            type: 'object',
             properties: {
-              text: { type: "string" },
+              text: { type: 'string' },
               action: {
-                type: "object",
+                type: 'object',
                 properties: {
-                  type: { type: "string", enum: ["set_priority_by_diet_logic"] },
-                  dietLogic: { type: "string", enum: ["drop", "force", "limit", "pass"] },
-                  value: { type: "number" },
+                  type: {
+                    type: 'string',
+                    enum: ['set_priority_by_diet_logic'],
+                  },
+                  dietLogic: {
+                    type: 'string',
+                    enum: ['drop', 'force', 'limit', 'pass'],
+                  },
+                  value: { type: 'number' },
                 },
-                required: ["type", "dietLogic", "value"],
+                required: ['type', 'dietLogic', 'value'],
               },
             },
-            required: ["text"],
+            required: ['text'],
           },
         },
       },
-      required: ["complianceScore", "summary", "strengths", "weaknesses", "suggestions"],
+      required: [
+        'complianceScore',
+        'summary',
+        'strengths',
+        'weaknesses',
+        'suggestions',
+      ],
     };
 
     const raw = await gemini.generateJson({
       prompt,
       jsonSchema,
       temperature: 0.3,
-      purpose: "plan",
+      purpose: 'plan',
     });
 
     const jsonStr = extractJsonFromResponse(raw);
     const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
     const score = Number(parsed.complianceScore);
-    const rawSuggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
-    const suggestions: DietRuleSuggestion[] = rawSuggestions.map((s: unknown) => {
-      if (typeof s === "string") return { text: s };
-      if (s && typeof s === "object" && "text" in s) {
-        const o = s as { text: string; action?: unknown };
-        let action: SetPriorityByDietLogicAction | undefined;
-        if (o.action && typeof o.action === "object" && o.action !== null && "type" in o.action && "dietLogic" in o.action && "value" in o.action) {
-          const a = o.action as { type: string; dietLogic: string; value: number };
-          if (a.type === "set_priority_by_diet_logic" && ["drop", "force", "limit", "pass"].includes(a.dietLogic)) {
-            action = {
-              type: "set_priority_by_diet_logic",
-              dietLogic: a.dietLogic as DietLogicType,
-              value: Math.min(65500, Math.max(1, Math.round(Number(a.value) || 100))),
+    const rawSuggestions = Array.isArray(parsed.suggestions)
+      ? parsed.suggestions
+      : [];
+    const suggestions: DietRuleSuggestion[] = rawSuggestions.map(
+      (s: unknown) => {
+        if (typeof s === 'string') return { text: s };
+        if (s && typeof s === 'object' && 'text' in s) {
+          const o = s as { text: string; action?: unknown };
+          let action: SetPriorityByDietLogicAction | undefined;
+          if (
+            o.action &&
+            typeof o.action === 'object' &&
+            o.action !== null &&
+            'type' in o.action &&
+            'dietLogic' in o.action &&
+            'value' in o.action
+          ) {
+            const a = o.action as {
+              type: string;
+              dietLogic: string;
+              value: number;
             };
+            if (
+              a.type === 'set_priority_by_diet_logic' &&
+              ['drop', 'force', 'limit', 'pass'].includes(a.dietLogic)
+            ) {
+              action = {
+                type: 'set_priority_by_diet_logic',
+                dietLogic: a.dietLogic as DietLogicType,
+                value: Math.min(
+                  65500,
+                  Math.max(1, Math.round(Number(a.value) || 100)),
+                ),
+              };
+            }
           }
+          return { text: String(o.text ?? ''), action };
         }
-        return { text: String(o.text ?? ""), action };
-      }
-      return { text: String(s) };
-    });
+        return { text: String(s) };
+      },
+    );
     const analysis: DietRulesAnalysis = {
-      complianceScore: Math.min(100, Math.max(0, Number.isFinite(score) ? score : 0)),
-      summary: String(parsed.summary ?? ""),
-      strengths: Array.isArray(parsed.strengths) ? parsed.strengths.map(String) : [],
-      weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses.map(String) : [],
+      complianceScore: Math.min(
+        100,
+        Math.max(0, Number.isFinite(score) ? score : 0),
+      ),
+      summary: String(parsed.summary ?? ''),
+      strengths: Array.isArray(parsed.strengths)
+        ? parsed.strengths.map(String)
+        : [],
+      weaknesses: Array.isArray(parsed.weaknesses)
+        ? parsed.weaknesses.map(String)
+        : [],
       suggestions,
     };
     return { data: analysis };
   } catch (e) {
-    console.error("analyzeDietRulesWithAI error:", e);
+    console.error('analyzeDietRulesWithAI error:', e);
     return {
       error:
-        e instanceof Error ? e.message : "Er is een fout opgetreden bij de AI-analyse",
+        e instanceof Error
+          ? e.message
+          : 'Er is een fout opgetreden bij de AI-analyse',
     };
   }
 }
@@ -218,45 +263,49 @@ Belangrijk: antwoord ALLEEN met één geldig JSON-object. Geen tekst vóór of n
  */
 export async function applyDietRuleAnalysisAction(
   dietTypeId: string,
-  action: SetPriorityByDietLogicAction
+  action: SetPriorityByDietLogicAction,
 ): Promise<ActionResult<{ updated: number }>> {
   const ok = await isAdmin();
   if (!ok) {
-    return { error: "Geen toegang: alleen admins kunnen analyse-acties uitvoeren" };
+    return {
+      error: 'Geen toegang: alleen admins kunnen analyse-acties uitvoeren',
+    };
   }
-  if (!dietTypeId || action.type !== "set_priority_by_diet_logic") {
-    return { error: "Ongeldige actie" };
+  if (!dietTypeId || action.type !== 'set_priority_by_diet_logic') {
+    return { error: 'Ongeldige actie' };
   }
   const value = Math.min(65500, Math.max(1, Math.round(action.value)));
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
-      .from("diet_category_constraints")
+      .from('diet_category_constraints')
       .update({
         rule_priority: value,
         priority: value,
       })
-      .eq("diet_type_id", dietTypeId)
-      .eq("diet_logic", action.dietLogic)
-      .eq("is_active", true)
-      .select("id");
+      .eq('diet_type_id', dietTypeId)
+      .eq('diet_logic', action.dietLogic)
+      .eq('is_active', true)
+      .select('id');
 
     if (error) {
       return { error: `Fout bij bijwerken: ${error.message}` };
     }
     return { data: { updated: data?.length ?? 0 } };
   } catch (e) {
-    console.error("applyDietRuleAnalysisAction error:", e);
+    console.error('applyDietRuleAnalysisAction error:', e);
     return {
       error:
-        e instanceof Error ? e.message : "Er is een fout opgetreden bij toepassen",
+        e instanceof Error
+          ? e.message
+          : 'Er is een fout opgetreden bij toepassen',
     };
   }
 }
 
 export type ConstraintSettingsSuggestion = {
   dietLogic: DietLogicType;
-  strictness: "hard" | "soft";
+  strictness: 'hard' | 'soft';
   priority: number;
   minPerDay: number | null;
   minPerWeek: number | null;
@@ -274,34 +323,42 @@ export async function suggestConstraintSettingsWithAI(input: {
 }): Promise<ActionResult<ConstraintSettingsSuggestion>> {
   const ok = await isAdmin();
   if (!ok) {
-    return { error: "Geen toegang: alleen admins kunnen AI-suggesties gebruiken" };
+    return {
+      error: 'Geen toegang: alleen admins kunnen AI-suggesties gebruiken',
+    };
   }
   if (!input.dietTypeId || !input.categoryId) {
-    return { error: "Diet type ID en category ID zijn vereist" };
+    return { error: 'Diet type ID en category ID zijn vereist' };
   }
 
   try {
     const supabase = await createClient();
 
-    const [{ data: dietType, error: dietError }, { data: category, error: catError }] =
-      await Promise.all([
-        supabase.from("diet_types").select("id, name").eq("id", input.dietTypeId).single(),
-        supabase
-          .from("ingredient_categories")
-          .select("id, code, name_nl, name_en, category_type")
-          .eq("id", input.categoryId)
-          .single(),
-      ]);
+    const [
+      { data: dietType, error: dietError },
+      { data: category, error: catError },
+    ] = await Promise.all([
+      supabase
+        .from('diet_types')
+        .select('id, name')
+        .eq('id', input.dietTypeId)
+        .single(),
+      supabase
+        .from('ingredient_categories')
+        .select('id, code, name_nl, name_en, category_type')
+        .eq('id', input.categoryId)
+        .single(),
+    ]);
 
     if (dietError || !dietType) {
-      return { error: "Dieettype niet gevonden" };
+      return { error: 'Dieettype niet gevonden' };
     }
     if (catError || !category) {
-      return { error: "Ingrediëntgroep niet gevonden" };
+      return { error: 'Ingrediëntgroep niet gevonden' };
     }
 
     const policiesResult = await getDietGroupPoliciesAction(input.dietTypeId);
-    if ("error" in policiesResult) {
+    if ('error' in policiesResult) {
       return { error: policiesResult.error };
     }
     const policies: GroupPolicyRow[] = policiesResult.data ?? [];
@@ -344,36 +401,47 @@ Belangrijk: antwoord ALLEEN met één geldig JSON-object, geen introductietekst 
 - maxPerWeek: getal of null (alleen bij limit)`;
 
     const jsonSchema = {
-      type: "object",
+      type: 'object',
       properties: {
         dietLogic: {
-          type: "string",
-          enum: ["drop", "force", "limit", "pass"],
+          type: 'string',
+          enum: ['drop', 'force', 'limit', 'pass'],
         },
-        strictness: { type: "string", enum: ["hard", "soft"] },
-        priority: { type: "number" },
-        minPerDay: { type: ["number", "null"] },
-        minPerWeek: { type: ["number", "null"] },
-        maxPerDay: { type: ["number", "null"] },
-        maxPerWeek: { type: ["number", "null"] },
+        strictness: { type: 'string', enum: ['hard', 'soft'] },
+        priority: { type: 'number' },
+        minPerDay: { type: ['number', 'null'] },
+        minPerWeek: { type: ['number', 'null'] },
+        maxPerDay: { type: ['number', 'null'] },
+        maxPerWeek: { type: ['number', 'null'] },
       },
-      required: ["dietLogic", "strictness", "priority", "minPerDay", "minPerWeek", "maxPerDay", "maxPerWeek"],
+      required: [
+        'dietLogic',
+        'strictness',
+        'priority',
+        'minPerDay',
+        'minPerWeek',
+        'maxPerDay',
+        'maxPerWeek',
+      ],
     };
 
     const raw = await gemini.generateJson({
       prompt,
       jsonSchema,
       temperature: 0.2,
-      purpose: "plan",
+      purpose: 'plan',
     });
 
     const jsonStr = extractJsonFromResponse(raw);
     const parsed = JSON.parse(jsonStr) as ConstraintSettingsSuggestion;
     // Normalise nulls and priority range
     const suggestion: ConstraintSettingsSuggestion = {
-      dietLogic: parsed.dietLogic ?? "drop",
-      strictness: parsed.strictness ?? "hard",
-      priority: Math.min(65500, Math.max(1, Math.round(Number(parsed.priority) || 100))),
+      dietLogic: parsed.dietLogic ?? 'drop',
+      strictness: parsed.strictness ?? 'hard',
+      priority: Math.min(
+        65500,
+        Math.max(1, Math.round(Number(parsed.priority) || 100)),
+      ),
       minPerDay: parsed.minPerDay != null ? Number(parsed.minPerDay) : null,
       minPerWeek: parsed.minPerWeek != null ? Number(parsed.minPerWeek) : null,
       maxPerDay: parsed.maxPerDay != null ? Number(parsed.maxPerDay) : null,
@@ -381,10 +449,12 @@ Belangrijk: antwoord ALLEEN met één geldig JSON-object, geen introductietekst 
     };
     return { data: suggestion };
   } catch (e) {
-    console.error("suggestConstraintSettingsWithAI error:", e);
+    console.error('suggestConstraintSettingsWithAI error:', e);
     return {
       error:
-        e instanceof Error ? e.message : "Er is een fout opgetreden bij de AI-suggestie",
+        e instanceof Error
+          ? e.message
+          : 'Er is een fout opgetreden bij de AI-suggestie',
     };
   }
 }

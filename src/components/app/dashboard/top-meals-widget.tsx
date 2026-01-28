@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import type { CustomMealRecord } from "@/src/lib/custom-meals/customMeals.service";
-import { ChartBarIcon } from "@heroicons/react/20/solid";
+import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
+import { ChartBarIcon } from '@heroicons/react/20/solid';
 
 type TopMealsWidgetProps = {
   initialMeals: CustomMealRecord[];
@@ -21,7 +21,8 @@ export function TopMealsWidget({ initialMeals }: TopMealsWidgetProps) {
 
       {meals.length === 0 ? (
         <div className="text-zinc-500 dark:text-zinc-400 text-sm py-4">
-          Nog geen maaltijden geconsumeerd. Begin met het toevoegen van maaltijden!
+          Nog geen maaltijden geconsumeerd. Begin met het toevoegen van
+          maaltijden!
         </div>
       ) : (
         <div className="space-y-3">

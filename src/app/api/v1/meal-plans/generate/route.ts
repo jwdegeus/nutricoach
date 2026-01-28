@@ -1,21 +1,21 @@
 /**
  * Meal Plan Generation API Route
- * 
+ *
  * POST endpoint for generating meal plans via the meal planner agent.
  * Intended for smoke testing and internal use.
- * 
+ *
  * @route POST /api/v1/meal-plans/generate
  */
 
-import { generateMealPlanAction } from "@/src/app/(app)/menus/actions/generateMealPlan.action";
-import { NextResponse } from "next/server";
+import { generateMealPlanAction } from '@/src/app/(app)/menus/actions/generateMealPlan.action';
+import { NextResponse } from 'next/server';
 
 // Force dynamic rendering - AI output should not be cached
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 /**
  * POST handler for meal plan generation
- * 
+ *
  * Accepts a JSON body with meal plan request data and returns
  * the generated meal plan or an error.
  */
@@ -37,14 +37,14 @@ export async function POST(req: Request) {
         {
           status: 200,
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
-        }
+        },
       );
     }
 
     // Handle validation error
-    if (result.error.code === "VALIDATION_ERROR") {
+    if (result.error.code === 'VALIDATION_ERROR') {
       return NextResponse.json(
         {
           ok: false,
@@ -53,9 +53,9 @@ export async function POST(req: Request) {
         {
           status: 400,
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
-        }
+        },
       );
     }
 
@@ -68,9 +68,9 @@ export async function POST(req: Request) {
       {
         status: 500,
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
-      }
+      },
     );
   } catch (error) {
     // Handle unexpected errors (e.g., JSON parse failure)
@@ -78,16 +78,16 @@ export async function POST(req: Request) {
       {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR" as const,
-          message: "Invalid request format. Expected JSON body.",
+          code: 'VALIDATION_ERROR' as const,
+          message: 'Invalid request format. Expected JSON body.',
         },
       },
       {
         status: 400,
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
-      }
+      },
     );
   }
 }

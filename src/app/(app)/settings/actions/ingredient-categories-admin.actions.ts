@@ -1,8 +1,8 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import type { ActionResult } from "@/src/lib/actions";
-import { getGeminiClient } from "@/src/lib/ai/gemini/gemini.client";
+import { createClient } from '@/src/lib/supabase/server';
+import type { ActionResult, ActionResultWithOk } from '@/src/lib/types';
+import { getGeminiClient } from '@/src/lib/ai/gemini/gemini.client';
 
 /**
  * Normalize a term for deduplication:
@@ -13,7 +13,7 @@ import { getGeminiClient } from "@/src/lib/ai/gemini/gemini.client";
 function normalizeTerm(term: string): string {
   return term
     .trim()
-    .replace(/\s+/g, " ") // Collapse multiple whitespace to single space
+    .replace(/\s+/g, ' ') // Collapse multiple whitespace to single space
     .toLowerCase();
 }
 
@@ -31,7 +31,10 @@ function extractJsonFromResponse(rawResponse: string): string {
   }
 
   // Also handle cases where code block might not be at start/end
-  jsonString = jsonString.replace(/^```(?:json)?\s*/gm, '').replace(/\s*```$/gm, '').trim();
+  jsonString = jsonString
+    .replace(/^```(?:json)?\s*/gm, '')
+    .replace(/\s*```$/gm, '')
+    .trim();
 
   // Find JSON array by counting brackets (handles nested arrays correctly)
   const arrayStartIdx = jsonString.indexOf('[');
@@ -39,25 +42,25 @@ function extractJsonFromResponse(rawResponse: string): string {
     let bracketCount = 0;
     let inString = false;
     let escapeNext = false;
-    
+
     for (let i = arrayStartIdx; i < jsonString.length; i++) {
       const char = jsonString[i];
-      
+
       if (escapeNext) {
         escapeNext = false;
         continue;
       }
-      
+
       if (char === '\\') {
         escapeNext = true;
         continue;
       }
-      
+
       if (char === '"' && !escapeNext) {
         inString = !inString;
         continue;
       }
-      
+
       if (!inString) {
         if (char === '[') bracketCount++;
         if (char === ']') bracketCount--;
@@ -74,25 +77,25 @@ function extractJsonFromResponse(rawResponse: string): string {
     let braceCount = 0;
     let inString = false;
     let escapeNext = false;
-    
+
     for (let i = objectStartIdx; i < jsonString.length; i++) {
       const char = jsonString[i];
-      
+
       if (escapeNext) {
         escapeNext = false;
         continue;
       }
-      
+
       if (char === '\\') {
         escapeNext = true;
         continue;
       }
-      
+
       if (char === '"' && !escapeNext) {
         inString = !inString;
         continue;
       }
-      
+
       if (!inString) {
         if (char === '{') braceCount++;
         if (char === '}') braceCount--;
@@ -115,20 +118,20 @@ function extractJsonFromResponse(rawResponse: string): string {
  */
 function validateTerm(term: string): { valid: boolean; error?: string } {
   const normalized = normalizeTerm(term);
-  
+
   if (normalized.length < 2) {
-    return { valid: false, error: "Term moet minimaal 2 tekens lang zijn" };
+    return { valid: false, error: 'Term moet minimaal 2 tekens lang zijn' };
   }
-  
+
   if (normalized.length > 80) {
-    return { valid: false, error: "Term mag maximaal 80 tekens lang zijn" };
+    return { valid: false, error: 'Term mag maximaal 80 tekens lang zijn' };
   }
-  
+
   // Must contain at least one letter (a-z)
   if (!/[a-z]/.test(normalized)) {
-    return { valid: false, error: "Term moet minimaal één letter bevatten" };
+    return { valid: false, error: 'Term moet minimaal één letter bevatten' };
   }
-  
+
   return { valid: true };
 }
 
@@ -136,14 +139,14 @@ function validateTerm(term: string): { valid: boolean; error?: string } {
  * Get all ingredient categories (forbidden and required)
  */
 export async function getIngredientCategoriesAction(): Promise<
-  ActionResult<
+  ActionResultWithOk<
     Array<{
       id: string;
       code: string;
       name_nl: string;
       name_en: string | null;
       description: string | null;
-      category_type: "forbidden" | "required";
+      category_type: 'forbidden' | 'required';
       display_order: number;
       is_active: boolean;
       items_count?: number;
@@ -161,50 +164,52 @@ export async function getIngredientCategoriesAction(): Promise<
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin using user_roles table
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen categorieën bekijken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen categorieën bekijken',
         },
       };
     }
 
     // Get categories with item counts (admins see all, including inactive)
     const { data: categories, error } = await supabase
-      .from("ingredient_categories")
+      .from('ingredient_categories')
       .select(
         `
         *,
         items:ingredient_category_items(count)
-      `
+      `,
       )
-      .order("category_type", { ascending: true })
-      .order("display_order", { ascending: true })
-      .order("is_active", { ascending: false }); // Active first
-    
-    console.log(`[getIngredientCategoriesAction] Found ${categories?.length || 0} categories (including inactive)`);
+      .order('category_type', { ascending: true })
+      .order('display_order', { ascending: true })
+      .order('is_active', { ascending: false }); // Active first
+
+    console.log(
+      `[getIngredientCategoriesAction] Found ${categories?.length || 0} categories (including inactive)`,
+    );
 
     if (error) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -227,12 +232,12 @@ export async function getIngredientCategoriesAction(): Promise<
       data: categoriesWithCounts,
     };
   } catch (error) {
-    console.error("Error in getIngredientCategoriesAction:", error);
+    console.error('Error in getIngredientCategoriesAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -240,23 +245,23 @@ export async function getIngredientCategoriesAction(): Promise<
 
 /**
  * Get ingredient categories filtered for a specific diet (for create constraint dropdown)
- * 
+ *
  * Returns categories that are:
  * - Already used in constraints for this diet, OR
  * - Have diet-specific prefix (e.g., wahls_), OR
  * - Are global/core categories (not diet-prefixed)
- * 
+ *
  * Only returns active categories, sorted alphabetically.
  */
 export async function getIngredientCategoriesForDietAction(
-  dietTypeId: string
+  dietTypeId: string,
 ): Promise<
-  ActionResult<
+  ActionResultWithOk<
     Array<{
       id: string;
       code: string;
       name_nl: string;
-      category_type: "forbidden" | "required";
+      category_type: 'forbidden' | 'required';
       is_diet_specific: boolean; // true if code starts with diet prefix (e.g., wahls_)
     }>
   >
@@ -272,35 +277,35 @@ export async function getIngredientCategoriesForDietAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin using user_roles table
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen categorieën bekijken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen categorieën bekijken',
         },
       };
     }
 
     // Get diet type name to determine prefix (e.g., "Wahls Paleo" -> "wahls_")
     const { data: dietType } = await supabase
-      .from("diet_types")
-      .select("name")
-      .eq("id", dietTypeId)
+      .from('diet_types')
+      .select('name')
+      .eq('id', dietTypeId)
       .single();
 
     // Determine diet prefix from diet name
@@ -308,43 +313,43 @@ export async function getIngredientCategoriesForDietAction(
     let dietPrefix: string | null = null;
     if (dietType?.name) {
       const dietNameLower = dietType.name.toLowerCase();
-      if (dietNameLower.includes("wahls")) {
-        dietPrefix = "wahls_";
+      if (dietNameLower.includes('wahls')) {
+        dietPrefix = 'wahls_';
       }
       // Future: add other diet prefixes here
     }
 
     // Get categories already used in constraints for this diet
     const { data: existingConstraints } = await supabase
-      .from("diet_category_constraints")
-      .select("category_id")
-      .eq("diet_type_id", dietTypeId)
-      .eq("is_active", true);
+      .from('diet_category_constraints')
+      .select('category_id')
+      .eq('diet_type_id', dietTypeId)
+      .eq('is_active', true);
 
     const usedCategoryIds = new Set(
-      (existingConstraints || []).map((c: any) => c.category_id)
+      (existingConstraints || []).map((c: any) => c.category_id),
     );
 
     // Get all active categories
     const { data: categories, error } = await supabase
-      .from("ingredient_categories")
-      .select("id, code, name_nl, category_type")
-      .eq("is_active", true)
-      .order("name_nl", { ascending: true }); // Alphabetical
+      .from('ingredient_categories')
+      .select('id, code, name_nl, category_type')
+      .eq('is_active', true)
+      .order('name_nl', { ascending: true }); // Alphabetical
 
     if (error) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
     }
 
     // Known diet-specific prefixes (for filtering)
-    const knownDietPrefixes = ["wahls_"]; // Future: add more as needed
-    
+    const knownDietPrefixes = ['wahls_']; // Future: add more as needed
+
     // Filter categories:
     // 1. Categories already used in constraints for this diet (always show)
     // 2. Categories with this diet's prefix (e.g., wahls_)
@@ -355,7 +360,7 @@ export async function getIngredientCategoriesForDietAction(
         if (usedCategoryIds.has(cat.id)) {
           return true;
         }
-        
+
         // If we have a diet prefix (e.g., wahls_)
         if (dietPrefix) {
           // Include if category has this diet's prefix
@@ -364,7 +369,7 @@ export async function getIngredientCategoriesForDietAction(
           }
           // Include if category is global/core (doesn't start with any known diet prefix)
           const isGlobalCategory = !knownDietPrefixes.some((prefix) =>
-            cat.code.startsWith(prefix)
+            cat.code.startsWith(prefix),
           );
           if (isGlobalCategory) {
             return true;
@@ -372,7 +377,7 @@ export async function getIngredientCategoriesForDietAction(
           // Exclude other diet-specific categories
           return false;
         }
-        
+
         // If no diet prefix detected, show all active categories (fallback)
         return true;
       })
@@ -387,7 +392,7 @@ export async function getIngredientCategoriesForDietAction(
         // Sort: diet-specific first, then alphabetically
         if (a.is_diet_specific && !b.is_diet_specific) return -1;
         if (!a.is_diet_specific && b.is_diet_specific) return 1;
-        return a.name_nl.localeCompare(b.name_nl, "nl");
+        return a.name_nl.localeCompare(b.name_nl, 'nl');
       });
 
     return {
@@ -395,12 +400,12 @@ export async function getIngredientCategoriesForDietAction(
       data: filtered,
     };
   } catch (error) {
-    console.error("Error in getIngredientCategoriesForDietAction:", error);
+    console.error('Error in getIngredientCategoriesForDietAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -410,18 +415,18 @@ export async function getIngredientCategoriesForDietAction(
  * Get diet category constraints for a specific diet
  */
 export async function getDietCategoryConstraintsAction(
-  dietTypeId: string
+  dietTypeId: string,
 ): Promise<
-  ActionResult<
+  ActionResultWithOk<
     Array<{
       id: string;
       category_id: string;
       category_code: string;
       category_name_nl: string;
-      category_type: "forbidden" | "required";
-      constraint_type: "forbidden" | "required";
-      rule_action: "allow" | "block";
-      strictness: "hard" | "soft";
+      category_type: 'forbidden' | 'required';
+      constraint_type: 'forbidden' | 'required';
+      rule_action: 'allow' | 'block';
+      strictness: 'hard' | 'soft';
       min_per_day: number | null;
       min_per_week: number | null;
       priority: number;
@@ -441,26 +446,26 @@ export async function getDietCategoryConstraintsAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin using user_roles table
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen constraints bekijken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen constraints bekijken',
         },
       };
     }
@@ -468,35 +473,47 @@ export async function getDietCategoryConstraintsAction(
     // Get ALL constraints for this diet (including inactive for admin view)
     // Sorteer op rule_priority (firewall evaluatie volgorde)
     const { data: constraints, error } = await supabase
-      .from("diet_category_constraints")
+      .from('diet_category_constraints')
       .select(
         `
         *,
         category:ingredient_categories(code, name_nl, category_type)
-      `
+      `,
       )
-      .eq("diet_type_id", dietTypeId)
-      .order("rule_priority", { ascending: false })
-      .order("priority", { ascending: false }); // Fallback voor backward compatibility
-    
-    console.log(`[getDietCategoryConstraintsAction] Query result for diet ${dietTypeId}:`);
+      .eq('diet_type_id', dietTypeId)
+      .order('rule_priority', { ascending: false })
+      .order('priority', { ascending: false }); // Fallback voor backward compatibility
+
+    console.log(
+      `[getDietCategoryConstraintsAction] Query result for diet ${dietTypeId}:`,
+    );
     console.log(`  - Error:`, error);
     console.log(`  - Constraints count:`, constraints?.length || 0);
     if (error) {
-      console.error(`[getDietCategoryConstraintsAction] Database error:`, error);
+      console.error(
+        `[getDietCategoryConstraintsAction] Database error:`,
+        error,
+      );
     }
     if (constraints && constraints.length > 0) {
-      console.log(`[getDietCategoryConstraintsAction] First constraint:`, JSON.stringify(constraints[0], null, 2));
+      console.log(
+        `[getDietCategoryConstraintsAction] First constraint:`,
+        JSON.stringify(constraints[0], null, 2),
+      );
     } else {
-      console.warn(`[getDietCategoryConstraintsAction] ⚠️ NO CONSTRAINTS FOUND for diet ${dietTypeId}`);
-      console.warn(`[getDietCategoryConstraintsAction] This means no guard rails have been configured via GuardRailsManager yet.`);
+      console.warn(
+        `[getDietCategoryConstraintsAction] ⚠️ NO CONSTRAINTS FOUND for diet ${dietTypeId}`,
+      );
+      console.warn(
+        `[getDietCategoryConstraintsAction] This means no guard rails have been configured via GuardRailsManager yet.`,
+      );
     }
 
     if (error) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -512,7 +529,9 @@ export async function getDietCategoryConstraintsAction(
         category_name_nl: category.name_nl || 'Onbekende categorie',
         category_type: category.category_type || constraint.constraint_type,
         constraint_type: constraint.constraint_type,
-        rule_action: constraint.rule_action || (constraint.constraint_type === 'forbidden' ? 'block' : 'allow'),
+        rule_action:
+          constraint.rule_action ||
+          (constraint.constraint_type === 'forbidden' ? 'block' : 'allow'),
         strictness: constraint.strictness,
         min_per_day: constraint.min_per_day,
         min_per_week: constraint.min_per_week,
@@ -521,20 +540,22 @@ export async function getDietCategoryConstraintsAction(
         is_active: constraint.is_active ?? true,
       };
     });
-    
-    console.log(`[getDietCategoryConstraintsAction] Formatted ${formattedConstraints.length} constraints`);
+
+    console.log(
+      `[getDietCategoryConstraintsAction] Formatted ${formattedConstraints.length} constraints`,
+    );
 
     return {
       ok: true,
       data: formattedConstraints,
     };
   } catch (error) {
-    console.error("Error in getDietCategoryConstraintsAction:", error);
+    console.error('Error in getDietCategoryConstraintsAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -547,16 +568,16 @@ export async function upsertDietCategoryConstraintsAction(
   dietTypeId: string,
   constraints: Array<{
     category_id: string;
-    constraint_type?: "forbidden" | "required"; // Legacy, wordt afgeleid van rule_action
-    rule_action?: "allow" | "block";
-    strictness?: "hard" | "soft";
+    constraint_type?: 'forbidden' | 'required'; // Legacy, wordt afgeleid van rule_action
+    rule_action?: 'allow' | 'block';
+    strictness?: 'hard' | 'soft';
     min_per_day?: number | null;
     min_per_week?: number | null;
     priority?: number;
     rule_priority?: number;
     is_active?: boolean;
-  }>
-): Promise<ActionResult<void>> {
+  }>,
+): Promise<ActionResultWithOk<void>> {
   try {
     const supabase = await createClient();
 
@@ -568,41 +589,41 @@ export async function upsertDietCategoryConstraintsAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin using user_roles table
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen constraints bewerken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen constraints bewerken',
         },
       };
     }
 
     // Delete existing constraints for this diet
     const { error: deleteError } = await supabase
-      .from("diet_category_constraints")
+      .from('diet_category_constraints')
       .delete()
-      .eq("diet_type_id", dietTypeId);
+      .eq('diet_type_id', dietTypeId);
 
     if (deleteError) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: deleteError.message,
         },
       };
@@ -611,37 +632,41 @@ export async function upsertDietCategoryConstraintsAction(
     // Insert new constraints
     if (constraints.length > 0) {
       const { error: insertError } = await supabase
-        .from("diet_category_constraints")
+        .from('diet_category_constraints')
         .insert(
           constraints.map((c) => {
             // Bepaal rule_action: gebruik expliciete rule_action of afleiden van constraint_type
-            const ruleAction = c.rule_action || (c.constraint_type === 'forbidden' ? 'block' : 'allow');
+            const ruleAction =
+              c.rule_action ||
+              (c.constraint_type === 'forbidden' ? 'block' : 'allow');
             // Bepaal constraint_type voor backward compatibility
-            const constraintType = c.constraint_type || (ruleAction === 'block' ? 'forbidden' : 'required');
+            const constraintType =
+              c.constraint_type ||
+              (ruleAction === 'block' ? 'forbidden' : 'required');
             // Gebruik rule_priority als expliciet gegeven, anders priority, anders default 50
             const rulePriority = c.rule_priority ?? c.priority ?? 50;
             const priority = c.priority ?? rulePriority; // Behoud priority voor backward compatibility
-            
+
             return {
               diet_type_id: dietTypeId,
               category_id: c.category_id,
               constraint_type: constraintType,
               rule_action: ruleAction,
-              strictness: c.strictness || "hard",
+              strictness: c.strictness || 'hard',
               min_per_day: c.min_per_day ?? null,
               min_per_week: c.min_per_week ?? null,
               priority: priority,
               rule_priority: rulePriority,
               is_active: c.is_active ?? true,
             };
-          })
+          }),
         );
 
       if (insertError) {
         return {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: insertError.message,
           },
         };
@@ -653,12 +678,12 @@ export async function upsertDietCategoryConstraintsAction(
       data: undefined,
     };
   } catch (error) {
-    console.error("Error in upsertDietCategoryConstraintsAction:", error);
+    console.error('Error in upsertDietCategoryConstraintsAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -672,10 +697,10 @@ export async function createIngredientCategoryAction(input: {
   name_nl: string;
   name_en?: string | null;
   description?: string | null;
-  category_type: "forbidden" | "required";
+  category_type: 'forbidden' | 'required';
   parent_category_id?: string | null;
   display_order?: number;
-}): Promise<ActionResult<{ id: string }>> {
+}): Promise<ActionResultWithOk<{ id: string }>> {
   try {
     const supabase = await createClient();
 
@@ -686,26 +711,26 @@ export async function createIngredientCategoryAction(input: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen categorieën aanmaken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen categorieën aanmaken',
         },
       };
     }
@@ -715,14 +740,14 @@ export async function createIngredientCategoryAction(input: {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Code en Nederlandse naam zijn verplicht",
+          code: 'VALIDATION_ERROR',
+          message: 'Code en Nederlandse naam zijn verplicht',
         },
       };
     }
 
     const { data, error } = await supabase
-      .from("ingredient_categories")
+      .from('ingredient_categories')
       .insert({
         code: input.code.trim().toLowerCase(),
         name_nl: input.name_nl.trim(),
@@ -733,16 +758,16 @@ export async function createIngredientCategoryAction(input: {
         display_order: input.display_order || 0,
         is_active: true,
       })
-      .select("id")
+      .select('id')
       .single();
 
     if (error) {
-      if (error.code === "23505") {
+      if (error.code === '23505') {
         // Unique constraint violation
         return {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
+            code: 'VALIDATION_ERROR',
             message: `Categorie met code "${input.code}" bestaat al`,
           },
         };
@@ -750,7 +775,7 @@ export async function createIngredientCategoryAction(input: {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -761,12 +786,12 @@ export async function createIngredientCategoryAction(input: {
       data: { id: data.id },
     };
   } catch (error) {
-    console.error("Error in createIngredientCategoryAction:", error);
+    console.error('Error in createIngredientCategoryAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -784,8 +809,8 @@ export async function updateIngredientCategoryAction(
     description?: string | null;
     display_order?: number;
     is_active?: boolean;
-  }
-): Promise<ActionResult<{ id: string }>> {
+  },
+): Promise<ActionResultWithOk<{ id: string }>> {
   try {
     const supabase = await createClient();
 
@@ -796,50 +821,54 @@ export async function updateIngredientCategoryAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen categorieën bewerken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen categorieën bewerken',
         },
       };
     }
 
     const updateData: any = {};
-    if (input.code !== undefined) updateData.code = input.code.trim().toLowerCase();
+    if (input.code !== undefined)
+      updateData.code = input.code.trim().toLowerCase();
     if (input.name_nl !== undefined) updateData.name_nl = input.name_nl.trim();
-    if (input.name_en !== undefined) updateData.name_en = input.name_en?.trim() || null;
-    if (input.description !== undefined) updateData.description = input.description?.trim() || null;
-    if (input.display_order !== undefined) updateData.display_order = input.display_order;
+    if (input.name_en !== undefined)
+      updateData.name_en = input.name_en?.trim() || null;
+    if (input.description !== undefined)
+      updateData.description = input.description?.trim() || null;
+    if (input.display_order !== undefined)
+      updateData.display_order = input.display_order;
     if (input.is_active !== undefined) updateData.is_active = input.is_active;
 
     const { data, error } = await supabase
-      .from("ingredient_categories")
+      .from('ingredient_categories')
       .update(updateData)
-      .eq("id", categoryId)
-      .select("id")
+      .eq('id', categoryId)
+      .select('id')
       .single();
 
     if (error) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -850,12 +879,12 @@ export async function updateIngredientCategoryAction(
       data: { id: data.id },
     };
   } catch (error) {
-    console.error("Error in updateIngredientCategoryAction:", error);
+    console.error('Error in updateIngredientCategoryAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -867,7 +896,7 @@ export async function updateIngredientCategoryAction(
 function getDietPrefixFromName(dietName: string | null): string | null {
   if (!dietName) return null;
   const lower = dietName.toLowerCase();
-  if (lower.includes("wahls")) return "wahls_";
+  if (lower.includes('wahls')) return 'wahls_';
   return null;
 }
 
@@ -879,8 +908,8 @@ function getDietPrefixFromName(dietName: string | null): string | null {
 export async function updateIngredientCategoryOriginAction(
   categoryId: string,
   dietTypeId: string,
-  origin: "diet_specific" | "general"
-): Promise<ActionResult<{ id: string; code: string }>> {
+  origin: 'diet_specific' | 'general',
+): Promise<ActionResultWithOk<{ id: string; code: string }>> {
   try {
     const supabase = await createClient();
 
@@ -891,58 +920,58 @@ export async function updateIngredientCategoryOriginAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen categorieën bewerken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen categorieën bewerken',
         },
       };
     }
 
     const { data: dietType } = await supabase
-      .from("diet_types")
-      .select("name")
-      .eq("id", dietTypeId)
+      .from('diet_types')
+      .select('name')
+      .eq('id', dietTypeId)
       .single();
 
     const dietPrefix = getDietPrefixFromName(dietType?.name ?? null);
-    if (origin === "diet_specific" && !dietPrefix) {
+    if (origin === 'diet_specific' && !dietPrefix) {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Dit dieettype ondersteunt geen dieet-specifieke herkomst",
+          code: 'VALIDATION_ERROR',
+          message: 'Dit dieettype ondersteunt geen dieet-specifieke herkomst',
         },
       };
     }
 
     const { data: category, error: fetchError } = await supabase
-      .from("ingredient_categories")
-      .select("id, code")
-      .eq("id", categoryId)
+      .from('ingredient_categories')
+      .select('id, code')
+      .eq('id', categoryId)
       .single();
 
     if (fetchError || !category) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
-          message: fetchError?.message ?? "Categorie niet gevonden",
+          code: 'DB_ERROR',
+          message: fetchError?.message ?? 'Categorie niet gevonden',
         },
       };
     }
@@ -950,7 +979,7 @@ export async function updateIngredientCategoryOriginAction(
     const currentCode = (category as { code: string }).code;
     let newCode: string;
 
-    if (origin === "diet_specific") {
+    if (origin === 'diet_specific') {
       newCode =
         dietPrefix && !currentCode.startsWith(dietPrefix)
           ? `${dietPrefix}${currentCode}`
@@ -967,8 +996,8 @@ export async function updateIngredientCategoryOriginAction(
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Code mag niet leeg worden",
+          code: 'VALIDATION_ERROR',
+          message: 'Code mag niet leeg worden',
         },
       };
     }
@@ -980,34 +1009,34 @@ export async function updateIngredientCategoryOriginAction(
     }
 
     const { data: existing } = await supabase
-      .from("ingredient_categories")
-      .select("id")
-      .eq("code", newCode)
-      .neq("id", categoryId)
+      .from('ingredient_categories')
+      .select('id')
+      .eq('code', newCode)
+      .neq('id', categoryId)
       .maybeSingle();
 
     if (existing) {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
+          code: 'VALIDATION_ERROR',
           message: `Er bestaat al een categorie met code "${newCode}"`,
         },
       };
     }
 
     const { data: updated, error: updateError } = await supabase
-      .from("ingredient_categories")
+      .from('ingredient_categories')
       .update({ code: newCode })
-      .eq("id", categoryId)
-      .select("id, code")
+      .eq('id', categoryId)
+      .select('id, code')
       .single();
 
     if (updateError) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: updateError.message,
         },
       };
@@ -1021,12 +1050,12 @@ export async function updateIngredientCategoryOriginAction(
       },
     };
   } catch (error) {
-    console.error("Error in updateIngredientCategoryOriginAction:", error);
+    console.error('Error in updateIngredientCategoryOriginAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -1036,8 +1065,8 @@ export async function updateIngredientCategoryOriginAction(
  * Delete (soft delete) an ingredient category
  */
 export async function deleteIngredientCategoryAction(
-  categoryId: string
-): Promise<ActionResult<void>> {
+  categoryId: string,
+): Promise<ActionResultWithOk<void>> {
   try {
     const supabase = await createClient();
 
@@ -1048,36 +1077,36 @@ export async function deleteIngredientCategoryAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen categorieën verwijderen",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen categorieën verwijderen',
         },
       };
     }
 
     // Blokkeer verwijderen als deze categorie nog in een actieve dieetregel (diet_category_constraint) zit
     const { data: inUse } = await supabase
-      .from("diet_category_constraints")
-      .select("id")
-      .eq("category_id", categoryId)
-      .eq("is_active", true)
+      .from('diet_category_constraints')
+      .select('id')
+      .eq('category_id', categoryId)
+      .eq('is_active', true)
       .limit(1)
       .maybeSingle();
 
@@ -1085,24 +1114,24 @@ export async function deleteIngredientCategoryAction(
       return {
         ok: false,
         error: {
-          code: "IN_USE",
+          code: 'IN_USE',
           message:
-            "Deze ingrediëntgroep wordt nog gebruikt door één of meer dieetregels. Verwijder eerst die dieetregels (tab Dieetregels).",
+            'Deze ingrediëntgroep wordt nog gebruikt door één of meer dieetregels. Verwijder eerst die dieetregels (tab Dieetregels).',
         },
       };
     }
 
     // Soft delete by setting is_active = false
     const { error } = await supabase
-      .from("ingredient_categories")
+      .from('ingredient_categories')
       .update({ is_active: false })
-      .eq("id", categoryId);
+      .eq('id', categoryId);
 
     if (error) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -1113,19 +1142,19 @@ export async function deleteIngredientCategoryAction(
       data: undefined,
     };
   } catch (error) {
-    console.error("Error in deleteIngredientCategoryAction:", error);
+    console.error('Error in deleteIngredientCategoryAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
 }
 
 /** Diet Logic (P0–P3): drop, force, limit, pass – zie docs/diet-logic-plan.md */
-type DietLogicValue = "drop" | "force" | "limit" | "pass";
+type DietLogicValue = 'drop' | 'force' | 'limit' | 'pass';
 
 /**
  * Update a single diet category constraint
@@ -1134,8 +1163,8 @@ type DietLogicValue = "drop" | "force" | "limit" | "pass";
 export async function updateDietCategoryConstraintAction(
   constraintId: string,
   input: {
-    rule_action?: "allow" | "block";
-    strictness?: "hard" | "soft";
+    rule_action?: 'allow' | 'block';
+    strictness?: 'hard' | 'soft';
     min_per_day?: number | null;
     min_per_week?: number | null;
     max_per_day?: number | null;
@@ -1147,8 +1176,8 @@ export async function updateDietCategoryConstraintAction(
     is_paused?: boolean;
     /** Diet Logic (P0–P3); bij zetten wordt rule_action afgeleid: drop/limit→block, force/pass→allow */
     diet_logic?: DietLogicValue;
-  }
-): Promise<ActionResult<{ id: string }>> {
+  },
+): Promise<ActionResultWithOk<{ id: string }>> {
   try {
     const supabase = await createClient();
 
@@ -1159,37 +1188,43 @@ export async function updateDietCategoryConstraintAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen constraints bewerken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen constraints bewerken',
         },
       };
     }
 
     const updateData: any = {};
-    if (input.rule_action !== undefined) updateData.rule_action = input.rule_action;
-    if (input.strictness !== undefined) updateData.strictness = input.strictness;
-    if (input.min_per_day !== undefined) updateData.min_per_day = input.min_per_day;
-    if (input.min_per_week !== undefined) updateData.min_per_week = input.min_per_week;
-    if (input.max_per_day !== undefined) updateData.max_per_day = input.max_per_day;
-    if (input.max_per_week !== undefined) updateData.max_per_week = input.max_per_week;
+    if (input.rule_action !== undefined)
+      updateData.rule_action = input.rule_action;
+    if (input.strictness !== undefined)
+      updateData.strictness = input.strictness;
+    if (input.min_per_day !== undefined)
+      updateData.min_per_day = input.min_per_day;
+    if (input.min_per_week !== undefined)
+      updateData.min_per_week = input.min_per_week;
+    if (input.max_per_day !== undefined)
+      updateData.max_per_day = input.max_per_day;
+    if (input.max_per_week !== undefined)
+      updateData.max_per_week = input.max_per_week;
     if (input.priority !== undefined) updateData.priority = input.priority;
     if (input.rule_priority !== undefined) {
       updateData.rule_priority = input.rule_priority;
@@ -1202,21 +1237,24 @@ export async function updateDietCategoryConstraintAction(
     if (input.diet_logic !== undefined) {
       updateData.diet_logic = input.diet_logic;
       // rule_action afleiden uit diet_logic (docs/diet-logic-plan.md)
-      updateData.rule_action = (input.diet_logic === "drop" || input.diet_logic === "limit") ? "block" : "allow";
+      updateData.rule_action =
+        input.diet_logic === 'drop' || input.diet_logic === 'limit'
+          ? 'block'
+          : 'allow';
     }
 
     const { data, error } = await supabase
-      .from("diet_category_constraints")
+      .from('diet_category_constraints')
       .update(updateData)
-      .eq("id", constraintId)
-      .select("id")
+      .eq('id', constraintId)
+      .select('id')
       .single();
 
     if (error) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -1227,12 +1265,12 @@ export async function updateDietCategoryConstraintAction(
       data: { id: data.id },
     };
   } catch (error) {
-    console.error("Error in updateDietCategoryConstraintAction:", error);
+    console.error('Error in updateDietCategoryConstraintAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -1242,8 +1280,8 @@ export async function updateDietCategoryConstraintAction(
  * Delete a specific diet category constraint
  */
 export async function deleteDietCategoryConstraintAction(
-  constraintId: string
-): Promise<ActionResult<void>> {
+  constraintId: string,
+): Promise<ActionResultWithOk<void>> {
   try {
     const supabase = await createClient();
 
@@ -1254,40 +1292,40 @@ export async function deleteDietCategoryConstraintAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen constraints verwijderen",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen constraints verwijderen',
         },
       };
     }
 
     const { error } = await supabase
-      .from("diet_category_constraints")
+      .from('diet_category_constraints')
       .delete()
-      .eq("id", constraintId);
+      .eq('id', constraintId);
 
     if (error) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -1298,12 +1336,12 @@ export async function deleteDietCategoryConstraintAction(
       data: undefined,
     };
   } catch (error) {
-    console.error("Error in deleteDietCategoryConstraintAction:", error);
+    console.error('Error in deleteDietCategoryConstraintAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -1311,19 +1349,19 @@ export async function deleteDietCategoryConstraintAction(
 
 /**
  * List ingredient categories for a diet with item counts (read-only overview)
- * 
+ *
  * Returns categories filtered for the diet (same logic as getIngredientCategoriesForDietAction)
  * but includes item counts for display.
  */
 export async function listIngredientCategoriesForDietAction(
-  dietTypeId: string
+  dietTypeId: string,
 ): Promise<
-  ActionResult<
+  ActionResultWithOk<
     Array<{
       id: string;
       code: string;
       name_nl: string;
-      category_type: "forbidden" | "required";
+      category_type: 'forbidden' | 'required';
       is_diet_specific: boolean;
       items_count: number; // Active items count
     }>
@@ -1340,72 +1378,72 @@ export async function listIngredientCategoriesForDietAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin using user_roles table
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen categorieën bekijken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen categorieën bekijken',
         },
       };
     }
 
     // Get diet type name to determine prefix
     const { data: dietType } = await supabase
-      .from("diet_types")
-      .select("name")
-      .eq("id", dietTypeId)
+      .from('diet_types')
+      .select('name')
+      .eq('id', dietTypeId)
       .single();
 
     // Determine diet prefix
     let dietPrefix: string | null = null;
     if (dietType?.name) {
       const dietNameLower = dietType.name.toLowerCase();
-      if (dietNameLower.includes("wahls")) {
-        dietPrefix = "wahls_";
+      if (dietNameLower.includes('wahls')) {
+        dietPrefix = 'wahls_';
       }
     }
 
     // Get categories already used in constraints for this diet
     const { data: existingConstraints } = await supabase
-      .from("diet_category_constraints")
-      .select("category_id")
-      .eq("diet_type_id", dietTypeId)
-      .eq("is_active", true);
+      .from('diet_category_constraints')
+      .select('category_id')
+      .eq('diet_type_id', dietTypeId)
+      .eq('is_active', true);
 
     const usedCategoryIds = new Set(
-      (existingConstraints || []).map((c: any) => c.category_id)
+      (existingConstraints || []).map((c: any) => c.category_id),
     );
 
     // Known diet-specific prefixes
-    const knownDietPrefixes = ["wahls_"];
+    const knownDietPrefixes = ['wahls_'];
 
     // Get all active categories
     const { data: categories, error } = await supabase
-      .from("ingredient_categories")
-      .select("id, code, name_nl, category_type")
-      .eq("is_active", true)
-      .order("name_nl", { ascending: true });
+      .from('ingredient_categories')
+      .select('id, code, name_nl, category_type')
+      .eq('is_active', true)
+      .order('name_nl', { ascending: true });
 
     if (error) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -1417,7 +1455,7 @@ export async function listIngredientCategoriesForDietAction(
       if (usedCategoryIds.has(cat.id)) {
         return true;
       }
-      
+
       if (dietPrefix) {
         // Include if has diet prefix
         if (cat.code.startsWith(dietPrefix)) {
@@ -1425,14 +1463,14 @@ export async function listIngredientCategoriesForDietAction(
         }
         // Include if global
         const isGlobalCategory = !knownDietPrefixes.some((prefix) =>
-          cat.code.startsWith(prefix)
+          cat.code.startsWith(prefix),
         );
         if (isGlobalCategory) {
           return true;
         }
         return false;
       }
-      
+
       return true;
     });
 
@@ -1447,11 +1485,11 @@ export async function listIngredientCategoriesForDietAction(
       // For better performance with many categories, we could use a Postgres function, but for now this works
       const countPromises = categoryIds.map(async (categoryId: string) => {
         const { count, error } = await supabase
-          .from("ingredient_category_items")
-          .select("*", { count: "exact", head: true })
-          .eq("category_id", categoryId)
-          .eq("is_active", true);
-        
+          .from('ingredient_category_items')
+          .select('*', { count: 'exact', head: true })
+          .eq('category_id', categoryId)
+          .eq('is_active', true);
+
         if (!error && count !== null) {
           itemsCountMap.set(categoryId, count);
         }
@@ -1474,7 +1512,7 @@ export async function listIngredientCategoriesForDietAction(
         // Sort: diet-specific first, then alphabetically
         if (a.is_diet_specific && !b.is_diet_specific) return -1;
         if (!a.is_diet_specific && b.is_diet_specific) return 1;
-        return a.name_nl.localeCompare(b.name_nl, "nl");
+        return a.name_nl.localeCompare(b.name_nl, 'nl');
       });
 
     return {
@@ -1482,12 +1520,12 @@ export async function listIngredientCategoriesForDietAction(
       data: filtered,
     };
   } catch (error) {
-    console.error("Error in listIngredientCategoriesForDietAction:", error);
+    console.error('Error in listIngredientCategoriesForDietAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -1495,14 +1533,14 @@ export async function listIngredientCategoriesForDietAction(
 
 /**
  * Read ingredient category items for a category (read-only, with limit)
- * 
+ *
  * Returns first N items (default 50) + total count for pagination info.
  */
 export async function readIngredientCategoryItemsAction(
   categoryId: string,
-  limit: number = 50
+  limit: number = 50,
 ): Promise<
-  ActionResult<{
+  ActionResultWithOk<{
     items: Array<{
       id: string;
       term: string;
@@ -1527,42 +1565,42 @@ export async function readIngredientCategoryItemsAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin using user_roles table
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen items bekijken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen items bekijken',
         },
       };
     }
 
     // Get total count (active items only)
     const { count: totalCount, error: countError } = await supabase
-      .from("ingredient_category_items")
-      .select("*", { count: "exact", head: true })
-      .eq("category_id", categoryId)
-      .eq("is_active", true);
+      .from('ingredient_category_items')
+      .select('*', { count: 'exact', head: true })
+      .eq('category_id', categoryId)
+      .eq('is_active', true);
 
     if (countError) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: countError.message,
         },
       };
@@ -1570,19 +1608,21 @@ export async function readIngredientCategoryItemsAction(
 
     // Get first N items (active only), including subgroup_id
     const { data: items, error } = await supabase
-      .from("ingredient_category_items")
-      .select("id, term, term_nl, synonyms, display_order, is_active, subgroup_id")
-      .eq("category_id", categoryId)
-      .eq("is_active", true)
-      .order("display_order", { ascending: true })
-      .order("term", { ascending: true })
+      .from('ingredient_category_items')
+      .select(
+        'id, term, term_nl, synonyms, display_order, is_active, subgroup_id',
+      )
+      .eq('category_id', categoryId)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+      .order('term', { ascending: true })
       .limit(limit);
 
     if (error) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -1607,12 +1647,12 @@ export async function readIngredientCategoryItemsAction(
       },
     };
   } catch (error) {
-    console.error("Error in readIngredientCategoryItemsAction:", error);
+    console.error('Error in readIngredientCategoryItemsAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -1622,9 +1662,9 @@ export async function readIngredientCategoryItemsAction(
  * Get ingredient category items (synonyms) for a category
  */
 export async function getIngredientCategoryItemsAction(
-  categoryId: string
+  categoryId: string,
 ): Promise<
-  ActionResult<
+  ActionResultWithOk<
     Array<{
       id: string;
       category_id: string;
@@ -1646,42 +1686,42 @@ export async function getIngredientCategoryItemsAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen items bekijken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen items bekijken',
         },
       };
     }
 
     const { data: items, error } = await supabase
-      .from("ingredient_category_items")
-      .select("*")
-      .eq("category_id", categoryId)
-      .order("display_order", { ascending: true })
-      .order("term", { ascending: true });
+      .from('ingredient_category_items')
+      .select('*')
+      .eq('category_id', categoryId)
+      .order('display_order', { ascending: true })
+      .order('term', { ascending: true });
 
     if (error) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -1702,12 +1742,12 @@ export async function getIngredientCategoryItemsAction(
       data: formattedItems,
     };
   } catch (error) {
-    console.error("Error in getIngredientCategoryItemsAction:", error);
+    console.error('Error in getIngredientCategoryItemsAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -1722,7 +1762,7 @@ export async function createIngredientCategoryItemAction(input: {
   term_nl?: string | null;
   synonyms?: string[];
   display_order?: number;
-}): Promise<ActionResult<{ id: string }>> {
+}): Promise<ActionResultWithOk<{ id: string }>> {
   try {
     const supabase = await createClient();
 
@@ -1733,26 +1773,26 @@ export async function createIngredientCategoryItemAction(input: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen items aanmaken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen items aanmaken',
         },
       };
     }
@@ -1761,14 +1801,14 @@ export async function createIngredientCategoryItemAction(input: {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Term is verplicht",
+          code: 'VALIDATION_ERROR',
+          message: 'Term is verplicht',
         },
       };
     }
 
     const { data, error } = await supabase
-      .from("ingredient_category_items")
+      .from('ingredient_category_items')
       .insert({
         category_id: input.category_id,
         term: input.term.trim().toLowerCase(),
@@ -1777,15 +1817,15 @@ export async function createIngredientCategoryItemAction(input: {
         display_order: input.display_order || 0,
         is_active: true,
       })
-      .select("id")
+      .select('id')
       .single();
 
     if (error) {
-      if (error.code === "23505") {
+      if (error.code === '23505') {
         return {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
+            code: 'VALIDATION_ERROR',
             message: `Term "${input.term}" bestaat al in deze categorie`,
           },
         };
@@ -1793,7 +1833,7 @@ export async function createIngredientCategoryItemAction(input: {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -1804,12 +1844,12 @@ export async function createIngredientCategoryItemAction(input: {
       data: { id: data.id },
     };
   } catch (error) {
-    console.error("Error in createIngredientCategoryItemAction:", error);
+    console.error('Error in createIngredientCategoryItemAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -1827,8 +1867,8 @@ export async function updateIngredientCategoryItemAction(
     display_order?: number;
     is_active?: boolean;
     subgroup_id?: string | null;
-  }
-): Promise<ActionResult<{ id: string }>> {
+  },
+): Promise<ActionResultWithOk<{ id: string }>> {
   try {
     const supabase = await createClient();
 
@@ -1839,50 +1879,54 @@ export async function updateIngredientCategoryItemAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen items bewerken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen items bewerken',
         },
       };
     }
 
     const updateData: any = {};
-    if (input.term !== undefined) updateData.term = input.term.trim().toLowerCase();
-    if (input.term_nl !== undefined) updateData.term_nl = input.term_nl?.trim() || null;
+    if (input.term !== undefined)
+      updateData.term = input.term.trim().toLowerCase();
+    if (input.term_nl !== undefined)
+      updateData.term_nl = input.term_nl?.trim() || null;
     if (input.synonyms !== undefined) updateData.synonyms = input.synonyms;
-    if (input.display_order !== undefined) updateData.display_order = input.display_order;
+    if (input.display_order !== undefined)
+      updateData.display_order = input.display_order;
     if (input.is_active !== undefined) updateData.is_active = input.is_active;
-    if (input.subgroup_id !== undefined) updateData.subgroup_id = input.subgroup_id;
+    if (input.subgroup_id !== undefined)
+      updateData.subgroup_id = input.subgroup_id;
 
     const { data, error } = await supabase
-      .from("ingredient_category_items")
+      .from('ingredient_category_items')
       .update(updateData)
-      .eq("id", itemId)
-      .select("id")
+      .eq('id', itemId)
+      .select('id')
       .single();
 
     if (error) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -1893,12 +1937,12 @@ export async function updateIngredientCategoryItemAction(
       data: { id: data.id },
     };
   } catch (error) {
-    console.error("Error in updateIngredientCategoryItemAction:", error);
+    console.error('Error in updateIngredientCategoryItemAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -1908,8 +1952,8 @@ export async function updateIngredientCategoryItemAction(
  * Delete an ingredient category item (soft delete: sets is_active=false)
  */
 export async function deleteIngredientCategoryItemAction(
-  itemId: string
-): Promise<ActionResult<void>> {
+  itemId: string,
+): Promise<ActionResultWithOk<void>> {
   try {
     const supabase = await createClient();
 
@@ -1920,41 +1964,41 @@ export async function deleteIngredientCategoryItemAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen items verwijderen",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen items verwijderen',
         },
       };
     }
 
     // Soft delete: set is_active=false
     const { error } = await supabase
-      .from("ingredient_category_items")
+      .from('ingredient_category_items')
       .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq("id", itemId);
+      .eq('id', itemId);
 
     if (error) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -1965,12 +2009,12 @@ export async function deleteIngredientCategoryItemAction(
       data: undefined,
     };
   } catch (error) {
-    console.error("Error in deleteIngredientCategoryItemAction:", error);
+    console.error('Error in deleteIngredientCategoryItemAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -1978,7 +2022,7 @@ export async function deleteIngredientCategoryItemAction(
 
 /**
  * Generate subgroup suggestions using AI based on category name
- * 
+ *
  * Level 1: Suggests logical subgroups for a category (e.g., for "non-gluten grains": rijst, pasta's, granen)
  */
 export async function generateSubgroupSuggestionsAction(input: {
@@ -1986,7 +2030,7 @@ export async function generateSubgroupSuggestionsAction(input: {
   categoryName: string;
   categoryCode?: string;
 }): Promise<
-  ActionResult<{
+  ActionResultWithOk<{
     suggestions: Array<{
       name: string;
       nameNl: string;
@@ -2004,36 +2048,36 @@ export async function generateSubgroupSuggestionsAction(input: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen AI suggesties genereren",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen AI suggesties genereren',
         },
       };
     }
 
     // Fetch existing subgroups
     const { data: existingSubgroups } = await supabase
-      .from("ingredient_subgroups")
-      .select("name, name_nl")
-      .eq("category_id", input.categoryId)
-      .eq("is_active", true);
+      .from('ingredient_subgroups')
+      .select('name, name_nl')
+      .eq('category_id', input.categoryId)
+      .eq('is_active', true);
 
     const existingNames = new Set<string>();
     (existingSubgroups || []).forEach((sg) => {
@@ -2045,10 +2089,10 @@ export async function generateSubgroupSuggestionsAction(input: {
 
     const prompt = `Je bent een expert in ingrediënten en voedingscategorieën.
 
-Gegeven de ingrediëntgroep: "${input.categoryName}"${input.categoryCode ? ` (code: ${input.categoryCode})` : ""}
+Gegeven de ingrediëntgroep: "${input.categoryName}"${input.categoryCode ? ` (code: ${input.categoryCode})` : ''}
 
 BELANGRIJK - BESTAANDE SUBGROEPEN:
-${existingNames.size > 0 ? `Deze categorie heeft al de volgende subgroepen: ${Array.from(existingNames).join(", ")}` : "Deze categorie heeft nog geen subgroepen"}
+${existingNames.size > 0 ? `Deze categorie heeft al de volgende subgroepen: ${Array.from(existingNames).join(', ')}` : 'Deze categorie heeft nog geen subgroepen'}
 
 Gevraagd:
 1. Genereer 5-8 logische subgroepen die deze categorie zouden kunnen organiseren
@@ -2076,15 +2120,15 @@ Zorg dat alle namen lowercase zijn en geen speciale tekens bevatten (behalve spa
 VOORKOM DUPLICATEN met bestaande subgroepen.`;
 
     const jsonSchema = {
-      type: "array",
+      type: 'array',
       items: {
-        type: "object",
+        type: 'object',
         properties: {
-          name: { type: "string" },
-          nameNl: { type: "string" },
-          description: { type: "string", nullable: true },
+          name: { type: 'string' },
+          nameNl: { type: 'string' },
+          description: { type: 'string', nullable: true },
         },
-        required: ["name", "nameNl"],
+        required: ['name', 'nameNl'],
       },
     };
 
@@ -2093,19 +2137,21 @@ VOORKOM DUPLICATEN met bestaande subgroepen.`;
         prompt,
         jsonSchema,
         temperature: 0.7,
-        purpose: "enrich",
+        purpose: 'enrich',
       });
 
       // Extract JSON from potentially wrapped response (remove markdown code blocks)
       const jsonString = extractJsonFromResponse(rawResponse);
       let parsed: unknown;
-      
+
       try {
         parsed = JSON.parse(jsonString);
       } catch (parseError) {
-        console.error("JSON parse error:", parseError);
-        console.error("Raw response:", rawResponse.substring(0, 500));
-        throw new Error(`Invalid JSON from AI: ${parseError instanceof Error ? parseError.message : "Unknown parse error"}`);
+        console.error('JSON parse error:', parseError);
+        console.error('Raw response:', rawResponse.substring(0, 500));
+        throw new Error(
+          `Invalid JSON from AI: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`,
+        );
       }
 
       const suggestions = Array.isArray(parsed) ? parsed : [];
@@ -2113,7 +2159,12 @@ VOORKOM DUPLICATEN met bestaande subgroepen.`;
       // Normalize and filter suggestions
       const normalized = suggestions
         .map((s: any) => {
-          if (!s.name || !s.nameNl || typeof s.name !== "string" || typeof s.nameNl !== "string") {
+          if (
+            !s.name ||
+            !s.nameNl ||
+            typeof s.name !== 'string' ||
+            typeof s.nameNl !== 'string'
+          ) {
             return null;
           }
 
@@ -2121,7 +2172,10 @@ VOORKOM DUPLICATEN met bestaande subgroepen.`;
           const normalizedNameNl = normalizeTerm(s.nameNl);
 
           // Check for duplicates
-          if (existingNames.has(normalizedName) || existingNames.has(normalizedNameNl)) {
+          if (
+            existingNames.has(normalizedName) ||
+            existingNames.has(normalizedNameNl)
+          ) {
             return null;
           }
 
@@ -2131,7 +2185,12 @@ VOORKOM DUPLICATEN met bestaande subgroepen.`;
             description: s.description ? s.description.trim() : undefined,
           };
         })
-        .filter((s: any): s is { name: string; nameNl: string; description?: string } => s !== null);
+        .filter(
+          (
+            s: unknown,
+          ): s is { name: string; nameNl: string; description?: string } =>
+            s !== null && typeof s === 'object',
+        ) as { name: string; nameNl: string; description?: string }[];
 
       return {
         ok: true,
@@ -2140,22 +2199,22 @@ VOORKOM DUPLICATEN met bestaande subgroepen.`;
         },
       };
     } catch (aiError) {
-      console.error("Error calling Gemini API:", aiError);
+      console.error('Error calling Gemini API:', aiError);
       return {
         ok: false,
         error: {
-          code: "AI_ERROR",
-          message: `AI generatie mislukt: ${aiError instanceof Error ? aiError.message : "Onbekende fout"}`,
+          code: 'AI_ERROR',
+          message: `AI generatie mislukt: ${aiError instanceof Error ? aiError.message : 'Onbekende fout'}`,
         },
       };
     }
   } catch (error) {
-    console.error("Error in generateSubgroupSuggestionsAction:", error);
+    console.error('Error in generateSubgroupSuggestionsAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -2163,7 +2222,7 @@ VOORKOM DUPLICATEN met bestaande subgroepen.`;
 
 /**
  * Generate ingredient suggestions using AI based on category name
- * 
+ *
  * Level 2: Uses Gemini AI to find specific ingredients for a subgroup (e.g., for "rijst": zilvervliesrijst, basmati, bruine rijst)
  */
 const DEFAULT_SUGGESTION_LIMIT = 30;
@@ -2179,7 +2238,7 @@ export async function generateIngredientSuggestionsAction(input: {
   /** Extra termen om uit te sluiten (bv. eerder gegenereerde suggesties in deze sessie). */
   excludeTerms?: string[];
 }): Promise<
-  ActionResult<{
+  ActionResultWithOk<{
     suggestions: Array<{
       term: string;
       termNl: string | null;
@@ -2197,52 +2256,52 @@ export async function generateIngredientSuggestionsAction(input: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen AI suggesties genereren",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen AI suggesties genereren',
         },
       };
     }
 
     // Fetch existing items - in category or in specific subgroup
     const itemsQuery = supabase
-      .from("ingredient_category_items")
-      .select("term, term_nl, synonyms")
-      .eq("category_id", input.categoryId)
-      .eq("is_active", true);
+      .from('ingredient_category_items')
+      .select('term, term_nl, synonyms')
+      .eq('category_id', input.categoryId)
+      .eq('is_active', true);
 
     // If subgroup is specified, only check items in that subgroup
     // Otherwise check all items in category (including those without subgroup)
     if (input.subgroupId) {
-      itemsQuery.eq("subgroup_id", input.subgroupId);
+      itemsQuery.eq('subgroup_id', input.subgroupId);
     }
 
     const { data: existingItems, error: itemsError } = await itemsQuery;
 
     if (itemsError) {
-      console.error("Error fetching existing items:", itemsError);
+      console.error('Error fetching existing items:', itemsError);
       return {
         ok: false,
         error: {
-          code: "INTERNAL_ERROR",
-          message: "Kon bestaande items niet ophalen",
+          code: 'INTERNAL_ERROR',
+          message: 'Kon bestaande items niet ophalen',
         },
       };
     }
@@ -2250,16 +2309,16 @@ export async function generateIngredientSuggestionsAction(input: {
     // Build list of existing terms and synonyms for AI context
     const existingTerms = new Set<string>();
     const existingSynonyms = new Set<string>();
-    
+
     (existingItems || []).forEach((item) => {
       const normalizedTerm = normalizeTerm(item.term);
       existingTerms.add(normalizedTerm);
-      
+
       if (item.term_nl) {
         const normalizedNl = normalizeTerm(item.term_nl);
         existingTerms.add(normalizedNl);
       }
-      
+
       if (item.synonyms && Array.isArray(item.synonyms)) {
         item.synonyms.forEach((syn: string) => {
           existingSynonyms.add(normalizeTerm(syn));
@@ -2268,7 +2327,9 @@ export async function generateIngredientSuggestionsAction(input: {
     });
 
     // Merge excludeTerms (e.g. already-shown suggestions when fetching "more")
-    (input.excludeTerms ?? []).forEach((t) => existingTerms.add(normalizeTerm(t)));
+    (input.excludeTerms ?? []).forEach((t) =>
+      existingTerms.add(normalizeTerm(t)),
+    );
 
     const existingTermsList = Array.from(existingTerms).slice(0, 80); // Limit to avoid huge prompts
     const existingSynonymsList = Array.from(existingSynonyms).slice(0, 50);
@@ -2276,29 +2337,32 @@ export async function generateIngredientSuggestionsAction(input: {
     const gemini = getGeminiClient();
 
     // Build prompt for AI with existing items context and subgroup context
-    const subgroupContext = input.subgroupId && input.subgroupName
-      ? `\n\nSUBGROEP CONTEXT:
+    const subgroupContext =
+      input.subgroupId && input.subgroupName
+        ? `\n\nSUBGROEP CONTEXT:
 Je genereert suggesties voor de subgroep "${input.subgroupName}" binnen "${input.categoryName}".
 Focus specifiek op ingrediënten die bij deze subgroep horen.`
-      : "";
+        : '';
 
     const prompt = `Je bent een expert in ingrediënten en voedingscategorieën.
 
-Gegeven de ingrediëntgroep: "${input.categoryName}"${input.categoryCode ? ` (code: ${input.categoryCode})` : ""}${subgroupContext}
+Gegeven de ingrediëntgroep: "${input.categoryName}"${input.categoryCode ? ` (code: ${input.categoryCode})` : ''}${subgroupContext}
 
 BELANGRIJK - BESTAANDE INGREDIËNTEN:
-${input.subgroupId && input.subgroupName 
-  ? `De subgroep "${input.subgroupName}" bevat al de volgende ingrediënten:`
-  : `Deze categorie bevat al de volgende ingrediënten:`}
-${existingTermsList.length > 0 ? `- Termen: ${existingTermsList.join(", ")}` : "- Geen bestaande termen"}
-${existingSynonymsList.length > 0 ? `- Synoniemen: ${existingSynonymsList.join(", ")}` : "- Geen bestaande synoniemen"}
+${
+  input.subgroupId && input.subgroupName
+    ? `De subgroep "${input.subgroupName}" bevat al de volgende ingrediënten:`
+    : `Deze categorie bevat al de volgende ingrediënten:`
+}
+${existingTermsList.length > 0 ? `- Termen: ${existingTermsList.join(', ')}` : '- Geen bestaande termen'}
+${existingSynonymsList.length > 0 ? `- Synoniemen: ${existingSynonymsList.join(', ')}` : '- Geen bestaande synoniemen'}
 
 Gevraagd:
-1. Genereer tot ${input.limit ?? DEFAULT_SUGGESTION_LIMIT} NIEUWE relevante ingrediënten die tot ${input.subgroupId ? `de subgroep "${input.subgroupName}"` : "deze groep"} behoren maar NOG NIET in de lijst staan
+1. Genereer tot ${input.limit ?? DEFAULT_SUGGESTION_LIMIT} NIEUWE relevante ingrediënten die tot ${input.subgroupId ? `de subgroep "${input.subgroupName}"` : 'deze groep'} behoren maar NOG NIET in de lijst staan
 2. VOORKOM duplicaten: controleer zorgvuldig dat je suggesties niet overlappen met bestaande termen of synoniemen
 3. Voor elk ingrediënt: geef ALLEEN de Nederlandse term (lowercase), en 3-5 Nederlandse synoniemen
 4. Synoniemen moeten ook lowercase zijn en ALLEEN Nederlands
-5. Focus op ingrediënten die logisch bij ${input.subgroupId ? `deze subgroep` : "deze categorie"} horen maar nog ontbreken
+5. Focus op ingrediënten die logisch bij ${input.subgroupId ? `deze subgroep` : 'deze categorie'} horen maar nog ontbreken
 6. GEEN Engels - alleen Nederlandse termen
 
 Voorbeeld voor ${input.subgroupId ? `subgroep "pasta" binnen "Glutenhoudende granen"` : `"Glutenhoudende granen"`} (als pasta en tarwe al bestaan):
@@ -2319,18 +2383,18 @@ Zorg dat alle termen lowercase zijn en geen speciale tekens bevatten (behalve sp
 VOORKOM DUPLICATEN met bestaande termen en synoniemen.`;
 
     const jsonSchema = {
-      type: "array",
+      type: 'array',
       items: {
-        type: "object",
+        type: 'object',
         properties: {
-          term: { type: "string" },
-          termNl: { type: "string", nullable: true },
+          term: { type: 'string' },
+          termNl: { type: 'string', nullable: true },
           synonyms: {
-            type: "array",
-            items: { type: "string" },
+            type: 'array',
+            items: { type: 'string' },
           },
         },
-        required: ["term"],
+        required: ['term'],
       },
     };
 
@@ -2339,19 +2403,21 @@ VOORKOM DUPLICATEN met bestaande termen en synoniemen.`;
         prompt,
         jsonSchema,
         temperature: 0.7,
-        purpose: "enrich",
+        purpose: 'enrich',
       });
 
       // Extract JSON from potentially wrapped response (remove markdown code blocks)
       const jsonString = extractJsonFromResponse(rawResponse);
       let parsed: unknown;
-      
+
       try {
         parsed = JSON.parse(jsonString);
       } catch (parseError) {
-        console.error("JSON parse error:", parseError);
-        console.error("Raw response:", rawResponse.substring(0, 500));
-        throw new Error(`Invalid JSON from AI: ${parseError instanceof Error ? parseError.message : "Unknown parse error"}`);
+        console.error('JSON parse error:', parseError);
+        console.error('Raw response:', rawResponse.substring(0, 500));
+        throw new Error(
+          `Invalid JSON from AI: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`,
+        );
       }
 
       const suggestions = Array.isArray(parsed) ? parsed : [];
@@ -2359,15 +2425,15 @@ VOORKOM DUPLICATEN met bestaande termen en synoniemen.`;
       // Normalize and validate suggestions
       const normalized = suggestions
         .map((s: any) => {
-          if (!s.term || typeof s.term !== "string") return null;
-          
+          if (!s.term || typeof s.term !== 'string') return null;
+
           const normalizedTerm = normalizeTerm(s.term);
-          
+
           // Check if this term already exists (case-insensitive)
           if (existingTerms.has(normalizedTerm)) {
             return null; // Skip duplicates
           }
-          
+
           // Use Dutch term as primary, fallback to term if no termNl
           const termNl = s.termNl ? normalizeTerm(s.termNl) : normalizedTerm;
           return {
@@ -2375,13 +2441,23 @@ VOORKOM DUPLICATEN met bestaande termen en synoniemen.`;
             termNl: termNl,
             synonyms: Array.isArray(s.synonyms)
               ? s.synonyms
-                  .map((syn: any) => (typeof syn === "string" ? normalizeTerm(syn) : null))
-                  .filter((syn: string | null): syn is string => syn !== null && syn.length >= 2)
+                  .map((syn: any) =>
+                    typeof syn === 'string' ? normalizeTerm(syn) : null,
+                  )
+                  .filter(
+                    (syn: string | null): syn is string =>
+                      syn !== null && syn.length >= 2,
+                  )
                   .filter((syn: string) => !existingSynonyms.has(syn)) // Filter out existing synonyms
               : [],
           };
         })
-        .filter((s: any): s is { term: string; termNl: string | null; synonyms: string[] } => s !== null);
+        .filter(
+          (
+            s: unknown,
+          ): s is { term: string; termNl: string | null; synonyms: string[] } =>
+            s !== null && typeof s === 'object',
+        ) as { term: string; termNl: string | null; synonyms: string[] }[];
 
       return {
         ok: true,
@@ -2390,22 +2466,22 @@ VOORKOM DUPLICATEN met bestaande termen en synoniemen.`;
         },
       };
     } catch (aiError) {
-      console.error("Error calling Gemini API:", aiError);
+      console.error('Error calling Gemini API:', aiError);
       return {
         ok: false,
         error: {
-          code: "AI_ERROR",
-          message: `AI generatie mislukt: ${aiError instanceof Error ? aiError.message : "Onbekende fout"}`,
+          code: 'AI_ERROR',
+          message: `AI generatie mislukt: ${aiError instanceof Error ? aiError.message : 'Onbekende fout'}`,
         },
       };
     }
   } catch (error) {
-    console.error("Error in generateIngredientSuggestionsAction:", error);
+    console.error('Error in generateIngredientSuggestionsAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -2413,7 +2489,7 @@ VOORKOM DUPLICATEN met bestaande termen en synoniemen.`;
 
 /**
  * Add a single ingredient category item
- * 
+ *
  * Validates and normalizes the term, checks for duplicates (case-insensitive),
  * and returns the created item ID or an error if duplicate.
  */
@@ -2423,7 +2499,7 @@ export async function addIngredientCategoryItemAction(input: {
   term: string;
   termNl?: string | null;
   synonyms?: string[];
-}): Promise<ActionResult<{ id: string }>> {
+}): Promise<ActionResultWithOk<{ id: string }>> {
   try {
     const supabase = await createClient();
 
@@ -2434,26 +2510,26 @@ export async function addIngredientCategoryItemAction(input: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen items toevoegen",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen items toevoegen',
         },
       };
     }
@@ -2464,8 +2540,8 @@ export async function addIngredientCategoryItemAction(input: {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: validation.error || "Ongeldige term",
+          code: 'VALIDATION_ERROR',
+          message: validation.error || 'Ongeldige term',
         },
       };
     }
@@ -2476,18 +2552,18 @@ export async function addIngredientCategoryItemAction(input: {
     // If subgroup_id is provided, verify it belongs to the category
     if (input.subgroupId) {
       const { data: subgroup } = await supabase
-        .from("ingredient_subgroups")
-        .select("category_id")
-        .eq("id", input.subgroupId)
-        .eq("is_active", true)
+        .from('ingredient_subgroups')
+        .select('category_id')
+        .eq('id', input.subgroupId)
+        .eq('is_active', true)
         .single();
 
       if (!subgroup || subgroup.category_id !== input.categoryId) {
         return {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Subgroep hoort niet bij deze categorie",
+            code: 'VALIDATION_ERROR',
+            message: 'Subgroep hoort niet bij deze categorie',
           },
         };
       }
@@ -2496,15 +2572,15 @@ export async function addIngredientCategoryItemAction(input: {
     // Check for existing duplicate (case-insensitive, including inactive items)
     // Check in category if no subgroup, or in subgroup if subgroup is provided
     const query = supabase
-      .from("ingredient_category_items")
-      .select("id, is_active")
-      .eq("category_id", input.categoryId)
-      .ilike("term", normalizedTerm);
+      .from('ingredient_category_items')
+      .select('id, is_active')
+      .eq('category_id', input.categoryId)
+      .ilike('term', normalizedTerm);
 
     if (input.subgroupId) {
-      query.eq("subgroup_id", input.subgroupId);
+      query.eq('subgroup_id', input.subgroupId);
     } else {
-      query.is("subgroup_id", null);
+      query.is('subgroup_id', null);
     }
 
     const { data: existing } = await query.maybeSingle();
@@ -2514,28 +2590,28 @@ export async function addIngredientCategoryItemAction(input: {
         return {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
+            code: 'VALIDATION_ERROR',
             message: `Term "${input.term}" bestaat al in deze categorie`,
           },
         };
       } else {
         // Reactivate soft-deleted item
         const { data: reactivated, error: reactivateError } = await supabase
-          .from("ingredient_category_items")
+          .from('ingredient_category_items')
           .update({
             is_active: true,
             term_nl: input.termNl?.trim() || null,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", existing.id)
-          .select("id")
+          .eq('id', existing.id)
+          .select('id')
           .single();
 
         if (reactivateError) {
           return {
             ok: false,
             error: {
-              code: "DB_ERROR",
+              code: 'DB_ERROR',
               message: reactivateError.message,
             },
           };
@@ -2555,7 +2631,7 @@ export async function addIngredientCategoryItemAction(input: {
 
     // Insert new item
     const { data, error } = await supabase
-      .from("ingredient_category_items")
+      .from('ingredient_category_items')
       .insert({
         category_id: input.categoryId,
         subgroup_id: input.subgroupId || null,
@@ -2565,15 +2641,15 @@ export async function addIngredientCategoryItemAction(input: {
         display_order: 0,
         is_active: true,
       })
-      .select("id")
+      .select('id')
       .single();
 
     if (error) {
-      if (error.code === "23505") {
+      if (error.code === '23505') {
         return {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
+            code: 'VALIDATION_ERROR',
             message: `Term "${input.term}" bestaat al in deze categorie`,
           },
         };
@@ -2581,7 +2657,7 @@ export async function addIngredientCategoryItemAction(input: {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -2592,12 +2668,12 @@ export async function addIngredientCategoryItemAction(input: {
       data: { id: data.id },
     };
   } catch (error) {
-    console.error("Error in addIngredientCategoryItemAction:", error);
+    console.error('Error in addIngredientCategoryItemAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -2605,17 +2681,17 @@ export async function addIngredientCategoryItemAction(input: {
 
 /**
  * Bulk add ingredient category items
- * 
+ *
  * Parses lines from text input, normalizes and validates each term,
  * deduplicates (case-insensitive), and returns summary of added/skipped items.
- * 
+ *
  * Max 200 items per bulk action (anti-abuse).
  */
 export async function bulkAddIngredientCategoryItemsAction(input: {
   categoryId: string;
   termsText: string; // Multi-line text, one term per line
 }): Promise<
-  ActionResult<{
+  ActionResultWithOk<{
     added: string[]; // Terms that were successfully added
     skippedDuplicates: string[]; // Terms that were skipped (already exist)
     skippedInvalid: Array<{ term: string; error: string }>; // Terms that failed validation
@@ -2632,33 +2708,33 @@ export async function bulkAddIngredientCategoryItemsAction(input: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen items bulk toevoegen",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen items bulk toevoegen',
         },
       };
     }
 
     // Parse lines: split, trim, filter empty
     const lines = input.termsText
-      .split("\n")
+      .split('\n')
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
 
@@ -2666,8 +2742,8 @@ export async function bulkAddIngredientCategoryItemsAction(input: {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Geen geldige termen gevonden",
+          code: 'VALIDATION_ERROR',
+          message: 'Geen geldige termen gevonden',
         },
       };
     }
@@ -2677,8 +2753,8 @@ export async function bulkAddIngredientCategoryItemsAction(input: {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Maximaal 200 termen per bulk actie toegestaan",
+          code: 'VALIDATION_ERROR',
+          message: 'Maximaal 200 termen per bulk actie toegestaan',
         },
       };
     }
@@ -2694,14 +2770,14 @@ export async function bulkAddIngredientCategoryItemsAction(input: {
 
     for (const originalTerm of lines) {
       const normalized = normalizeTerm(originalTerm);
-      
+
       // Skip if we've already seen this normalized term in the input
       if (normalizedTerms.has(normalized)) {
         continue;
       }
-      
+
       normalizedTerms.set(normalized, originalTerm);
-      
+
       const validation = validateTerm(originalTerm);
       validationResults.push({
         original: originalTerm,
@@ -2713,22 +2789,22 @@ export async function bulkAddIngredientCategoryItemsAction(input: {
 
     // Get existing items for this category (all, including inactive)
     const { data: existingItems, error: fetchError } = await supabase
-      .from("ingredient_category_items")
-      .select("term, is_active")
-      .eq("category_id", input.categoryId);
+      .from('ingredient_category_items')
+      .select('term, is_active')
+      .eq('category_id', input.categoryId);
 
     if (fetchError) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: fetchError.message,
         },
       };
     }
 
     const existingTermsSet = new Set(
-      (existingItems || []).map((item: any) => item.term.toLowerCase())
+      (existingItems || []).map((item: any) => item.term.toLowerCase()),
     );
     const existingInactiveTerms = new Map<string, string>(); // normalized term -> original term from DB
     (existingItems || []).forEach((item: any) => {
@@ -2748,7 +2824,7 @@ export async function bulkAddIngredientCategoryItemsAction(input: {
       if (!result.valid) {
         skippedInvalid.push({
           term: result.original,
-          error: result.error || "Ongeldige term",
+          error: result.error || 'Ongeldige term',
         });
         continue;
       }
@@ -2773,49 +2849,51 @@ export async function bulkAddIngredientCategoryItemsAction(input: {
       }
     }
 
-      // Reactivate soft-deleted items
-      if (toReactivate.length > 0) {
-        const reactivatePromises = toReactivate.map(async ({ term, original }) => {
+    // Reactivate soft-deleted items
+    if (toReactivate.length > 0) {
+      const reactivatePromises = toReactivate.map(
+        async ({ term, original }) => {
           const { error: reactivateError } = await supabase
-            .from("ingredient_category_items")
+            .from('ingredient_category_items')
             .update({
               is_active: true,
               updated_at: new Date().toISOString(),
             })
-            .eq("category_id", input.categoryId)
-            .ilike("term", term);
+            .eq('category_id', input.categoryId)
+            .ilike('term', term);
 
           if (!reactivateError) {
             added.push(original);
           }
-        });
+        },
+      );
 
-        await Promise.all(reactivatePromises);
-      }
+      await Promise.all(reactivatePromises);
+    }
 
-      // Insert new items (without synonyms for bulk - user can add those manually)
-      if (toInsert.length > 0) {
-        const insertData = toInsert.map(({ term }) => ({
-          category_id: input.categoryId,
-          term,
-          term_nl: null,
-          synonyms: [],
-          display_order: 0,
-          is_active: true,
-        }));
+    // Insert new items (without synonyms for bulk - user can add those manually)
+    if (toInsert.length > 0) {
+      const insertData = toInsert.map(({ term }) => ({
+        category_id: input.categoryId,
+        term,
+        term_nl: null,
+        synonyms: [],
+        display_order: 0,
+        is_active: true,
+      }));
 
       const { error: insertError } = await supabase
-        .from("ingredient_category_items")
+        .from('ingredient_category_items')
         .insert(insertData);
 
       if (insertError) {
         // Partial failure - some might have been inserted
         // We'll report what we can, but this is a best-effort scenario
-        console.error("Error inserting bulk items:", insertError);
+        console.error('Error inserting bulk items:', insertError);
         return {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: `Fout bij toevoegen items: ${insertError.message}`,
           },
         };
@@ -2837,12 +2915,12 @@ export async function bulkAddIngredientCategoryItemsAction(input: {
       },
     };
   } catch (error) {
-    console.error("Error in bulkAddIngredientCategoryItemsAction:", error);
+    console.error('Error in bulkAddIngredientCategoryItemsAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -2852,8 +2930,8 @@ export async function bulkAddIngredientCategoryItemsAction(input: {
  * Migrate legacy diet_rules to new ingredient_categories system
  */
 export async function migrateLegacyRulesToNewSystemAction(
-  dietTypeId: string
-): Promise<ActionResult<{ migrated: number; skipped: number }>> {
+  dietTypeId: string,
+): Promise<ActionResultWithOk<{ migrated: number; skipped: number }>> {
   try {
     const supabase = await createClient();
 
@@ -2864,43 +2942,43 @@ export async function migrateLegacyRulesToNewSystemAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen migreren",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen migreren',
         },
       };
     }
 
     // Get legacy rules
     const { data: legacyRules, error: rulesError } = await supabase
-      .from("diet_rules")
-      .select("*")
-      .eq("diet_type_id", dietTypeId)
-      .eq("is_active", true)
-      .in("rule_type", ["exclude_ingredient", "require_ingredient"]);
+      .from('diet_rules')
+      .select('*')
+      .eq('diet_type_id', dietTypeId)
+      .eq('is_active', true)
+      .in('rule_type', ['exclude_ingredient', 'require_ingredient']);
 
     if (rulesError) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: rulesError.message,
         },
       };
@@ -2919,8 +2997,8 @@ export async function migrateLegacyRulesToNewSystemAction(
     for (const rule of legacyRules) {
       try {
         const ruleValue = rule.rule_value as any;
-        const isForbidden = rule.rule_type === "exclude_ingredient";
-        const isRequired = rule.rule_type === "require_ingredient";
+        const isForbidden = rule.rule_type === 'exclude_ingredient';
+        const isRequired = rule.rule_type === 'require_ingredient';
 
         // Extract category info
         let categoryCode: string;
@@ -2930,15 +3008,17 @@ export async function migrateLegacyRulesToNewSystemAction(
         if (isForbidden) {
           if (Array.isArray(ruleValue)) {
             // Array of category names
-            categoryCode = rule.rule_key || `forbidden_${rule.id.substring(0, 8)}`;
-            categoryName = rule.description || ruleValue.join(", ");
+            categoryCode =
+              rule.rule_key || `forbidden_${rule.id.substring(0, 8)}`;
+            categoryName = rule.description || ruleValue.join(', ');
             ingredients = ruleValue;
           } else if (ruleValue?.excluded_categories) {
             const categories = Array.isArray(ruleValue.excluded_categories)
               ? ruleValue.excluded_categories
               : [ruleValue.excluded_categories];
-            categoryCode = rule.rule_key || `forbidden_${rule.id.substring(0, 8)}`;
-            categoryName = rule.description || categories.join(", ");
+            categoryCode =
+              rule.rule_key || `forbidden_${rule.id.substring(0, 8)}`;
+            categoryName = rule.description || categories.join(', ');
             ingredients = categories;
           } else {
             skipped++;
@@ -2949,8 +3029,9 @@ export async function migrateLegacyRulesToNewSystemAction(
             ingredients = Array.isArray(ruleValue.requiredIngredients)
               ? ruleValue.requiredIngredients
               : [ruleValue.requiredIngredients];
-            categoryCode = rule.rule_key || `required_${rule.id.substring(0, 8)}`;
-            categoryName = rule.description || ingredients.join(", ");
+            categoryCode =
+              rule.rule_key || `required_${rule.id.substring(0, 8)}`;
+            categoryName = rule.description || ingredients.join(', ');
           } else {
             skipped++;
             continue;
@@ -2963,15 +3044,15 @@ export async function migrateLegacyRulesToNewSystemAction(
         // Normalize category code
         categoryCode = categoryCode
           .toLowerCase()
-          .replace(/[^a-z0-9_]/g, "_")
-          .replace(/_+/g, "_")
-          .replace(/^_|_$/g, "");
+          .replace(/[^a-z0-9_]/g, '_')
+          .replace(/_+/g, '_')
+          .replace(/^_|_$/g, '');
 
         // Check if category already exists
-        let { data: existingCategory } = await supabase
-          .from("ingredient_categories")
-          .select("id")
-          .eq("code", categoryCode)
+        const { data: existingCategory } = await supabase
+          .from('ingredient_categories')
+          .select('id')
+          .eq('code', categoryCode)
           .maybeSingle();
 
         let categoryId: string;
@@ -2979,18 +3060,21 @@ export async function migrateLegacyRulesToNewSystemAction(
         if (!existingCategory) {
           // Create category
           const { data: newCategory, error: categoryError } = await supabase
-            .from("ingredient_categories")
+            .from('ingredient_categories')
             .insert({
               code: categoryCode,
               name_nl: categoryName,
-              category_type: isForbidden ? "forbidden" : "required",
+              category_type: isForbidden ? 'forbidden' : 'required',
               is_active: true,
             })
-            .select("id")
+            .select('id')
             .single();
 
           if (categoryError) {
-            console.error(`Error creating category ${categoryCode}:`, categoryError);
+            console.error(
+              `Error creating category ${categoryCode}:`,
+              categoryError,
+            );
             skipped++;
             continue;
           }
@@ -3007,14 +3091,14 @@ export async function migrateLegacyRulesToNewSystemAction(
 
           // Check if item already exists
           const { data: existingItem } = await supabase
-            .from("ingredient_category_items")
-            .select("id")
-            .eq("category_id", categoryId)
-            .eq("term", term)
+            .from('ingredient_category_items')
+            .select('id')
+            .eq('category_id', categoryId)
+            .eq('term', term)
             .maybeSingle();
 
           if (!existingItem) {
-            await supabase.from("ingredient_category_items").insert({
+            await supabase.from('ingredient_category_items').insert({
               category_id: categoryId,
               term: term,
               term_nl: ingredient,
@@ -3026,30 +3110,31 @@ export async function migrateLegacyRulesToNewSystemAction(
 
         // Check if constraint already exists
         const { data: existingConstraint } = await supabase
-          .from("diet_category_constraints")
-          .select("id")
-          .eq("diet_type_id", dietTypeId)
-          .eq("category_id", categoryId)
+          .from('diet_category_constraints')
+          .select('id')
+          .eq('diet_type_id', dietTypeId)
+          .eq('category_id', categoryId)
           .maybeSingle();
 
         if (!existingConstraint) {
           // Create constraint
           const minPerDay =
-            isRequired && ruleValue?.frequency === "daily"
+            isRequired && ruleValue?.frequency === 'daily'
               ? ruleValue?.minimumAmount || ruleValue?.minAmountMl || 1
               : null;
           const minPerWeek =
             isRequired &&
-            (ruleValue?.frequency === "2x_weekly" || ruleValue?.frequency === "weekly")
+            (ruleValue?.frequency === '2x_weekly' ||
+              ruleValue?.frequency === 'weekly')
               ? ruleValue?.minimumAmount || 1
               : null;
 
-          await supabase.from("diet_category_constraints").insert({
+          await supabase.from('diet_category_constraints').insert({
             diet_type_id: dietTypeId,
             category_id: categoryId,
-            constraint_type: isForbidden ? "forbidden" : "required",
-            rule_action: isForbidden ? "block" : "allow",
-            strictness: "hard",
+            constraint_type: isForbidden ? 'forbidden' : 'required',
+            rule_action: isForbidden ? 'block' : 'allow',
+            strictness: 'hard',
             min_per_day: minPerDay,
             min_per_week: minPerWeek,
             priority: rule.priority || 50,
@@ -3060,9 +3145,9 @@ export async function migrateLegacyRulesToNewSystemAction(
 
         // Deactivate legacy rule
         await supabase
-          .from("diet_rules")
+          .from('diet_rules')
           .update({ is_active: false })
-          .eq("id", rule.id);
+          .eq('id', rule.id);
 
         migrated++;
       } catch (err) {
@@ -3076,12 +3161,12 @@ export async function migrateLegacyRulesToNewSystemAction(
       data: { migrated, skipped },
     };
   } catch (error) {
-    console.error("Error in migrateLegacyRulesToNewSystemAction:", error);
+    console.error('Error in migrateLegacyRulesToNewSystemAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -3094,10 +3179,8 @@ export async function migrateLegacyRulesToNewSystemAction(
 /**
  * Get all subgroups for a category, with their items
  */
-export async function getIngredientSubgroupsAction(
-  categoryId: string
-): Promise<
-  ActionResult<
+export async function getIngredientSubgroupsAction(categoryId: string): Promise<
+  ActionResultWithOk<
     Array<{
       id: string;
       category_id: string;
@@ -3128,44 +3211,44 @@ export async function getIngredientSubgroupsAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen subgroepen bekijken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen subgroepen bekijken',
         },
       };
     }
 
     // Get subgroups
     const { data: subgroups, error: subgroupsError } = await supabase
-      .from("ingredient_subgroups")
-      .select("*")
-      .eq("category_id", categoryId)
-      .eq("is_active", true)
-      .order("display_order", { ascending: true })
-      .order("name", { ascending: true });
+      .from('ingredient_subgroups')
+      .select('*')
+      .eq('category_id', categoryId)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+      .order('name', { ascending: true });
 
     if (subgroupsError) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: subgroupsError.message,
         },
       };
@@ -3176,19 +3259,19 @@ export async function getIngredientSubgroupsAction(
       (subgroups || []).map(async (subgroup) => {
         // Get items count
         const { count } = await supabase
-          .from("ingredient_category_items")
-          .select("*", { count: "exact", head: true })
-          .eq("subgroup_id", subgroup.id)
-          .eq("is_active", true);
+          .from('ingredient_category_items')
+          .select('*', { count: 'exact', head: true })
+          .eq('subgroup_id', subgroup.id)
+          .eq('is_active', true);
 
         // Get items
         const { data: items } = await supabase
-          .from("ingredient_category_items")
-          .select("id, term, term_nl, synonyms, display_order, is_active")
-          .eq("subgroup_id", subgroup.id)
-          .eq("is_active", true)
-          .order("display_order", { ascending: true })
-          .order("term", { ascending: true });
+          .from('ingredient_category_items')
+          .select('id, term, term_nl, synonyms, display_order, is_active')
+          .eq('subgroup_id', subgroup.id)
+          .eq('is_active', true)
+          .order('display_order', { ascending: true })
+          .order('term', { ascending: true });
 
         return {
           id: subgroup.id,
@@ -3208,7 +3291,7 @@ export async function getIngredientSubgroupsAction(
             is_active: item.is_active,
           })),
         };
-      })
+      }),
     );
 
     return {
@@ -3216,12 +3299,12 @@ export async function getIngredientSubgroupsAction(
       data: subgroupsWithItems,
     };
   } catch (error) {
-    console.error("Error in getIngredientSubgroupsAction:", error);
+    console.error('Error in getIngredientSubgroupsAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -3236,7 +3319,7 @@ export async function createIngredientSubgroupAction(input: {
   nameNl?: string | null;
   description?: string | null;
   displayOrder?: number;
-}): Promise<ActionResult<{ id: string }>> {
+}): Promise<ActionResultWithOk<{ id: string }>> {
   try {
     const supabase = await createClient();
 
@@ -3247,26 +3330,26 @@ export async function createIngredientSubgroupAction(input: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen subgroepen aanmaken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen subgroepen aanmaken',
         },
       };
     }
@@ -3276,25 +3359,25 @@ export async function createIngredientSubgroupAction(input: {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Subgroep naam moet minimaal 2 tekens lang zijn",
+          code: 'VALIDATION_ERROR',
+          message: 'Subgroep naam moet minimaal 2 tekens lang zijn',
         },
       };
     }
 
     // Check for duplicate
     const { data: existing } = await supabase
-      .from("ingredient_subgroups")
-      .select("id")
-      .eq("category_id", input.categoryId)
-      .ilike("name", input.name.trim())
+      .from('ingredient_subgroups')
+      .select('id')
+      .eq('category_id', input.categoryId)
+      .ilike('name', input.name.trim())
       .maybeSingle();
 
     if (existing) {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
+          code: 'VALIDATION_ERROR',
           message: `Subgroep "${input.name}" bestaat al in deze categorie`,
         },
       };
@@ -3302,7 +3385,7 @@ export async function createIngredientSubgroupAction(input: {
 
     // Insert
     const { data, error } = await supabase
-      .from("ingredient_subgroups")
+      .from('ingredient_subgroups')
       .insert({
         category_id: input.categoryId,
         name: input.name.trim(),
@@ -3311,15 +3394,15 @@ export async function createIngredientSubgroupAction(input: {
         display_order: input.displayOrder ?? 0,
         is_active: true,
       })
-      .select("id")
+      .select('id')
       .single();
 
     if (error) {
-      if (error.code === "23505") {
+      if (error.code === '23505') {
         return {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
+            code: 'VALIDATION_ERROR',
             message: `Subgroep "${input.name}" bestaat al in deze categorie`,
           },
         };
@@ -3327,7 +3410,7 @@ export async function createIngredientSubgroupAction(input: {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -3338,12 +3421,12 @@ export async function createIngredientSubgroupAction(input: {
       data: { id: data.id },
     };
   } catch (error) {
-    console.error("Error in createIngredientSubgroupAction:", error);
+    console.error('Error in createIngredientSubgroupAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -3359,8 +3442,8 @@ export async function updateIngredientSubgroupAction(
     nameNl?: string | null;
     description?: string | null;
     displayOrder?: number;
-  }
-): Promise<ActionResult<{ id: string }>> {
+  },
+): Promise<ActionResultWithOk<{ id: string }>> {
   try {
     const supabase = await createClient();
 
@@ -3371,26 +3454,26 @@ export async function updateIngredientSubgroupAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen subgroepen bewerken",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen subgroepen bewerken',
         },
       };
     }
@@ -3402,8 +3485,8 @@ export async function updateIngredientSubgroupAction(
         return {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Subgroep naam moet minimaal 2 tekens lang zijn",
+            code: 'VALIDATION_ERROR',
+            message: 'Subgroep naam moet minimaal 2 tekens lang zijn',
           },
         };
       }
@@ -3423,8 +3506,8 @@ export async function updateIngredientSubgroupAction(
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Geen velden om bij te werken",
+          code: 'VALIDATION_ERROR',
+          message: 'Geen velden om bij te werken',
         },
       };
     }
@@ -3432,25 +3515,25 @@ export async function updateIngredientSubgroupAction(
     // Check for duplicate name if name is being updated
     if (input.name !== undefined) {
       const { data: subgroup } = await supabase
-        .from("ingredient_subgroups")
-        .select("category_id")
-        .eq("id", subgroupId)
+        .from('ingredient_subgroups')
+        .select('category_id')
+        .eq('id', subgroupId)
         .single();
 
       if (subgroup) {
         const { data: existing } = await supabase
-          .from("ingredient_subgroups")
-          .select("id")
-          .eq("category_id", subgroup.category_id)
-          .ilike("name", input.name.trim())
-          .neq("id", subgroupId)
+          .from('ingredient_subgroups')
+          .select('id')
+          .eq('category_id', subgroup.category_id)
+          .ilike('name', input.name.trim())
+          .neq('id', subgroupId)
           .maybeSingle();
 
         if (existing) {
           return {
             ok: false,
             error: {
-              code: "VALIDATION_ERROR",
+              code: 'VALIDATION_ERROR',
               message: `Subgroep "${input.name}" bestaat al in deze categorie`,
             },
           };
@@ -3460,18 +3543,18 @@ export async function updateIngredientSubgroupAction(
 
     // Update
     const { data, error } = await supabase
-      .from("ingredient_subgroups")
+      .from('ingredient_subgroups')
       .update(updates)
-      .eq("id", subgroupId)
-      .select("id")
+      .eq('id', subgroupId)
+      .select('id')
       .single();
 
     if (error) {
-      if (error.code === "23505") {
+      if (error.code === '23505') {
         return {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
+            code: 'VALIDATION_ERROR',
             message: `Subgroep naam bestaat al in deze categorie`,
           },
         };
@@ -3479,7 +3562,7 @@ export async function updateIngredientSubgroupAction(
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -3490,12 +3573,12 @@ export async function updateIngredientSubgroupAction(
       data: { id: data.id },
     };
   } catch (error) {
-    console.error("Error in updateIngredientSubgroupAction:", error);
+    console.error('Error in updateIngredientSubgroupAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }
@@ -3505,8 +3588,8 @@ export async function updateIngredientSubgroupAction(
  * Delete (soft delete) an ingredient subgroup
  */
 export async function deleteIngredientSubgroupAction(
-  subgroupId: string
-): Promise<ActionResult<{ id: string }>> {
+  subgroupId: string,
+): Promise<ActionResultWithOk<{ id: string }>> {
   try {
     const supabase = await createClient();
 
@@ -3517,43 +3600,43 @@ export async function deleteIngredientSubgroupAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // Check admin
     const { data: role } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!role) {
       return {
         ok: false,
         error: {
-          code: "FORBIDDEN",
-          message: "Alleen admins kunnen subgroepen verwijderen",
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen subgroepen verwijderen',
         },
       };
     }
 
     // Soft delete: set is_active = false
     const { data, error } = await supabase
-      .from("ingredient_subgroups")
+      .from('ingredient_subgroups')
       .update({ is_active: false })
-      .eq("id", subgroupId)
-      .select("id")
+      .eq('id', subgroupId)
+      .select('id')
       .single();
 
     if (error) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -3564,12 +3647,12 @@ export async function deleteIngredientSubgroupAction(
       data: { id: data.id },
     };
   } catch (error) {
-    console.error("Error in deleteIngredientSubgroupAction:", error);
+    console.error('Error in deleteIngredientSubgroupAction:', error);
     return {
       ok: false,
       error: {
-        code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout",
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }

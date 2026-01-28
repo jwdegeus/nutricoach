@@ -1,6 +1,6 @@
 /**
  * Recipe Import Types
- * 
+ *
  * Type definitions for recipe import jobs.
  */
 
@@ -8,11 +8,11 @@
  * Recipe import status enum
  */
 export type RecipeImportStatus =
-  | "uploaded"
-  | "processing"
-  | "ready_for_review"
-  | "failed"
-  | "finalized";
+  | 'uploaded'
+  | 'processing'
+  | 'ready_for_review'
+  | 'failed'
+  | 'finalized';
 
 /**
  * Source image metadata
@@ -61,8 +61,8 @@ export type RecipeImportJob = {
 export type CreateRecipeImportInput = {
   sourceImagePath?: string;
   sourceImageMeta?: SourceImageMeta;
-  sourceLocale?: string;
-  targetLocale?: string;
+  sourceLocale?: string | null;
+  targetLocale?: string | null;
 };
 
 /**
@@ -104,7 +104,7 @@ export type ImportRecipeFromUrlSuccess = {
  */
 export type ImportRecipeFromUrlError = {
   ok: false;
-  errorCode: "INVALID_URL" | "UNAUTHORIZED" | "INTERNAL";
+  errorCode: 'INVALID_URL' | 'UNAUTHORIZED' | 'INTERNAL';
   message: string;
 };
 

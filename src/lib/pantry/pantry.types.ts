@@ -1,6 +1,6 @@
 /**
  * Pantry Types
- * 
+ *
  * Types for pantry/inventory items stored per user on NEVO code level.
  */
 
@@ -18,7 +18,7 @@ export type PantryItem = {
 
 /**
  * Pantry availability (used by shopping service)
- * 
+ *
  * Supports both binary (isAvailable) and quantity-based (availableG) pantry models.
  * - If availableG is provided: use exact quantity
  * - Else if isAvailable === true: treat as "sufficient" (missingG = 0)

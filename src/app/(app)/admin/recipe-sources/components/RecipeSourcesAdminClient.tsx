@@ -1,21 +1,34 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Table, TableHead, TableHeader, TableRow, TableBody, TableCell } from "@/components/catalyst/table";
-import { Button } from "@/components/catalyst/button";
-import { Badge } from "@/components/catalyst/badge";
-import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } from "@/components/catalyst/dialog";
-import { Field, Label, Description } from "@/components/catalyst/fieldset";
-import { Input } from "@/components/catalyst/input";
-import { Select } from "@/components/catalyst/select";
-import { ConfirmDialog } from "@/components/catalyst/confirm-dialog";
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  Table,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableBody,
+  TableCell,
+} from '@/components/catalyst/table';
+import { Button } from '@/components/catalyst/button';
+import { Badge } from '@/components/catalyst/badge';
+import {
+  Dialog,
+  DialogTitle,
+  DialogDescription,
+  DialogBody,
+  DialogActions,
+} from '@/components/catalyst/dialog';
+import { Field, Label, Description } from '@/components/catalyst/fieldset';
+import { Input } from '@/components/catalyst/input';
+import { Select } from '@/components/catalyst/select';
+import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
 import {
   PencilIcon,
   TrashIcon,
   ArrowPathIcon,
   PlusIcon,
-} from "@heroicons/react/20/solid";
+} from '@heroicons/react/20/solid';
 
 type RecipeSource = {
   id: string;
@@ -36,23 +49,25 @@ export function RecipeSourcesAdminClient() {
   // Edit dialog state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingSource, setEditingSource] = useState<RecipeSource | null>(null);
-  const [editName, setEditName] = useState("");
+  const [editName, setEditName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingSource, setDeletingSource] = useState<RecipeSource | null>(null);
+  const [deletingSource, setDeletingSource] = useState<RecipeSource | null>(
+    null,
+  );
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Merge dialog state
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [mergingSource, setMergingSource] = useState<RecipeSource | null>(null);
-  const [targetSourceId, setTargetSourceId] = useState<string>("");
+  const [targetSourceId, setTargetSourceId] = useState<string>('');
   const [isMerging, setIsMerging] = useState(false);
 
   // Create dialog state
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [newSourceName, setNewSourceName] = useState("");
+  const [newSourceName, setNewSourceName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
@@ -63,16 +78,16 @@ export function RecipeSourcesAdminClient() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch("/api/admin/recipe-sources");
+      const response = await fetch('/api/admin/recipe-sources');
       const result = await response.json();
 
       if (!result.ok) {
-        throw new Error(result.error?.message || "Fout bij laden bronnen");
+        throw new Error(result.error?.message || 'Fout bij laden bronnen');
       }
 
       setSources(result.data || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fout bij laden bronnen");
+      setError(err instanceof Error ? err.message : 'Fout bij laden bronnen');
     } finally {
       setLoading(false);
     }
@@ -89,10 +104,10 @@ export function RecipeSourcesAdminClient() {
 
     setIsSaving(true);
     try {
-      const response = await fetch("/api/admin/recipe-sources", {
-        method: "PUT",
+      const response = await fetch('/api/admin/recipe-sources', {
+        method: 'PUT',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           id: editingSource.id,
@@ -103,47 +118,47 @@ export function RecipeSourcesAdminClient() {
       const result = await response.json();
 
       if (!result.ok) {
-        throw new Error(result.error?.message || "Fout bij bijwerken");
+        throw new Error(result.error?.message || 'Fout bij bijwerken');
       }
 
       await loadSources();
-      
+
       // Wait a bit to ensure database updates are complete
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
       // Dispatch event to notify other components that sources have been updated
       // Use a more reliable approach: broadcast to all windows/tabs
-      if (typeof window !== "undefined") {
+      if (typeof window !== 'undefined') {
         // Dispatch to current window
-        const event = new CustomEvent("recipeSourceUpdated", {
-          detail: { oldName: editingSource.name, newName: editName.trim() }
+        const event = new CustomEvent('recipeSourceUpdated', {
+          detail: { oldName: editingSource.name, newName: editName.trim() },
         });
         window.dispatchEvent(event);
-        
+
         // Also use BroadcastChannel for cross-tab communication
         try {
-          const channel = new BroadcastChannel("recipe-source-updates");
+          const channel = new BroadcastChannel('recipe-source-updates');
           channel.postMessage({
-            type: "sourceUpdated",
+            type: 'sourceUpdated',
             oldName: editingSource.name,
-            newName: editName.trim()
+            newName: editName.trim(),
           });
           // Keep channel open briefly to ensure message is sent
           setTimeout(() => channel.close(), 100);
-        } catch (e) {
+        } catch (_e) {
           // BroadcastChannel not supported, fallback to event only
-          console.log("BroadcastChannel not supported, using events only");
+          console.log('BroadcastChannel not supported, using events only');
         }
       }
-      
+
       // Refresh all pages to show updated source names
       router.refresh();
-      
+
       setEditDialogOpen(false);
       setEditingSource(null);
-      setEditName("");
+      setEditName('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fout bij bijwerken");
+      setError(err instanceof Error ? err.message : 'Fout bij bijwerken');
     } finally {
       setIsSaving(false);
     }
@@ -159,21 +174,24 @@ export function RecipeSourcesAdminClient() {
 
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/admin/recipe-sources/${deletingSource.id}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        `/api/admin/recipe-sources/${deletingSource.id}`,
+        {
+          method: 'DELETE',
+        },
+      );
 
       const result = await response.json();
 
       if (!result.ok) {
-        throw new Error(result.error?.message || "Fout bij verwijderen");
+        throw new Error(result.error?.message || 'Fout bij verwijderen');
       }
 
       await loadSources();
       setDeleteDialogOpen(false);
       setDeletingSource(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fout bij verwijderen");
+      setError(err instanceof Error ? err.message : 'Fout bij verwijderen');
     } finally {
       setIsDeleting(false);
     }
@@ -181,7 +199,7 @@ export function RecipeSourcesAdminClient() {
 
   const handleMerge = (source: RecipeSource) => {
     setMergingSource(source);
-    setTargetSourceId("");
+    setTargetSourceId('');
     setMergeDialogOpen(true);
   };
 
@@ -190,28 +208,31 @@ export function RecipeSourcesAdminClient() {
 
     setIsMerging(true);
     try {
-      const response = await fetch(`/api/admin/recipe-sources/${mergingSource.id}/merge`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `/api/admin/recipe-sources/${mergingSource.id}/merge`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            targetSourceId,
+          }),
         },
-        body: JSON.stringify({
-          targetSourceId,
-        }),
-      });
+      );
 
       const result = await response.json();
 
       if (!result.ok) {
-        throw new Error(result.error?.message || "Fout bij samenvoegen");
+        throw new Error(result.error?.message || 'Fout bij samenvoegen');
       }
 
       await loadSources();
       setMergeDialogOpen(false);
       setMergingSource(null);
-      setTargetSourceId("");
+      setTargetSourceId('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fout bij samenvoegen");
+      setError(err instanceof Error ? err.message : 'Fout bij samenvoegen');
     } finally {
       setIsMerging(false);
     }
@@ -222,10 +243,10 @@ export function RecipeSourcesAdminClient() {
 
     setIsCreating(true);
     try {
-      const response = await fetch("/api/admin/recipe-sources", {
-        method: "POST",
+      const response = await fetch('/api/admin/recipe-sources', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           name: newSourceName.trim(),
@@ -235,14 +256,14 @@ export function RecipeSourcesAdminClient() {
       const result = await response.json();
 
       if (!result.ok) {
-        throw new Error(result.error?.message || "Fout bij aanmaken");
+        throw new Error(result.error?.message || 'Fout bij aanmaken');
       }
 
       await loadSources();
       setCreateDialogOpen(false);
-      setNewSourceName("");
+      setNewSourceName('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fout bij aanmaken");
+      setError(err instanceof Error ? err.message : 'Fout bij aanmaken');
     } finally {
       setIsCreating(false);
     }
@@ -293,7 +314,10 @@ export function RecipeSourcesAdminClient() {
           <TableBody>
             {sources.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-zinc-500 dark:text-zinc-400 py-8">
+                <TableCell
+                  colSpan={5}
+                  className="text-center text-zinc-500 dark:text-zinc-400 py-8"
+                >
                   Geen bronnen gevonden
                 </TableCell>
               </TableRow>
@@ -304,15 +328,15 @@ export function RecipeSourcesAdminClient() {
                     {source.name}
                   </TableCell>
                   <TableCell>
-                    <Badge color={source.is_system ? "blue" : "zinc"}>
-                      {source.is_system ? "Systeem" : "Gebruiker"}
+                    <Badge color={source.is_system ? 'blue' : 'zinc'}>
+                      {source.is_system ? 'Systeem' : 'Gebruiker'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-zinc-600 dark:text-zinc-400">
                     {source.usage_count}x
                   </TableCell>
                   <TableCell className="text-zinc-600 dark:text-zinc-400">
-                    {new Date(source.created_at).toLocaleDateString("nl-NL")}
+                    {new Date(source.created_at).toLocaleDateString('nl-NL')}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -363,11 +387,18 @@ export function RecipeSourcesAdminClient() {
           </Field>
         </DialogBody>
         <DialogActions>
-          <Button outline onClick={() => setEditDialogOpen(false)} disabled={isSaving}>
+          <Button
+            outline
+            onClick={() => setEditDialogOpen(false)}
+            disabled={isSaving}
+          >
             Annuleren
           </Button>
-          <Button onClick={handleSaveEdit} disabled={isSaving || !editName.trim()}>
-            {isSaving ? "Opslaan..." : "Opslaan"}
+          <Button
+            onClick={handleSaveEdit}
+            disabled={isSaving || !editName.trim()}
+          >
+            {isSaving ? 'Opslaan...' : 'Opslaan'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -381,7 +412,7 @@ export function RecipeSourcesAdminClient() {
         description={
           deletingSource
             ? `Weet je zeker dat je "${deletingSource.name}" wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.`
-            : ""
+            : ''
         }
         confirmLabel="Verwijderen"
         cancelLabel="Annuleren"
@@ -393,8 +424,8 @@ export function RecipeSourcesAdminClient() {
       <Dialog open={mergeDialogOpen} onClose={() => setMergeDialogOpen(false)}>
         <DialogTitle>Bronnen samenvoegen</DialogTitle>
         <DialogDescription>
-          Voeg "{mergingSource?.name}" samen met een andere bron. Alle recepten met deze bron
-          worden bijgewerkt naar de gekozen doelbron.
+          Voeg &quot;{mergingSource?.name}&quot; samen met een andere bron. Alle
+          recepten met deze bron worden bijgewerkt naar de gekozen doelbron.
         </DialogDescription>
         <DialogBody>
           <Field>
@@ -414,12 +445,17 @@ export function RecipeSourcesAdminClient() {
                 ))}
             </Select>
             <Description>
-              Kies de bron waarmee je wilt samenvoegen. De huidige bron wordt verwijderd.
+              Kies de bron waarmee je wilt samenvoegen. De huidige bron wordt
+              verwijderd.
             </Description>
           </Field>
         </DialogBody>
         <DialogActions>
-          <Button outline onClick={() => setMergeDialogOpen(false)} disabled={isMerging}>
+          <Button
+            outline
+            onClick={() => setMergeDialogOpen(false)}
+            disabled={isMerging}
+          >
             Annuleren
           </Button>
           <Button
@@ -427,13 +463,16 @@ export function RecipeSourcesAdminClient() {
             disabled={isMerging || !targetSourceId}
             color="primary"
           >
-            {isMerging ? "Samenvoegen..." : "Samenvoegen"}
+            {isMerging ? 'Samenvoegen...' : 'Samenvoegen'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Create Dialog */}
-      <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)}>
+      <Dialog
+        open={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+      >
         <DialogTitle>Nieuwe bron toevoegen</DialogTitle>
         <DialogDescription>Voeg een nieuwe systeembron toe</DialogDescription>
         <DialogBody>
@@ -448,11 +487,18 @@ export function RecipeSourcesAdminClient() {
           </Field>
         </DialogBody>
         <DialogActions>
-          <Button outline onClick={() => setCreateDialogOpen(false)} disabled={isCreating}>
+          <Button
+            outline
+            onClick={() => setCreateDialogOpen(false)}
+            disabled={isCreating}
+          >
             Annuleren
           </Button>
-          <Button onClick={handleCreate} disabled={isCreating || !newSourceName.trim()}>
-            {isCreating ? "Aanmaken..." : "Aanmaken"}
+          <Button
+            onClick={handleCreate}
+            disabled={isCreating || !newSourceName.trim()}
+          >
+            {isCreating ? 'Aanmaken...' : 'Aanmaken'}
           </Button>
         </DialogActions>
       </Dialog>

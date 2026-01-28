@@ -1,32 +1,38 @@
 /**
  * Meal Image Analysis Service
- * 
+ *
  * Analyzes uploaded images (photos, screenshots) to extract recipe/meal information
  * using Gemini Vision API. Handles translation from English to Dutch.
  */
 
-import "server-only";
-import { getGeminiClient } from "@/src/lib/ai/gemini/gemini.client";
-import { z } from "zod";
-import type { Meal, MealIngredientRef } from "@/src/lib/diets";
+import 'server-only';
+import { getGeminiClient } from '@/src/lib/ai/gemini/gemini.client';
+import { z } from 'zod';
+import type { Meal, MealIngredientRef } from '@/src/lib/diets';
 
 /**
  * Schema for recipe analysis result from Gemini Vision
  */
 const recipeAnalysisSchema = z.object({
-  name: z.string().describe("Recipe/meal name"),
-  language: z.enum(["en", "nl", "other"]).describe("Detected language of the recipe"),
-  ingredients: z.array(z.object({
-    name: z.string(),
-    amount: z.number().optional(),
-    unit: z.string().optional(),
-    notes: z.string().optional(),
-  })).describe("List of ingredients"),
-  instructions: z.array(z.string()).optional().describe("Cooking instructions"),
-  prepTime: z.number().optional().describe("Preparation time in minutes"),
-  cookTime: z.number().optional().describe("Cooking time in minutes"),
-  servings: z.number().optional().describe("Number of servings"),
-  notes: z.string().optional().describe("Additional notes or information"),
+  name: z.string().describe('Recipe/meal name'),
+  language: z
+    .enum(['en', 'nl', 'other'])
+    .describe('Detected language of the recipe'),
+  ingredients: z
+    .array(
+      z.object({
+        name: z.string(),
+        amount: z.number().optional(),
+        unit: z.string().optional(),
+        notes: z.string().optional(),
+      }),
+    )
+    .describe('List of ingredients'),
+  instructions: z.array(z.string()).optional().describe('Cooking instructions'),
+  prepTime: z.number().optional().describe('Preparation time in minutes'),
+  cookTime: z.number().optional().describe('Cooking time in minutes'),
+  servings: z.number().optional().describe('Number of servings'),
+  notes: z.string().optional().describe('Additional notes or information'),
 });
 
 export type RecipeAnalysis = z.infer<typeof recipeAnalysisSchema>;
@@ -42,8 +48,14 @@ function cleanRecipeAnalysis(data: unknown): unknown {
   const obj = data as Record<string, unknown>;
 
   // Ensure name exists and is a string
-  if (!obj.name || typeof obj.name !== 'string' || obj.name.trim().length === 0) {
-    throw new Error(`Recipe name is required and must be a non-empty string. Got: ${JSON.stringify(obj.name)}`);
+  if (
+    !obj.name ||
+    typeof obj.name !== 'string' ||
+    obj.name.trim().length === 0
+  ) {
+    throw new Error(
+      `Recipe name is required and must be a non-empty string. Got: ${JSON.stringify(obj.name)}`,
+    );
   }
 
   // Ensure language exists
@@ -64,22 +76,22 @@ function cleanRecipeAnalysis(data: unknown): unknown {
     })
     .map((ing: unknown) => {
       const ingObj = ing as Record<string, unknown>;
-      const cleaned: Record<string, unknown> = { 
-        name: String(ingObj.name).trim() 
+      const cleaned: Record<string, unknown> = {
+        name: String(ingObj.name).trim(),
       };
-      
+
       if (typeof ingObj.amount === 'number' && !isNaN(ingObj.amount)) {
         cleaned.amount = ingObj.amount;
       }
-      
+
       if (typeof ingObj.unit === 'string' && ingObj.unit.trim().length > 0) {
         cleaned.unit = ingObj.unit.trim();
       }
-      
+
       if (typeof ingObj.notes === 'string' && ingObj.notes.trim().length > 0) {
         cleaned.notes = ingObj.notes.trim();
       }
-      
+
       return cleaned;
     });
 
@@ -97,7 +109,7 @@ function cleanRecipeAnalysis(data: unknown): unknown {
   } else {
     delete obj.servings;
   }
-  
+
   if (obj.prepTime === null || obj.prepTime === undefined) {
     delete obj.prepTime;
   } else if (typeof obj.prepTime === 'number' && !isNaN(obj.prepTime)) {
@@ -105,7 +117,7 @@ function cleanRecipeAnalysis(data: unknown): unknown {
   } else {
     delete obj.prepTime;
   }
-  
+
   if (obj.cookTime === null || obj.cookTime === undefined) {
     delete obj.cookTime;
   } else if (typeof obj.cookTime === 'number' && !isNaN(obj.cookTime)) {
@@ -113,8 +125,12 @@ function cleanRecipeAnalysis(data: unknown): unknown {
   } else {
     delete obj.cookTime;
   }
-  
-  if (obj.notes === null || obj.notes === undefined || (typeof obj.notes === 'string' && obj.notes.trim().length === 0)) {
+
+  if (
+    obj.notes === null ||
+    obj.notes === undefined ||
+    (typeof obj.notes === 'string' && obj.notes.trim().length === 0)
+  ) {
     delete obj.notes;
   }
 
@@ -122,9 +138,11 @@ function cleanRecipeAnalysis(data: unknown): unknown {
   if (obj.instructions !== undefined && obj.instructions !== null) {
     if (Array.isArray(obj.instructions)) {
       const cleanedInstructions = obj.instructions
-        .filter((inst: unknown) => typeof inst === 'string' && inst.trim().length > 0)
+        .filter(
+          (inst: unknown) => typeof inst === 'string' && inst.trim().length > 0,
+        )
         .map((inst: unknown) => String(inst).trim());
-      
+
       if (cleanedInstructions.length > 0) {
         obj.instructions = cleanedInstructions;
       } else {
@@ -140,21 +158,24 @@ function cleanRecipeAnalysis(data: unknown): unknown {
 
 /**
  * Convert recipe analysis to Meal format
- * 
+ *
  * Note: This creates a basic Meal structure. For full integration with NEVO,
  * ingredients would need to be matched to NEVO codes. This is a simplified version.
  */
 export function recipeAnalysisToMeal(
   analysis: RecipeAnalysis,
-  slot: "breakfast" | "lunch" | "dinner" | "snack",
-  date: string
+  slot: 'breakfast' | 'lunch' | 'dinner' | 'snack',
+  date: string,
 ): Meal {
   // Create ingredient refs (simplified - would need NEVO matching in production)
-  const ingredientRefs: MealIngredientRef[] = analysis.ingredients.map((ing, idx) => ({
-    nevoCode: `CUSTOM_${idx}`, // Placeholder - would need actual NEVO matching
-    amountG: ing.amount || 100, // Default to 100g if no amount specified
-    notes: ing.notes,
-  }));
+  const ingredientRefs: MealIngredientRef[] = analysis.ingredients.map(
+    (ing, idx) => ({
+      nevoCode: `CUSTOM_${idx}`, // Placeholder - would need actual NEVO matching
+      amountG: ing.amount || 100, // Default to 100g if no amount specified
+      quantityG: ing.amount || 100,
+      notes: ing.notes,
+    }),
+  );
 
   // Calculate total prep time
   const totalPrepTime = (analysis.prepTime || 0) + (analysis.cookTime || 0);
@@ -172,14 +193,14 @@ export function recipeAnalysisToMeal(
 
 /**
  * Analyze an image and extract recipe information
- * 
+ *
  * @param imageData - Base64 encoded image data or data URL
  * @param mimeType - MIME type of the image
  * @returns Analyzed recipe information
  */
 export async function analyzeMealImage(
   imageData: string,
-  mimeType: string
+  mimeType: string,
 ): Promise<RecipeAnalysis> {
   const gemini = getGeminiClient();
 
@@ -215,33 +236,33 @@ Return ONLY valid JSON conforming to the schema. Do NOT include markdown code bl
 
   // Convert Zod schema to JSON schema
   const jsonSchema = {
-    type: "object",
+    type: 'object',
     properties: {
-      name: { type: "string" },
-      language: { type: "string", enum: ["en", "nl", "other"] },
+      name: { type: 'string' },
+      language: { type: 'string', enum: ['en', 'nl', 'other'] },
       ingredients: {
-        type: "array",
+        type: 'array',
         items: {
-          type: "object",
+          type: 'object',
           properties: {
-            name: { type: "string" },
-            amount: { type: "number" },
-            unit: { type: "string" },
-            notes: { type: "string" },
+            name: { type: 'string' },
+            amount: { type: 'number' },
+            unit: { type: 'string' },
+            notes: { type: 'string' },
           },
-          required: ["name"],
+          required: ['name'],
         },
       },
       instructions: {
-        type: "array",
-        items: { type: "string" },
+        type: 'array',
+        items: { type: 'string' },
       },
-      prepTime: { type: "number" },
-      cookTime: { type: "number" },
-      servings: { type: "number" },
-      notes: { type: "string" },
+      prepTime: { type: 'number' },
+      cookTime: { type: 'number' },
+      servings: { type: 'number' },
+      notes: { type: 'string' },
     },
-    required: ["name", "language", "ingredients"],
+    required: ['name', 'language', 'ingredients'],
   };
 
   try {
@@ -255,13 +276,15 @@ Return ONLY valid JSON conforming to the schema. Do NOT include markdown code bl
 
     // Extract JSON from markdown code blocks if present
     let jsonString = rawJson.trim();
-    
+
     // Remove markdown code blocks (```json ... ``` or ``` ... ```)
-    const codeBlockMatch = jsonString.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+    const codeBlockMatch = jsonString.match(
+      /^```(?:json)?\s*([\s\S]*?)\s*```$/,
+    );
     if (codeBlockMatch) {
       jsonString = codeBlockMatch[1].trim();
     }
-    
+
     // Also handle cases where JSON is wrapped in other text
     // Try to find JSON object boundaries
     const jsonObjectMatch = jsonString.match(/\{[\s\S]*\}/);
@@ -275,25 +298,25 @@ Return ONLY valid JSON conforming to the schema. Do NOT include markdown code bl
       parsed = JSON.parse(jsonString);
     } catch (parseError) {
       throw new Error(
-        `Invalid JSON from Gemini: ${parseError instanceof Error ? parseError.message : "Unknown parse error"}. Raw response: ${rawJson.substring(0, 500)}`
+        `Invalid JSON from Gemini: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}. Raw response: ${rawJson.substring(0, 500)}`,
       );
     }
 
     // Clean up null values and ensure required fields
     const cleaned = cleanRecipeAnalysis(parsed);
-    
+
     // Validate against schema
     let analysis: RecipeAnalysis;
     try {
       analysis = recipeAnalysisSchema.parse(cleaned);
     } catch (validationError) {
       throw new Error(
-        `Schema validation failed: ${validationError instanceof Error ? validationError.message : "Unknown validation error"}. Parsed data: ${JSON.stringify(cleaned, null, 2).substring(0, 1000)}`
+        `Schema validation failed: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}. Parsed data: ${JSON.stringify(cleaned, null, 2).substring(0, 1000)}`,
       );
     }
 
     // If language is English, translate to Dutch
-    if (analysis.language === "en") {
+    if (analysis.language === 'en') {
       const translated = await translateRecipeToDutch(analysis);
       return translated;
     }
@@ -301,7 +324,7 @@ Return ONLY valid JSON conforming to the schema. Do NOT include markdown code bl
     return analysis;
   } catch (error) {
     throw new Error(
-      `Failed to analyze meal image: ${error instanceof Error ? error.message : "Unknown error"}`
+      `Failed to analyze meal image: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
   }
 }
@@ -309,7 +332,9 @@ Return ONLY valid JSON conforming to the schema. Do NOT include markdown code bl
 /**
  * Translate recipe from English to Dutch
  */
-async function translateRecipeToDutch(analysis: RecipeAnalysis): Promise<RecipeAnalysis> {
+async function translateRecipeToDutch(
+  analysis: RecipeAnalysis,
+): Promise<RecipeAnalysis> {
   const gemini = getGeminiClient();
 
   const translationPrompt = `Translate this recipe to Dutch. Keep the structure and return JSON:
@@ -317,7 +342,7 @@ async function translateRecipeToDutch(analysis: RecipeAnalysis): Promise<RecipeA
 Recipe name: "${analysis.name}"
 Ingredients: ${JSON.stringify(analysis.ingredients)}
 Instructions: ${JSON.stringify(analysis.instructions || [])}
-Notes: "${analysis.notes || ""}"
+Notes: "${analysis.notes || ''}"
 
 Translate:
 - Recipe name to Dutch
@@ -328,33 +353,33 @@ Translate:
 Keep all numbers, units, and quantities unchanged.`;
 
   const jsonSchema = {
-    type: "object",
+    type: 'object',
     properties: {
-      name: { type: "string" },
-      language: { type: "string", enum: ["nl"] },
+      name: { type: 'string' },
+      language: { type: 'string', enum: ['nl'] },
       ingredients: {
-        type: "array",
+        type: 'array',
         items: {
-          type: "object",
+          type: 'object',
           properties: {
-            name: { type: "string" },
-            amount: { type: "number" },
-            unit: { type: "string" },
-            notes: { type: "string" },
+            name: { type: 'string' },
+            amount: { type: 'number' },
+            unit: { type: 'string' },
+            notes: { type: 'string' },
           },
-          required: ["name"],
+          required: ['name'],
         },
       },
       instructions: {
-        type: "array",
-        items: { type: "string" },
+        type: 'array',
+        items: { type: 'string' },
       },
-      prepTime: { type: "number" },
-      cookTime: { type: "number" },
-      servings: { type: "number" },
-      notes: { type: "string" },
+      prepTime: { type: 'number' },
+      cookTime: { type: 'number' },
+      servings: { type: 'number' },
+      notes: { type: 'string' },
     },
-    required: ["name", "language", "ingredients"],
+    required: ['name', 'language', 'ingredients'],
   };
 
   try {
@@ -362,18 +387,20 @@ Keep all numbers, units, and quantities unchanged.`;
       prompt: translationPrompt,
       jsonSchema,
       temperature: 0.3,
-      purpose: "translate",
+      purpose: 'translate',
     });
 
     // Extract JSON from markdown code blocks if present
     let jsonString = rawJson.trim();
-    
+
     // Remove markdown code blocks (```json ... ``` or ``` ... ```)
-    const codeBlockMatch = jsonString.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+    const codeBlockMatch = jsonString.match(
+      /^```(?:json)?\s*([\s\S]*?)\s*```$/,
+    );
     if (codeBlockMatch) {
       jsonString = codeBlockMatch[1].trim();
     }
-    
+
     // Also handle cases where JSON is wrapped in other text
     const jsonObjectMatch = jsonString.match(/\{[\s\S]*\}/);
     if (jsonObjectMatch) {
@@ -386,14 +413,14 @@ Keep all numbers, units, and quantities unchanged.`;
     // Preserve original timing and servings
     return {
       ...translated,
-      language: "nl" as const,
+      language: 'nl' as const,
       prepTime: analysis.prepTime,
       cookTime: analysis.cookTime,
       servings: analysis.servings,
     };
   } catch (error) {
     // If translation fails, return original with language marked as English
-    console.warn("Translation failed, returning original:", error);
+    console.warn('Translation failed, returning original:', error);
     return analysis;
   }
 }

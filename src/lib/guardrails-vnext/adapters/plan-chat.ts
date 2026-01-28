@@ -1,6 +1,6 @@
 /**
  * Guard Rails vNext - Plan Chat Adapter
- * 
+ *
  * Maps Plan Edit and/or Plan Snapshot to GuardrailsEvaluateInput targets.
  * Pure mapping function (no side effects, deterministic).
  */
@@ -12,10 +12,10 @@ import { mapMealPlanToGuardrailsTargets } from './meal-planner';
 
 /**
  * Map Plan Edit to GuardrailsEvaluateInput targets
- * 
+ *
  * Maps PlanEdit user intent and constraints to TextAtom[] arrays.
  * Also includes plan snapshot if provided for complete evaluation.
- * 
+ *
  * @param edit - Plan edit (user intent)
  * @param planSnapshot - Optional plan snapshot (current state)
  * @param locale - Optional locale for text atoms
@@ -24,7 +24,7 @@ import { mapMealPlanToGuardrailsTargets } from './meal-planner';
 export function mapPlanEditToGuardrailsTargets(
   edit: PlanEdit,
   planSnapshot?: MealPlanResponse,
-  locale?: 'nl' | 'en'
+  locale?: 'nl' | 'en',
 ): {
   ingredient: TextAtom[];
   step: TextAtom[];
@@ -59,7 +59,10 @@ export function mapPlanEditToGuardrailsTargets(
   }
 
   // Map avoidIngredients from constraints to ingredients
-  if (edit.constraints?.avoidIngredients && edit.constraints.avoidIngredients.length > 0) {
+  if (
+    edit.constraints?.avoidIngredients &&
+    edit.constraints.avoidIngredients.length > 0
+  ) {
     for (let i = 0; i < edit.constraints.avoidIngredients.length; i++) {
       const ingredient = edit.constraints.avoidIngredients[i]?.trim();
       if (ingredient) {
@@ -74,7 +77,10 @@ export function mapPlanEditToGuardrailsTargets(
 
   // If plan snapshot is provided, merge its targets
   if (planSnapshot) {
-    const snapshotTargets = mapMealPlanToGuardrailsTargets(planSnapshot, locale);
+    const snapshotTargets = mapMealPlanToGuardrailsTargets(
+      planSnapshot,
+      locale,
+    );
     // Merge ingredients (avoid duplicates by path)
     const existingPaths = new Set(ingredientAtoms.map((a) => a.path));
     for (const atom of snapshotTargets.ingredient) {

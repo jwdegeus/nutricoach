@@ -1,10 +1,10 @@
-import type { Metadata } from "next";
-import { Suspense } from "react";
-import { LoginForm } from "./login-form";
+import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import { LoginForm } from './login-form';
 
 export const metadata: Metadata = {
-  title: "Login | NutriCoach",
-  description: "Login to your NutriCoach account",
+  title: 'Login | NutriCoach',
+  description: 'Login to your NutriCoach account',
 };
 
 export default function LoginPage() {

@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/src/lib/supabase/server";
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/src/lib/supabase/server';
 
 /**
  * GET /api/recipes/sources
@@ -11,21 +11,21 @@ export async function GET(request: NextRequest) {
 
     // Get all sources, ordered by usage_count desc, then by name
     const { data, error } = await supabase
-      .from("recipe_sources")
-      .select("id, name, is_system, usage_count")
-      .order("usage_count", { ascending: false })
-      .order("name", { ascending: true });
+      .from('recipe_sources')
+      .select('id, name, is_system, usage_count')
+      .order('usage_count', { ascending: false })
+      .order('name', { ascending: true });
 
     if (error) {
       return NextResponse.json(
         {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: error.message,
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -34,16 +34,19 @@ export async function GET(request: NextRequest) {
       data: data || [],
     });
   } catch (error) {
-    console.error("Error fetching recipe sources:", error);
+    console.error('Error fetching recipe sources:', error);
     return NextResponse.json(
       {
         ok: false,
         error: {
-          code: "FETCH_ERROR",
-          message: error instanceof Error ? error.message : "Onbekende fout bij ophalen bronnen",
+          code: 'FETCH_ERROR',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Onbekende fout bij ophalen bronnen',
         },
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -64,27 +67,27 @@ export async function POST(request: NextRequest) {
         {
           ok: false,
           error: {
-            code: "AUTH_ERROR",
-            message: "Je moet ingelogd zijn om een bron toe te voegen",
+            code: 'AUTH_ERROR',
+            message: 'Je moet ingelogd zijn om een bron toe te voegen',
           },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     const body = await request.json();
     const { name } = body;
 
-    if (!name || typeof name !== "string" || name.trim().length === 0) {
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json(
         {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Bron naam is vereist",
+            code: 'VALIDATION_ERROR',
+            message: 'Bron naam is vereist',
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -92,9 +95,9 @@ export async function POST(request: NextRequest) {
 
     // Check if source already exists
     const { data: existing } = await supabase
-      .from("recipe_sources")
-      .select("id")
-      .eq("name", trimmedName)
+      .from('recipe_sources')
+      .select('id')
+      .eq('name', trimmedName)
       .maybeSingle();
 
     if (existing) {
@@ -107,14 +110,14 @@ export async function POST(request: NextRequest) {
 
     // Insert new source
     const { data: newSource, error } = await supabase
-      .from("recipe_sources")
+      .from('recipe_sources')
       .insert({
         name: trimmedName,
         is_system: false,
         created_by_user_id: user.id,
         usage_count: 0,
       })
-      .select("id, name, is_system, usage_count")
+      .select('id, name, is_system, usage_count')
       .single();
 
     if (error) {
@@ -122,11 +125,11 @@ export async function POST(request: NextRequest) {
         {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: error.message,
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -135,16 +138,19 @@ export async function POST(request: NextRequest) {
       data: newSource,
     });
   } catch (error) {
-    console.error("Error creating recipe source:", error);
+    console.error('Error creating recipe source:', error);
     return NextResponse.json(
       {
         ok: false,
         error: {
-          code: "CREATE_ERROR",
-          message: error instanceof Error ? error.message : "Onbekende fout bij aanmaken bron",
+          code: 'CREATE_ERROR',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Onbekende fout bij aanmaken bron',
         },
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -1,9 +1,9 @@
 /**
  * Guard Rails vNext - Ruleset Loader
- * 
+ *
  * Loads GuardrailsRuleset from database and code overlays.
  * Optionally loads Diet Logic (Dieetregels) for 4-phase evaluation (DROP/FORCE/LIMIT/PASS).
- * 
+ *
  * @see docs/guardrails-vnext-semantics.md for evaluation semantics
  * @see docs/diet-logic-plan.md for Diet Logic
  */
@@ -70,8 +70,8 @@ export interface GuardrailsRepo {
       rule_label: string;
       substitution_suggestions: string[];
       priority: number;
-      target: "ingredient" | "step" | "metadata";
-      match_mode: "exact" | "word_boundary" | "substring" | "canonical_id";
+      target: 'ingredient' | 'step' | 'metadata';
+      match_mode: 'exact' | 'word_boundary' | 'substring' | 'canonical_id';
       updated_at: string;
       is_active?: boolean;
     }>;
@@ -147,7 +147,7 @@ type ProvenanceSource = {
 
 /**
  * Generate stable rule ID from database constraint
- * 
+ *
  * Format: `db:diet_category_constraints:<id>`
  */
 function generateRuleId(source: string, id: string): string {
@@ -156,12 +156,15 @@ function generateRuleId(source: string, id: string): string {
 
 /**
  * Determine rule status from database fields
- * 
+ *
  * @param isActive - is_active field from database
  * @param strictness - strictness field (for paused detection)
  * @returns Rule status
  */
-function determineRuleStatus(isActive: boolean, strictness: 'hard' | 'soft'): RuleStatus {
+function determineRuleStatus(
+  isActive: boolean,
+  strictness: 'hard' | 'soft',
+): RuleStatus {
   if (!isActive) {
     return 'deleted';
   }
@@ -173,7 +176,7 @@ function determineRuleStatus(isActive: boolean, strictness: 'hard' | 'soft'): Ru
 
 /**
  * Check if rule should be included in ruleset based on status
- * 
+ *
  * @param status - Rule status
  * @returns true if rule should be included
  */
@@ -186,7 +189,7 @@ function shouldIncludeRule(status: RuleStatus): boolean {
 
 /**
  * Map database constraint to GuardRule
- * 
+ *
  * @param constraint - Database constraint
  * @param itemIndex - Index of item in category (for unique IDs)
  * @returns GuardRule
@@ -207,32 +210,41 @@ function mapConstraintToRule(
       }>;
     };
   },
-  itemIndex: number
+  itemIndex: number,
 ): GuardRule {
   const ruleAction: 'allow' | 'block' =
     constraint.rule_action ||
     (constraint.category.category_type === 'forbidden' ? 'block' : 'allow');
-  
+
   const item = constraint.category.items[itemIndex];
   const term = item.term.toLowerCase();
   const synonyms = (item.synonyms || []).map((s) => s.toLowerCase());
-  
+
   // Map rule code based on category and strictness
   let ruleCode: GuardReasonCode = 'FORBIDDEN_INGREDIENT';
   if (constraint.category.category_type === 'required') {
     ruleCode = 'MISSING_REQUIRED_CATEGORY';
   } else if (ruleAction === 'allow') {
     // Allow rules don't have a specific reason code, use fallback
-    ruleCode = constraint.strictness === 'hard' ? 'FORBIDDEN_INGREDIENT' : 'SOFT_CONSTRAINT_VIOLATION';
+    ruleCode =
+      constraint.strictness === 'hard'
+        ? 'FORBIDDEN_INGREDIENT'
+        : 'SOFT_CONSTRAINT_VIOLATION';
   } else {
-    ruleCode = constraint.strictness === 'hard' ? 'FORBIDDEN_INGREDIENT' : 'SOFT_CONSTRAINT_VIOLATION';
+    ruleCode =
+      constraint.strictness === 'hard'
+        ? 'FORBIDDEN_INGREDIENT'
+        : 'SOFT_CONSTRAINT_VIOLATION';
   }
-  
+
   // Mark allow rules as non-enforcing (BLOCK always wins in evaluator)
   const isNonEnforcingAllow = ruleAction === 'allow';
-  
+
   return {
-    id: generateRuleId('db:diet_category_constraints', `${constraint.id}:${itemIndex}`),
+    id: generateRuleId(
+      'db:diet_category_constraints',
+      `${constraint.id}:${itemIndex}`,
+    ),
     action: ruleAction,
     strictness: constraint.strictness || 'hard', // Default to hard if not specified
     priority: constraint.rule_priority || 50, // Default to 50 if not specified
@@ -243,9 +255,10 @@ function mapConstraintToRule(
     },
     metadata: {
       ruleCode,
-      label: ruleAction === 'allow'
-        ? `${constraint.category.name_nl} (Toegestaan)`
-        : `${constraint.category.name_nl} (${constraint.strictness === 'hard' ? 'Strikt verboden' : 'Niet gewenst'})`,
+      label:
+        ruleAction === 'allow'
+          ? `${constraint.category.name_nl} (Toegestaan)`
+          : `${constraint.category.name_nl} (${constraint.strictness === 'hard' ? 'Strikt verboden' : 'Niet gewenst'})`,
       category: constraint.category.code,
       specificity: 'diet', // Database rules are diet-level
       isNonEnforcingAllow,
@@ -255,7 +268,7 @@ function mapConstraintToRule(
 
 /**
  * Map recipe adaptation rule to GuardRule
- * 
+ *
  * @param rule - Database recipe adaptation rule
  * @returns GuardRule
  */
@@ -267,13 +280,13 @@ function mapRecipeAdaptationRuleToRule(rule: {
   rule_label: string;
   substitution_suggestions: string[];
   priority: number;
-  target?: "ingredient" | "step" | "metadata";
-  match_mode?: "exact" | "word_boundary" | "substring" | "canonical_id";
+  target?: 'ingredient' | 'step' | 'metadata';
+  match_mode?: 'exact' | 'word_boundary' | 'substring' | 'canonical_id';
   is_active?: boolean;
 }): GuardRule {
   const term = rule.term.toLowerCase();
   const synonyms = (rule.synonyms || []).map((s) => s.toLowerCase());
-  
+
   // Try to map rule_code to GuardReasonCode, fallback to UNKNOWN_ERROR
   let ruleCode: GuardReasonCode = 'UNKNOWN_ERROR';
   const validCodes: GuardReasonCode[] = [
@@ -290,25 +303,26 @@ function mapRecipeAdaptationRuleToRule(rule: {
     'MEAL_STRUCTURE_VIOLATION',
     'SOFT_CONSTRAINT_VIOLATION',
   ];
-  
+
   if (validCodes.includes(rule.rule_code as GuardReasonCode)) {
     ruleCode = rule.rule_code as GuardReasonCode;
   }
-  
+
   // Build remediation hints from substitution suggestions
-  const remediation = rule.substitution_suggestions.length > 0
-    ? [
-        {
-          type: 'substitute' as const,
-          payload: {
-            original: term,
-            alternatives: rule.substitution_suggestions,
+  const remediation =
+    rule.substitution_suggestions.length > 0
+      ? [
+          {
+            type: 'substitute' as const,
+            payload: {
+              original: term,
+              alternatives: rule.substitution_suggestions,
+            },
+            promptText: `Replace '${term}' with ${rule.substitution_suggestions.join(' or ')}`,
           },
-          promptText: `Replace '${term}' with ${rule.substitution_suggestions.join(' or ')}`,
-        },
-      ]
-    : undefined;
-  
+        ]
+      : undefined;
+
   return {
     id: generateRuleId('db:recipe_adaptation_rules', rule.id),
     action: 'block', // Recipe adaptation rules are always block
@@ -333,7 +347,7 @@ function mapRecipeAdaptationRuleToRule(rule: {
 
 /**
  * Create default repository using Supabase
- * 
+ *
  * @param dietId - Diet ID
  * @returns Repository instance
  */
@@ -341,7 +355,7 @@ async function createDefaultRepo(dietId: string): Promise<GuardrailsRepo> {
   // Dynamic import to avoid server-only issues in tests
   const { createClient } = await import('@/src/lib/supabase/server');
   const supabase = await createClient();
-  
+
   return {
     async loadConstraints(dietId: string) {
       // Load all constraints (including inactive) for status determination
@@ -358,21 +372,21 @@ async function createDefaultRepo(dietId: string): Promise<GuardrailsRepo> {
             category_type,
             items:ingredient_category_items(term, term_nl, synonyms, is_active)
           )
-        `
+        `,
         )
         .eq('diet_type_id', dietId)
         // Note: We load all constraints (active and inactive) to determine status
         // Prioriteit: 1 = hoogst, 65500 = laagst → ascending (lagere waarde eerst)
         .order('rule_priority', { ascending: true })
         .order('priority', { ascending: true });
-      
+
       if (error) {
         return { constraints: [], errors: [error.message] };
       }
-      
+
       return { constraints: (data || []) as any };
     },
-    
+
     async loadRecipeAdaptationRules(dietId: string) {
       // Load all rules (including inactive) for status determination
       // Filtering happens in mapRecipeAdaptationRuleToRule based on is_active
@@ -383,25 +397,25 @@ async function createDefaultRepo(dietId: string): Promise<GuardrailsRepo> {
         // Note: We load all rules (active and inactive) to determine status
         // Filtering by status happens in the mapping function
         .order('priority', { ascending: false });
-      
+
       if (error) {
         return { rules: [], errors: [error.message] };
       }
-      
+
       return { rules: (data || []) as any };
     },
-    
+
     async loadHeuristics(dietId: string) {
       const { data, error } = await supabase
         .from('recipe_adaptation_heuristics')
         .select('*')
         .eq('diet_type_id', dietId)
         .eq('is_active', true);
-      
+
       if (error) {
         return { heuristics: [], errors: [error.message] };
       }
-      
+
       return { heuristics: (data || []) as any };
     },
   };
@@ -409,7 +423,7 @@ async function createDefaultRepo(dietId: string): Promise<GuardrailsRepo> {
 
 /**
  * Get fallback ruleset (hardcoded basic rules)
- * 
+ *
  * @param dietId - Diet ID
  * @returns Fallback ruleset
  */
@@ -459,7 +473,7 @@ function getFallbackRuleset(dietId: string): GuardrailsRuleset {
       },
     },
   ];
-  
+
   // Calculate content hash (policy payload only, excluding provenance timestamps)
   const policyPayload = {
     dietId,
@@ -469,7 +483,7 @@ function getFallbackRuleset(dietId: string): GuardrailsRuleset {
     },
   };
   const contentHash = hashContent(policyPayload);
-  
+
   return {
     dietId,
     version: 1,
@@ -490,29 +504,35 @@ function getFallbackRuleset(dietId: string): GuardrailsRuleset {
 
 /**
  * Load guard rails ruleset from database and overlays
- * 
+ *
  * @param input - Load input
  * @returns Loaded ruleset with provenance and content hash
  */
 export async function loadGuardrailsRuleset(
-  input: LoadGuardrailsRulesetInput
+  input: LoadGuardrailsRulesetInput,
 ): Promise<GuardrailsRuleset> {
-  const { dietId, mode, locale = 'nl', now = new Date().toISOString(), repo } = input;
-  
+  const {
+    dietId,
+    mode,
+    locale = 'nl',
+    now = new Date().toISOString(),
+    repo,
+  } = input;
+
   // Create repository (use provided or default)
   const repository = repo || (await createDefaultRepo(dietId));
-  
+
   // Initialize provenance tracking
   const provenanceSources: ProvenanceSource[] = [];
   const allRules: GuardRule[] = [];
   const allErrors: string[] = [];
-  
+
   // Load constraints from database
   const constraintsResult = await repository.loadConstraints(dietId);
   if (constraintsResult.errors) {
     allErrors.push(...constraintsResult.errors);
   }
-  
+
   if (constraintsResult.constraints.length > 0) {
     // Map constraints to rules with status filtering
     for (const constraint of constraintsResult.constraints) {
@@ -524,38 +544,38 @@ export async function loadGuardrailsRuleset(
       if (c.is_paused === true) {
         continue;
       }
-      
+
       // Determine constraint status (based on is_active field)
       const constraintStatus = determineRuleStatus(
         constraint.is_active ?? true, // Default to active if not specified
-        constraint.strictness || 'hard'
+        constraint.strictness || 'hard',
       );
-      
+
       // Skip deleted constraints
       if (!shouldIncludeRule(constraintStatus)) {
         continue;
       }
-      
+
       // Create a rule for each item in the category
       for (let i = 0; i < constraint.category.items.length; i++) {
         const item = constraint.category.items[i];
-        
+
         // Determine item status (based on is_active field)
         const itemStatus = determineRuleStatus(
           item.is_active ?? true, // Default to active if not specified
-          constraint.strictness || 'hard'
+          constraint.strictness || 'hard',
         );
-        
+
         // Skip deleted items
         if (!shouldIncludeRule(itemStatus)) {
           continue;
         }
-        
+
         const rule = mapConstraintToRule(constraint, i);
         allRules.push(rule);
       }
     }
-    
+
     provenanceSources.push({
       kind: 'db',
       ref: 'diet_category_constraints',
@@ -565,18 +585,18 @@ export async function loadGuardrailsRuleset(
         ruleCount: allRules.length,
         // Count active constraints (for provenance)
         activeConstraintCount: constraintsResult.constraints.filter(
-          (c) => c.is_active !== false
+          (c) => c.is_active !== false,
         ).length,
       },
     });
   }
-  
+
   // Load recipe adaptation rules (legacy/additional)
   const rulesResult = await repository.loadRecipeAdaptationRules(dietId);
   if (rulesResult.errors) {
     allErrors.push(...rulesResult.errors);
   }
-  
+
   if (rulesResult.rules.length > 0) {
     // Map rules with status filtering
     const mappedRules = rulesResult.rules
@@ -584,18 +604,18 @@ export async function loadGuardrailsRuleset(
         // Determine rule status (based on is_active field)
         const status = determineRuleStatus(
           rule.is_active ?? true, // Default to active if not specified
-          'hard' // Recipe adaptation rules don't have strictness, default to hard
+          'hard', // Recipe adaptation rules don't have strictness, default to hard
         );
-        
+
         // Only include active rules
         if (!shouldIncludeRule(status)) {
           return null;
         }
-        
+
         return mapRecipeAdaptationRuleToRule(rule);
       })
       .filter((rule): rule is GuardRule => rule !== null);
-    
+
     // Merge rules (overlay wins if same ID)
     for (const newRule of mappedRules) {
       const existingIndex = allRules.findIndex((r) => r.id === newRule.id);
@@ -606,7 +626,7 @@ export async function loadGuardrailsRuleset(
         allRules.push(newRule);
       }
     }
-    
+
     provenanceSources.push({
       kind: 'db',
       ref: 'recipe_adaptation_rules',
@@ -614,37 +634,35 @@ export async function loadGuardrailsRuleset(
       details: {
         ruleCount: mappedRules.length,
         // Count active rules (for provenance)
-        activeRuleCount: rulesResult.rules.filter(
-          (r) => r.is_active !== false
-        ).length,
+        activeRuleCount: rulesResult.rules.filter((r) => r.is_active !== false)
+          .length,
       },
     });
   }
-  
+
   // Load heuristics
   const heuristicsResult = await repository.loadHeuristics(dietId);
   if (heuristicsResult.errors) {
     allErrors.push(...heuristicsResult.errors);
   }
-  
+
   const addedSugarHeuristic = heuristicsResult.heuristics.find(
-    (h) => h.heuristic_type === 'added_sugar'
+    (h) => h.heuristic_type === 'added_sugar',
   );
   const addedSugarTerms = (addedSugarHeuristic?.terms as string[]) || [];
-  
+
   // If no rules found, use fallback
   if (allRules.length === 0) {
     return getFallbackRuleset(dietId);
   }
-  
+
   // Sort rules deterministically by ID for stable hash
   const sortedRules = [...allRules].sort((a, b) => a.id.localeCompare(b.id));
-  
+
   // Build heuristics object
-  const heuristics = addedSugarTerms.length > 0
-    ? { addedSugarTerms }
-    : undefined;
-  
+  const heuristics =
+    addedSugarTerms.length > 0 ? { addedSugarTerms } : undefined;
+
   // Calculate version (use max updated_at timestamp or fallback to 1)
   // Version is a number - in production could use schema version or incrementing counter
   // For now, use a hash of updated_at timestamps for determinism
@@ -654,14 +672,14 @@ export async function loadGuardrailsRuleset(
     ...rulesResult.rules.map((r) => r.updated_at),
     ...heuristicsResult.heuristics.map((h) => h.updated_at),
   ].filter(Boolean);
-  
+
   if (allUpdatedAts.length > 0) {
     // Use hash of timestamps as version (deterministic but not sequential)
     // In production, would use schema version or incrementing counter
     const versionHash = hashContent(allUpdatedAts.sort().join(','));
     version = parseInt(versionHash.substring(0, 8), 16) || 1;
   }
-  
+
   // Calculate content hash (policy payload only, excluding provenance timestamps)
   const policyPayload = {
     dietId,
@@ -669,9 +687,11 @@ export async function loadGuardrailsRuleset(
     heuristics,
   };
   const contentHash = hashContent(policyPayload);
-  
+
   // Build provenance metadata
-  const provenanceSource: 'database' | 'fallback' = provenanceSources.some((s) => s.kind === 'db')
+  const provenanceSource: 'database' | 'fallback' = provenanceSources.some(
+    (s) => s.kind === 'db',
+  )
     ? 'database'
     : 'fallback';
   const provenance = {
@@ -681,15 +701,18 @@ export async function loadGuardrailsRuleset(
       sources: provenanceSources,
       ruleCounts: {
         total: sortedRules.length,
-        bySource: provenanceSources.reduce((acc, source) => {
-          acc[source.ref] = (source.details?.ruleCount as number) || 0;
-          return acc;
-        }, {} as Record<string, number>),
+        bySource: provenanceSources.reduce(
+          (acc, source) => {
+            acc[source.ref] = (source.details?.ruleCount as number) || 0;
+            return acc;
+          },
+          {} as Record<string, number>,
+        ),
       },
       errors: allErrors.length > 0 ? allErrors : undefined,
     },
   };
-  
+
   return {
     dietId,
     version,
@@ -716,7 +739,7 @@ export async function loadGuardrailsRuleset(
  * @returns { guardrails, dietLogic } — dietLogic is null when diet-logic load fails or returns empty
  */
 export async function loadRulesetWithDietLogic(
-  input: LoadRulesetWithDietLogicInput
+  input: LoadRulesetWithDietLogicInput,
 ): Promise<LoadRulesetWithDietLogicResult> {
   const { dietId, userId, isInflamed, ...rest } = input;
 

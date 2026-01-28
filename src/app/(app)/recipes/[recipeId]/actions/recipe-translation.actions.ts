@@ -1,8 +1,7 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { translateRecipe } from "../services/recipe-translation.service";
-import type { CustomMealRecord } from "@/src/lib/custom-meals/customMeals.service";
+import { createClient } from '@/src/lib/supabase/server';
+import { translateRecipe } from '../services/recipe-translation.service';
 
 /**
  * Action result type
@@ -12,7 +11,7 @@ type ActionResult<T> =
   | {
       ok: false;
       error: {
-        code: "AUTH_ERROR" | "VALIDATION_ERROR" | "DB_ERROR" | "AI_ERROR";
+        code: 'AUTH_ERROR' | 'VALIDATION_ERROR' | 'DB_ERROR' | 'AI_ERROR';
         message: string;
       };
     };
@@ -22,12 +21,14 @@ type ActionResult<T> =
  */
 export async function translateRecipeAction(args: {
   mealId: string;
-  source: "custom" | "gemini";
-}): Promise<ActionResult<{
-  translated: boolean;
-  sourceLanguage: 'nl' | 'en' | 'other';
-  targetLanguage: 'nl' | 'en';
-}>> {
+  source: 'custom' | 'gemini';
+}): Promise<
+  ActionResult<{
+    translated: boolean;
+    sourceLanguage: 'nl' | 'en' | 'other';
+    targetLanguage: 'nl' | 'en';
+  }>
+> {
   try {
     const supabase = await createClient();
     const {
@@ -38,27 +39,28 @@ export async function translateRecipeAction(args: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om recepten te vertalen",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om recepten te vertalen',
         },
       };
     }
 
     // Get current meal data
-    const tableName = args.source === "custom" ? "custom_meals" : "meal_history";
+    const tableName =
+      args.source === 'custom' ? 'custom_meals' : 'meal_history';
 
     const { data: meal, error: fetchError } = await supabase
       .from(tableName)
-      .select("*")
-      .eq("id", args.mealId)
-      .eq("user_id", user.id)
+      .select('*')
+      .eq('id', args.mealId)
+      .eq('user_id', user.id)
       .maybeSingle();
 
     if (fetchError) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: fetchError.message,
         },
       };
@@ -68,15 +70,15 @@ export async function translateRecipeAction(args: {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Recept niet gevonden",
+          code: 'VALIDATION_ERROR',
+          message: 'Recept niet gevonden',
         },
       };
     }
 
     // Prepare recipe data for translation
     const recipe = {
-      name: meal.name || meal.meal_name || meal.mealName || "",
+      name: meal.name || meal.meal_name || meal.mealName || '',
       mealData: meal.meal_data || meal.mealData || {},
       aiAnalysis: meal.ai_analysis || meal.aiAnalysis || {},
     };
@@ -104,7 +106,7 @@ export async function translateRecipeAction(args: {
       updated_at: new Date().toISOString(),
     };
 
-    if (args.source === "custom") {
+    if (args.source === 'custom') {
       updateData.name = translation.translatedName;
     } else {
       // meal_history uses meal_name instead of name
@@ -114,14 +116,14 @@ export async function translateRecipeAction(args: {
     const { error: updateError } = await supabase
       .from(tableName)
       .update(updateData)
-      .eq("id", args.mealId)
-      .eq("user_id", user.id);
+      .eq('id', args.mealId)
+      .eq('user_id', user.id);
 
     if (updateError) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: updateError.message,
         },
       };
@@ -136,12 +138,15 @@ export async function translateRecipeAction(args: {
       },
     };
   } catch (error) {
-    console.error("[translateRecipeAction] Error:", error);
+    console.error('[translateRecipeAction] Error:', error);
     return {
       ok: false,
       error: {
-        code: "AI_ERROR",
-        message: error instanceof Error ? error.message : "Onbekende fout bij vertalen recept",
+        code: 'AI_ERROR',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Onbekende fout bij vertalen recept',
       },
     };
   }

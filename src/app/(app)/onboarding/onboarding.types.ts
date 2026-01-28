@@ -5,12 +5,12 @@
 /**
  * Diet strictness level
  */
-export type DietStrictness = "strict" | "flexible";
+export type DietStrictness = 'strict' | 'flexible';
 
 /**
  * Variety level for meal planning
  */
-export type VarietyLevel = "low" | "std" | "high";
+export type VarietyLevel = 'low' | 'std' | 'high';
 
 /**
  * Input type for onboarding form data
@@ -61,11 +61,11 @@ export type OnboardingStatus = {
  */
 export function mapVarietyLevelToDays(level: VarietyLevel): number {
   switch (level) {
-    case "low":
+    case 'low':
       return 3;
-    case "std":
+    case 'std':
       return 7;
-    case "high":
+    case 'high':
       return 14;
     default:
       return 7; // Default to standard
@@ -79,9 +79,9 @@ export function mapVarietyLevelToDays(level: VarietyLevel): number {
  */
 export function mapStrictnessToNumber(strictness?: DietStrictness): number {
   switch (strictness) {
-    case "strict":
+    case 'strict':
       return 9; // High strictness
-    case "flexible":
+    case 'flexible':
       return 2; // Low strictness
     default:
       return 5; // Default to middle
@@ -95,7 +95,7 @@ export function mapStrictnessToNumber(strictness?: DietStrictness): number {
  */
 export function mapNumberToStrictness(strictness: number): DietStrictness {
   // 1-5 = flexible, 6-10 = strict
-  return strictness <= 5 ? "flexible" : "strict";
+  return strictness <= 5 ? 'flexible' : 'strict';
 }
 
 /**
@@ -104,7 +104,7 @@ export function mapNumberToStrictness(strictness: number): DietStrictness {
  * @returns VarietyLevel
  */
 export function mapDaysToVarietyLevel(days: number): VarietyLevel {
-  if (days <= 3) return "low";
-  if (days <= 7) return "std";
-  return "high";
+  if (days <= 3) return 'low';
+  if (days <= 7) return 'std';
+  return 'high';
 }

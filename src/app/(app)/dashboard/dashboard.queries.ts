@@ -3,7 +3,7 @@
 // Install with: npm install server-only
 // import "server-only";
 
-import type { RawKPI, RawActivity, DashboardData } from "./dashboard.types";
+import type { RawKPI, RawActivity, DashboardData } from './dashboard.types';
 
 /**
  * Server-only query functions
@@ -20,36 +20,36 @@ export async function getKPIs(): Promise<RawKPI[]> {
 
   return [
     {
-      id: "1",
-      metric: "total_clients",
+      id: '1',
+      metric: 'total_clients',
       value: 24,
       previousValue: 21.33,
-      period: "month",
-      periodLabel: "from last month",
+      period: 'month',
+      periodLabel: 'from last month',
     },
     {
-      id: "2",
-      metric: "active_meal_plans",
+      id: '2',
+      metric: 'active_meal_plans',
       value: 18,
       previousValue: 17.11,
-      period: "week",
-      periodLabel: "from last week",
+      period: 'week',
+      periodLabel: 'from last week',
     },
     {
-      id: "3",
-      metric: "appointments_this_week",
+      id: '3',
+      metric: 'appointments_this_week',
       value: 8,
       previousValue: 8.17,
-      period: "week",
-      periodLabel: "from last week",
+      period: 'week',
+      periodLabel: 'from last week',
     },
     {
-      id: "4",
-      metric: "revenue_this_month",
+      id: '4',
+      metric: 'revenue_this_month',
       value: 2450,
       previousValue: 2262.15,
-      period: "month",
-      periodLabel: "from last month",
+      period: 'month',
+      periodLabel: 'from last month',
     },
   ];
 }
@@ -58,7 +58,9 @@ export async function getKPIs(): Promise<RawKPI[]> {
  * Fetches recent activity data from the database
  * TODO: Replace with real database query
  */
-export async function getRecentActivities(limit: number = 10): Promise<RawActivity[]> {
+export async function getRecentActivities(
+  limit: number = 10,
+): Promise<RawActivity[]> {
   // Simulate async database call
   await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -66,50 +68,50 @@ export async function getRecentActivities(limit: number = 10): Promise<RawActivi
   // This will be replaced with real database queries that return consistent timestamps
   const baseTimestamp = new Date('2024-01-15T12:00:00Z').getTime();
   const now = baseTimestamp;
-  
+
   const activities: RawActivity[] = [
     {
-      id: "1",
-      type: "client" as const,
-      description: "New client registered: John Doe",
+      id: '1',
+      type: 'client' as const,
+      description: 'New client registered: John Doe',
       timestamp: new Date(now - 1000 * 60 * 15), // 15 minutes ago
-      userId: "system",
-      userName: "System",
+      userId: 'system',
+      userName: 'System',
     },
     {
-      id: "2",
-      type: "meal_plan" as const,
-      description: "Meal plan created for Jane Smith",
+      id: '2',
+      type: 'meal_plan' as const,
+      description: 'Meal plan created for Jane Smith',
       timestamp: new Date(now - 1000 * 60 * 60 * 2), // 2 hours ago
-      userId: "current-user",
-      userName: "You",
+      userId: 'current-user',
+      userName: 'You',
     },
     {
-      id: "3",
-      type: "appointment" as const,
-      description: "Appointment scheduled with Mike Johnson",
+      id: '3',
+      type: 'appointment' as const,
+      description: 'Appointment scheduled with Mike Johnson',
       timestamp: new Date(now - 1000 * 60 * 60 * 5), // 5 hours ago
-      userId: "current-user",
-      userName: "You",
+      userId: 'current-user',
+      userName: 'You',
     },
     {
-      id: "4",
-      type: "client" as const,
-      description: "Client profile updated: Sarah Williams",
+      id: '4',
+      type: 'client' as const,
+      description: 'Client profile updated: Sarah Williams',
       timestamp: new Date(now - 1000 * 60 * 60 * 24), // 1 day ago
-      userId: "current-user",
-      userName: "You",
+      userId: 'current-user',
+      userName: 'You',
     },
     {
-      id: "5",
-      type: "meal_plan" as const,
-      description: "Meal plan completed by Robert Brown",
+      id: '5',
+      type: 'meal_plan' as const,
+      description: 'Meal plan completed by Robert Brown',
       timestamp: new Date(now - 1000 * 60 * 60 * 48), // 2 days ago
-      userId: "system",
-      userName: "System",
+      userId: 'system',
+      userName: 'System',
     },
   ];
-  
+
   return activities.slice(0, limit);
 }
 

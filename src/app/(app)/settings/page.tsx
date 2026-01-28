@@ -1,13 +1,13 @@
-import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { createClient } from "@/src/lib/supabase/server";
-import { isAdmin } from "@/src/lib/auth/roles";
-import { SettingsForm } from "./settings-form";
-import { AdminLinks } from "./components/AdminLinks";
+import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/src/lib/supabase/server';
+import { isAdmin } from '@/src/lib/auth/roles';
+import { SettingsForm } from './settings-form';
+import { AdminLinks } from './components/AdminLinks';
 
 export const metadata: Metadata = {
-  title: "Instellingen | NutriCoach",
-  description: "Beheer je applicatie instellingen",
+  title: 'Instellingen | NutriCoach',
+  description: 'Beheer je applicatie instellingen',
 };
 
 export default async function SettingsPage() {
@@ -17,7 +17,7 @@ export default async function SettingsPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   const admin = await isAdmin();

@@ -1,18 +1,18 @@
 /**
  * Recipe Adaptation Actions - Enforcement Tests
- * 
+ *
  * Tests for vNext guard rails enforcement in applyRecipeAdaptationAction.
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import type { GuardDecision } from '@/src/lib/guardrails-vnext/types';
 
 /**
  * Helper: Check if guard decision should block apply
- * 
+ *
  * HARD blocks prevent apply, SOFT warnings do not.
- * 
+ *
  * @param decision - Guard decision from vNext evaluator
  * @returns True if apply should be blocked
  */
@@ -51,7 +51,11 @@ describe('Recipe Adaptation Enforcement', () => {
         },
       };
 
-      assert.strictEqual(shouldBlockApply(decision), true, 'Should block apply on HARD violation');
+      assert.strictEqual(
+        shouldBlockApply(decision),
+        true,
+        'Should block apply on HARD violation',
+      );
     });
 
     it('should allow apply when only SOFT warnings (ok === true, outcome === warned)', () => {
@@ -82,7 +86,11 @@ describe('Recipe Adaptation Enforcement', () => {
         },
       };
 
-      assert.strictEqual(shouldBlockApply(decision), false, 'Should allow apply on SOFT warning');
+      assert.strictEqual(
+        shouldBlockApply(decision),
+        false,
+        'Should allow apply on SOFT warning',
+      );
     });
 
     it('should allow apply when no violations (ok === true, outcome === allowed)', () => {
@@ -113,7 +121,11 @@ describe('Recipe Adaptation Enforcement', () => {
         },
       };
 
-      assert.strictEqual(shouldBlockApply(decision), false, 'Should allow apply when no violations');
+      assert.strictEqual(
+        shouldBlockApply(decision),
+        false,
+        'Should allow apply when no violations',
+      );
     });
 
     it('should block apply when HARD violation even if SOFT warnings also present', () => {
@@ -144,7 +156,11 @@ describe('Recipe Adaptation Enforcement', () => {
         },
       };
 
-      assert.strictEqual(shouldBlockApply(decision), true, 'Should block apply when HARD violation present, even with SOFT warnings');
+      assert.strictEqual(
+        shouldBlockApply(decision),
+        true,
+        'Should block apply when HARD violation present, even with SOFT warnings',
+      );
     });
   });
 });

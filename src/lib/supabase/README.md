@@ -5,12 +5,14 @@ Deze directory bevat de Supabase client connectors voor Next.js App Router.
 ## Setup
 
 1. **Installeer dependencies:**
+
    ```bash
    npm install
    ```
 
 2. **Maak `.env.local` bestand:**
    Kopieer `ENV.example` naar `.env.local` en vul je Supabase credentials in:
+
    ```bash
    cp ENV.example .env.local
    ```
@@ -29,11 +31,11 @@ import { createClient } from '@/src/lib/supabase/server'
 
 export default async function MyPage() {
   const supabase = await createClient()
-  
+
   const { data, error } = await supabase
     .from('clients')
     .select('*')
-  
+
   return <div>...</div>
 }
 ```
@@ -49,7 +51,7 @@ import { useEffect, useState } from 'react'
 export function MyComponent() {
   const [data, setData] = useState(null)
   const supabase = createBrowserClient()
-  
+
   useEffect(() => {
     supabase
       .from('clients')
@@ -58,7 +60,7 @@ export function MyComponent() {
         if (data) setData(data)
       })
   }, [])
-  
+
   return <div>...</div>
 }
 ```
@@ -66,18 +68,18 @@ export function MyComponent() {
 ### Server Actions
 
 ```typescript
-'use server'
+'use server';
 
-import { createClient } from '@/src/lib/supabase/server'
+import { createClient } from '@/src/lib/supabase/server';
 
 export async function createClient(data: FormData) {
-  const supabase = await createClient()
-  
+  const supabase = await createClient();
+
   const { error } = await supabase
     .from('clients')
-    .insert({ name: data.get('name') })
-  
-  if (error) throw error
+    .insert({ name: data.get('name') });
+
+  if (error) throw error;
 }
 ```
 

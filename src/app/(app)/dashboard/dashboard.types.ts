@@ -7,13 +7,13 @@ export type RawKPI = {
   metric: string;
   value: number;
   previousValue?: number;
-  period: "week" | "month" | "year";
+  period: 'week' | 'month' | 'year';
   periodLabel: string;
 };
 
 export type RawActivity = {
   id: string;
-  type: "client" | "meal_plan" | "appointment" | "payment" | "other";
+  type: 'client' | 'meal_plan' | 'appointment' | 'payment' | 'other';
   description: string;
   timestamp: Date | string;
   userId?: string;

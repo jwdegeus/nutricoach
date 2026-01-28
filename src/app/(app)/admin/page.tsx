@@ -1,12 +1,15 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/src/lib/supabase/server";
-import { isAdmin } from "@/src/lib/auth/roles";
-import { getAllDietTypes } from "@/src/app/(app)/settings/actions/diet-admin.actions";
-import { AdminDashboardClient } from "./components/AdminDashboardClient";
+import { redirect } from 'next/navigation';
+import { createClient } from '@/src/lib/supabase/server';
+import { isAdmin } from '@/src/lib/auth/roles';
+import {
+  getAllDietTypes,
+  type DietTypeOutput,
+} from '@/src/app/(app)/settings/actions/diet-admin.actions';
+import { AdminDashboardClient } from './components/AdminDashboardClient';
 
 export const metadata = {
-  title: "Admin Dashboard | NutriCoach Admin",
-  description: "Admin beheer dashboard",
+  title: 'Admin Dashboard | NutriCoach Admin',
+  description: 'Admin beheer dashboard',
 };
 
 async function getAdminStats() {
@@ -14,19 +17,22 @@ async function getAdminStats() {
 
   // Get diet types count
   const dietTypesResult = await getAllDietTypes();
-  const dietTypes = dietTypesResult.data || [];
-  const activeDietTypes = dietTypes.filter((dt) => dt.isActive).length;
+  const dietTypes = 'data' in dietTypesResult ? dietTypesResult.data : [];
+  const activeDietTypes = dietTypes.filter(
+    (dt: DietTypeOutput) => dt.isActive,
+  ).length;
   const totalDietTypes = dietTypes.length;
 
   // Get recipe sources count
-  const { data: sources, error: sourcesError } = await supabase
-    .from("recipe_sources")
-    .select("id, is_system, usage_count", { count: "exact" });
+  const { data: sources } = await supabase
+    .from('recipe_sources')
+    .select('id, is_system, usage_count', { count: 'exact' });
 
   const totalSources = sources?.length || 0;
   const systemSources = sources?.filter((s) => s.is_system).length || 0;
   const userSources = totalSources - systemSources;
-  const totalUsage = sources?.reduce((sum, s) => sum + (s.usage_count || 0), 0) || 0;
+  const totalUsage =
+    sources?.reduce((sum, s) => sum + (s.usage_count || 0), 0) || 0;
 
   return {
     dietTypes: {
@@ -50,12 +56,12 @@ export default async function AdminDashboardPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   const userIsAdmin = await isAdmin();
   if (!userIsAdmin) {
-    redirect("/dashboard");
+    redirect('/dashboard');
   }
 
   const stats = await getAdminStats();

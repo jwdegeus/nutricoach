@@ -16,7 +16,7 @@ import type {
   DietLogicTargets,
   DietLogicEvaluationResult,
   DietLogicPhaseResult,
-} from "./types";
+} from './types';
 
 /**
  * Genereert genormaliseerde vormen van een ingredientnaam voor matching.
@@ -27,9 +27,9 @@ function normaliseIngredientNameForMatching(name: string): string[] {
   const raw = name.trim().toLowerCase();
   if (!raw) return [];
   const forms = new Set<string>([raw]);
-  const withSpaces = raw.replace(/_/g, " ");
+  const withSpaces = raw.replace(/_/g, ' ');
   forms.add(withSpaces);
-  const withoutTrailingS = withSpaces.replace(/\s+s$/i, "");
+  const withoutTrailingS = withSpaces.replace(/\s+s$/i, '');
   if (withoutTrailingS !== withSpaces) forms.add(withoutTrailingS);
   return Array.from(forms);
 }
@@ -41,12 +41,13 @@ function ingredientMatchesConstraint(name: string, terms: string[]): boolean {
   for (const n of candidates) {
     for (const t of terms) {
       if (!t) continue;
-      const termForms = [t, t.replace(/_/g, " ")];
+      const termForms = [t, t.replace(/_/g, ' ')];
       for (const tNorm of termForms) {
         if (n === tNorm || n.includes(tNorm) || tNorm.includes(n)) return true;
         const tokens = n.split(/\s+/);
         for (const tok of tokens) {
-          if (tok === tNorm || tok.includes(tNorm) || tNorm.includes(tok)) return true;
+          if (tok === tNorm || tok.includes(tNorm) || tNorm.includes(tok))
+            return true;
         }
       }
     }
@@ -60,7 +61,7 @@ function ingredientMatchesConstraint(name: string, terms: string[]): boolean {
  */
 function winningConstraintForIngredient(
   ingredientName: string,
-  allByPriority: DietLogicConstraint[]
+  allByPriority: DietLogicConstraint[],
 ): DietLogicConstraint | null {
   for (const c of allByPriority) {
     if (ingredientMatchesConstraint(ingredientName, c.terms)) return c;
@@ -77,7 +78,7 @@ function winningConstraintForIngredient(
  */
 export function evaluateDietLogic(
   ruleset: DietLogicRuleset,
-  targets: DietLogicTargets
+  targets: DietLogicTargets,
 ): DietLogicEvaluationResult {
   const ingredients = targets.ingredients ?? [];
   const phaseResults: DietLogicPhaseResult[] = [];
@@ -87,7 +88,7 @@ export function evaluateDietLogic(
 
   // Alle regels op prioriteit (1=hoogst eerst) voor conflictresolutie
   const allByPriority = [...ruleset.constraints].sort(
-    (a, b) => (a.priority ?? 50) - (b.priority ?? 50)
+    (a, b) => (a.priority ?? 50) - (b.priority ?? 50),
   );
 
   // ---------- Fase 1: DROP (na conflictresolutie) ----------
@@ -95,9 +96,9 @@ export function evaluateDietLogic(
   const dropWarnings: string[] = [];
   for (const ing of ingredients) {
     const winner = winningConstraintForIngredient(ing.name, allByPriority);
-    if (winner?.dietLogic !== "drop") continue;
+    if (winner?.dietLogic !== 'drop') continue;
     const msg = `${ing.name} hoort bij "${winner.categoryNameNl}" (DROP – niet toegestaan)`;
-    if (winner.strictness === "hard") {
+    if (winner.strictness === 'hard') {
       dropViolations.push(msg);
     } else {
       dropWarnings.push(msg);
@@ -118,16 +119,18 @@ export function evaluateDietLogic(
       ok: false,
       failedPhase: 1,
       phaseResults,
-      summary: summaryParts.join(" "),
+      summary: summaryParts.join(' '),
       warnings: allWarnings.length ? allWarnings : undefined,
     };
   }
 
   // ---------- Fase 2: FORCE (tel alleen ingrediënten waar deze FORCE-regel wint) ----------
-  const forceDeficits: DietLogicPhaseResult["forceDeficits"] = [];
+  const forceDeficits: DietLogicPhaseResult['forceDeficits'] = [];
   for (const constraint of ruleset.byLogic.force) {
     const count = ingredients.filter(
-      (ing) => winningConstraintForIngredient(ing.name, allByPriority)?.id === constraint.id
+      (ing) =>
+        winningConstraintForIngredient(ing.name, allByPriority)?.id ===
+        constraint.id,
     ).length;
     const minDay = constraint.minPerDay ?? 0;
     const minWeek = constraint.minPerWeek ?? 0;
@@ -147,17 +150,22 @@ export function evaluateDietLogic(
     ok: phase2Ok,
     violations: phase2Ok
       ? []
-      : forceDeficits.map((d) => `Te weinig uit "${d.categoryNameNl}" (FORCE-quotum niet gehaald)`),
+      : forceDeficits.map(
+          (d) =>
+            `Te weinig uit "${d.categoryNameNl}" (FORCE-quotum niet gehaald)`,
+        ),
     forceDeficits: phase2Ok ? undefined : forceDeficits,
   });
   if (!phase2Ok) {
     failedPhase = 2;
-    summaryParts.push(`Fase 2 FORCE: quotum niet gehaald voor ${forceDeficits.length} categorie(ën).`);
+    summaryParts.push(
+      `Fase 2 FORCE: quotum niet gehaald voor ${forceDeficits.length} categorie(ën).`,
+    );
     return {
       ok: false,
       failedPhase: 2,
       phaseResults,
-      summary: summaryParts.join(" "),
+      summary: summaryParts.join(' '),
       warnings: allWarnings.length ? allWarnings : undefined,
     };
   }
@@ -165,10 +173,12 @@ export function evaluateDietLogic(
   // ---------- Fase 3: LIMIT (tel alleen waar deze LIMIT-regel wint; soft = waarschuwing) ----------
   const limitViolations: string[] = [];
   const limitWarnings: string[] = [];
-  const limitExcesses: DietLogicPhaseResult["limitExcesses"] = [];
+  const limitExcesses: DietLogicPhaseResult['limitExcesses'] = [];
   for (const constraint of ruleset.byLogic.limit) {
     const count = ingredients.filter(
-      (ing) => winningConstraintForIngredient(ing.name, allByPriority)?.id === constraint.id
+      (ing) =>
+        winningConstraintForIngredient(ing.name, allByPriority)?.id ===
+        constraint.id,
     ).length;
     const maxDay = constraint.maxPerDay ?? Infinity;
     const maxWeek = constraint.maxPerWeek ?? Infinity;
@@ -183,7 +193,7 @@ export function evaluateDietLogic(
       };
       limitExcesses.push(excess);
       const msg = `"${constraint.categoryNameNl}": ${count} gebruikt, max ${constraint.maxPerDay ?? constraint.maxPerWeek}`;
-      if (constraint.strictness === "hard") {
+      if (constraint.strictness === 'hard') {
         limitViolations.push(msg);
       } else {
         limitWarnings.push(msg);
@@ -201,12 +211,14 @@ export function evaluateDietLogic(
   });
   if (!phase3Ok) {
     failedPhase = 3;
-    summaryParts.push(`Fase 3 LIMIT: overschrijding voor ${limitViolations.length} categorie(ën).`);
+    summaryParts.push(
+      `Fase 3 LIMIT: overschrijding voor ${limitViolations.length} categorie(ën).`,
+    );
     return {
       ok: false,
       failedPhase: 3,
       phaseResults,
-      summary: summaryParts.join(" "),
+      summary: summaryParts.join(' '),
       warnings: allWarnings.length ? allWarnings : undefined,
     };
   }
@@ -222,7 +234,7 @@ export function evaluateDietLogic(
     ok: true,
     failedPhase: null,
     phaseResults,
-    summary: "Dieetregels (Diet Logic): alle fases geslaagd.",
+    summary: 'Dieetregels (Diet Logic): alle fases geslaagd.',
     warnings: allWarnings.length ? allWarnings : undefined,
   };
 }

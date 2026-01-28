@@ -1,31 +1,37 @@
-"use client";
+'use client';
 
-import { useState, useTransition, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/catalyst/button";
-import { Heading } from "@/components/catalyst/heading";
-import { Description } from "@/components/catalyst/fieldset";
-import { Input } from "@/components/catalyst/input";
-import { Field, Label } from "@/components/catalyst/fieldset";
-import { Text } from "@/components/catalyst/text";
-import { createMealPlanAction } from "../../actions/mealPlans.actions";
-import { getLatestRunningRunAction } from "../../../runs/actions/runs.actions";
-import { getCurrentDietIdAction } from "@/src/app/(app)/recipes/[recipeId]/actions/recipe-ai.persist.actions";
-import { GuardrailsViolationEmptyState } from "../../[planId]/components/GuardrailsViolationEmptyState";
-import { Loader2, Calendar } from "lucide-react";
+import { useState, useTransition, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/catalyst/button';
+import { Heading } from '@/components/catalyst/heading';
+import { Description } from '@/components/catalyst/fieldset';
+import { Input } from '@/components/catalyst/input';
+import { Field, Label } from '@/components/catalyst/fieldset';
+import { Text } from '@/components/catalyst/text';
+import { createMealPlanAction } from '../../actions/mealPlans.actions';
+import { getLatestRunningRunAction } from '../../../runs/actions/runs.actions';
+import { getCurrentDietIdAction } from '@/src/app/(app)/recipes/[recipeId]/actions/recipe-ai.persist.actions';
+import { GuardrailsViolationEmptyState } from '../../[planId]/components/GuardrailsViolationEmptyState';
+import { Loader2, Calendar } from 'lucide-react';
 
 type GuardrailsViolationState = {
   reasonCodes: string[];
   contentHash: string;
   rulesetVersion?: number;
-  forceDeficits?: Array<{ categoryCode: string; categoryNameNl: string; minPerDay?: number; minPerWeek?: number }>;
+  forceDeficits?: Array<{
+    categoryCode: string;
+    categoryNameNl: string;
+    minPerDay?: number;
+    minPerWeek?: number;
+  }>;
 };
 
 export function CreateMealPlanForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [guardrailsViolation, setGuardrailsViolation] = useState<GuardrailsViolationState | null>(null);
+  const [guardrailsViolation, setGuardrailsViolation] =
+    useState<GuardrailsViolationState | null>(null);
   const [dietTypeId, setDietTypeId] = useState<string | undefined>(undefined);
   const [isRetrying, setIsRetrying] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
@@ -39,9 +45,9 @@ export function CreateMealPlanForm() {
   });
   const [dateFrom, setDateFrom] = useState<string>(() => {
     // Default to today
-    return new Date().toISOString().split("T")[0];
+    return new Date().toISOString().split('T')[0];
   });
-  const [days, setDays] = useState<string>("7");
+  const [days, setDays] = useState<string>('7');
 
   // Cleanup on unmount
   useEffect(() => {
@@ -72,8 +78,7 @@ export function CreateMealPlanForm() {
       return;
     }
 
-    let intervalId: NodeJS.Timeout;
-    let startTime = Date.now();
+    const startTime = Date.now();
 
     const checkProgress = async () => {
       const result = await getLatestRunningRunAction();
@@ -84,15 +89,15 @@ export function CreateMealPlanForm() {
         // Estimate progress based on elapsed time
         // Typical generation takes 10-30 seconds
         if (elapsed < 5000) {
-          setProgress("Profiel laden...");
+          setProgress('Profiel laden...');
         } else if (elapsed < 15000) {
-          setProgress("Meal plan genereren...");
+          setProgress('Meal plan genereren...');
         } else if (elapsed < 25000) {
-          setProgress("Plan valideren...");
+          setProgress('Plan valideren...');
         } else if (elapsed < 35000) {
-          setProgress("Enrichment toevoegen...");
+          setProgress('Enrichment toevoegen...');
         } else {
-          setProgress("Bijna klaar...");
+          setProgress('Bijna klaar...');
         }
       } else {
         // No running run found, might be done or error
@@ -102,27 +107,25 @@ export function CreateMealPlanForm() {
 
     // Check immediately, then every 2 seconds
     checkProgress();
-    intervalId = setInterval(checkProgress, 2000);
+    const intervalId = setInterval(checkProgress, 2000);
 
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
+      clearInterval(intervalId);
     };
   }, [isPending]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Prevent double submission
     if (isPending || hasSubmitted) {
       return;
     }
-    
+
     setError(null);
     setGuardrailsViolation(null);
     setHasSubmitted(true);
-    
+
     // Mark as submitting in sessionStorage to prevent double submission
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('meal-plan-submitting', 'true');
@@ -130,7 +133,7 @@ export function CreateMealPlanForm() {
 
     const daysNum = parseInt(days, 10);
     if (isNaN(daysNum) || daysNum < 1 || daysNum > 30) {
-      setError("Aantal dagen moet tussen 1 en 30 zijn");
+      setError('Aantal dagen moet tussen 1 en 30 zijn');
       setHasSubmitted(false);
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem('meal-plan-submitting');
@@ -139,7 +142,7 @@ export function CreateMealPlanForm() {
     }
 
     if (!dateFrom) {
-      setError("Selecteer een startdatum");
+      setError('Selecteer een startdatum');
       setHasSubmitted(false);
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem('meal-plan-submitting');
@@ -159,14 +162,14 @@ export function CreateMealPlanForm() {
           if (typeof window !== 'undefined') {
             sessionStorage.removeItem('meal-plan-submitting');
           }
-          
+
           // Dispatch custom event to notify shopping cart (but don't wait)
           window.dispatchEvent(new CustomEvent('meal-plan-changed'));
-          
+
           // Use replace instead of push to prevent back button issues
           // and immediately navigate away to prevent any re-submission
           router.replace(`/meal-plans/${result.data.planId}`);
-          
+
           // Don't reset hasSubmitted - we're redirecting anyway
           return; // Early return to prevent any further execution
         } else {
@@ -175,17 +178,23 @@ export function CreateMealPlanForm() {
             sessionStorage.removeItem('meal-plan-submitting');
           }
           // Check for guardrails violation
-          if (result.error.code === "GUARDRAILS_VIOLATION" && result.error.details) {
+          if (
+            result.error.code === 'GUARDRAILS_VIOLATION' &&
+            result.error.details
+          ) {
             const d = result.error.details;
             setGuardrailsViolation({
               reasonCodes: d.reasonCodes,
               contentHash: d.contentHash,
               rulesetVersion: d.rulesetVersion,
-              ...("forceDeficits" in d && Array.isArray(d.forceDeficits) && { forceDeficits: d.forceDeficits }),
+              ...('forceDeficits' in d &&
+                Array.isArray(d.forceDeficits) && {
+                  forceDeficits: d.forceDeficits,
+                }),
             });
-          } else if (result.error.code === "CONFLICT") {
+          } else if (result.error.code === 'CONFLICT') {
             setError(
-              "Er is al een generatie bezig. Wacht even en probeer het opnieuw. Als dit probleem aanhoudt, wacht 10 minuten en probeer het dan opnieuw."
+              'Er is al een generatie bezig. Wacht even en probeer het opnieuw. Als dit probleem aanhoudt, wacht 10 minuten en probeer het dan opnieuw.',
             );
           } else {
             setError(result.error.message);
@@ -193,7 +202,7 @@ export function CreateMealPlanForm() {
         }
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Fout bij aanmaken meal plan"
+          err instanceof Error ? err.message : 'Fout bij aanmaken meal plan',
         );
         setHasSubmitted(false);
         if (typeof window !== 'undefined') {
@@ -207,17 +216,17 @@ export function CreateMealPlanForm() {
     setIsRetrying(true);
     setGuardrailsViolation(null);
     setError(null);
-    
+
     // Trigger form submission again
     const daysNum = parseInt(days, 10);
     if (isNaN(daysNum) || daysNum < 1 || daysNum > 30) {
-      setError("Aantal dagen moet tussen 1 en 30 zijn");
+      setError('Aantal dagen moet tussen 1 en 30 zijn');
       setIsRetrying(false);
       return;
     }
 
     if (!dateFrom) {
-      setError("Selecteer een startdatum");
+      setError('Selecteer een startdatum');
       setIsRetrying(false);
       return;
     }
@@ -246,17 +255,23 @@ export function CreateMealPlanForm() {
           if (typeof window !== 'undefined') {
             sessionStorage.removeItem('meal-plan-submitting');
           }
-          if (result.error.code === "GUARDRAILS_VIOLATION" && result.error.details) {
+          if (
+            result.error.code === 'GUARDRAILS_VIOLATION' &&
+            result.error.details
+          ) {
             const d = result.error.details;
             setGuardrailsViolation({
               reasonCodes: d.reasonCodes,
               contentHash: d.contentHash,
               rulesetVersion: d.rulesetVersion,
-              ...("forceDeficits" in d && Array.isArray(d.forceDeficits) && { forceDeficits: d.forceDeficits }),
+              ...('forceDeficits' in d &&
+                Array.isArray(d.forceDeficits) && {
+                  forceDeficits: d.forceDeficits,
+                }),
             });
-          } else if (result.error.code === "CONFLICT") {
+          } else if (result.error.code === 'CONFLICT') {
             setError(
-              "Er is al een generatie bezig. Wacht even en probeer het opnieuw. Als dit probleem aanhoudt, wacht 10 minuten en probeer het dan opnieuw."
+              'Er is al een generatie bezig. Wacht even en probeer het opnieuw. Als dit probleem aanhoudt, wacht 10 minuten en probeer het dan opnieuw.',
             );
           } else {
             setError(result.error.message);
@@ -264,7 +279,7 @@ export function CreateMealPlanForm() {
         }
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Fout bij aanmaken meal plan"
+          err instanceof Error ? err.message : 'Fout bij aanmaken meal plan',
         );
         setHasSubmitted(false);
         if (typeof window !== 'undefined') {
@@ -300,8 +315,8 @@ export function CreateMealPlanForm() {
     <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
       <Heading>Plan Instellingen</Heading>
       <div className="mt-4">
-        <form 
-          onSubmit={handleSubmit} 
+        <form
+          onSubmit={handleSubmit}
           className="space-y-6"
           onKeyDown={(e) => {
             // Prevent form submission on Enter key if already submitting
@@ -319,9 +334,7 @@ export function CreateMealPlanForm() {
               disabled={isPending}
               required
             />
-            <Description>
-              De eerste dag van je meal plan
-            </Description>
+            <Description>De eerste dag van je meal plan</Description>
           </Field>
 
           <Field>
@@ -335,9 +348,7 @@ export function CreateMealPlanForm() {
               disabled={isPending}
               required
             />
-            <Description>
-              Aantal dagen voor het meal plan (1-30)
-            </Description>
+            <Description>Aantal dagen voor het meal plan (1-30)</Description>
           </Field>
 
           {error && (
@@ -360,10 +371,10 @@ export function CreateMealPlanForm() {
                 </div>
               </div>
               <div className="w-full bg-blue-200 dark:bg-blue-900 rounded-full h-2 overflow-hidden">
-                <div 
+                <div
                   className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-500"
-                  style={{ 
-                    width: `${Math.min(90, Math.max(10, (elapsedTime / 40000) * 100))}%` 
+                  style={{
+                    width: `${Math.min(90, Math.max(10, (elapsedTime / 40000) * 100))}%`,
                   }}
                 />
               </div>

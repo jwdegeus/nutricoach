@@ -1,16 +1,21 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useRef } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { ArrowPathIcon } from "@heroicons/react/20/solid";
-import { NavbarItem } from "@/components/catalyst/navbar";
-import { getActivePlanEditsAction, checkPlanEditStatusAction } from "@/src/app/(app)/meal-plans/[planId]/actions/planEdit.actions";
+import { useEffect, useState, useRef } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { ArrowPathIcon } from '@heroicons/react/20/solid';
+import { NavbarItem } from '@/components/catalyst/navbar';
+import {
+  getActivePlanEditsAction,
+  checkPlanEditStatusAction,
+} from '@/src/app/(app)/meal-plans/[planId]/actions/planEdit.actions';
 
 export function PlanEditStatusIndicator() {
   const pathname = usePathname();
   const router = useRouter();
   const [isRunning, setIsRunning] = useState(false);
-  const [activeRuns, setActiveRuns] = useState<Array<{ runId: string; runType: string }>>([]);
+  const [activeRuns, setActiveRuns] = useState<
+    Array<{ runId: string; runType: string }>
+  >([]);
   const hasRefreshedRef = useRef(false); // Track if we've already refreshed
 
   // Extract planId from pathname if we're on a meal plan detail page
@@ -22,8 +27,6 @@ export function PlanEditStatusIndicator() {
       setIsRunning(false);
       return;
     }
-
-    let intervalId: NodeJS.Timeout;
 
     const checkStatus = async () => {
       const result = await getActivePlanEditsAction(planId);
@@ -40,12 +43,10 @@ export function PlanEditStatusIndicator() {
     checkStatus();
 
     // Poll every 2 seconds
-    intervalId = setInterval(checkStatus, 2000);
+    const intervalId = setInterval(checkStatus, 2000);
 
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
+      clearInterval(intervalId);
     };
   }, [planId]);
 
@@ -60,11 +61,14 @@ export function PlanEditStatusIndicator() {
       const checks = await Promise.all(
         activeRuns.map(async (run) => {
           const result = await checkPlanEditStatusAction(run.runId);
-          return { runId: run.runId, status: result.ok ? result.data.status : "running" };
-        })
+          return {
+            runId: run.runId,
+            status: result.ok ? result.data.status : 'running',
+          };
+        }),
       );
 
-      const stillRunning = checks.filter((c) => c.status === "running");
+      const stillRunning = checks.filter((c) => c.status === 'running');
       if (stillRunning.length !== activeRuns.length) {
         // Some runs completed
         if (stillRunning.length === 0) {
@@ -76,14 +80,20 @@ export function PlanEditStatusIndicator() {
             // Use a longer delay and only refresh if we're still on the same page
             setTimeout(() => {
               // Double-check we're still on a meal plan page before refreshing
-              const currentPlanId = pathname.match(/\/meal-plans\/([^\/]+)/)?.[1];
+              const currentPlanId = pathname.match(
+                /\/meal-plans\/([^\/]+)/,
+              )?.[1];
               if (currentPlanId === planId && hasRefreshedRef.current) {
                 router.refresh();
               }
             }, 1000);
           }
         } else {
-          setActiveRuns(activeRuns.filter((r) => stillRunning.some((sr) => sr.runId === r.runId)));
+          setActiveRuns(
+            activeRuns.filter((r) =>
+              stillRunning.some((sr) => sr.runId === r.runId),
+            ),
+          );
         }
       }
     };

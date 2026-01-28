@@ -1,9 +1,9 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { CustomMealsService } from "@/src/lib/custom-meals/customMeals.service";
-import type { CustomMealRecord } from "@/src/lib/custom-meals/customMeals.service";
-import type { MealSlot } from "@/src/lib/diets";
+import { createClient } from '@/src/lib/supabase/server';
+import { CustomMealsService } from '@/src/lib/custom-meals/customMeals.service';
+import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
+import type { MealSlot } from '@/src/lib/diets';
 
 /**
  * Action result type
@@ -13,7 +13,7 @@ type ActionResult<T> =
   | {
       ok: false;
       error: {
-        code: "AUTH_ERROR" | "VALIDATION_ERROR" | "DB_ERROR" | "AI_ERROR";
+        code: 'AUTH_ERROR' | 'VALIDATION_ERROR' | 'DB_ERROR' | 'AI_ERROR';
         message: string;
       };
     };
@@ -21,10 +21,12 @@ type ActionResult<T> =
 /**
  * Get all meals for current user (custom meals + meal history)
  */
-export async function getAllMealsAction(): Promise<ActionResult<{
-  customMeals: CustomMealRecord[];
-  mealHistory: any[]; // TODO: type this properly
-}>> {
+export async function getAllMealsAction(): Promise<
+  ActionResult<{
+    customMeals: CustomMealRecord[];
+    mealHistory: any[]; // TODO: type this properly
+  }>
+> {
   try {
     const supabase = await createClient();
     const {
@@ -35,8 +37,8 @@ export async function getAllMealsAction(): Promise<ActionResult<{
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om maaltijden te bekijken",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om maaltijden te bekijken',
         },
       };
     }
@@ -46,10 +48,10 @@ export async function getAllMealsAction(): Promise<ActionResult<{
 
     // Also get meal history
     const { data: mealHistory } = await supabase
-      .from("meal_history")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+      .from('meal_history')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
 
     return {
       ok: true,
@@ -62,8 +64,8 @@ export async function getAllMealsAction(): Promise<ActionResult<{
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
@@ -89,8 +91,8 @@ export async function logMealConsumptionAction(args: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om consumptie te loggen",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om consumptie te loggen',
         },
       };
     }
@@ -109,8 +111,8 @@ export async function logMealConsumptionAction(args: {
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
@@ -119,7 +121,9 @@ export async function logMealConsumptionAction(args: {
 /**
  * Get top 5 consumed meals for dashboard
  */
-export async function getTopConsumedMealsAction(): Promise<ActionResult<CustomMealRecord[]>> {
+export async function getTopConsumedMealsAction(): Promise<
+  ActionResult<CustomMealRecord[]>
+> {
   try {
     const supabase = await createClient();
     const {
@@ -130,8 +134,8 @@ export async function getTopConsumedMealsAction(): Promise<ActionResult<CustomMe
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
@@ -147,8 +151,8 @@ export async function getTopConsumedMealsAction(): Promise<ActionResult<CustomMe
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
@@ -159,7 +163,7 @@ export async function getTopConsumedMealsAction(): Promise<ActionResult<CustomMe
  */
 export async function getMealByIdAction(
   mealId: string,
-  source: "custom" | "gemini"
+  source: 'custom' | 'gemini',
 ): Promise<ActionResult<CustomMealRecord | any>> {
   try {
     const supabase = await createClient();
@@ -171,13 +175,13 @@ export async function getMealByIdAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om maaltijden te bekijken",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om maaltijden te bekijken',
         },
       };
     }
 
-    if (source === "custom") {
+    if (source === 'custom') {
       const service = new CustomMealsService();
       const meal = await service.getMealById(mealId, user.id);
 
@@ -185,8 +189,8 @@ export async function getMealByIdAction(
         return {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Maaltijd niet gevonden",
+            code: 'VALIDATION_ERROR',
+            message: 'Maaltijd niet gevonden',
           },
         };
       }
@@ -198,17 +202,17 @@ export async function getMealByIdAction(
     } else {
       // Get from meal_history
       const { data, error } = await supabase
-        .from("meal_history")
-        .select("*")
-        .eq("id", mealId)
-        .eq("user_id", user.id)
+        .from('meal_history')
+        .select('*')
+        .eq('id', mealId)
+        .eq('user_id', user.id)
         .maybeSingle();
 
       if (error) {
         return {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: error.message,
           },
         };
@@ -218,8 +222,8 @@ export async function getMealByIdAction(
         return {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Maaltijd niet gevonden",
+            code: 'VALIDATION_ERROR',
+            message: 'Maaltijd niet gevonden',
           },
         };
       }
@@ -249,8 +253,8 @@ export async function getMealByIdAction(
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }

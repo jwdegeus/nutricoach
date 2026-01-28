@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import React, { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Textarea } from "@/components/catalyst/textarea";
-import { Button } from "@/components/catalyst/button";
-import { Heading } from "@/components/catalyst/heading";
-import { Text } from "@/components/catalyst/text";
-import { submitPlanChatMessageAction } from "../actions/planChat.actions";
-import { Loader2, Send, CheckCircle2 } from "lucide-react";
-import type { PlanChatMessage } from "@/src/lib/agents/meal-planner/planEdit.schemas";
-import { GuardrailsViolationMessage } from "./GuardrailsViolationMessage";
+import React, { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Textarea } from '@/components/catalyst/textarea';
+import { Button } from '@/components/catalyst/button';
+import { Heading } from '@/components/catalyst/heading';
+import { Text } from '@/components/catalyst/text';
+import { submitPlanChatMessageAction } from '../actions/planChat.actions';
+import { Loader2, Send, CheckCircle2 } from 'lucide-react';
+import type { PlanChatMessage } from '@/src/lib/agents/meal-planner/planEdit.schemas';
+import { GuardrailsViolationMessage } from './GuardrailsViolationMessage';
 
 type PlanChatClientProps = {
   planId: string;
@@ -20,19 +20,26 @@ type PlanChatClientProps = {
 };
 
 // Extended message type for UI (includes system/error messages)
-type ExtendedChatMessage = PlanChatMessage | {
-  role: "system";
-  type: "guardrails_violation";
-  reasonCodes: string[];
-  contentHash: string;
-  rulesetVersion?: number;
-  dietTypeId?: string;
-};
+type ExtendedChatMessage =
+  | PlanChatMessage
+  | {
+      role: 'system';
+      type: 'guardrails_violation';
+      reasonCodes: string[];
+      contentHash: string;
+      rulesetVersion?: number;
+      dietTypeId?: string;
+    };
 
-export function PlanChatClient({ planId, initialDraft, onDraftChange, dietTypeId }: PlanChatClientProps) {
+export function PlanChatClient({
+  planId,
+  initialDraft,
+  onDraftChange,
+  dietTypeId,
+}: PlanChatClientProps) {
   const router = useRouter();
   const [messages, setMessages] = useState<ExtendedChatMessage[]>([]);
-  const [input, setInput] = useState(initialDraft || "");
+  const [input, setInput] = useState(initialDraft || '');
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [lastApplied, setLastApplied] = useState<{
@@ -56,14 +63,14 @@ export function PlanChatClient({ planId, initialDraft, onDraftChange, dietTypeId
     if (!input.trim() || isPending) return;
 
     const userMessage: PlanChatMessage = {
-      role: "user",
+      role: 'user',
       content: input.trim(),
     };
 
     // Append user message
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
-    setInput("");
+    setInput('');
     setError(null);
 
     startTransition(async () => {
@@ -71,7 +78,7 @@ export function PlanChatClient({ planId, initialDraft, onDraftChange, dietTypeId
         // Send last 12 messages (to keep context manageable)
         // Filter out system messages when sending to backend
         const messagesToSend = newMessages
-          .filter((msg): msg is PlanChatMessage => msg.role !== "system")
+          .filter((msg): msg is PlanChatMessage => msg.role !== 'system')
           .slice(-12);
 
         const result = await submitPlanChatMessageAction({
@@ -82,7 +89,7 @@ export function PlanChatClient({ planId, initialDraft, onDraftChange, dietTypeId
         if (result.ok) {
           // Append assistant reply
           const assistantMessage: PlanChatMessage = {
-            role: "assistant",
+            role: 'assistant',
             content: result.data.reply,
           };
           setMessages([...newMessages, assistantMessage]);
@@ -96,11 +103,14 @@ export function PlanChatClient({ planId, initialDraft, onDraftChange, dietTypeId
           router.refresh();
         } else {
           // Check for GUARDRAILS_VIOLATION
-          if (result.error.code === "GUARDRAILS_VIOLATION" && result.error.details) {
+          if (
+            result.error.code === 'GUARDRAILS_VIOLATION' &&
+            result.error.details
+          ) {
             // Add guardrails violation message to chat
             const violationMessage: ExtendedChatMessage = {
-              role: "system",
-              type: "guardrails_violation",
+              role: 'system',
+              type: 'guardrails_violation',
               reasonCodes: result.error.details.reasonCodes,
               contentHash: result.error.details.contentHash,
               rulesetVersion: result.error.details.rulesetVersion,
@@ -114,7 +124,7 @@ export function PlanChatClient({ planId, initialDraft, onDraftChange, dietTypeId
         }
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Fout bij versturen bericht"
+          err instanceof Error ? err.message : 'Fout bij versturen bericht',
         );
       }
     });
@@ -129,16 +139,22 @@ export function PlanChatClient({ planId, initialDraft, onDraftChange, dietTypeId
           <div className="space-y-4 mb-4 min-h-[300px] max-h-[500px] overflow-y-auto">
             {messages.length === 0 && (
               <div className="text-center text-zinc-500 dark:text-zinc-400 py-8">
-                <Text>Stel een vraag of vraag om een aanpassing aan je meal plan.</Text>
+                <Text>
+                  Stel een vraag of vraag om een aanpassing aan je meal plan.
+                </Text>
                 <Text className="text-sm mt-2">
-                  Bijvoorbeeld: "Maak maandag gezonder" of "Vervang het ontbijt op dinsdag"
+                  Bijvoorbeeld: &quot;Maak maandag gezonder&quot; of
+                  &quot;Vervang het ontbijt op dinsdag&quot;
                 </Text>
               </div>
             )}
 
             {messages.map((msg, idx) => {
               // Handle system messages (guardrails violation)
-              if (msg.role === "system" && msg.type === "guardrails_violation") {
+              if (
+                msg.role === 'system' &&
+                msg.type === 'guardrails_violation'
+              ) {
                 return (
                   <div key={idx} className="flex justify-start">
                     <div className="max-w-[80%] w-full">
@@ -158,17 +174,19 @@ export function PlanChatClient({ planId, initialDraft, onDraftChange, dietTypeId
                 <div
                   key={idx}
                   className={`flex ${
-                    msg.role === "user" ? "justify-end" : "justify-start"
+                    msg.role === 'user' ? 'justify-end' : 'justify-start'
                   }`}
                 >
                   <div
                     className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                      msg.role === "user"
-                        ? "bg-blue-500 text-white"
-                        : "bg-zinc-100 dark:bg-zinc-800"
+                      msg.role === 'user'
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-zinc-100 dark:bg-zinc-800'
                     }`}
                   >
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    <p className="text-sm whitespace-pre-wrap">
+                      {'content' in msg ? msg.content : ''}
+                    </p>
                   </div>
                 </div>
               );

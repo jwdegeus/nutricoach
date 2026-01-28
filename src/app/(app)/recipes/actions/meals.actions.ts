@@ -1,10 +1,10 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { CustomMealsService } from "@/src/lib/custom-meals/customMeals.service";
-import { MealHistoryService } from "@/src/lib/meal-history";
-import type { CustomMealRecord } from "@/src/lib/custom-meals/customMeals.service";
-import type { MealSlot } from "@/src/lib/diets";
+import { createClient } from '@/src/lib/supabase/server';
+import { CustomMealsService } from '@/src/lib/custom-meals/customMeals.service';
+import { MealHistoryService } from '@/src/lib/meal-history';
+import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
+import type { MealSlot } from '@/src/lib/diets';
 
 /**
  * Action result type
@@ -14,7 +14,7 @@ type ActionResult<T> =
   | {
       ok: false;
       error: {
-        code: "AUTH_ERROR" | "VALIDATION_ERROR" | "DB_ERROR" | "AI_ERROR";
+        code: 'AUTH_ERROR' | 'VALIDATION_ERROR' | 'DB_ERROR' | 'AI_ERROR';
         message: string;
       };
     };
@@ -22,10 +22,12 @@ type ActionResult<T> =
 /**
  * Get all meals for current user (custom meals + meal history)
  */
-export async function getAllMealsAction(): Promise<ActionResult<{
-  customMeals: CustomMealRecord[];
-  mealHistory: any[]; // TODO: type this properly
-}>> {
+export async function getAllMealsAction(): Promise<
+  ActionResult<{
+    customMeals: CustomMealRecord[];
+    mealHistory: any[]; // TODO: type this properly
+  }>
+> {
   try {
     const supabase = await createClient();
     const {
@@ -36,8 +38,8 @@ export async function getAllMealsAction(): Promise<ActionResult<{
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om recepten te bekijken",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om recepten te bekijken',
         },
       };
     }
@@ -47,10 +49,10 @@ export async function getAllMealsAction(): Promise<ActionResult<{
 
     // Also get meal history
     const { data: mealHistory } = await supabase
-      .from("meal_history")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+      .from('meal_history')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
 
     return {
       ok: true,
@@ -63,8 +65,8 @@ export async function getAllMealsAction(): Promise<ActionResult<{
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
@@ -90,8 +92,8 @@ export async function logMealConsumptionAction(args: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om consumptie te loggen",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om consumptie te loggen',
         },
       };
     }
@@ -110,8 +112,8 @@ export async function logMealConsumptionAction(args: {
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
@@ -120,7 +122,9 @@ export async function logMealConsumptionAction(args: {
 /**
  * Get top 5 consumed meals for dashboard
  */
-export async function getTopConsumedMealsAction(): Promise<ActionResult<CustomMealRecord[]>> {
+export async function getTopConsumedMealsAction(): Promise<
+  ActionResult<CustomMealRecord[]>
+> {
   try {
     const supabase = await createClient();
     const {
@@ -131,8 +135,8 @@ export async function getTopConsumedMealsAction(): Promise<ActionResult<CustomMe
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
@@ -148,8 +152,8 @@ export async function getTopConsumedMealsAction(): Promise<ActionResult<CustomMe
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
@@ -160,7 +164,7 @@ export async function getTopConsumedMealsAction(): Promise<ActionResult<CustomMe
  */
 export async function updateMealDietTypeAction(args: {
   mealId: string;
-  source: "custom" | "gemini";
+  source: 'custom' | 'gemini';
   dietTypeName: string | null; // diet_types.name or null to remove
 }): Promise<ActionResult<void>> {
   try {
@@ -173,8 +177,8 @@ export async function updateMealDietTypeAction(args: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om dieettypes bij te werken",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om dieettypes bij te werken',
         },
       };
     }
@@ -183,18 +187,18 @@ export async function updateMealDietTypeAction(args: {
     // For now, we'll use the name directly as diet_key
     const dietKey = args.dietTypeName || null;
 
-    if (args.source === "custom") {
+    if (args.source === 'custom') {
       const { error } = await supabase
-        .from("custom_meals")
+        .from('custom_meals')
         .update({ diet_key: dietKey })
-        .eq("id", args.mealId)
-        .eq("user_id", user.id);
+        .eq('id', args.mealId)
+        .eq('user_id', user.id);
 
       if (error) {
         return {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: error.message,
           },
         };
@@ -202,16 +206,16 @@ export async function updateMealDietTypeAction(args: {
     } else {
       // Update meal_history
       const { error } = await supabase
-        .from("meal_history")
+        .from('meal_history')
         .update({ diet_key: dietKey })
-        .eq("id", args.mealId)
-        .eq("user_id", user.id);
+        .eq('id', args.mealId)
+        .eq('user_id', user.id);
 
       if (error) {
         return {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: error.message,
           },
         };
@@ -226,8 +230,8 @@ export async function updateMealDietTypeAction(args: {
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
@@ -238,7 +242,7 @@ export async function updateMealDietTypeAction(args: {
  */
 export async function deleteMealAction(args: {
   mealId: string;
-  source: "custom" | "gemini";
+  source: 'custom' | 'gemini';
 }): Promise<ActionResult<void>> {
   try {
     const supabase = await createClient();
@@ -250,24 +254,24 @@ export async function deleteMealAction(args: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om maaltijden te verwijderen",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om maaltijden te verwijderen',
         },
       };
     }
 
-    if (args.source === "custom") {
+    if (args.source === 'custom') {
       const { error } = await supabase
-        .from("custom_meals")
+        .from('custom_meals')
         .delete()
-        .eq("id", args.mealId)
-        .eq("user_id", user.id);
+        .eq('id', args.mealId)
+        .eq('user_id', user.id);
 
       if (error) {
         return {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: error.message,
           },
         };
@@ -275,16 +279,16 @@ export async function deleteMealAction(args: {
     } else {
       // Delete from meal_history
       const { error } = await supabase
-        .from("meal_history")
+        .from('meal_history')
         .delete()
-        .eq("id", args.mealId)
-        .eq("user_id", user.id);
+        .eq('id', args.mealId)
+        .eq('user_id', user.id);
 
       if (error) {
         return {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: error.message,
           },
         };
@@ -299,8 +303,8 @@ export async function deleteMealAction(args: {
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
@@ -311,7 +315,7 @@ export async function deleteMealAction(args: {
  */
 export async function rateRecipeAction(args: {
   mealId: string;
-  source: "custom" | "gemini";
+  source: 'custom' | 'gemini';
   rating: number;
 }): Promise<ActionResult<void>> {
   try {
@@ -324,8 +328,8 @@ export async function rateRecipeAction(args: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om een recept te beoordelen",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om een recept te beoordelen',
         },
       };
     }
@@ -335,52 +339,52 @@ export async function rateRecipeAction(args: {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Rating moet tussen 1 en 5 zijn",
+          code: 'VALIDATION_ERROR',
+          message: 'Rating moet tussen 1 en 5 zijn',
         },
       };
     }
 
     const historyService = new MealHistoryService();
-    
-    if (args.source === "custom") {
+
+    if (args.source === 'custom') {
       // For custom meals, check if meal_history entry exists
       // If not, create one first, then rate it
       const { data: existingHistory } = await supabase
-        .from("meal_history")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("meal_id", args.mealId)
+        .from('meal_history')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('meal_id', args.mealId)
         .maybeSingle();
 
       if (!existingHistory) {
         // Get custom meal data to create meal_history entry
         const { data: customMeal } = await supabase
-          .from("custom_meals")
-          .select("id, name, meal_slot, meal_data, diet_key")
-          .eq("id", args.mealId)
-          .eq("user_id", user.id)
+          .from('custom_meals')
+          .select('id, name, meal_slot, meal_data, diet_key')
+          .eq('id', args.mealId)
+          .eq('user_id', user.id)
           .single();
 
         if (!customMeal) {
           return {
             ok: false,
             error: {
-              code: "VALIDATION_ERROR",
-              message: "Recept niet gevonden",
+              code: 'VALIDATION_ERROR',
+              message: 'Recept niet gevonden',
             },
           };
         }
 
         // Create meal_history entry for this custom meal
         const { error: insertError } = await supabase
-          .from("meal_history")
+          .from('meal_history')
           .insert({
             user_id: user.id,
             meal_id: args.mealId,
             meal_name: customMeal.name,
             meal_slot: customMeal.meal_slot,
-            diet_key: customMeal.diet_key || "balanced",
+            diet_key: customMeal.diet_key || 'balanced',
             meal_data: customMeal.meal_data,
           });
 
@@ -388,7 +392,7 @@ export async function rateRecipeAction(args: {
           return {
             ok: false,
             error: {
-              code: "DB_ERROR",
+              code: 'DB_ERROR',
               message: insertError.message,
             },
           };
@@ -410,8 +414,8 @@ export async function rateRecipeAction(args: {
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
@@ -422,7 +426,7 @@ export async function rateRecipeAction(args: {
  */
 export async function getRecipeRatingAction(args: {
   mealId: string;
-  source: "custom" | "gemini";
+  source: 'custom' | 'gemini';
 }): Promise<ActionResult<number | null>> {
   try {
     const supabase = await createClient();
@@ -434,25 +438,25 @@ export async function getRecipeRatingAction(args: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
         },
       };
     }
 
     // For both custom and gemini, check meal_history
     const { data, error } = await supabase
-      .from("meal_history")
-      .select("user_rating")
-      .eq("user_id", user.id)
-      .eq("meal_id", args.mealId)
+      .from('meal_history')
+      .select('user_rating')
+      .eq('user_id', user.id)
+      .eq('meal_id', args.mealId)
       .maybeSingle();
 
     if (error) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: error.message,
         },
       };
@@ -466,8 +470,8 @@ export async function getRecipeRatingAction(args: {
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
@@ -478,7 +482,7 @@ export async function getRecipeRatingAction(args: {
  */
 export async function updateRecipeNotesAction(args: {
   mealId: string;
-  source: "custom" | "gemini";
+  source: 'custom' | 'gemini';
   notes: string | null;
 }): Promise<ActionResult<void>> {
   try {
@@ -491,24 +495,24 @@ export async function updateRecipeNotesAction(args: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om notities bij te werken",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om notities bij te werken',
         },
       };
     }
 
-    if (args.source === "custom") {
+    if (args.source === 'custom') {
       const { error } = await supabase
-        .from("custom_meals")
+        .from('custom_meals')
         .update({ notes: args.notes || null })
-        .eq("id", args.mealId)
-        .eq("user_id", user.id);
+        .eq('id', args.mealId)
+        .eq('user_id', user.id);
 
       if (error) {
         return {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: error.message,
           },
         };
@@ -516,16 +520,16 @@ export async function updateRecipeNotesAction(args: {
     } else {
       // Update meal_history
       const { error } = await supabase
-        .from("meal_history")
+        .from('meal_history')
         .update({ notes: args.notes || null })
-        .eq("id", args.mealId)
-        .eq("user_id", user.id);
+        .eq('id', args.mealId)
+        .eq('user_id', user.id);
 
       if (error) {
         return {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: error.message,
           },
         };
@@ -540,8 +544,8 @@ export async function updateRecipeNotesAction(args: {
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
@@ -553,7 +557,7 @@ export async function updateRecipeNotesAction(args: {
  */
 export async function updateRecipePrepTimeAndServingsAction(args: {
   mealId: string;
-  source: "custom" | "gemini";
+  source: 'custom' | 'gemini';
   prepTime?: number | null;
   servings?: number | null;
 }): Promise<ActionResult<void>> {
@@ -567,51 +571,58 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om receptgegevens bij te werken",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om receptgegevens bij te werken',
         },
       };
     }
 
     // Validate servings if provided
-    if (args.servings !== undefined && args.servings !== null && args.servings < 1) {
+    if (
+      args.servings !== undefined &&
+      args.servings !== null &&
+      args.servings < 1
+    ) {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Portiegrootte moet minimaal 1 zijn",
+          code: 'VALIDATION_ERROR',
+          message: 'Portiegrootte moet minimaal 1 zijn',
         },
       };
     }
 
     // Validate prepTime if provided
-    if (args.prepTime !== undefined && args.prepTime !== null && args.prepTime < 0) {
+    if (
+      args.prepTime !== undefined &&
+      args.prepTime !== null &&
+      args.prepTime < 0
+    ) {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Bereidingstijd kan niet negatief zijn",
+          code: 'VALIDATION_ERROR',
+          message: 'Bereidingstijd kan niet negatief zijn',
         },
       };
     }
 
     // Get current meal data
-    let currentMealData: any;
-    let currentAiAnalysis: any;
-    const tableName = args.source === "custom" ? "custom_meals" : "meal_history";
+    const tableName =
+      args.source === 'custom' ? 'custom_meals' : 'meal_history';
 
     const { data: currentMeal, error: fetchError } = await supabase
       .from(tableName)
-      .select("meal_data, ai_analysis")
-      .eq("id", args.mealId)
-      .eq("user_id", user.id)
+      .select('meal_data, ai_analysis')
+      .eq('id', args.mealId)
+      .eq('user_id', user.id)
       .maybeSingle();
 
     if (fetchError) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: fetchError.message,
         },
       };
@@ -621,20 +632,25 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Recept niet gevonden",
+          code: 'VALIDATION_ERROR',
+          message: 'Recept niet gevonden',
         },
       };
     }
 
-    currentMealData = currentMeal.meal_data || {};
-    currentAiAnalysis = currentMeal.ai_analysis || {};
+    const currentMealData = currentMeal.meal_data || {};
+    const currentAiAnalysis = currentMeal.ai_analysis || {};
 
     // Calculate ratio if servings changed
     const oldServings = currentMealData.servings || null;
-    const newServings = args.servings !== undefined ? args.servings : oldServings;
-    const servingsChanged = oldServings !== null && newServings !== null && oldServings !== newServings;
-    const ratio = servingsChanged && oldServings > 0 ? newServings / oldServings : 1;
+    const newServings =
+      args.servings !== undefined ? args.servings : oldServings;
+    const servingsChanged =
+      oldServings !== null &&
+      newServings !== null &&
+      oldServings !== newServings;
+    const ratio =
+      servingsChanged && oldServings > 0 ? newServings / oldServings : 1;
 
     // Update meal_data
     const updatedMealData = { ...currentMealData };
@@ -648,88 +664,103 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
     }
 
     // Recalculate ingredient quantities if servings changed
-    if (servingsChanged && updatedMealData.ingredientRefs && Array.isArray(updatedMealData.ingredientRefs)) {
-      updatedMealData.ingredientRefs = updatedMealData.ingredientRefs.map((ref: any) => ({
-        ...ref,
-        quantityG: Math.round(ref.quantityG * ratio),
-      }));
+    if (
+      servingsChanged &&
+      updatedMealData.ingredientRefs &&
+      Array.isArray(updatedMealData.ingredientRefs)
+    ) {
+      updatedMealData.ingredientRefs = updatedMealData.ingredientRefs.map(
+        (ref: any) => ({
+          ...ref,
+          quantityG: Math.round(ref.quantityG * ratio),
+        }),
+      );
     }
 
     // Also recalculate legacy ingredients format
-    if (servingsChanged && updatedMealData.ingredients && Array.isArray(updatedMealData.ingredients)) {
-      updatedMealData.ingredients = updatedMealData.ingredients.map((ing: any) => {
-        const updated = { ...ing };
-        if (ing.quantity !== null && ing.quantity !== undefined) {
-          updated.quantity = Math.round(ing.quantity * ratio * 10) / 10; // Round to 1 decimal
-        }
-        return updated;
-      });
+    if (
+      servingsChanged &&
+      updatedMealData.ingredients &&
+      Array.isArray(updatedMealData.ingredients)
+    ) {
+      updatedMealData.ingredients = updatedMealData.ingredients.map(
+        (ing: any) => {
+          const updated = { ...ing };
+          if (ing.quantity !== null && ing.quantity !== undefined) {
+            updated.quantity = Math.round(ing.quantity * ratio * 10) / 10; // Round to 1 decimal
+          }
+          return updated;
+        },
+      );
     }
 
     // Update instructions to reflect new portion size
-    let updatedAiAnalysis = { ...currentAiAnalysis };
+    const updatedAiAnalysis = { ...currentAiAnalysis };
     if (servingsChanged && currentAiAnalysis.instructions) {
       const instructions = currentAiAnalysis.instructions;
-      
+
       if (Array.isArray(instructions)) {
         // Update each instruction step
-        updatedAiAnalysis.instructions = instructions.map((instruction: any) => {
-          const instructionText = typeof instruction === 'string' 
-            ? instruction 
-            : (instruction?.text || instruction?.step || String(instruction));
-          
-          // Replace common portion references in instructions
-          let updatedText = instructionText;
-          
-          // Replace "voor X personen" or "voor X personen" patterns
-          updatedText = updatedText.replace(
-            /voor\s+(\d+)\s+personen?/gi,
-            `voor ${newServings} personen`
-          );
-          
-          // Replace "X personen" patterns
-          updatedText = updatedText.replace(
-            /(\d+)\s+personen?/g,
-            (match, num) => {
-              const oldNum = parseInt(num);
-              if (oldNum === oldServings) {
-                return `${newServings} personen`;
-              }
-              return match;
+        updatedAiAnalysis.instructions = instructions.map(
+          (instruction: any) => {
+            const instructionText =
+              typeof instruction === 'string'
+                ? instruction
+                : instruction?.text || instruction?.step || String(instruction);
+
+            // Replace common portion references in instructions
+            let updatedText = instructionText;
+
+            // Replace "voor X personen" or "voor X personen" patterns
+            updatedText = updatedText.replace(
+              /voor\s+(\d+)\s+personen?/gi,
+              `voor ${newServings} personen`,
+            );
+
+            // Replace "X personen" patterns
+            updatedText = updatedText.replace(
+              /(\d+)\s+personen?/g,
+              (match: string, num: string) => {
+                const oldNum = parseInt(num);
+                if (oldNum === oldServings) {
+                  return `${newServings} personen`;
+                }
+                return match;
+              },
+            );
+
+            // Replace numeric quantities that might be portion-related
+            // This is a simple heuristic - we look for numbers followed by common units
+            updatedText = updatedText.replace(
+              /(\d+(?:[.,]\d+)?)\s*(?:x|×)\s*(\d+)/g,
+              (match: string, qty: string, multiplier: string) => {
+                const quantity = parseFloat(qty.replace(',', '.'));
+                const mult = parseInt(multiplier);
+                if (mult === oldServings) {
+                  const newQty = Math.round(quantity * ratio * 10) / 10;
+                  return `${newQty} x ${newServings}`;
+                }
+                return match;
+              },
+            );
+
+            if (typeof instruction === 'string') {
+              return updatedText;
+            } else {
+              return {
+                ...instruction,
+                text: updatedText,
+                step: updatedText,
+              };
             }
-          );
-          
-          // Replace numeric quantities that might be portion-related
-          // This is a simple heuristic - we look for numbers followed by common units
-          updatedText = updatedText.replace(
-            /(\d+(?:[.,]\d+)?)\s*(?:x|×)\s*(\d+)/g,
-            (match, qty, multiplier) => {
-              const quantity = parseFloat(qty.replace(',', '.'));
-              const mult = parseInt(multiplier);
-              if (mult === oldServings) {
-                const newQty = Math.round(quantity * ratio * 10) / 10;
-                return `${newQty} x ${newServings}`;
-              }
-              return match;
-            }
-          );
-          
-          if (typeof instruction === 'string') {
-            return updatedText;
-          } else {
-            return {
-              ...instruction,
-              text: updatedText,
-              step: updatedText,
-            };
-          }
-        });
+          },
+        );
       } else if (typeof instructions === 'string') {
         // Single string instruction
         let updatedText = instructions;
         updatedText = updatedText.replace(
           /voor\s+(\d+)\s+personen?/gi,
-          `voor ${newServings} personen`
+          `voor ${newServings} personen`,
         );
         updatedText = updatedText.replace(
           /(\d+)\s+personen?/g,
@@ -739,7 +770,7 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
               return `${newServings} personen`;
             }
             return match;
-          }
+          },
         );
         updatedAiAnalysis.instructions = updatedText;
       }
@@ -759,14 +790,14 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
     const { error: updateError } = await supabase
       .from(tableName)
       .update(updateData)
-      .eq("id", args.mealId)
-      .eq("user_id", user.id);
+      .eq('id', args.mealId)
+      .eq('user_id', user.id);
 
     if (updateError) {
       return {
         ok: false,
         error: {
-          code: "DB_ERROR",
+          code: 'DB_ERROR',
           message: updateError.message,
         },
       };
@@ -780,8 +811,8 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }
@@ -792,16 +823,16 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
  */
 export async function getMealByIdAction(
   mealId: string,
-  source: "custom" | "gemini"
+  source: 'custom' | 'gemini',
 ): Promise<ActionResult<CustomMealRecord | any>> {
   try {
     // Validate mealId
-    if (!mealId || mealId === "undefined" || mealId.trim() === "") {
+    if (!mealId || mealId === 'undefined' || mealId.trim() === '') {
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
-          message: "Recept ID is vereist",
+          code: 'VALIDATION_ERROR',
+          message: 'Recept ID is vereist',
         },
       };
     }
@@ -815,13 +846,13 @@ export async function getMealByIdAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om recepten te bekijken",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om recepten te bekijken',
         },
       };
     }
 
-    if (source === "custom") {
+    if (source === 'custom') {
       const service = new CustomMealsService();
       const meal = await service.getMealById(mealId, user.id);
 
@@ -829,18 +860,18 @@ export async function getMealByIdAction(
         return {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Recept niet gevonden",
+            code: 'VALIDATION_ERROR',
+            message: 'Recept niet gevonden',
           },
         };
       }
 
       // Get rating from meal_history if it exists
       const { data: ratingData } = await supabase
-        .from("meal_history")
-        .select("user_rating")
-        .eq("user_id", user.id)
-        .eq("meal_id", mealId)
+        .from('meal_history')
+        .select('user_rating')
+        .eq('user_id', user.id)
+        .eq('meal_id', mealId)
         .maybeSingle();
 
       // Get notes
@@ -851,15 +882,15 @@ export async function getMealByIdAction(
         userRating: ratingData?.user_rating || null,
         notes,
       };
-      
+
       // Debug logging for image URL
-      console.log("[getMealByIdAction] Custom meal loaded:", {
+      console.log('[getMealByIdAction] Custom meal loaded:', {
         id: meal.id,
         name: meal.name,
         sourceImageUrl: meal.sourceImageUrl,
         sourceImagePath: meal.sourceImagePath,
       });
-      
+
       return {
         ok: true,
         data: mealData,
@@ -867,17 +898,17 @@ export async function getMealByIdAction(
     } else {
       // Get from meal_history
       const { data, error } = await supabase
-        .from("meal_history")
-        .select("*")
-        .eq("id", mealId)
-        .eq("user_id", user.id)
+        .from('meal_history')
+        .select('*')
+        .eq('id', mealId)
+        .eq('user_id', user.id)
         .maybeSingle();
 
       if (error) {
         return {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: error.message,
           },
         };
@@ -887,8 +918,8 @@ export async function getMealByIdAction(
         return {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Recept niet gevonden",
+            code: 'VALIDATION_ERROR',
+            message: 'Recept niet gevonden',
           },
         };
       }
@@ -922,8 +953,8 @@ export async function getMealByIdAction(
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
     };
   }

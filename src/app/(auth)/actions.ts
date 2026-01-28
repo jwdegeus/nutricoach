@@ -1,32 +1,32 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { createClient } from '@/src/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 
 export async function signUp(formData: FormData) {
   const supabase = await createClient();
 
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-  const passwordConfirm = formData.get("passwordConfirm") as string;
+  const email = formData.get('email') as string;
+  const password = formData.get('password') as string;
+  const passwordConfirm = formData.get('passwordConfirm') as string;
 
   // Validation
   if (!email || !password || !passwordConfirm) {
     return {
-      error: "Alle velden zijn verplicht",
+      error: 'Alle velden zijn verplicht',
     };
   }
 
   if (password !== passwordConfirm) {
     return {
-      error: "Wachtwoorden komen niet overeen",
+      error: 'Wachtwoorden komen niet overeen',
     };
   }
 
   if (password.length < 6) {
     return {
-      error: "Wachtwoord moet minimaal 6 tekens lang zijn",
+      error: 'Wachtwoord moet minimaal 6 tekens lang zijn',
     };
   }
 
@@ -34,7 +34,7 @@ export async function signUp(formData: FormData) {
     email,
     password,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/callback`,
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`,
     },
   });
 
@@ -46,20 +46,20 @@ export async function signUp(formData: FormData) {
 
   return {
     success: true,
-    message: "Controleer je e-mail om je account te bevestigen",
+    message: 'Controleer je e-mail om je account te bevestigen',
   };
 }
 
 export async function signIn(formData: FormData) {
   const supabase = await createClient();
 
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-  const redirectTo = formData.get("redirect") as string | null;
+  const email = formData.get('email') as string;
+  const password = formData.get('password') as string;
+  const redirectTo = formData.get('redirect') as string | null;
 
   if (!email || !password) {
     return {
-      error: "E-mail en wachtwoord zijn verplicht",
+      error: 'E-mail en wachtwoord zijn verplicht',
     };
   }
 
@@ -81,39 +81,39 @@ export async function signIn(formData: FormData) {
 
   if (user) {
     const { data: preferences } = await supabase
-      .from("user_preferences")
-      .select("onboarding_completed")
-      .eq("user_id", user.id)
+      .from('user_preferences')
+      .select('onboarding_completed')
+      .eq('user_id', user.id)
       .maybeSingle();
 
     // If onboarding not completed, redirect to onboarding
     // Otherwise use redirectTo or default to dashboard
     const finalRedirect = preferences?.onboarding_completed
-      ? redirectTo || "/dashboard"
-      : "/onboarding";
+      ? redirectTo || '/dashboard'
+      : '/onboarding';
 
-    revalidatePath("/", "layout");
+    revalidatePath('/', 'layout');
     redirect(finalRedirect);
   } else {
     // Fallback (shouldn't happen after successful login)
-    revalidatePath("/", "layout");
-    redirect(redirectTo || "/dashboard");
+    revalidatePath('/', 'layout');
+    redirect(redirectTo || '/dashboard');
   }
 }
 
 export async function resetPassword(formData: FormData) {
   const supabase = await createClient();
 
-  const email = formData.get("email") as string;
+  const email = formData.get('email') as string;
 
   if (!email) {
     return {
-      error: "E-mail is verplicht",
+      error: 'E-mail is verplicht',
     };
   }
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/reset-password/confirm`,
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/reset-password/confirm`,
   });
 
   if (error) {
@@ -124,31 +124,31 @@ export async function resetPassword(formData: FormData) {
 
   return {
     success: true,
-    message: "Controleer je e-mail voor de wachtwoord reset link",
+    message: 'Controleer je e-mail voor de wachtwoord reset link',
   };
 }
 
 export async function updatePassword(formData: FormData) {
   const supabase = await createClient();
 
-  const password = formData.get("password") as string;
-  const passwordConfirm = formData.get("passwordConfirm") as string;
+  const password = formData.get('password') as string;
+  const passwordConfirm = formData.get('passwordConfirm') as string;
 
   if (!password || !passwordConfirm) {
     return {
-      error: "Alle velden zijn verplicht",
+      error: 'Alle velden zijn verplicht',
     };
   }
 
   if (password !== passwordConfirm) {
     return {
-      error: "Wachtwoorden komen niet overeen",
+      error: 'Wachtwoorden komen niet overeen',
     };
   }
 
   if (password.length < 6) {
     return {
-      error: "Wachtwoord moet minimaal 6 tekens lang zijn",
+      error: 'Wachtwoord moet minimaal 6 tekens lang zijn',
     };
   }
 
@@ -162,13 +162,13 @@ export async function updatePassword(formData: FormData) {
     };
   }
 
-  revalidatePath("/", "layout");
-  redirect("/dashboard");
+  revalidatePath('/', 'layout');
+  redirect('/dashboard');
 }
 
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  revalidatePath("/", "layout");
-  redirect("/login");
+  revalidatePath('/', 'layout');
+  redirect('/login');
 }

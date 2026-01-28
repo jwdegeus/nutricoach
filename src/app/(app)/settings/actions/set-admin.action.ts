@@ -1,7 +1,7 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { revalidatePath } from "next/cache";
+import { createClient } from '@/src/lib/supabase/server';
+import { revalidatePath } from 'next/cache';
 
 /**
  * Set the current user as admin
@@ -18,18 +18,18 @@ export async function setCurrentUserAsAdmin(): Promise<{
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { error: "Je moet ingelogd zijn" };
+    return { error: 'Je moet ingelogd zijn' };
   }
 
   // Check if there are any existing admins
   const { data: existingAdmins, error: checkError } = await supabase
-    .from("user_roles")
-    .select("user_id")
-    .eq("role", "admin")
+    .from('user_roles')
+    .select('user_id')
+    .eq('role', 'admin')
     .limit(1);
 
   if (checkError) {
-    console.error("Error checking existing admins:", checkError);
+    console.error('Error checking existing admins:', checkError);
     return { error: `Fout bij controleren admins: ${checkError.message}` };
   }
 
@@ -38,40 +38,38 @@ export async function setCurrentUserAsAdmin(): Promise<{
   if (existingAdmins && existingAdmins.length > 0) {
     return {
       error:
-        "Er bestaan al admins. Gebruik SQL om een gebruiker admin te maken. Zie de migratie bestanden voor voorbeelden.",
+        'Er bestaan al admins. Gebruik SQL om een gebruiker admin te maken. Zie de migratie bestanden voor voorbeelden.',
     };
   }
 
   // Check if user already has admin role
   const { data: existingRole } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", user.id)
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
     .maybeSingle();
 
   // If user already has admin role, return success
-  if (existingRole?.role === "admin") {
+  if (existingRole?.role === 'admin') {
     return { success: true };
   }
 
   // Upsert the admin role (only works if no admins exist yet)
-  const { error } = await supabase
-    .from("user_roles")
-    .upsert(
-      {
-        user_id: user.id,
-        role: "admin",
-      },
-      {
-        onConflict: "user_id",
-      }
-    );
+  const { error } = await supabase.from('user_roles').upsert(
+    {
+      user_id: user.id,
+      role: 'admin',
+    },
+    {
+      onConflict: 'user_id',
+    },
+  );
 
   if (error) {
-    console.error("Error setting admin role:", error);
+    console.error('Error setting admin role:', error);
     return { error: `Fout bij instellen admin rol: ${error.message}` };
   }
 
-  revalidatePath("/settings");
+  revalidatePath('/settings');
   return { success: true };
 }

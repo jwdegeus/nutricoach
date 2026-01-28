@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   Table,
@@ -7,12 +7,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/catalyst/table";
-import { Button } from "@/components/catalyst/button";
-import { Heading } from "@/components/catalyst/heading";
-import { Text } from "@/components/catalyst/text";
-import type { MealPlanRecord } from "@/src/lib/meal-plans/mealPlans.types";
-import { Eye, Calendar } from "lucide-react";
+} from '@/components/catalyst/table';
+import { Button } from '@/components/catalyst/button';
+import { Heading } from '@/components/catalyst/heading';
+import { Text } from '@/components/catalyst/text';
+import type { MealPlanRecord } from '@/src/lib/meal-plans/mealPlans.types';
+import { Eye, Calendar } from 'lucide-react';
 
 type MealPlansTableProps = {
   plans: MealPlanRecord[];
@@ -53,21 +53,19 @@ export function MealPlansTable({ plans }: MealPlansTableProps) {
           <TableBody>
             {plans.map((plan) => {
               const createdDate = new Date(plan.createdAt);
-              const formattedDate = createdDate.toLocaleDateString("nl-NL", {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
+              const formattedDate = createdDate.toLocaleDateString('nl-NL', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
               });
 
               return (
                 <TableRow key={plan.id}>
-                  <TableCell className="font-medium">
-                    {plan.dateFrom}
-                  </TableCell>
+                  <TableCell className="font-medium">{plan.dateFrom}</TableCell>
                   <TableCell>{plan.days} dagen</TableCell>
                   <TableCell>
                     <span className="capitalize">
-                      {plan.dietKey.replace(/_/g, " ")}
+                      {plan.dietKey.replace(/_/g, ' ')}
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
@@ -75,10 +73,7 @@ export function MealPlansTable({ plans }: MealPlansTableProps) {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button
-                        outline
-                        href={`/meal-plans/${plan.id}`}
-                      >
+                      <Button outline href={`/meal-plans/${plan.id}`}>
                         <Eye className="h-4 w-4 mr-1" />
                         Details
                       </Button>

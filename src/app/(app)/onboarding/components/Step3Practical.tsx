@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { Select } from "@/components/catalyst/select";
+import { Select } from '@/components/catalyst/select';
 
 interface Step3PracticalProps {
   maxPrepMinutes: number;
@@ -10,10 +10,10 @@ interface Step3PracticalProps {
 }
 
 const PREP_TIME_OPTIONS = [
-  { value: 15, label: "15 minuten" },
-  { value: 30, label: "30 minuten" },
-  { value: 45, label: "45 minuten" },
-  { value: 60, label: "60 minuten" },
+  { value: 15, label: '15 minuten' },
+  { value: 30, label: '30 minuten' },
+  { value: 45, label: '45 minuten' },
+  { value: 60, label: '60 minuten' },
 ];
 
 const SERVINGS_OPTIONS = Array.from({ length: 6 }, (_, i) => i + 1);
@@ -33,8 +33,8 @@ export function Step3Practical({
         </h2>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
           {/* TODO: i18n key: onboarding.step3.description */}
-          Vertel ons over je kookvoorkeuren en hoeveel porties je meestal
-          nodig hebt.
+          Vertel ons over je kookvoorkeuren en hoeveel porties je meestal nodig
+          hebt.
         </p>
       </div>
 
@@ -84,7 +84,7 @@ export function Step3Practical({
           >
             {SERVINGS_OPTIONS.map((servings) => (
               <option key={servings} value={servings.toString()}>
-                {servings} {servings === 1 ? "portie" : "porties"}
+                {servings} {servings === 1 ? 'portie' : 'porties'}
               </option>
             ))}
           </Select>

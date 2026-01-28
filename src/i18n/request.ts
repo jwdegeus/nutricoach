@@ -10,15 +10,17 @@ export default getRequestConfig(async ({ requestLocale }) => {
   if (!locale) {
     try {
       const supabase = await createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       if (user) {
         const { data: preferences } = await supabase
           .from('user_preferences')
           .select('language')
           .eq('user_id', user.id)
           .maybeSingle();
-        
+
         if (preferences?.language) {
           locale = preferences.language;
         }
@@ -47,7 +49,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
   }
 
   // Default timeZone to avoid ENVIRONMENT_FALLBACK and server/client markup mismatches
-  const timeZone = process.env.NEXT_PUBLIC_TIMEZONE ?? "Europe/Amsterdam";
+  const timeZone = process.env.NEXT_PUBLIC_TIMEZONE ?? 'Europe/Amsterdam';
 
   return {
     locale,

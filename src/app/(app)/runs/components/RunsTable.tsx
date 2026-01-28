@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Table,
   TableBody,
@@ -9,15 +9,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/catalyst/table";
-import { Heading } from "@/components/catalyst/heading";
-import { Text } from "@/components/catalyst/text";
-import { Badge } from "@/components/catalyst/badge";
-import { Button } from "@/components/catalyst/button";
-import { ConfirmDialog } from "@/components/catalyst/confirm-dialog";
-import { cancelRunAction, deleteRunAction } from "../actions/runs.actions";
-import type { MealPlanRunRecord } from "../actions/runs.actions";
-import { X, Trash2 } from "lucide-react";
+} from '@/components/catalyst/table';
+import { Heading } from '@/components/catalyst/heading';
+import { Text } from '@/components/catalyst/text';
+import { Badge } from '@/components/catalyst/badge';
+import { Button } from '@/components/catalyst/button';
+import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
+import { cancelRunAction, deleteRunAction } from '../actions/runs.actions';
+import type { MealPlanRunRecord } from '../actions/runs.actions';
+import { X, Trash2 } from 'lucide-react';
 
 type RunsTableProps = {
   runs: MealPlanRunRecord[];
@@ -29,7 +29,7 @@ type RunRowProps = {
   formatDuration: (ms: number) => string;
   formatRunningDuration: (ms: number) => string;
   calculateRunningDuration: (createdAt: string) => number;
-  getStatusBadgeColor: (status: string) => "green" | "yellow" | "red" | "zinc";
+  getStatusBadgeColor: (status: string) => 'green' | 'yellow' | 'red' | 'zinc';
   getRunTypeLabel: (runType: string) => string;
   isStuck: (run: MealPlanRunRecord) => boolean;
   onAction: () => void;
@@ -52,9 +52,8 @@ function RunRow({
 }: RunRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const runningDuration = run.status === "running" 
-    ? calculateRunningDuration(run.createdAt)
-    : null;
+  const runningDuration =
+    run.status === 'running' ? calculateRunningDuration(run.createdAt) : null;
   const stuck = isStuck(run);
 
   const handleCancel = () => {
@@ -76,9 +75,7 @@ function RunRow({
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-2">
-            <Badge color={getStatusBadgeColor(run.status)}>
-              {run.status}
-            </Badge>
+            <Badge color={getStatusBadgeColor(run.status)}>{run.status}</Badge>
             {stuck && (
               <Badge color="red" className="text-xs">
                 Mogelijk vastgelopen
@@ -91,11 +88,9 @@ function RunRow({
             )}
           </div>
         </TableCell>
-        <TableCell className="font-mono text-xs">
-          {run.model}
-        </TableCell>
+        <TableCell className="font-mono text-xs">{run.model}</TableCell>
         <TableCell>
-          {run.status === "running" && runningDuration !== null
+          {run.status === 'running' && runningDuration !== null
             ? formatRunningDuration(runningDuration)
             : formatDuration(run.durationMs)}
         </TableCell>
@@ -110,16 +105,16 @@ function RunRow({
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-2">
-            {(run.errorMessage || run.status === "running" || stuck) && (
+            {(run.errorMessage || run.status === 'running' || stuck) && (
               <Button
                 plain
                 onClick={() => setExpanded(!expanded)}
                 className="text-xs"
               >
-                {expanded ? "Verberg" : "Details"}
+                {expanded ? 'Verberg' : 'Details'}
               </Button>
             )}
-            {run.status === "running" && (
+            {run.status === 'running' && (
               <Button
                 plain
                 onClick={handleCancel}
@@ -144,17 +139,19 @@ function RunRow({
         <TableRow>
           <TableCell colSpan={7} className="bg-zinc-50 dark:bg-zinc-900/50">
             <div className="space-y-2 py-2">
-              {run.status === "running" && runningDuration !== null && (
+              {run.status === 'running' && runningDuration !== null && (
                 <div>
                   <Text className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
                     Looptijd:
                   </Text>
                   <Text className="text-xs text-zinc-600 dark:text-zinc-400 ml-2">
-                    {formatRunningDuration(runningDuration)} (sinds {formatDate(run.createdAt)})
+                    {formatRunningDuration(runningDuration)} (sinds{' '}
+                    {formatDate(run.createdAt)})
                   </Text>
                   {stuck && (
                     <Text className="text-xs text-red-600 dark:text-red-400 ml-2">
-                      ⚠️ Deze run loopt al langer dan 5 minuten en kan vastgelopen zijn.
+                      ⚠️ Deze run loopt al langer dan 5 minuten en kan
+                      vastgelopen zijn.
                     </Text>
                   )}
                 </div>
@@ -254,12 +251,12 @@ export function RunsTable({ runs }: RunsTableProps) {
       const result = await deleteRunAction(runId);
       if (result.ok) {
         // Small delay to ensure database is updated
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
         router.refresh();
         handleAction();
       } else {
         // Show error to user
-        console.error("Delete failed:", result.error);
+        console.error('Delete failed:', result.error);
         alert(`Fout bij verwijderen: ${result.error.message}`);
       }
     });
@@ -279,7 +276,7 @@ export function RunsTable({ runs }: RunsTableProps) {
   }
 
   const formatDuration = (ms: number): string => {
-    if (ms === 0) return "0ms";
+    if (ms === 0) return '0ms';
     if (ms < 1000) return `${ms}ms`;
     const seconds = Math.floor(ms / 1000);
     if (seconds < 60) return `${seconds}s`;
@@ -290,38 +287,38 @@ export function RunsTable({ runs }: RunsTableProps) {
 
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
-    return date.toLocaleString("nl-NL", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+    return date.toLocaleString('nl-NL', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   };
 
   const getStatusBadgeColor = (
-    status: string
-  ): "green" | "yellow" | "red" | "zinc" => {
+    status: string,
+  ): 'green' | 'yellow' | 'red' | 'zinc' => {
     switch (status) {
-      case "success":
-        return "green";
-      case "running":
-        return "yellow";
-      case "error":
-        return "red";
+      case 'success':
+        return 'green';
+      case 'running':
+        return 'yellow';
+      case 'error':
+        return 'red';
       default:
-        return "zinc";
+        return 'zinc';
     }
   };
 
   const getRunTypeLabel = (runType: string): string => {
     switch (runType) {
-      case "generate":
-        return "Generate";
-      case "regenerate":
-        return "Regenerate";
-      case "enrich":
-        return "Enrich";
+      case 'generate':
+        return 'Generate';
+      case 'regenerate':
+        return 'Regenerate';
+      case 'enrich':
+        return 'Enrich';
       default:
         return runType;
     }
@@ -345,7 +342,7 @@ export function RunsTable({ runs }: RunsTableProps) {
   };
 
   const isStuck = (run: MealPlanRunRecord): boolean => {
-    if (run.status !== "running") return false;
+    if (run.status !== 'running') return false;
     const runningDuration = calculateRunningDuration(run.createdAt);
     // Consider stuck if running for more than 5 minutes
     return runningDuration > 5 * 60 * 1000;
@@ -378,39 +375,39 @@ export function RunsTable({ runs }: RunsTableProps) {
       <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
         <Heading>Meal Plan Runs ({runs.length})</Heading>
         <div className="mt-4">
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeader>Datum</TableHeader>
-              <TableHeader>Type</TableHeader>
-              <TableHeader>Status</TableHeader>
-              <TableHeader>Model</TableHeader>
-              <TableHeader>Duur</TableHeader>
-              <TableHeader>Error Code</TableHeader>
-              <TableHeader>Acties</TableHeader>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {runs.map((run) => (
-              <RunRow
-                key={run.id}
-                run={run}
-                formatDate={formatDate}
-                formatDuration={formatDuration}
-                formatRunningDuration={formatRunningDuration}
-                calculateRunningDuration={calculateRunningDuration}
-                getStatusBadgeColor={getStatusBadgeColor}
-                getRunTypeLabel={getRunTypeLabel}
-                isStuck={isStuck}
-                onAction={handleAction}
-                onCancel={handleCancel}
-                onDelete={handleDelete}
-              />
-            ))}
-          </TableBody>
-        </Table>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableHeader>Datum</TableHeader>
+                <TableHeader>Type</TableHeader>
+                <TableHeader>Status</TableHeader>
+                <TableHeader>Model</TableHeader>
+                <TableHeader>Duur</TableHeader>
+                <TableHeader>Error Code</TableHeader>
+                <TableHeader>Acties</TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {runs.map((run) => (
+                <RunRow
+                  key={run.id}
+                  run={run}
+                  formatDate={formatDate}
+                  formatDuration={formatDuration}
+                  formatRunningDuration={formatRunningDuration}
+                  calculateRunningDuration={calculateRunningDuration}
+                  getStatusBadgeColor={getStatusBadgeColor}
+                  getRunTypeLabel={getRunTypeLabel}
+                  isStuck={isStuck}
+                  onAction={handleAction}
+                  onCancel={handleCancel}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
-    </div>
     </>
   );
 }

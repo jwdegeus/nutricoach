@@ -1,16 +1,16 @@
 /**
  * Repair Prompt Builder
- * 
+ *
  * Builds prompts for repairing malformed or invalid meal plan outputs
  * from the Gemini API.
  */
 
 /**
  * Build a repair prompt for fixing meal plan generation issues
- * 
+ *
  * Creates a prompt that instructs Gemini to repair a malformed or
  * invalid JSON output while maintaining schema compliance and hard constraints.
- * 
+ *
  * @param args - Repair prompt arguments
  * @param args.originalPrompt - The original prompt that was used
  * @param args.badOutput - The malformed or invalid output (raw text or stringified JSON)

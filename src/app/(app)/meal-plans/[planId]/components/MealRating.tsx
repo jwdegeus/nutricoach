@@ -1,10 +1,11 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Star } from "lucide-react";
-import { rateMealAction, getMealRatingAction } from "@/src/app/(app)/meal-plans/actions/mealRating.actions";
-import { Button } from "@/components/catalyst/button";
-
+import { useState, useEffect } from 'react';
+import { Star } from 'lucide-react';
+import {
+  rateMealAction,
+  getMealRatingAction,
+} from '@/src/app/(app)/meal-plans/actions/mealRating.actions';
 type MealRatingProps = {
   mealId: string;
   className?: string;
@@ -27,7 +28,7 @@ export function MealRating({ mealId, className }: MealRatingProps) {
           setRating(result.rating);
         }
       } catch (err) {
-        console.error("Error loading rating:", err);
+        console.error('Error loading rating:', err);
       } finally {
         setIsLoading(false);
       }
@@ -50,7 +51,7 @@ export function MealRating({ mealId, className }: MealRatingProps) {
         setError(result.error);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fout bij opslaan");
+      setError(err instanceof Error ? err.message : 'Fout bij opslaan');
     } finally {
       setIsSubmitting(false);
     }
@@ -58,7 +59,7 @@ export function MealRating({ mealId, className }: MealRatingProps) {
 
   if (isLoading) {
     return (
-      <div className={`flex items-center gap-1 ${className || ""}`}>
+      <div className={`flex items-center gap-1 ${className || ''}`}>
         <div className="flex gap-0.5">
           {[1, 2, 3, 4, 5].map((star) => (
             <Star
@@ -75,7 +76,7 @@ export function MealRating({ mealId, className }: MealRatingProps) {
   const displayRating = hoveredRating ?? rating ?? 0;
 
   return (
-    <div className={`flex flex-col gap-1 ${className || ""}`}>
+    <div className={`flex flex-col gap-1 ${className || ''}`}>
       <div className="flex items-center gap-1">
         <div className="flex gap-0.5">
           {[1, 2, 3, 4, 5].map((star) => (
@@ -87,17 +88,17 @@ export function MealRating({ mealId, className }: MealRatingProps) {
               onMouseLeave={() => setHoveredRating(null)}
               disabled={isSubmitting}
               className="focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
-              aria-label={`Beoordeel met ${star} ${star === 1 ? "ster" : "sterren"}`}
+              aria-label={`Beoordeel met ${star} ${star === 1 ? 'ster' : 'sterren'}`}
             >
               <Star
                 className={`h-4 w-4 transition-colors ${
                   star <= displayRating
-                    ? "text-yellow-400 fill-yellow-400"
-                    : "text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700"
+                    ? 'text-yellow-400 fill-yellow-400'
+                    : 'text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700'
                 } ${
                   isSubmitting
-                    ? "opacity-50 cursor-not-allowed"
-                    : "cursor-pointer hover:text-yellow-300 hover:fill-yellow-300"
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'cursor-pointer hover:text-yellow-300 hover:fill-yellow-300'
                 }`}
               />
             </button>

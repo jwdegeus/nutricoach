@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import { useState, useCallback, useEffect } from "react";
-import { Input } from "@/components/catalyst/input";
-import { Button } from "@/components/catalyst/button";
-import { searchNevoFoodsAction } from "../actions/pantry-ui.actions";
-import { upsertUserPantryItemAction } from "../actions/pantry-ui.actions";
-import { useRouter } from "next/navigation";
-import { Loader2, Plus } from "lucide-react";
+import { useState, useCallback, useEffect } from 'react';
+import { Input } from '@/components/catalyst/input';
+import { Button } from '@/components/catalyst/button';
+import { searchNevoFoodsAction } from '../actions/pantry-ui.actions';
+import { upsertUserPantryItemAction } from '../actions/pantry-ui.actions';
+import { useRouter } from 'next/navigation';
+import { Loader2, Plus } from 'lucide-react';
 
 type NevoFoodResult = {
   nevoCode: string;
@@ -14,7 +14,7 @@ type NevoFoodResult = {
 };
 
 export function PantrySearchAdd() {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   const [results, setResults] = useState<NevoFoodResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isAdding, setIsAdding] = useState<string | null>(null);
@@ -36,7 +36,7 @@ export function PantrySearchAdd() {
         setResults(result.data);
       } else {
         setResults([]);
-        console.error("Search error:", result.error);
+        console.error('Search error:', result.error);
       }
     }, 300);
 
@@ -57,17 +57,17 @@ export function PantrySearchAdd() {
           // Refresh page to show new item
           router.refresh();
           // Clear search
-          setQuery("");
+          setQuery('');
           setResults([]);
         } else {
-          console.error("Error adding item:", result.error);
+          console.error('Error adding item:', result.error);
           alert(`Fout bij toevoegen: ${result.error.message}`);
         }
       } finally {
         setIsAdding(null);
       }
     },
-    [router]
+    [router],
   );
 
   return (

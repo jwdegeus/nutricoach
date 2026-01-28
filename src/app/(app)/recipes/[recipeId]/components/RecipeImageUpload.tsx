@@ -1,15 +1,15 @@
-"use client";
+'use client';
 
-import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/catalyst/button";
-import { ConfirmDialog } from "@/components/catalyst/confirm-dialog";
-import { Text } from "@/components/catalyst/text";
-import { PhotoIcon, TrashIcon } from "@heroicons/react/20/solid";
-import { ImageLightbox } from "./ImageLightbox";
+import { useState, useRef, useEffect } from 'react';
+import { Button } from '@/components/catalyst/button';
+import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
+import { Text } from '@/components/catalyst/text';
+import { PhotoIcon, TrashIcon } from '@heroicons/react/20/solid';
+import { ImageLightbox } from './ImageLightbox';
 
 type RecipeImageUploadProps = {
   mealId: string;
-  source: "custom" | "gemini";
+  source: 'custom' | 'gemini';
   currentImageUrl: string | null;
   onImageUploaded: (imageUrl: string) => void;
   onImageRemoved?: () => void;
@@ -35,38 +35,44 @@ export function RecipeImageUpload({
 
   // Update previewUrl when currentImageUrl changes
   useEffect(() => {
-    console.log("[RecipeImageUpload] currentImageUrl changed:", { 
-      mealId, 
-      currentImageUrl, 
+    console.log('[RecipeImageUpload] currentImageUrl changed:', {
+      mealId,
+      currentImageUrl,
       currentImageUrlType: typeof currentImageUrl,
       currentImageUrlString: String(currentImageUrl),
-      previous: previewUrl 
+      previous: previewUrl,
     });
     // Ensure we use the string value, not an object
-    const imageUrlString = currentImageUrl && typeof currentImageUrl === 'string' 
-      ? currentImageUrl.trim() 
-      : currentImageUrl 
-        ? String(currentImageUrl).trim() 
-        : null;
-    
+    const imageUrlString =
+      currentImageUrl && typeof currentImageUrl === 'string'
+        ? currentImageUrl.trim()
+        : currentImageUrl
+          ? String(currentImageUrl).trim()
+          : null;
+
     // Validate and normalize URL format
     if (imageUrlString) {
       try {
         // Check if it's a valid URL (absolute) or a valid path (relative)
-        const isAbsoluteUrl = imageUrlString.startsWith('http://') || imageUrlString.startsWith('https://');
+        const isAbsoluteUrl =
+          imageUrlString.startsWith('http://') ||
+          imageUrlString.startsWith('https://');
         const isDataUrl = imageUrlString.startsWith('data:');
         const isRelativePath = imageUrlString.startsWith('/');
-        
+
         if (!isAbsoluteUrl && !isDataUrl && !isRelativePath) {
-          console.warn("[RecipeImageUpload] Invalid image URL format:", imageUrlString);
+          console.warn(
+            '[RecipeImageUpload] Invalid image URL format:',
+            imageUrlString,
+          );
           setImageLoadError(true);
           setPreviewUrl(null);
           return;
         }
-        
+
         // Filter out tracking pixels and other non-image URLs
         const lowerUrl = imageUrlString.toLowerCase();
-        const isTrackingPixel = 
+        const isTrackingPixel =
           lowerUrl.includes('facebook.com/tr') ||
           lowerUrl.includes('google-analytics.com') ||
           lowerUrl.includes('googletagmanager.com') ||
@@ -77,33 +83,37 @@ export function RecipeImageUpload({
           lowerUrl.includes('beacon') ||
           lowerUrl.includes('noscript') ||
           lowerUrl.includes('amp;') || // HTML entities in URL (like &amp;)
-          (lowerUrl.includes('?') && !lowerUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i)); // Query params without image extension
-        
+          (lowerUrl.includes('?') &&
+            !lowerUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i)); // Query params without image extension
+
         if (isTrackingPixel) {
-          console.warn("[RecipeImageUpload] Filtered out tracking pixel or non-image URL:", imageUrlString);
+          console.warn(
+            '[RecipeImageUpload] Filtered out tracking pixel or non-image URL:',
+            imageUrlString,
+          );
           setImageLoadError(true);
           setPreviewUrl(null);
           return;
         }
-        
+
         // For relative paths, ensure they're properly formatted
         // (they should already be correct from storage service, but double-check)
         let normalizedUrl = imageUrlString;
         if (isRelativePath && !normalizedUrl.startsWith('/')) {
           normalizedUrl = `/${normalizedUrl}`;
         }
-        
-        console.log("[RecipeImageUpload] Setting preview URL:", {
+
+        console.log('[RecipeImageUpload] Setting preview URL:', {
           original: imageUrlString,
           normalized: normalizedUrl,
           isAbsoluteUrl,
           isDataUrl,
           isRelativePath,
         });
-        
+
         setPreviewUrl(normalizedUrl);
       } catch (e) {
-        console.warn("[RecipeImageUpload] Error validating URL:", e);
+        console.warn('[RecipeImageUpload] Error validating URL:', e);
         setImageLoadError(true);
         setPreviewUrl(null);
         return;
@@ -111,23 +121,25 @@ export function RecipeImageUpload({
     } else {
       setPreviewUrl(null);
     }
-    
+
     setImageLoadError(false); // Reset error state when URL changes
   }, [currentImageUrl, mealId]);
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     // Validate file type
-    if (!file.type.startsWith("image/")) {
-      setError("Alleen afbeeldingen zijn toegestaan");
+    if (!file.type.startsWith('image/')) {
+      setError('Alleen afbeeldingen zijn toegestaan');
       return;
     }
 
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      setError("Afbeelding is te groot (max 10MB)");
+      setError('Afbeelding is te groot (max 10MB)');
       return;
     }
 
@@ -139,10 +151,10 @@ export function RecipeImageUpload({
       const base64 = await fileToBase64(file);
 
       // Upload via action
-      const response = await fetch("/api/recipes/upload-image", {
-        method: "POST",
+      const response = await fetch('/api/recipes/upload-image', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           mealId,
@@ -155,7 +167,7 @@ export function RecipeImageUpload({
       const result = await response.json();
 
       if (!result.ok) {
-        throw new Error(result.error?.message || "Upload mislukt");
+        throw new Error(result.error?.message || 'Upload mislukt');
       }
 
       // Update preview
@@ -163,12 +175,12 @@ export function RecipeImageUpload({
       setImageLoadError(false); // Reset error state on successful upload
       onImageUploaded(result.data.url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload mislukt");
+      setError(err instanceof Error ? err.message : 'Upload mislukt');
     } finally {
       setIsUploading(false);
       // Reset file input
       if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+        fileInputRef.current.value = '';
       }
     }
   };
@@ -183,10 +195,10 @@ export function RecipeImageUpload({
     setDeleteDialogOpen(false);
 
     try {
-      const response = await fetch("/api/recipes/delete-image", {
-        method: "POST",
+      const response = await fetch('/api/recipes/delete-image', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           mealId,
@@ -197,7 +209,7 @@ export function RecipeImageUpload({
       const result = await response.json();
 
       if (!result.ok) {
-        throw new Error(result.error?.message || "Verwijderen mislukt");
+        throw new Error(result.error?.message || 'Verwijderen mislukt');
       }
 
       // Clear preview
@@ -207,7 +219,7 @@ export function RecipeImageUpload({
         onImageRemoved();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Verwijderen mislukt");
+      setError(err instanceof Error ? err.message : 'Verwijderen mislukt');
     } finally {
       setIsDeleting(false);
     }
@@ -274,7 +286,7 @@ export function RecipeImageUpload({
                     errorType: e.type || 'unknown',
                     timestamp: new Date().toISOString(),
                   };
-                  
+
                   // Try to get more info from the event
                   try {
                     if ('message' in e) {
@@ -283,22 +295,28 @@ export function RecipeImageUpload({
                     if ('error' in e) {
                       errorInfo.error = String((e as any).error);
                     }
-                  } catch (err) {
+                  } catch (_err) {
                     // Ignore errors when extracting event properties
                   }
-                  
+
                   // Log with explicit stringification to avoid serialization issues
-                  console.error("[RecipeImageUpload] Image failed to load:", JSON.stringify(errorInfo, null, 2));
-                  console.error("[RecipeImageUpload] Raw error event:", e);
-                  console.error("[RecipeImageUpload] Image element:", target);
-                  
+                  console.error(
+                    '[RecipeImageUpload] Image failed to load:',
+                    JSON.stringify(errorInfo, null, 2),
+                  );
+                  console.error('[RecipeImageUpload] Raw error event:', e);
+                  console.error('[RecipeImageUpload] Image element:', target);
+
                   setImageLoadError(true);
                 }}
                 onLoad={() => {
-                  console.log("[RecipeImageUpload] Image loaded successfully:", {
-                    mealId,
-                    imageUrl: previewUrl
-                  });
+                  console.log(
+                    '[RecipeImageUpload] Image loaded successfully:',
+                    {
+                      mealId,
+                      imageUrl: previewUrl,
+                    },
+                  );
                   setImageLoadError(false);
                 }}
               />
@@ -311,7 +329,9 @@ export function RecipeImageUpload({
                   </Text>
                   {previewUrl && (
                     <Text className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 break-all">
-                      {previewUrl.length > 50 ? `${previewUrl.substring(0, 50)}...` : previewUrl}
+                      {previewUrl.length > 50
+                        ? `${previewUrl.substring(0, 50)}...`
+                        : previewUrl}
                     </Text>
                   )}
                 </div>
@@ -337,17 +357,19 @@ export function RecipeImageUpload({
               Verwijderen
             </Button>
             {error && (
-              <span className="text-sm text-red-600 dark:text-red-400">{error}</span>
+              <span className="text-sm text-red-600 dark:text-red-400">
+                {error}
+              </span>
             )}
           </div>
-            {!imageLoadError && previewUrl && (
-              <ImageLightbox
-                open={lightboxOpen}
-                onClose={() => setLightboxOpen(false)}
-                imageUrl={previewUrl}
-                alt="Recept foto"
-              />
-            )}
+          {!imageLoadError && previewUrl && (
+            <ImageLightbox
+              open={lightboxOpen}
+              onClose={() => setLightboxOpen(false)}
+              imageUrl={previewUrl}
+              alt="Recept foto"
+            />
+          )}
           <ConfirmDialog
             open={deleteDialogOpen}
             onClose={() => setDeleteDialogOpen(false)}
@@ -369,11 +391,13 @@ export function RecipeImageUpload({
           >
             <PhotoIcon className="h-12 w-12 text-zinc-400 dark:text-zinc-500" />
             <span className="text-sm text-zinc-600 dark:text-zinc-400">
-              {isUploading ? "Uploaden..." : "Upload foto van eindresultaat"}
+              {isUploading ? 'Uploaden...' : 'Upload foto van eindresultaat'}
             </span>
           </button>
           {error && (
-            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+              {error}
+            </p>
           )}
         </div>
       )}

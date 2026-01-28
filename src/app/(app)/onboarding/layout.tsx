@@ -1,8 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: "Onboarding | NutriCoach",
-  description: "Stel je voorkeuren in voor NutriCoach",
+  title: 'Onboarding | NutriCoach',
+  description: 'Stel je voorkeuren in voor NutriCoach',
 };
 
 /**

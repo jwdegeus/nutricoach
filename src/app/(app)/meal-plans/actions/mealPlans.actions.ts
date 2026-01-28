@@ -1,17 +1,17 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { MealPlansService } from "@/src/lib/meal-plans/mealPlans.service";
-import { AppError } from "@/src/lib/errors/app-error";
+import { createClient } from '@/src/lib/supabase/server';
+import { MealPlansService } from '@/src/lib/meal-plans/mealPlans.service';
+import { AppError } from '@/src/lib/errors/app-error';
 import type {
   CreateMealPlanInput,
   RegenerateMealPlanInput,
   MealPlanRecord,
-} from "@/src/lib/meal-plans/mealPlans.types";
+} from '@/src/lib/meal-plans/mealPlans.types';
 import {
   createMealPlanInputSchema,
   regenerateMealPlanInputSchema,
-} from "@/src/lib/meal-plans/mealPlans.schemas";
+} from '@/src/lib/meal-plans/mealPlans.schemas';
 
 /**
  * Action result type
@@ -21,14 +21,28 @@ type ActionResult<T> =
   | {
       ok: false;
       error: {
-        code: "AUTH_ERROR" | "VALIDATION_ERROR" | "DB_ERROR" | "AGENT_ERROR" | "RATE_LIMIT" | "CONFLICT" | "GUARDRAILS_VIOLATION";
+        code:
+          | 'AUTH_ERROR'
+          | 'UNAUTHORIZED'
+          | 'VALIDATION_ERROR'
+          | 'DB_ERROR'
+          | 'AGENT_ERROR'
+          | 'RATE_LIMIT'
+          | 'CONFLICT'
+          | 'GUARDRAILS_VIOLATION'
+          | 'MEAL_LOCKED';
         message: string;
         details?: {
-          outcome: "blocked";
+          outcome: 'blocked';
           reasonCodes: string[];
           contentHash: string;
           rulesetVersion?: number;
-          forceDeficits?: Array<{ categoryCode: string; categoryNameNl: string; minPerDay?: number; minPerWeek?: number }>;
+          forceDeficits?: Array<{
+            categoryCode: string;
+            categoryNameNl: string;
+            minPerDay?: number;
+            minPerWeek?: number;
+          }>;
         };
       };
     };
@@ -37,7 +51,7 @@ type ActionResult<T> =
  * Create a new meal plan
  */
 export async function createMealPlanAction(
-  raw: unknown
+  raw: unknown,
 ): Promise<ActionResult<{ planId: string }>> {
   try {
     // Get authenticated user
@@ -50,8 +64,8 @@ export async function createMealPlanAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om een meal plan aan te maken",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om een meal plan aan te maken',
         },
       };
     }
@@ -64,11 +78,11 @@ export async function createMealPlanAction(
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
+          code: 'VALIDATION_ERROR',
           message:
             error instanceof Error
               ? error.message
-              : "Ongeldige input voor meal plan",
+              : 'Ongeldige input voor meal plan',
         },
       };
     }
@@ -96,14 +110,20 @@ export async function createMealPlanAction(
 
     // Fallback for other errors
     const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+      error instanceof Error ? error.message : 'Unknown error';
 
     // Determine error code
-    let code: "VALIDATION_ERROR" | "DB_ERROR" | "AGENT_ERROR" = "DB_ERROR";
-    if (errorMessage.includes("validation") || errorMessage.includes("Invalid")) {
-      code = "VALIDATION_ERROR";
-    } else if (errorMessage.includes("Gemini") || errorMessage.includes("agent")) {
-      code = "AGENT_ERROR";
+    let code: 'VALIDATION_ERROR' | 'DB_ERROR' | 'AGENT_ERROR' = 'DB_ERROR';
+    if (
+      errorMessage.includes('validation') ||
+      errorMessage.includes('Invalid')
+    ) {
+      code = 'VALIDATION_ERROR';
+    } else if (
+      errorMessage.includes('Gemini') ||
+      errorMessage.includes('agent')
+    ) {
+      code = 'AGENT_ERROR';
     }
 
     return {
@@ -120,7 +140,7 @@ export async function createMealPlanAction(
  * Regenerate a meal plan
  */
 export async function regenerateMealPlanAction(
-  raw: unknown
+  raw: unknown,
 ): Promise<ActionResult<{ planId: string }>> {
   try {
     // Get authenticated user
@@ -133,8 +153,8 @@ export async function regenerateMealPlanAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om een meal plan te regenereren",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om een meal plan te regenereren',
         },
       };
     }
@@ -147,11 +167,11 @@ export async function regenerateMealPlanAction(
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
+          code: 'VALIDATION_ERROR',
           message:
             error instanceof Error
               ? error.message
-              : "Ongeldige input voor regenerate",
+              : 'Ongeldige input voor regenerate',
         },
       };
     }
@@ -179,14 +199,20 @@ export async function regenerateMealPlanAction(
 
     // Fallback for other errors
     const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+      error instanceof Error ? error.message : 'Unknown error';
 
     // Determine error code
-    let code: "VALIDATION_ERROR" | "DB_ERROR" | "AGENT_ERROR" = "DB_ERROR";
-    if (errorMessage.includes("validation") || errorMessage.includes("Invalid")) {
-      code = "VALIDATION_ERROR";
-    } else if (errorMessage.includes("Gemini") || errorMessage.includes("agent")) {
-      code = "AGENT_ERROR";
+    let code: 'VALIDATION_ERROR' | 'DB_ERROR' | 'AGENT_ERROR' = 'DB_ERROR';
+    if (
+      errorMessage.includes('validation') ||
+      errorMessage.includes('Invalid')
+    ) {
+      code = 'VALIDATION_ERROR';
+    } else if (
+      errorMessage.includes('Gemini') ||
+      errorMessage.includes('agent')
+    ) {
+      code = 'AGENT_ERROR';
     }
 
     return {
@@ -203,7 +229,7 @@ export async function regenerateMealPlanAction(
  * List meal plans for current user
  */
 export async function listMealPlansAction(
-  limit: number = 20
+  limit: number = 20,
 ): Promise<ActionResult<MealPlanRecord[]>> {
   try {
     // Get authenticated user
@@ -216,8 +242,8 @@ export async function listMealPlansAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om meal plans op te halen",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om meal plans op te halen',
         },
       };
     }
@@ -234,11 +260,11 @@ export async function listMealPlansAction(
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
+        code: 'DB_ERROR',
         message:
           error instanceof Error
             ? error.message
-            : "Fout bij ophalen meal plans",
+            : 'Fout bij ophalen meal plans',
       },
     };
   }
@@ -248,7 +274,7 @@ export async function listMealPlansAction(
  * Load a specific meal plan
  */
 export async function loadMealPlanAction(
-  planId: string
+  planId: string,
 ): Promise<ActionResult<MealPlanRecord>> {
   try {
     // Get authenticated user
@@ -261,8 +287,8 @@ export async function loadMealPlanAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om een meal plan op te halen",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om een meal plan op te halen',
         },
       };
     }
@@ -279,11 +305,9 @@ export async function loadMealPlanAction(
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
+        code: 'DB_ERROR',
         message:
-          error instanceof Error
-            ? error.message
-            : "Fout bij ophalen meal plan",
+          error instanceof Error ? error.message : 'Fout bij ophalen meal plan',
       },
     };
   }
@@ -293,7 +317,7 @@ export async function loadMealPlanAction(
  * Delete a meal plan
  */
 export async function deleteMealPlanAction(
-  planId: string
+  planId: string,
 ): Promise<ActionResult<void>> {
   try {
     // Get authenticated user
@@ -306,8 +330,8 @@ export async function deleteMealPlanAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om een meal plan te verwijderen",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om een meal plan te verwijderen',
         },
       };
     }
@@ -336,11 +360,11 @@ export async function deleteMealPlanAction(
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
+        code: 'DB_ERROR',
         message:
           error instanceof Error
             ? error.message
-            : "Fout bij verwijderen meal plan",
+            : 'Fout bij verwijderen meal plan',
       },
     };
   }

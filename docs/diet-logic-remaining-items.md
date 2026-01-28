@@ -108,9 +108,9 @@ FORCE per dag evalueren betekent: per dag de **geëffectueerde** ingrediënten k
 
 ## Samenvatting
 
-| Punt | Eerste stap | Volgende stappen |
-|------|-------------|------------------|
+| Punt                               | Eerste stap                                            | Volgende stappen                                                                             |
+| ---------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
 | **Substitutie bij FORCE-deficits** | `forceDeficits` in GUARDRAILS_VIOLATION-payload zetten | UI “voeg toe: …” tonen; zoek/filter op categorie; optioneel retry met deficit-hint in prompt |
-| **Plan-chat per-dag Diet Logic** | Documenteer dat plan-chat batch-eval doet | Eventueel: `applyPlanEditDryRun` + per-dag evaluatie op resulting plan |
+| **Plan-chat per-dag Diet Logic**   | Documenteer dat plan-chat batch-eval doet              | Eventueel: `applyPlanEditDryRun` + per-dag evaluatie op resulting plan                       |
 
 Beide punten vragen vooral **productkeuzes** (wel/geen retry, wel/geen dry-run) en daarna technische invulling op de genoemde plekken.

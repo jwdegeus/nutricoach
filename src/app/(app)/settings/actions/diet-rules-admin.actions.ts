@@ -1,8 +1,8 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { isAdmin } from "@/src/lib/auth/roles";
-import type { ActionResult } from "@/src/lib/types";
+import { createClient } from '@/src/lib/supabase/server';
+import { isAdmin } from '@/src/lib/auth/roles';
+import type { ActionResult } from '@/src/lib/types';
 import type {
   DietRule,
   DietRuleType,
@@ -10,13 +10,17 @@ import type {
   RequireIngredientRule,
   MacroConstraintRule,
   MealStructureRule,
-} from "@/src/app/(app)/onboarding/types/diet-rules.types";
+} from '@/src/app/(app)/onboarding/types/diet-rules.types';
 
 export type DietRuleInput = {
   dietTypeId: string;
   ruleType: DietRuleType;
   ruleKey: string;
-  ruleValue: ExcludeIngredientRule | RequireIngredientRule | MacroConstraintRule | MealStructureRule;
+  ruleValue:
+    | ExcludeIngredientRule
+    | RequireIngredientRule
+    | MacroConstraintRule
+    | MealStructureRule;
   description: string | null;
   priority: number;
   isActive?: boolean;
@@ -30,25 +34,25 @@ export type DietRuleOutput = DietRule & {
  * Get all rules for a specific diet type (admin only)
  */
 export async function getDietRulesForAdmin(
-  dietTypeId: string
+  dietTypeId: string,
 ): Promise<ActionResult<DietRuleOutput[]>> {
   const admin = await isAdmin();
   if (!admin) {
-    return { error: "Geen toegang: alleen admins kunnen dieetregels zien" };
+    return { error: 'Geen toegang: alleen admins kunnen dieetregels zien' };
   }
 
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from("diet_rules")
-    .select("*")
-    .eq("diet_type_id", dietTypeId)
-    .order("priority", { ascending: false })
-    .order("rule_type", { ascending: true })
-    .order("rule_key", { ascending: true });
+    .from('diet_rules')
+    .select('*')
+    .eq('diet_type_id', dietTypeId)
+    .order('priority', { ascending: false })
+    .order('rule_type', { ascending: true })
+    .order('rule_key', { ascending: true });
 
   if (error) {
-    console.error("Error fetching diet rules:", error);
+    console.error('Error fetching diet rules:', error);
     return { error: `Fout bij ophalen dieetregels: ${error.message}` };
   }
 
@@ -71,32 +75,32 @@ export async function getDietRulesForAdmin(
  * Create a new diet rule (admin only)
  */
 export async function createDietRule(
-  input: DietRuleInput
+  input: DietRuleInput,
 ): Promise<ActionResult<DietRuleOutput>> {
   const admin = await isAdmin();
   if (!admin) {
-    return { error: "Geen toegang: alleen admins kunnen dieetregels aanmaken" };
+    return { error: 'Geen toegang: alleen admins kunnen dieetregels aanmaken' };
   }
 
   if (!input.dietTypeId || !input.ruleType || !input.ruleKey) {
-    return { error: "Dieettype ID, regeltype en regelkey zijn verplicht" };
+    return { error: 'Dieettype ID, regeltype en regelkey zijn verplicht' };
   }
 
   const supabase = await createClient();
 
   // Verify diet type exists
   const { data: dietType, error: dietError } = await supabase
-    .from("diet_types")
-    .select("id")
-    .eq("id", input.dietTypeId)
+    .from('diet_types')
+    .select('id')
+    .eq('id', input.dietTypeId)
     .single();
 
   if (dietError || !dietType) {
-    return { error: "Dieettype niet gevonden" };
+    return { error: 'Dieettype niet gevonden' };
   }
 
   const { data, error } = await supabase
-    .from("diet_rules")
+    .from('diet_rules')
     .insert({
       diet_type_id: input.dietTypeId,
       rule_type: input.ruleType,
@@ -106,15 +110,15 @@ export async function createDietRule(
       priority: input.priority,
       is_active: input.isActive ?? true,
     })
-    .select("*")
+    .select('*')
     .single();
 
   if (error) {
-    console.error("Error creating diet rule:", error);
+    console.error('Error creating diet rule:', error);
     // Check for unique constraint violation
-    if (error.code === "23505") {
+    if (error.code === '23505') {
       return {
-        error: "Een regel met dit type en key bestaat al voor dit dieettype",
+        error: 'Een regel met dit type en key bestaat al voor dit dieettype',
       };
     }
     return { error: `Fout bij aanmaken dieetregel: ${error.message}` };
@@ -139,11 +143,11 @@ export async function createDietRule(
  */
 export async function updateDietRule(
   id: string,
-  input: Partial<DietRuleInput>
+  input: Partial<DietRuleInput>,
 ): Promise<ActionResult<DietRuleOutput>> {
   const admin = await isAdmin();
   if (!admin) {
-    return { error: "Geen toegang: alleen admins kunnen dieetregels bewerken" };
+    return { error: 'Geen toegang: alleen admins kunnen dieetregels bewerken' };
   }
 
   const supabase = await createClient();
@@ -169,21 +173,21 @@ export async function updateDietRule(
   }
 
   if (Object.keys(updateData).length === 0) {
-    return { error: "Geen wijzigingen opgegeven" };
+    return { error: 'Geen wijzigingen opgegeven' };
   }
 
   const { data, error } = await supabase
-    .from("diet_rules")
+    .from('diet_rules')
     .update(updateData)
-    .eq("id", id)
-    .select("*")
+    .eq('id', id)
+    .select('*')
     .single();
 
   if (error) {
-    console.error("Error updating diet rule:", error);
-    if (error.code === "23505") {
+    console.error('Error updating diet rule:', error);
+    if (error.code === '23505') {
       return {
-        error: "Een regel met dit type en key bestaat al voor dit dieettype",
+        error: 'Een regel met dit type en key bestaat al voor dit dieettype',
       };
     }
     return { error: `Fout bij bijwerken dieetregel: ${error.message}` };
@@ -209,18 +213,20 @@ export async function updateDietRule(
 export async function deleteDietRule(id: string): Promise<ActionResult<void>> {
   const admin = await isAdmin();
   if (!admin) {
-    return { error: "Geen toegang: alleen admins kunnen dieetregels verwijderen" };
+    return {
+      error: 'Geen toegang: alleen admins kunnen dieetregels verwijderen',
+    };
   }
 
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from("diet_rules")
+    .from('diet_rules')
     .update({ is_active: false })
-    .eq("id", id);
+    .eq('id', id);
 
   if (error) {
-    console.error("Error deleting diet rule:", error);
+    console.error('Error deleting diet rule:', error);
     return { error: `Fout bij verwijderen dieetregel: ${error.message}` };
   }
 

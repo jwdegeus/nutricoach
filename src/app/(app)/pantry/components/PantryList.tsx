@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { PantryItemRow } from "./PantryItemRow";
-import { Button } from "@/components/catalyst/button";
-import { deleteAllPantryItemsAction } from "../actions/pantry-ui.actions";
-import { ConfirmDialog } from "@/components/catalyst/confirm-dialog";
-import { Trash2, Loader2 } from "lucide-react";
+import { useState } from 'react';
+import { PantryItemRow } from './PantryItemRow';
+import { Button } from '@/components/catalyst/button';
+import { deleteAllPantryItemsAction } from '../actions/pantry-ui.actions';
+import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
+import { Trash2, Loader2 } from 'lucide-react';
 
 type PantryItemWithName = {
   id: string;
@@ -41,7 +41,7 @@ export function PantryList({ items, onUpdate }: PantryListProps) {
       }
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Fout bij leegmaken pantry"
+        err instanceof Error ? err.message : 'Fout bij leegmaken pantry',
       );
     } finally {
       setIsClearing(false);
@@ -64,7 +64,9 @@ export function PantryList({ items, onUpdate }: PantryListProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Mijn Pantry ({items.length} items)</h2>
+        <h2 className="text-lg font-semibold">
+          Mijn Pantry ({items.length} items)
+        </h2>
         <Button
           plain
           onClick={() => setShowClearDialog(true)}

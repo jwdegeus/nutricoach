@@ -1,6 +1,6 @@
 /**
  * Diet Types - Foundation for Meal Planning Agent
- * 
+ *
  * Defines the core types for diet profiles, rule sets, and agent contracts.
  * This is the source of truth for the meal planning agent's guard rails.
  */
@@ -10,16 +10,16 @@
  * These map to database diet_types.name but provide a stable API key
  */
 export type DietKey =
-  | "wahls_paleo_plus" // Wahls Paleo (therapeutic)
-  | "keto" // Ketogenic diet
-  | "mediterranean" // Mediterranean diet
-  | "vegan" // Vegan diet
-  | "balanced"; // Generic balanced diet (fallback)
+  | 'wahls_paleo_plus' // Wahls Paleo (therapeutic)
+  | 'keto' // Ketogenic diet
+  | 'mediterranean' // Mediterranean diet
+  | 'vegan' // Vegan diet
+  | 'balanced'; // Generic balanced diet (fallback)
 
 /**
  * Constraint type - distinguishes hard rules from soft preferences
  */
-export type ConstraintType = "hard" | "soft";
+export type ConstraintType = 'hard' | 'soft';
 
 /**
  * Macro target range (for flexible calorie/macro planning)
@@ -53,7 +53,7 @@ export type BatchCookingPreference = {
  * Budget preference (optional, for future use)
  */
 export type BudgetPreference = {
-  level: "low" | "medium" | "high" | "unlimited";
+  level: 'low' | 'medium' | 'high' | 'unlimited';
   maxPerMeal?: number; // optional max cost per meal
 };
 
@@ -92,8 +92,8 @@ export type DietProfile = {
   pantryUsage?: PantryPreference;
   // Additional preferences that might affect meal planning
   servingsDefault?: number; // Default number of servings per meal
-  varietyLevel?: "low" | "std" | "high"; // Affects weekly variety constraints
-  strictness?: "strict" | "flexible"; // How strictly to enforce rules
+  varietyLevel?: 'low' | 'std' | 'high'; // Affects weekly variety constraints
+  strictness?: 'strict' | 'flexible'; // How strictly to enforce rules
   // Meal preferences per slot (as tags for multiple preferences)
   mealPreferences?: {
     breakfast?: string[]; // e.g., ["eiwit shake", "groene smoothie"]
@@ -106,7 +106,7 @@ export type DietProfile = {
  * Ingredient constraint (for allowed/forbidden lists)
  */
 export type IngredientConstraint = {
-  type: "allowed" | "forbidden";
+  type: 'allowed' | 'forbidden';
   items: string[]; // Ingredient names or tags
   categories?: string[]; // Ingredient categories
   constraintType: ConstraintType; // hard or soft
@@ -127,7 +127,7 @@ export type RequiredCategoryConstraint = {
  * Per-meal constraint (e.g., min protein per meal slot)
  */
 export type PerMealConstraint = {
-  mealSlot: "breakfast" | "lunch" | "dinner" | "snack";
+  mealSlot: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   minProtein?: number; // grams
   minCarbs?: number;
   minFat?: number;
@@ -150,9 +150,10 @@ export type WeeklyVarietyConstraint = {
  * Macro constraint (daily or per-meal)
  */
 export type MacroConstraint = {
-  scope: "daily" | "per_meal";
+  scope: 'daily' | 'per_meal';
   maxCarbs?: number;
   maxSaturatedFat?: number;
+  maxFat?: number;
   minProtein?: number;
   minFat?: number;
   allowedTypes?: string[]; // e.g., ["monosaccharides"] for SCD
@@ -164,7 +165,7 @@ export type MacroConstraint = {
  * Meal structure constraint (e.g., Wahls vegetable cups)
  */
 export type MealStructureConstraint = {
-  type: "vegetable_cups" | "meal_timing" | "meal_count";
+  type: 'vegetable_cups' | 'meal_timing' | 'meal_count';
   // For vegetable_cups (Wahls)
   vegetableCupsRequirement?: {
     totalCups: number;
@@ -197,42 +198,42 @@ export type MealStructureConstraint = {
  */
 export type DietRuleSet = {
   dietKey: DietKey;
-  
+
   // Ingredient constraints
   ingredientConstraints: IngredientConstraint[];
-  
+
   // Category requirements
   requiredCategories: RequiredCategoryConstraint[];
-  
+
   // Per-meal constraints
   perMealConstraints: PerMealConstraint[];
-  
+
   // Weekly variety constraints
   weeklyVariety: WeeklyVarietyConstraint;
-  
+
   // Macro constraints
   macroConstraints: MacroConstraint[];
-  
+
   // Meal structure constraints
   mealStructure: MealStructureConstraint[];
-  
+
   // Calorie target (from profile)
   calorieTarget: {
     min?: number;
     max?: number;
     target?: number;
   };
-  
+
   // Prep time constraints
   prepTimeConstraints: {
     globalMax?: number;
     perMeal?: PrepTimePreference;
     batchCooking?: BatchCookingPreference;
   };
-  
+
   // Budget constraints (optional)
   budgetConstraints?: BudgetPreference;
-  
+
   // Pantry usage (optional)
   pantryUsage?: PantryPreference;
 };
@@ -240,7 +241,7 @@ export type DietRuleSet = {
 /**
  * Meal slot type
  */
-export type MealSlot = "breakfast" | "lunch" | "dinner" | "snack";
+export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
 /**
  * Meal ingredient reference with NEVO code

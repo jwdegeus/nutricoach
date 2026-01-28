@@ -1,173 +1,204 @@
-'use client'
+'use client';
 
-import React, { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogTitle,
   DialogDescription,
   DialogBody,
   DialogActions,
-} from '@/components/catalyst/dialog'
-import { Button } from '@/components/catalyst/button'
-import { Input } from '@/components/catalyst/input'
-import { Field, Label, Description, ErrorMessage } from '@/components/catalyst/fieldset'
-import { Text } from '@/components/catalyst/text'
-import { useTranslations } from 'next-intl'
-import { importRecipeFromUrlAction } from '@/src/app/(app)/recipes/import/actions/recipeImport.actions'
-import { SparklesIcon } from '@heroicons/react/20/solid'
+} from '@/components/catalyst/dialog';
+import { Button } from '@/components/catalyst/button';
+import { Input } from '@/components/catalyst/input';
+import {
+  Field,
+  Label,
+  Description,
+  ErrorMessage,
+} from '@/components/catalyst/fieldset';
+import { Text } from '@/components/catalyst/text';
+import { useTranslations } from 'next-intl';
+import { importRecipeFromUrlAction } from '@/src/app/(app)/recipes/import/actions/recipeImport.actions';
+import { SparklesIcon } from '@heroicons/react/20/solid';
 
 type RecipeImportModalProps = {
-  open: boolean
-  onClose: () => void
-}
+  open: boolean;
+  onClose: () => void;
+};
 
 export function RecipeImportModal({ open, onClose }: RecipeImportModalProps) {
-  const router = useRouter()
-  const [url, setUrl] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
-  const [internalOpen, setInternalOpen] = useState(open)
-  const t = useTranslations('common')
-  const tImport = useTranslations('recipeImport')
+  const router = useRouter();
+  const [url, setUrl] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [internalOpen, setInternalOpen] = useState(open);
+  const t = useTranslations('common');
+  const tImport = useTranslations('recipeImport');
 
   // Sync internal state with prop, but don't close if there's an error or pending
   React.useEffect(() => {
     if (open) {
       // Opening: reset form and set internal state
-      setUrl('')
-      setError(null)
-      setInternalOpen(true)
+      setUrl('');
+      setError(null);
+      setInternalOpen(true);
     } else if (!isPending && !error) {
       // Only close if not pending and no error
-      setInternalOpen(false)
+      setInternalOpen(false);
     }
-  }, [open, isPending, error])
+  }, [open, isPending, error]);
 
   const validateUrl = (urlValue: string): boolean => {
     if (!urlValue.trim()) {
-      setError('URL is verplicht')
-      return false
+      setError('URL is verplicht');
+      return false;
     }
 
     if (!urlValue.startsWith('http://') && !urlValue.startsWith('https://')) {
-      setError('URL moet beginnen met http:// of https://')
-      return false
+      setError('URL moet beginnen met http:// of https://');
+      return false;
     }
 
     try {
-      new URL(urlValue)
-      return true
+      new URL(urlValue);
+      return true;
     } catch {
-      setError('Ongeldige URL')
-      return false
+      setError('Ongeldige URL');
+      return false;
     }
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    e.stopPropagation() // Prevent any bubbling that might close the dialog
-    
+    e.preventDefault();
+    e.stopPropagation(); // Prevent any bubbling that might close the dialog
+
     // Don't submit if already pending
     if (isPending) {
-      console.log('[RecipeImportModal] Already processing, ignoring submit')
-      return
+      console.log('[RecipeImportModal] Already processing, ignoring submit');
+      return;
     }
 
-    setError(null)
+    setError(null);
 
     if (!validateUrl(url)) {
-      return
+      return;
     }
 
-    console.log('[RecipeImportModal] Starting import for URL:', url)
-    
+    console.log('[RecipeImportModal] Starting import for URL:', url);
+
     startTransition(async () => {
       try {
-        const result = await importRecipeFromUrlAction({ url })
-        console.log('[RecipeImportModal] Action result:', JSON.stringify(result, null, 2))
+        const result = await importRecipeFromUrlAction({ url });
+        console.log(
+          '[RecipeImportModal] Action result:',
+          JSON.stringify(result, null, 2),
+        );
 
         // Ensure we always have a result object
         if (!result) {
-          console.error('[RecipeImportModal] No result returned from action')
-          setError('Geen resultaat ontvangen van de server. Probeer het opnieuw.')
-          return
+          console.error('[RecipeImportModal] No result returned from action');
+          setError(
+            'Geen resultaat ontvangen van de server. Probeer het opnieuw.',
+          );
+          return;
         }
 
         if (result.ok) {
           // Success - pass job (with translated recipe) so import page shows it without refetch
-          console.log('[RecipeImportModal] Import successful, jobId:', result.jobId)
-          setUrl('')
-          setError(null)
-          setInternalOpen(false)
+          console.log(
+            '[RecipeImportModal] Import successful, jobId:',
+            result.jobId,
+          );
+          setUrl('');
+          setError(null);
+          setInternalOpen(false);
           if (result.jobId && result.job && typeof window !== 'undefined') {
             try {
-              sessionStorage.setItem(`recipe-import-job-${result.jobId}`, JSON.stringify(result.job))
+              sessionStorage.setItem(
+                `recipe-import-job-${result.jobId}`,
+                JSON.stringify(result.job),
+              );
             } catch {
               // ignore quota / parse errors
             }
           }
           if (result.jobId) {
-            router.push(`/recipes/import?jobId=${result.jobId}`)
-            onClose()
+            router.push(`/recipes/import?jobId=${result.jobId}`);
+            onClose();
           } else {
             // Fallback: just close modal
             setTimeout(() => {
-              onClose()
-            }, 100)
+              onClose();
+            }, 100);
           }
         } else {
           // Show error message
-          console.error('[RecipeImportModal] Import failed:', result.errorCode, result.message)
-          const errorMessage = result.message || 'Er is een fout opgetreden bij het importeren'
-          setError(errorMessage)
-          setInternalOpen(true) // Keep modal open on error
+          console.error(
+            '[RecipeImportModal] Import failed:',
+            result.errorCode,
+            result.message,
+          );
+          const errorMessage =
+            result.message || 'Er is een fout opgetreden bij het importeren';
+          setError(errorMessage);
+          setInternalOpen(true); // Keep modal open on error
         }
       } catch (err) {
-        console.error('[RecipeImportModal] Unexpected error:', err)
-        const isNetworkError = err instanceof Error && err.message === 'Failed to fetch'
+        console.error('[RecipeImportModal] Unexpected error:', err);
+        const isNetworkError =
+          err instanceof Error && err.message === 'Failed to fetch';
         const errorMessage = isNetworkError
           ? tImport('errorNetworkOrTimeout')
-          : (err instanceof Error ? err.message : 'Er is een onverwachte fout opgetreden bij het importeren')
-        setError(errorMessage)
+          : err instanceof Error
+            ? err.message
+            : 'Er is een onverwachte fout opgetreden bij het importeren';
+        setError(errorMessage);
       }
-    })
-  }
+    });
+  };
 
   const handleClose = () => {
     if (!isPending && !error) {
-      setUrl('')
-      setError(null)
-      setInternalOpen(false)
-      onClose()
+      setUrl('');
+      setError(null);
+      setInternalOpen(false);
+      onClose();
     }
-  }
+  };
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUrl(e.target.value)
+    setUrl(e.target.value);
     if (error) {
-      setError(null)
+      setError(null);
     }
-  }
+  };
 
   // Prevent closing during loading or when there's an error
   const handleDialogClose = (value: boolean) => {
-    console.log('[RecipeImportModal] Dialog close requested, isPending:', isPending, 'error:', error, 'value:', value)
+    console.log(
+      '[RecipeImportModal] Dialog close requested, isPending:',
+      isPending,
+      'error:',
+      error,
+      'value:',
+      value,
+    );
     // Don't allow closing if loading
     if (isPending) {
-      console.log('[RecipeImportModal] Prevented closing during loading')
-      return
+      console.log('[RecipeImportModal] Prevented closing during loading');
+      return;
     }
     // Don't allow closing if there's an error (user should see it)
     if (error) {
-      console.log('[RecipeImportModal] Prevented closing with error:', error)
-      return
+      console.log('[RecipeImportModal] Prevented closing with error:', error);
+      return;
     }
-    handleClose()
-  }
+    handleClose();
+  };
 
   // Force dialog to stay open if loading or has error
-  const dialogOpen = internalOpen || (isPending || error ? true : open)
+  const dialogOpen = internalOpen || (isPending || error ? true : open);
 
   return (
     <Dialog open={dialogOpen} onClose={handleDialogClose}>
@@ -262,15 +293,12 @@ export function RecipeImportModal({ open, onClose }: RecipeImportModalProps) {
             >
               {t('cancel')}
             </Button>
-            <Button
-              type="submit"
-              disabled={isPending || !url.trim()}
-            >
+            <Button type="submit" disabled={isPending || !url.trim()}>
               Importeren
             </Button>
           </DialogActions>
         )}
       </form>
     </Dialog>
-  )
+  );
 }

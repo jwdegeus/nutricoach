@@ -1,16 +1,16 @@
 /**
  * Recipe Adaptation Service
- * 
+ *
  * Server-side service for generating and validating recipe adaptations.
  * Orchestrates rewrite engine and diet validation with retry logic.
  */
 
-import "server-only";
-import { createClient } from "@/src/lib/supabase/server";
-import { CustomMealsService } from "@/src/lib/custom-meals/customMeals.service";
-import { ProfileService } from "@/src/lib/profile/profile.service";
-import { deriveDietRuleSet } from "@/src/lib/diets/diet-rules";
-import { INGREDIENT_CATEGORY_MAP } from "@/src/lib/diet-validation/ingredient-categorizer";
+import 'server-only';
+import { createClient } from '@/src/lib/supabase/server';
+import { CustomMealsService } from '@/src/lib/custom-meals/customMeals.service';
+import { ProfileService } from '@/src/lib/profile/profile.service';
+import { deriveDietRuleSet } from '@/src/lib/diets/diet-rules';
+import { INGREDIENT_CATEGORY_MAP } from '@/src/lib/diet-validation/ingredient-categorizer';
 import type {
   RequestRecipeAdaptationInput,
   RequestRecipeAdaptationResult,
@@ -18,16 +18,22 @@ import type {
   ViolationDetail,
   IngredientLine,
   StepLine,
-} from "../recipe-ai.types";
-import type { DietRuleset, ValidationReport } from "./diet-validator";
-import { validateDraft, findForbiddenMatches } from "./diet-validator";
-import type { DietRuleSet, IngredientConstraint } from "@/src/lib/diets";
-import { generateRecipeAdaptationWithGemini } from "./gemini-recipe-adaptation.service";
+} from '../recipe-ai.types';
+import type { DietRuleset, ValidationReport } from './diet-validator';
+import { validateDraft, findForbiddenMatches } from './diet-validator';
+import type { DietRuleSet } from '@/src/lib/diets';
+import { generateRecipeAdaptationWithGemini } from './gemini-recipe-adaptation.service';
 // vNext guard rails (shadow mode)
-import { loadGuardrailsRuleset, evaluateGuardrails } from "@/src/lib/guardrails-vnext";
-import { mapRecipeDraftToGuardrailsTargets } from "@/src/lib/guardrails-vnext/adapters/recipe-adaptation";
-import type { GuardrailsVNextDiagnostics } from "../recipe-ai.types";
-import type { EvaluationContext, Locale } from "@/src/lib/guardrails-vnext/types";
+import {
+  loadGuardrailsRuleset,
+  evaluateGuardrails,
+} from '@/src/lib/guardrails-vnext';
+import { mapRecipeDraftToGuardrailsTargets } from '@/src/lib/guardrails-vnext/adapters/recipe-adaptation';
+import type { GuardrailsVNextDiagnostics } from '../recipe-ai.types';
+import type {
+  EvaluationContext,
+  Locale,
+} from '@/src/lib/guardrails-vnext/types';
 
 /**
  * Recipe Adaptation Service
@@ -35,60 +41,74 @@ import type { EvaluationContext, Locale } from "@/src/lib/guardrails-vnext/types
 export class RecipeAdaptationService {
   /**
    * Request recipe adaptation
-   * 
+   *
    * Normalizes input, generates draft via engine, validates against diet rules,
    * and retries if validation fails (max 1 retry).
-   * 
+   *
    * @param input - Adaptation request input
    * @returns Discriminated union result
    */
   async requestAdaptation(
-    input: RequestRecipeAdaptationInput
+    input: RequestRecipeAdaptationInput,
   ): Promise<RequestRecipeAdaptationResult> {
-    console.log("[RecipeAdaptationService] ========================================");
-    console.log("[RecipeAdaptationService] requestAdaptation called");
-    console.log("[RecipeAdaptationService] Input:", JSON.stringify(input, null, 2));
-    
+    console.log(
+      '[RecipeAdaptationService] ========================================',
+    );
+    console.log('[RecipeAdaptationService] requestAdaptation called');
+    console.log(
+      '[RecipeAdaptationService] Input:',
+      JSON.stringify(input, null, 2),
+    );
+
     try {
       // Normalize input
       const recipeId = input.recipeId.trim();
       const dietId = input.dietId?.trim();
 
-      console.log("[RecipeAdaptationService] Normalized recipeId:", recipeId);
-      console.log("[RecipeAdaptationService] Normalized dietId:", dietId);
+      console.log('[RecipeAdaptationService] Normalized recipeId:', recipeId);
+      console.log('[RecipeAdaptationService] Normalized dietId:', dietId);
 
       // Validate recipeId
-      if (!recipeId || recipeId === "undefined") {
-        console.error("[RecipeAdaptationService] Invalid recipeId");
+      if (!recipeId || recipeId === 'undefined') {
+        console.error('[RecipeAdaptationService] Invalid recipeId');
         return {
-          outcome: "error",
-          message: "Recept ID is vereist",
-          code: "INVALID_INPUT",
+          outcome: 'error',
+          message: 'Recept ID is vereist',
+          code: 'INVALID_INPUT',
         };
       }
 
       // Check if dietId is provided
-      if (!dietId || dietId === "") {
-        console.warn("[RecipeAdaptationService] No dietId provided");
+      if (!dietId || dietId === '') {
+        console.warn('[RecipeAdaptationService] No dietId provided');
         return {
-          outcome: "empty",
-          reason: "NO_DIET_SELECTED",
+          outcome: 'empty',
+          reason: 'NO_DIET_SELECTED',
         };
       }
 
       // Load diet ruleset
-      console.log("[RecipeAdaptationService] Loading diet ruleset for dietId:", dietId);
+      console.log(
+        '[RecipeAdaptationService] Loading diet ruleset for dietId:',
+        dietId,
+      );
       const ruleset = await this.loadDietRuleset(dietId);
       if (!ruleset) {
-        console.error("[RecipeAdaptationService] Ruleset not found for dietId:", dietId);
+        console.error(
+          '[RecipeAdaptationService] Ruleset not found for dietId:',
+          dietId,
+        );
         return {
-          outcome: "error",
+          outcome: 'error',
           message: `Dieet met ID "${dietId}" niet gevonden`,
-          code: "INVALID_INPUT",
+          code: 'INVALID_INPUT',
         };
       }
-      
-      console.log("[RecipeAdaptationService] Ruleset loaded successfully, forbidden count:", ruleset.forbidden.length);
+
+      console.log(
+        '[RecipeAdaptationService] Ruleset loaded successfully, forbidden count:',
+        ruleset.forbidden.length,
+      );
 
       // Generate draft with engine (first attempt)
       // Bij twee-fase flow: bestaande violations uit eerdere analyse meegiven
@@ -98,28 +118,38 @@ export class RecipeAdaptationService {
       let needsRetry = false;
 
       try {
-        draft = await this.generateDraftWithEngine(recipeId, dietId, false, existingViolations);
+        draft = await this.generateDraftWithEngine(
+          recipeId,
+          dietId,
+          false,
+          existingViolations,
+        );
         validation = validateDraft(draft, ruleset);
 
         if (!validation.ok) {
           needsRetry = true;
         }
       } catch (error) {
-        console.error("Error generating draft:", error);
+        console.error('Error generating draft:', error);
         return {
-          outcome: "error",
+          outcome: 'error',
           message:
             error instanceof Error
               ? error.message
-              : "Fout bij genereren aangepast recept",
-          code: "INTERNAL_ERROR",
+              : 'Fout bij genereren aangepast recept',
+          code: 'INTERNAL_ERROR',
         };
       }
 
       // Retry with strict mode if validation failed
       if (needsRetry) {
         try {
-          draft = await this.generateDraftWithEngine(recipeId, dietId, true, existingViolations);
+          draft = await this.generateDraftWithEngine(
+            recipeId,
+            dietId,
+            true,
+            existingViolations,
+          );
           validation = validateDraft(draft, ruleset);
 
           if (!validation.ok) {
@@ -128,8 +158,11 @@ export class RecipeAdaptationService {
             // 2. The substitution didn't work perfectly
             // For now, we'll still return the draft but log a warning
             // The user will see the violations in the UI
-            console.warn("Strict mode rewrite still has violations:", validation.matches);
-            
+            console.warn(
+              'Strict mode rewrite still has violations:',
+              validation.matches,
+            );
+
             // TODO [GUARD-RAILS-vNext]: RISK #2 - Fail-Open Behavior
             // Current behavior: Draft is returned even with violations (fail-open).
             // Risk: Users can receive recipes that violate guard rails.
@@ -143,45 +176,59 @@ export class RecipeAdaptationService {
             // In a future version, we could implement iterative replacement
           }
         } catch (error) {
-          console.error("Error in retry draft generation:", error);
+          console.error('Error in retry draft generation:', error);
           return {
-            outcome: "error",
-            message: "Unable to produce diet-compliant rewrite",
-            code: "INTERNAL_ERROR",
+            outcome: 'error',
+            message: 'Unable to produce diet-compliant rewrite',
+            code: 'INTERNAL_ERROR',
           };
         }
       }
 
       // Validate draft structure
       if (!draft.rewrite || !draft.analysis) {
-        console.error("[RecipeAdaptationService] Invalid draft structure");
+        console.error('[RecipeAdaptationService] Invalid draft structure');
         return {
-          outcome: "error",
-          message: "Ongeldige draft structuur",
-          code: "INTERNAL_ERROR",
+          outcome: 'error',
+          message: 'Ongeldige draft structuur',
+          code: 'INTERNAL_ERROR',
         };
       }
 
-      console.log("[RecipeAdaptationService] Draft validation passed");
-      console.log("[RecipeAdaptationService] Violations in draft:", draft.analysis.violations.length);
-      
+      console.log('[RecipeAdaptationService] Draft validation passed');
+      console.log(
+        '[RecipeAdaptationService] Violations in draft:',
+        draft.analysis.violations.length,
+      );
+
       // Shadow mode: vNext guard rails evaluation (feature flag)
-      const useVNextGuardrails = process.env.USE_VNEXT_GUARDRAILS === "true";
+      const useVNextGuardrails = process.env.USE_VNEXT_GUARDRAILS === 'true';
       if (useVNextGuardrails) {
         try {
-          await this.evaluateVNextGuardrails(draft, dietId, input.locale, recipeId, validation);
+          await this.evaluateVNextGuardrails(
+            draft,
+            dietId,
+            input.locale,
+            recipeId,
+            validation,
+          );
         } catch (error) {
           // Don't fail the request if vNext evaluation fails
-          console.error("[RecipeAdaptationService] vNext guard rails evaluation failed:", error);
+          console.error(
+            '[RecipeAdaptationService] vNext guard rails evaluation failed:',
+            error,
+          );
         }
       }
-      
-      console.log("[RecipeAdaptationService] Returning success result");
-      console.log("[RecipeAdaptationService] ========================================");
+
+      console.log('[RecipeAdaptationService] Returning success result');
+      console.log(
+        '[RecipeAdaptationService] ========================================',
+      );
 
       // Return success
       return {
-        outcome: "success",
+        outcome: 'success',
         adaptation: draft,
         meta: {
           timestamp: new Date().toISOString(),
@@ -191,14 +238,17 @@ export class RecipeAdaptationService {
         },
       };
     } catch (error) {
-      console.error("Error in RecipeAdaptationService.requestAdaptation:", error);
+      console.error(
+        'Error in RecipeAdaptationService.requestAdaptation:',
+        error,
+      );
       return {
-        outcome: "error",
+        outcome: 'error',
         message:
           error instanceof Error
             ? error.message
-            : "Er is een onverwachte fout opgetreden",
-        code: "INTERNAL_ERROR",
+            : 'Er is een onverwachte fout opgetreden',
+        code: 'INTERNAL_ERROR',
       };
     }
   }
@@ -207,34 +257,36 @@ export class RecipeAdaptationService {
    * Alleen analyse: violations uit dieetregels, geen AI-rewrite.
    * Gebruikt in twee-fase flow (eerst "Analyseer recept", daarna "Genereer aangepaste versie").
    */
-  async getAnalysisOnly(recipeId: string, dietId: string): Promise<{
+  async getAnalysisOnly(
+    recipeId: string,
+    dietId: string,
+  ): Promise<{
     violations: ViolationDetail[];
     summary: string;
     recipeName: string;
   }> {
     const recipe = await this.loadRecipeForAnalysis(recipeId);
     if (!recipe) {
-      throw new Error("Recipe not found");
+      throw new Error('Recipe not found');
     }
     const ruleset = await this.loadDietRuleset(dietId);
     if (!ruleset) {
-      throw new Error("Diet ruleset not found");
+      throw new Error('Diet ruleset not found');
     }
     // Geen echte dieetregels: geen fallback gebruiken, geen nep-afwijkingen tonen
     if (ruleset.forbidden.length === 0) {
       return {
         violations: [],
-        summary: "Geen dieetregels geconfigureerd voor dit dieet.",
+        summary: 'Geen dieetregels geconfigureerd voor dit dieet.',
         recipeName: recipe.mealName,
-        noRulesConfigured: true,
       };
     }
     const violations = this.analyzeRecipeForViolations(recipe, ruleset);
 
     const summary =
       violations.length === 0
-        ? "Geen afwijkingen gevonden! Dit recept past perfect bij jouw dieet."
-        : `${violations.length} ingrediënt${violations.length !== 1 ? "en" : ""} wijk${violations.length !== 1 ? "en" : "t"} af van je dieetvoorkeuren.`;
+        ? 'Geen afwijkingen gevonden! Dit recept past perfect bij jouw dieet.'
+        : `${violations.length} ingrediënt${violations.length !== 1 ? 'en' : ''} wijk${violations.length !== 1 ? 'en' : 't'} af van je dieetvoorkeuren.`;
     return {
       violations,
       summary,
@@ -245,9 +297,13 @@ export class RecipeAdaptationService {
   /**
    * Load recipe for analysis-only (geen user-id in pad; gebruikt huidige user uit auth).
    */
-  private async loadRecipeForAnalysis(recipeId: string): Promise<{ mealData: any; mealName: string; steps: string[] } | null> {
+  private async loadRecipeForAnalysis(
+    recipeId: string,
+  ): Promise<{ mealData: any; mealName: string; steps: string[] } | null> {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return null;
     return this.loadRecipe(recipeId, user.id);
   }
@@ -257,7 +313,7 @@ export class RecipeAdaptationService {
    *
    * First tries to load recipe adaptation rules from database.
    * Falls back to deriving from user's diet profile if no rules found.
-   * 
+   *
    * @param dietId - Diet type ID (UUID from diet_types table)
    * @returns Diet ruleset or null if not found
    */
@@ -270,7 +326,7 @@ export class RecipeAdaptationService {
       // PRIORITY 1: Load guard rails (diet_category_constraints + ingredient_category_items)
       // Firewall evaluatie: sorteer op rule_priority (hoog naar laag) - eerste match wint
       const { data: constraints, error: constraintsError } = await supabase
-        .from("diet_category_constraints")
+        .from('diet_category_constraints')
         .select(
           `
           *,
@@ -281,17 +337,22 @@ export class RecipeAdaptationService {
             category_type,
             items:ingredient_category_items(term, term_nl, synonyms, is_active)
           )
-        `
+        `,
         )
-        .eq("diet_type_id", dietId)
-        .eq("is_active", true)
-        .order("rule_priority", { ascending: false })
-        .order("priority", { ascending: false }); // Fallback voor backward compatibility
+        .eq('diet_type_id', dietId)
+        .eq('is_active', true)
+        .order('rule_priority', { ascending: false })
+        .order('priority', { ascending: false }); // Fallback voor backward compatibility
 
       if (constraintsError) {
-        console.error(`[RecipeAdaptation] Error loading guard rails:`, constraintsError);
+        console.error(
+          `[RecipeAdaptation] Error loading guard rails:`,
+          constraintsError,
+        );
       } else {
-        console.log(`[RecipeAdaptation] Found ${constraints?.length || 0} guard rail constraints for diet ${dietId}`);
+        console.log(
+          `[RecipeAdaptation] Found ${constraints?.length || 0} guard rail constraints for diet ${dietId}`,
+        );
       }
 
       // If we have guard rails, use them as primary source
@@ -300,14 +361,14 @@ export class RecipeAdaptationService {
       if (!constraintsError && constraints && constraints.length > 0) {
         // Load recipe_adaptation_rules early so we can use substitution_suggestions for guard-rail terms
         const { data: rules, error: rulesError } = await supabase
-          .from("recipe_adaptation_rules")
-          .select("*")
-          .eq("diet_type_id", dietId)
-          .eq("is_active", true)
-          .order("priority", { ascending: false });
+          .from('recipe_adaptation_rules')
+          .select('*')
+          .eq('diet_type_id', dietId)
+          .eq('is_active', true)
+          .order('priority', { ascending: false });
 
         const adaptationRules = !rulesError && rules ? rules : [];
-        const forbidden: DietRuleset["forbidden"] = [];
+        const forbidden: DietRuleset['forbidden'] = [];
         // TODO [GUARD-RAILS-vNext]: RISK #6 - Allow Rules Not Used
         // Current behavior: allowedTerms Set is populated but never used for evaluation.
         // Only block rules are added to forbidden[] array, so allow rules have no effect.
@@ -322,19 +383,23 @@ export class RecipeAdaptationService {
 
         // Eerst: verzamel alle allow regels (voor firewall evaluatie)
         for (const constraint of constraints) {
-          const ruleAction = constraint.rule_action || (constraint.constraint_type === 'forbidden' ? 'block' : 'allow');
-          
-          if (ruleAction === "allow" && constraint.category) {
+          const ruleAction =
+            constraint.rule_action ||
+            (constraint.constraint_type === 'forbidden' ? 'block' : 'allow');
+
+          if (ruleAction === 'allow' && constraint.category) {
             const category = constraint.category as any;
             const items = category.items || [];
 
             for (const item of items) {
               if (item.is_active === false) continue;
-              const term = item.term?.toLowerCase() || "";
+              const term = item.term?.toLowerCase() || '';
               if (term) {
                 allowedTerms.add(term);
                 // Voeg ook synoniemen toe aan allowed set
-                const synonyms = Array.isArray(item.synonyms) ? item.synonyms : [];
+                const synonyms = Array.isArray(item.synonyms)
+                  ? item.synonyms
+                  : [];
                 synonyms.forEach((s: string) => {
                   if (s) allowedTerms.add(s.toLowerCase());
                 });
@@ -345,9 +410,11 @@ export class RecipeAdaptationService {
 
         // Dan: verzamel block regels (firewall: block heeft voorrang)
         for (const constraint of constraints) {
-          const ruleAction = constraint.rule_action || (constraint.constraint_type === 'forbidden' ? 'block' : 'allow');
-          
-          if (ruleAction === "block" && constraint.category) {
+          const ruleAction =
+            constraint.rule_action ||
+            (constraint.constraint_type === 'forbidden' ? 'block' : 'allow');
+
+          if (ruleAction === 'block' && constraint.category) {
             const category = constraint.category as any;
             const items = category.items || [];
 
@@ -355,37 +422,52 @@ export class RecipeAdaptationService {
             for (const item of items) {
               if (item.is_active === false) continue;
 
-              const synonyms = Array.isArray(item.synonyms) ? item.synonyms : [];
-              const term = item.term?.toLowerCase() || "";
-              const categoryCode = (category as { code?: string }).code ?? "";
+              const synonyms = Array.isArray(item.synonyms)
+                ? item.synonyms
+                : [];
+              const term = item.term?.toLowerCase() || '';
+              const categoryCode = (category as { code?: string }).code ?? '';
 
               // SubstitutionSuggestions: uit recipe_adaptation_rules (zelfde term/synonym) of fallback per categorie
               const adaptationRule = adaptationRules.find(
                 (r: { term?: string; synonyms?: string[] }) => {
-                  const rTerm = (r.term ?? "").toLowerCase();
-                  const rSynonyms = (Array.isArray(r.synonyms) ? r.synonyms : []).map((s: string) => s.toLowerCase());
-                  return rTerm === term || rSynonyms.includes(term) || synonyms.some((s: string) => rTerm === s.toLowerCase() || rSynonyms.includes(s.toLowerCase()));
-                }
+                  const rTerm = (r.term ?? '').toLowerCase();
+                  const rSynonyms = (
+                    Array.isArray(r.synonyms) ? r.synonyms : []
+                  ).map((s: string) => s.toLowerCase());
+                  return (
+                    rTerm === term ||
+                    rSynonyms.includes(term) ||
+                    synonyms.some(
+                      (s: string) =>
+                        rTerm === s.toLowerCase() ||
+                        rSynonyms.includes(s.toLowerCase()),
+                    )
+                  );
+                },
               );
-              const substitutionSuggestions: string[] = adaptationRule?.substitution_suggestions
-                ? (Array.isArray(adaptationRule.substitution_suggestions) ? adaptationRule.substitution_suggestions : [])
-                : this.getSubstitutionSuggestionsByCategoryCode(categoryCode);
+              const substitutionSuggestions: string[] =
+                adaptationRule?.substitution_suggestions
+                  ? Array.isArray(adaptationRule.substitution_suggestions)
+                    ? adaptationRule.substitution_suggestions
+                    : []
+                  : this.getSubstitutionSuggestionsByCategoryCode(categoryCode);
 
               // Firewall logica: als term al in allowed set staat, skip (allow heeft al voorrang gehad)
               // Maar block regels met hogere prioriteit kunnen allow overrulen
               // Omdat we al gesorteerd zijn op rule_priority, kunnen we gewoon toevoegen
               // De validator zal later de eerste match gebruiken
-              
+
               // Check if we already have this term
               const existing = forbidden.find((f) => f.term === term);
               if (!existing && term) {
                 // strictness: hard = blokkeren/vervangen, soft = beperkt/waarschuwing (limit)
-                const hard = constraint.strictness === "hard";
+                const hard = constraint.strictness === 'hard';
                 forbidden.push({
                   term,
                   synonyms: synonyms.map((s: string) => s.toLowerCase()),
-                  ruleCode: hard ? "GUARD_RAIL_HARD" : "GUARD_RAIL_SOFT",
-                  ruleLabel: `${category.name_nl} (${hard ? "Strikt verboden" : "Niet gewenst"})`,
+                  ruleCode: hard ? 'GUARD_RAIL_HARD' : 'GUARD_RAIL_SOFT',
+                  ruleLabel: `${category.name_nl} (${hard ? 'Strikt verboden' : 'Niet gewenst'})`,
                   substitutionSuggestions,
                 });
               }
@@ -393,48 +475,56 @@ export class RecipeAdaptationService {
           }
         }
 
-        console.log(`[RecipeAdaptation] Guard rails loaded: ${forbidden.length} forbidden terms from ${constraints.length} constraints`);
+        console.log(
+          `[RecipeAdaptation] Guard rails loaded: ${forbidden.length} forbidden terms from ${constraints.length} constraints`,
+        );
 
         // PRIORITY 2: Merge recipe adaptation rules (avoid duplicates; we already loaded them as adaptationRules)
         if (adaptationRules.length > 0) {
           for (const rule of adaptationRules) {
-            const term = (rule as { term?: string }).term?.toLowerCase() || "";
+            const term = (rule as { term?: string }).term?.toLowerCase() || '';
             const existing = forbidden.find((f) => f.term === term);
             if (!existing && term) {
               forbidden.push({
                 term,
                 synonyms: (rule.synonyms as string[]) || [],
-                ruleCode: (rule as { rule_code?: string }).rule_code ?? "RECIPE_ADAPTATION",
-                ruleLabel: (rule as { rule_label?: string }).rule_label ?? "Aanpassing",
-                substitutionSuggestions: (rule.substitution_suggestions as string[]) || [],
+                ruleCode:
+                  (rule as { rule_code?: string }).rule_code ??
+                  'RECIPE_ADAPTATION',
+                ruleLabel:
+                  (rule as { rule_label?: string }).rule_label ?? 'Aanpassing',
+                substitutionSuggestions:
+                  (rule.substitution_suggestions as string[]) || [],
               });
             }
           }
-          console.log(`[RecipeAdaptation] Added ${adaptationRules.length} recipe adaptation rules`);
+          console.log(
+            `[RecipeAdaptation] Added ${adaptationRules.length} recipe adaptation rules`,
+          );
         }
 
         // Get added sugar terms from heuristics
         const { data: heuristics } = await supabase
-          .from("recipe_adaptation_heuristics")
-          .select("*")
-          .eq("diet_type_id", dietId)
-          .eq("is_active", true);
+          .from('recipe_adaptation_heuristics')
+          .select('*')
+          .eq('diet_type_id', dietId)
+          .eq('is_active', true);
 
         const addedSugarHeuristic = heuristics?.find(
-          (h) => h.heuristic_type === "added_sugar"
+          (h) => h.heuristic_type === 'added_sugar',
         );
-        const addedSugarTerms =
-          (addedSugarHeuristic?.terms as string[]) || [];
+        const addedSugarTerms = (addedSugarHeuristic?.terms as string[]) || [];
 
         const ruleset: DietRuleset = {
           dietId,
           version: 1,
           forbidden,
-          heuristics: addedSugarTerms.length > 0 ? { addedSugarTerms } : undefined,
+          heuristics:
+            addedSugarTerms.length > 0 ? { addedSugarTerms } : undefined,
         };
 
         console.log(
-          `[RecipeAdaptation] ✓ Loaded ${forbidden.length} total rules (from guard rails + recipe adaptation) for diet ${dietId}`
+          `[RecipeAdaptation] ✓ Loaded ${forbidden.length} total rules (from guard rails + recipe adaptation) for diet ${dietId}`,
         );
 
         return ruleset;
@@ -442,26 +532,34 @@ export class RecipeAdaptationService {
 
       // FALLBACK: Try to load recipe adaptation rules from database (old method)
       const { data: rules, error: rulesError } = await supabase
-        .from("recipe_adaptation_rules")
-        .select("*")
-        .eq("diet_type_id", dietId)
-        .eq("is_active", true)
-        .order("priority", { ascending: false });
+        .from('recipe_adaptation_rules')
+        .select('*')
+        .eq('diet_type_id', dietId)
+        .eq('is_active', true)
+        .order('priority', { ascending: false });
 
       if (rulesError) {
-        console.error(`[RecipeAdaptation] Error loading rules from database:`, rulesError);
+        console.error(
+          `[RecipeAdaptation] Error loading rules from database:`,
+          rulesError,
+        );
       } else {
-        console.log(`[RecipeAdaptation] Found ${rules?.length || 0} rules in database for diet ${dietId}`);
+        console.log(
+          `[RecipeAdaptation] Found ${rules?.length || 0} rules in database for diet ${dietId}`,
+        );
       }
 
       const { data: heuristics, error: heuristicsError } = await supabase
-        .from("recipe_adaptation_heuristics")
-        .select("*")
-        .eq("diet_type_id", dietId)
-        .eq("is_active", true);
+        .from('recipe_adaptation_heuristics')
+        .select('*')
+        .eq('diet_type_id', dietId)
+        .eq('is_active', true);
 
       if (heuristicsError) {
-        console.error(`[RecipeAdaptation] Error loading heuristics from database:`, heuristicsError);
+        console.error(
+          `[RecipeAdaptation] Error loading heuristics from database:`,
+          heuristicsError,
+        );
       }
 
       // If we have rules in database, use them
@@ -471,33 +569,39 @@ export class RecipeAdaptationService {
           synonyms: (rule.synonyms as string[]) || [],
           ruleCode: rule.rule_code,
           ruleLabel: rule.rule_label,
-          substitutionSuggestions: (rule.substitution_suggestions as string[]) || [],
+          substitutionSuggestions:
+            (rule.substitution_suggestions as string[]) || [],
         }));
 
-        console.log(`[RecipeAdaptation] Rules loaded:`, forbidden.map(r => `${r.term} (${r.synonyms.length} synonyms)`));
+        console.log(
+          `[RecipeAdaptation] Rules loaded:`,
+          forbidden.map((r) => `${r.term} (${r.synonyms.length} synonyms)`),
+        );
 
         // Get added sugar terms from heuristics
         const addedSugarHeuristic = heuristics?.find(
-          (h) => h.heuristic_type === "added_sugar"
+          (h) => h.heuristic_type === 'added_sugar',
         );
-        const addedSugarTerms =
-          (addedSugarHeuristic?.terms as string[]) || [];
+        const addedSugarTerms = (addedSugarHeuristic?.terms as string[]) || [];
 
         const ruleset: DietRuleset = {
           dietId,
           version: 1,
           forbidden,
-          heuristics: addedSugarTerms.length > 0 ? { addedSugarTerms } : undefined,
+          heuristics:
+            addedSugarTerms.length > 0 ? { addedSugarTerms } : undefined,
         };
 
         console.log(
-          `[RecipeAdaptation] ✓ Loaded ${forbidden.length} rules from database for diet ${dietId}`
+          `[RecipeAdaptation] ✓ Loaded ${forbidden.length} rules from database for diet ${dietId}`,
         );
 
         return ruleset;
       }
 
-      console.log(`[RecipeAdaptation] No rules found in database, falling back to profile derivation`);
+      console.log(
+        `[RecipeAdaptation] No rules found in database, falling back to profile derivation`,
+      );
 
       // Fallback: derive from user's diet profile
       const {
@@ -505,7 +609,7 @@ export class RecipeAdaptationService {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        console.error("[RecipeAdaptation] User not authenticated");
+        console.error('[RecipeAdaptation] User not authenticated');
         return this.getFallbackRuleset(dietId);
       }
 
@@ -519,19 +623,25 @@ export class RecipeAdaptationService {
       // Convert DietRuleSet to DietRuleset (validator format)
       const ruleset = this.convertDietRuleSetToValidatorFormat(
         dietRuleSet,
-        dietId
+        dietId,
       );
 
       console.log(
-        `[RecipeAdaptation] ✓ Loaded diet ruleset for ${dietProfile.dietKey} with ${ruleset.forbidden.length} forbidden rules (derived from profile)`
+        `[RecipeAdaptation] ✓ Loaded diet ruleset for ${dietProfile.dietKey} with ${ruleset.forbidden.length} forbidden rules (derived from profile)`,
       );
-      console.log(`[RecipeAdaptation] Profile allergies:`, dietProfile.allergies);
+      console.log(
+        `[RecipeAdaptation] Profile allergies:`,
+        dietProfile.allergies,
+      );
       console.log(`[RecipeAdaptation] Profile dislikes:`, dietProfile.dislikes);
-      console.log(`[RecipeAdaptation] Ruleset forbidden terms:`, ruleset.forbidden.map(r => r.term));
+      console.log(
+        `[RecipeAdaptation] Ruleset forbidden terms:`,
+        ruleset.forbidden.map((r) => r.term),
+      );
 
       return ruleset;
     } catch (error) {
-      console.error("[RecipeAdaptation] Error loading diet ruleset:", error);
+      console.error('[RecipeAdaptation] Error loading diet ruleset:', error);
       // Fallback to basic ruleset if everything fails
       return this.getFallbackRuleset(dietId);
     }
@@ -539,23 +649,28 @@ export class RecipeAdaptationService {
 
   /**
    * Convert DietRuleSet to DietRuleset (validator format)
-   * 
+   *
    * Expands ingredient categories to specific terms and includes
    * allergies and dislikes from the profile.
    */
   private convertDietRuleSetToValidatorFormat(
     dietRuleSet: DietRuleSet,
-    dietId: string
+    dietId: string,
   ): DietRuleset {
-    const forbidden: DietRuleset["forbidden"] = [];
+    const forbidden: DietRuleset['forbidden'] = [];
     const INGREDIENT_CATEGORY_MAP = this.getIngredientCategoryMap();
 
-    console.log(`[RecipeAdaptation] Converting DietRuleSet to DietRuleset format`);
-    console.log(`[RecipeAdaptation] DietRuleSet ingredientConstraints count:`, dietRuleSet.ingredientConstraints.length);
+    console.log(
+      `[RecipeAdaptation] Converting DietRuleSet to DietRuleset format`,
+    );
+    console.log(
+      `[RecipeAdaptation] DietRuleSet ingredientConstraints count:`,
+      dietRuleSet.ingredientConstraints.length,
+    );
 
     // Process ingredient constraints
     for (const constraint of dietRuleSet.ingredientConstraints) {
-      if (constraint.type === "forbidden") {
+      if (constraint.type === 'forbidden') {
         console.log(`[RecipeAdaptation] Processing forbidden constraint:`, {
           items: constraint.items,
           categories: constraint.categories,
@@ -565,13 +680,21 @@ export class RecipeAdaptationService {
         // Add specific items
         for (const item of constraint.items) {
           // Check if we already have this item
-          const existing = forbidden.find((f) => f.term.toLowerCase() === item.toLowerCase());
+          const existing = forbidden.find(
+            (f) => f.term.toLowerCase() === item.toLowerCase(),
+          );
           if (!existing) {
             forbidden.push({
               term: item.toLowerCase(),
               synonyms: [],
-              ruleCode: constraint.constraintType === "hard" ? "FORBIDDEN_HARD" : "FORBIDDEN_SOFT",
-              ruleLabel: constraint.constraintType === "hard" ? "Strikt verboden" : "Niet gewenst",
+              ruleCode:
+                constraint.constraintType === 'hard'
+                  ? 'FORBIDDEN_HARD'
+                  : 'FORBIDDEN_SOFT',
+              ruleLabel:
+                constraint.constraintType === 'hard'
+                  ? 'Strikt verboden'
+                  : 'Niet gewenst',
               substitutionSuggestions: this.getSubstitutionSuggestions(item),
             });
             console.log(`[RecipeAdaptation] Added forbidden item: ${item}`);
@@ -582,57 +705,87 @@ export class RecipeAdaptationService {
         if (constraint.categories) {
           for (const category of constraint.categories) {
             const categoryItems = INGREDIENT_CATEGORY_MAP[category] || [];
-            console.log(`[RecipeAdaptation] Expanding category "${category}" with ${categoryItems.length} items`);
-            
+            console.log(
+              `[RecipeAdaptation] Expanding category "${category}" with ${categoryItems.length} items`,
+            );
+
             if (categoryItems.length === 0) {
-              console.warn(`[RecipeAdaptation] ⚠ Category "${category}" has no items in INGREDIENT_CATEGORY_MAP!`);
+              console.warn(
+                `[RecipeAdaptation] ⚠ Category "${category}" has no items in INGREDIENT_CATEGORY_MAP!`,
+              );
             }
-            
+
             for (const item of categoryItems) {
-              const existing = forbidden.find((f) => f.term.toLowerCase() === item.toLowerCase());
+              const existing = forbidden.find(
+                (f) => f.term.toLowerCase() === item.toLowerCase(),
+              );
               if (!existing) {
                 const synonyms = this.getSynonymsForTerm(item);
-                const substitutionSuggestions = this.getSubstitutionSuggestions(item, category);
+                const substitutionSuggestions = this.getSubstitutionSuggestions(
+                  item,
+                  category,
+                );
                 forbidden.push({
                   term: item.toLowerCase(),
                   synonyms,
-                  ruleCode: constraint.constraintType === "hard" ? "FORBIDDEN_HARD" : "FORBIDDEN_SOFT",
-                  ruleLabel: this.getCategoryLabel(category, constraint.constraintType),
+                  ruleCode:
+                    constraint.constraintType === 'hard'
+                      ? 'FORBIDDEN_HARD'
+                      : 'FORBIDDEN_SOFT',
+                  ruleLabel: this.getCategoryLabel(
+                    category,
+                    constraint.constraintType,
+                  ),
                   substitutionSuggestions,
                 });
-                console.log(`[RecipeAdaptation]   Added: ${item.toLowerCase()} (${synonyms.length} synonyms, ${substitutionSuggestions.length} substitutions)`);
+                console.log(
+                  `[RecipeAdaptation]   Added: ${item.toLowerCase()} (${synonyms.length} synonyms, ${substitutionSuggestions.length} substitutions)`,
+                );
               } else {
-                console.log(`[RecipeAdaptation]   Skipped duplicate: ${item.toLowerCase()}`);
+                console.log(
+                  `[RecipeAdaptation]   Skipped duplicate: ${item.toLowerCase()}`,
+                );
               }
             }
           }
         } else {
-          console.log(`[RecipeAdaptation]   No categories to expand for this constraint`);
+          console.log(
+            `[RecipeAdaptation]   No categories to expand for this constraint`,
+          );
         }
       }
     }
 
-    console.log(`[RecipeAdaptation] Converted to ${forbidden.length} forbidden rules`);
-    
+    console.log(
+      `[RecipeAdaptation] Converted to ${forbidden.length} forbidden rules`,
+    );
+
     if (forbidden.length === 0) {
-      console.error(`[RecipeAdaptation] ⚠ ERROR: Conversion resulted in 0 forbidden rules!`);
-      console.error(`[RecipeAdaptation]   DietRuleSet ingredientConstraints:`, dietRuleSet.ingredientConstraints);
-      console.error(`[RecipeAdaptation]   This means no violations will be detected!`);
+      console.error(
+        `[RecipeAdaptation] ⚠ ERROR: Conversion resulted in 0 forbidden rules!`,
+      );
+      console.error(
+        `[RecipeAdaptation]   DietRuleSet ingredientConstraints:`,
+        dietRuleSet.ingredientConstraints,
+      );
+      console.error(
+        `[RecipeAdaptation]   This means no violations will be detected!`,
+      );
     }
 
     // Add heuristics for added sugar detection
     const heuristics = {
       addedSugarTerms: [
-        "suiker",
-        "siroop",
-        "stroop",
-        "honing",
-        "glucose",
-        "fructose",
-        "sucrose",
-        "rietsuiker",
-        "witte suiker",
-        "kristalsuiker",
+        'suiker',
+        'siroop',
+        'stroop',
+        'honing',
+        'glucose',
+        'fructose',
+        'sucrose',
+        'rietsuiker',
+        'witte suiker',
+        'kristalsuiker',
       ],
     };
 
@@ -653,36 +806,111 @@ export class RecipeAdaptationService {
     const baseMap: Record<string, string[]> = {
       ...INGREDIENT_CATEGORY_MAP,
     };
-    
+
     // Add Dutch translations
     return {
       grains: [
         ...(baseMap.grains || []),
-        "tarwe", "rijst", "haver", "gerst", "rogge", "mais", "boekweit", "gierst",
-        "amarant", "pasta", "spaghetti", "penne", "fusilli", "macaroni", "orzo",
-        "risoni", "noedels", "tagliatelle", "fettuccine", "linguine", "ravioli",
-        "lasagne", "gnocchi", "brood", "meel", "bloem", "tarwebloem", "tarwemeel",
+        'tarwe',
+        'rijst',
+        'haver',
+        'gerst',
+        'rogge',
+        'mais',
+        'boekweit',
+        'gierst',
+        'amarant',
+        'pasta',
+        'spaghetti',
+        'penne',
+        'fusilli',
+        'macaroni',
+        'orzo',
+        'risoni',
+        'noedels',
+        'tagliatelle',
+        'fettuccine',
+        'linguine',
+        'ravioli',
+        'lasagne',
+        'gnocchi',
+        'brood',
+        'meel',
+        'bloem',
+        'tarwebloem',
+        'tarwemeel',
       ],
       dairy: [
         ...(baseMap.dairy || []),
-        "melk", "koemelk", "kaas", "yoghurt", "boter", "room", "zure room",
-        "karnemelk", "roomkaas", "volle melk", "halfvolle melk", "magere melk",
+        'melk',
+        'koemelk',
+        'kaas',
+        'yoghurt',
+        'boter',
+        'room',
+        'zure room',
+        'karnemelk',
+        'roomkaas',
+        'volle melk',
+        'halfvolle melk',
+        'magere melk',
       ],
       legumes: [
         ...(baseMap.legumes || []),
-        "bonen", "linzen", "kikkererwten", "erwten", "soja", "pinda's",
-        "zwarte bonen", "nierbonen", "mungbonen",
+        'bonen',
+        'linzen',
+        'kikkererwten',
+        'erwten',
+        'soja',
+        "pinda's",
+        'zwarte bonen',
+        'nierbonen',
+        'mungbonen',
       ],
       processed_sugar: [
         ...(baseMap.processed_sugar || []),
-        "suiker", "rietsuiker", "bruine suiker", "poedersuiker", "ahornsiroop",
-        "agavesiroop", "maissiroop", "witte suiker", "kristalsuiker", "basterdsuiker",
+        'suiker',
+        'rietsuiker',
+        'bruine suiker',
+        'poedersuiker',
+        'ahornsiroop',
+        'agavesiroop',
+        'maissiroop',
+        'witte suiker',
+        'kristalsuiker',
+        'basterdsuiker',
       ],
       gluten_containing_grains: [
-        "wheat", "tarwe", "barley", "gerst", "rye", "rogge", "spelt", "kamut", "triticale",
-        "pasta", "spaghetti", "penne", "fusilli", "macaroni", "orzo", "risoni", "couscous",
-        "noedels", "tagliatelle", "fettuccine", "linguine", "ravioli", "lasagne", "gnocchi",
-        "brood", "bread", "meel", "bloem", "tarwebloem", "tarwemeel",
+        'wheat',
+        'tarwe',
+        'barley',
+        'gerst',
+        'rye',
+        'rogge',
+        'spelt',
+        'kamut',
+        'triticale',
+        'pasta',
+        'spaghetti',
+        'penne',
+        'fusilli',
+        'macaroni',
+        'orzo',
+        'risoni',
+        'couscous',
+        'noedels',
+        'tagliatelle',
+        'fettuccine',
+        'linguine',
+        'ravioli',
+        'lasagne',
+        'gnocchi',
+        'brood',
+        'bread',
+        'meel',
+        'bloem',
+        'tarwebloem',
+        'tarwemeel',
       ],
     };
   }
@@ -692,10 +920,19 @@ export class RecipeAdaptationService {
    */
   private getSynonymsForTerm(term: string): string[] {
     const synonymMap: Record<string, string[]> = {
-      pasta: ["spaghetti", "penne", "fusilli", "macaroni", "orzo", "risoni", "couscous", "noedels"],
-      melk: ["koemelk", "volle melk", "halfvolle melk", "magere melk"],
-      tarwebloem: ["tarwe", "wheat", "bloem", "meel", "tarwemeel"],
-      suiker: ["rietsuiker", "witte suiker", "kristalsuiker", "basterdsuiker"],
+      pasta: [
+        'spaghetti',
+        'penne',
+        'fusilli',
+        'macaroni',
+        'orzo',
+        'risoni',
+        'couscous',
+        'noedels',
+      ],
+      melk: ['koemelk', 'volle melk', 'halfvolle melk', 'magere melk'],
+      tarwebloem: ['tarwe', 'wheat', 'bloem', 'meel', 'tarwemeel'],
+      suiker: ['rietsuiker', 'witte suiker', 'kristalsuiker', 'basterdsuiker'],
     };
 
     return synonymMap[term.toLowerCase()] || [];
@@ -705,24 +942,52 @@ export class RecipeAdaptationService {
    * Get substitution suggestions by ingredient_category.code (fallback voor guard-rail termen).
    * Gebruikt wanneer recipe_adaptation_rules geen match heeft voor de term.
    */
-  private getSubstitutionSuggestionsByCategoryCode(categoryCode: string): string[] {
+  private getSubstitutionSuggestionsByCategoryCode(
+    categoryCode: string,
+  ): string[] {
     const code = categoryCode.toLowerCase();
     const byCode: Record<string, string[]> = {
       // Gluten / granen
-      wahls_forbidden_gluten: ["rijstnoedels", "zucchininoedels", "glutenvrije pasta", "quinoa", "rijst"],
-      gluten_containing_grains: ["rijstnoedels", "zucchininoedels", "quinoa", "amandelmeel", "rijstmeel"],
-      grains: ["rijst", "quinoa", "amandelmeel", "rijstmeel"],
+      wahls_forbidden_gluten: [
+        'rijstnoedels',
+        'zucchininoedels',
+        'glutenvrije pasta',
+        'quinoa',
+        'rijst',
+      ],
+      gluten_containing_grains: [
+        'rijstnoedels',
+        'zucchininoedels',
+        'quinoa',
+        'amandelmeel',
+        'rijstmeel',
+      ],
+      grains: ['rijst', 'quinoa', 'amandelmeel', 'rijstmeel'],
       // Zuivel
-      wahls_forbidden_dairy: ["amandelmelk", "havermelk", "kokosmelk", "rijstmelk"],
-      dairy: ["amandelmelk", "havermelk", "kokosmelk", "rijstmelk"],
+      wahls_forbidden_dairy: [
+        'amandelmelk',
+        'havermelk',
+        'kokosmelk',
+        'rijstmelk',
+      ],
+      dairy: ['amandelmelk', 'havermelk', 'kokosmelk', 'rijstmelk'],
       // Suiker
-      wahls_forbidden_added_sugar: ["stevia", "monniksfruit", "erythritol", "verminder of weglaten"],
-      processed_sugar: ["stevia", "honing", "agavesiroop", "erythritol"],
+      wahls_forbidden_added_sugar: [
+        'stevia',
+        'monniksfruit',
+        'erythritol',
+        'verminder of weglaten',
+      ],
+      processed_sugar: ['stevia', 'honing', 'agavesiroop', 'erythritol'],
       // Overig Wahls/Paleo
-      wahls_forbidden_soy: ["tempeh (niet soja)", "linzen", "kikkererwten"],
-      wahls_forbidden_ultra_processed: ["verse variant", "zonder toevoegingen"],
-      wahls_limited_legumes: ["meer groente", "extra eiwit (ei, vis)"],
-      wahls_limited_non_gluten_grains: ["groente", "zoete aardappel", "pompoen"],
+      wahls_forbidden_soy: ['tempeh (niet soja)', 'linzen', 'kikkererwten'],
+      wahls_forbidden_ultra_processed: ['verse variant', 'zonder toevoegingen'],
+      wahls_limited_legumes: ['meer groente', 'extra eiwit (ei, vis)'],
+      wahls_limited_non_gluten_grains: [
+        'groente',
+        'zoete aardappel',
+        'pompoen',
+      ],
     };
     return byCode[code] ?? [];
   }
@@ -732,22 +997,28 @@ export class RecipeAdaptationService {
    */
   private getSubstitutionSuggestions(
     ingredient: string,
-    category?: string
+    category?: string,
   ): string[] {
     const lowerIngredient = ingredient.toLowerCase();
     const suggestions: Record<string, string[]> = {
       // Gluten/grains
-      pasta: ["rijstnoedels", "zucchininoedels", "glutenvrije pasta", "quinoa pasta", "rijst"],
-      tarwebloem: ["amandelmeel", "rijstmeel", "kokosmeel", "tapiocameel"],
-      wheat: ["amandelmeel", "rijstmeel", "kokosmeel", "tapiocameel"],
+      pasta: [
+        'rijstnoedels',
+        'zucchininoedels',
+        'glutenvrije pasta',
+        'quinoa pasta',
+        'rijst',
+      ],
+      tarwebloem: ['amandelmeel', 'rijstmeel', 'kokosmeel', 'tapiocameel'],
+      wheat: ['amandelmeel', 'rijstmeel', 'kokosmeel', 'tapiocameel'],
       // Dairy
-      melk: ["amandelmelk", "havermelk", "kokosmelk", "rijstmelk"],
-      milk: ["amandelmelk", "havermelk", "kokosmelk", "rijstmelk"],
-      kaas: ["plantaardige kaas", "nutritional yeast", "cashew kaas"],
-      cheese: ["plantaardige kaas", "nutritional yeast", "cashew kaas"],
+      melk: ['amandelmelk', 'havermelk', 'kokosmelk', 'rijstmelk'],
+      milk: ['amandelmelk', 'havermelk', 'kokosmelk', 'rijstmelk'],
+      kaas: ['plantaardige kaas', 'nutritional yeast', 'cashew kaas'],
+      cheese: ['plantaardige kaas', 'nutritional yeast', 'cashew kaas'],
       // Sugar
-      suiker: ["stevia", "honing", "agavesiroop", "erythritol"],
-      sugar: ["stevia", "honing", "agavesiroop", "erythritol"],
+      suiker: ['stevia', 'honing', 'agavesiroop', 'erythritol'],
+      sugar: ['stevia', 'honing', 'agavesiroop', 'erythritol'],
     };
 
     // Check specific ingredient first
@@ -756,14 +1027,14 @@ export class RecipeAdaptationService {
     }
 
     // Check category-based suggestions
-    if (category === "grains" || category === "gluten_containing_grains") {
-      return ["rijst", "quinoa", "amandelmeel", "rijstmeel"];
+    if (category === 'grains' || category === 'gluten_containing_grains') {
+      return ['rijst', 'quinoa', 'amandelmeel', 'rijstmeel'];
     }
-    if (category === "dairy") {
-      return ["amandelmelk", "havermelk", "kokosmelk"];
+    if (category === 'dairy') {
+      return ['amandelmelk', 'havermelk', 'kokosmelk'];
     }
-    if (category === "processed_sugar") {
-      return ["stevia", "honing", "agavesiroop"];
+    if (category === 'processed_sugar') {
+      return ['stevia', 'honing', 'agavesiroop'];
     }
 
     return [];
@@ -772,16 +1043,22 @@ export class RecipeAdaptationService {
   /**
    * Get category label
    */
-  private getCategoryLabel(category: string, constraintType: "hard" | "soft"): string {
+  private getCategoryLabel(
+    category: string,
+    constraintType: 'hard' | 'soft',
+  ): string {
     const labels: Record<string, string> = {
-      grains: "Glutenvrij dieet",
-      gluten_containing_grains: "Glutenvrij dieet",
-      dairy: "Lactose-intolerantie / Vegan",
-      legumes: "Paleo dieet",
-      processed_sugar: "Verminderde suikerinname",
+      grains: 'Glutenvrij dieet',
+      gluten_containing_grains: 'Glutenvrij dieet',
+      dairy: 'Lactose-intolerantie / Vegan',
+      legumes: 'Paleo dieet',
+      processed_sugar: 'Verminderde suikerinname',
     };
 
-    return labels[category] || (constraintType === "hard" ? "Strikt verboden" : "Niet gewenst");
+    return (
+      labels[category] ||
+      (constraintType === 'hard' ? 'Strikt verboden' : 'Niet gewenst')
+    );
   }
 
   /**
@@ -791,15 +1068,15 @@ export class RecipeAdaptationService {
     try {
       const supabase = await createClient();
       const { data: dietType } = await supabase
-        .from("diet_types")
-        .select("name")
-        .eq("id", dietId)
+        .from('diet_types')
+        .select('name')
+        .eq('id', dietId)
         .maybeSingle();
-      
-      return dietType?.name || "het geselecteerde dieet";
+
+      return dietType?.name || 'het geselecteerde dieet';
     } catch (error) {
-      console.error("[RecipeAdaptation] Error fetching diet name:", error);
-      return "het geselecteerde dieet";
+      console.error('[RecipeAdaptation] Error fetching diet name:', error);
+      return 'het geselecteerde dieet';
     }
   }
 
@@ -813,79 +1090,84 @@ export class RecipeAdaptationService {
       version: 1,
       forbidden: [
         {
-          term: "pasta",
+          term: 'pasta',
           synonyms: [
-            "spaghetti",
-            "penne",
-            "fusilli",
-            "macaroni",
-            "orzo",
-            "risoni",
-            "couscous",
-            "noedels",
-            "tagliatelle",
-            "fettuccine",
-            "linguine",
-            "ravioli",
-            "lasagne",
-            "gnocchi",
+            'spaghetti',
+            'penne',
+            'fusilli',
+            'macaroni',
+            'orzo',
+            'risoni',
+            'couscous',
+            'noedels',
+            'tagliatelle',
+            'fettuccine',
+            'linguine',
+            'ravioli',
+            'lasagne',
+            'gnocchi',
           ],
-          ruleCode: "GLUTEN_FREE",
-          ruleLabel: "Glutenvrij dieet",
+          ruleCode: 'GLUTEN_FREE',
+          ruleLabel: 'Glutenvrij dieet',
           substitutionSuggestions: [
-            "rijstnoedels",
-            "zucchininoedels",
-            "glutenvrije pasta",
-            "quinoa pasta",
-            "rijst",
+            'rijstnoedels',
+            'zucchininoedels',
+            'glutenvrije pasta',
+            'quinoa pasta',
+            'rijst',
           ],
         },
         {
-          term: "tarwebloem",
-          synonyms: ["tarwe", "wheat", "bloem", "meel", "tarwemeel"],
-          ruleCode: "GLUTEN_FREE",
-          ruleLabel: "Glutenvrij dieet",
+          term: 'tarwebloem',
+          synonyms: ['tarwe', 'wheat', 'bloem', 'meel', 'tarwemeel'],
+          ruleCode: 'GLUTEN_FREE',
+          ruleLabel: 'Glutenvrij dieet',
           substitutionSuggestions: [
-            "amandelmeel",
-            "rijstmeel",
-            "kokosmeel",
-            "tapiocameel",
+            'amandelmeel',
+            'rijstmeel',
+            'kokosmeel',
+            'tapiocameel',
           ],
         },
         {
-          term: "melk",
-          synonyms: ["koemelk", "volle melk", "halfvolle melk", "magere melk"],
-          ruleCode: "LACTOSE_FREE",
-          ruleLabel: "Lactose-intolerantie",
+          term: 'melk',
+          synonyms: ['koemelk', 'volle melk', 'halfvolle melk', 'magere melk'],
+          ruleCode: 'LACTOSE_FREE',
+          ruleLabel: 'Lactose-intolerantie',
           substitutionSuggestions: [
-            "amandelmelk",
-            "havermelk",
-            "kokosmelk",
-            "rijstmelk",
+            'amandelmelk',
+            'havermelk',
+            'kokosmelk',
+            'rijstmelk',
           ],
         },
         {
-          term: "suiker",
+          term: 'suiker',
           synonyms: [
-            "rietsuiker",
-            "witte suiker",
-            "kristalsuiker",
-            "basterdsuiker",
+            'rietsuiker',
+            'witte suiker',
+            'kristalsuiker',
+            'basterdsuiker',
           ],
-          ruleCode: "LOW_SUGAR",
-          ruleLabel: "Verminderde suikerinname",
-          substitutionSuggestions: ["stevia", "honing", "agavesiroop", "erythritol"],
+          ruleCode: 'LOW_SUGAR',
+          ruleLabel: 'Verminderde suikerinname',
+          substitutionSuggestions: [
+            'stevia',
+            'honing',
+            'agavesiroop',
+            'erythritol',
+          ],
         },
       ],
       heuristics: {
         addedSugarTerms: [
-          "suiker",
-          "siroop",
-          "stroop",
-          "honing",
-          "glucose",
-          "fructose",
-          "sucrose",
+          'suiker',
+          'siroop',
+          'stroop',
+          'honing',
+          'glucose',
+          'fructose',
+          'sucrose',
         ],
       },
     };
@@ -893,16 +1175,16 @@ export class RecipeAdaptationService {
 
   /**
    * Load recipe from database
-   * 
+   *
    * Tries custom_meals first, then meal_history
-   * 
+   *
    * @param recipeId - Recipe ID
    * @param userId - User ID
    * @returns Recipe data or null if not found
    */
   private async loadRecipe(
     recipeId: string,
-    userId: string
+    userId: string,
   ): Promise<{ mealData: any; mealName: string; steps: string[] } | null> {
     const supabase = await createClient();
 
@@ -914,7 +1196,7 @@ export class RecipeAdaptationService {
       const mealData = customMeal.mealData || {};
       // Instructions are stored in aiAnalysis, not in mealData (Meal type doesn't have instructions)
       const steps = customMeal.aiAnalysis?.instructions || [];
-      
+
       console.log(`[RecipeAdaptation] Loaded custom meal:`, {
         name: customMeal.name,
         hasIngredientRefs: !!mealData.ingredientRefs,
@@ -922,24 +1204,27 @@ export class RecipeAdaptationService {
         hasIngredients: !!mealData.ingredients,
         ingredientsCount: mealData.ingredients?.length || 0,
         hasAiAnalysis: !!customMeal.aiAnalysis,
-        aiAnalysisInstructions: customMeal.aiAnalysis?.instructions?.length || 0,
+        aiAnalysisInstructions:
+          customMeal.aiAnalysis?.instructions?.length || 0,
       });
-      
+
       return {
         mealData,
         mealName: customMeal.name,
         steps: Array.isArray(steps)
-          ? steps.map((s: any) => (typeof s === "string" ? s : s.text || s.step || String(s)))
+          ? steps.map((s: any) =>
+              typeof s === 'string' ? s : s.text || s.step || String(s),
+            )
           : [],
       };
     }
 
     // Try meal_history
     const { data: mealHistory } = await supabase
-      .from("meal_history")
-      .select("*")
-      .eq("id", recipeId)
-      .eq("user_id", userId)
+      .from('meal_history')
+      .select('*')
+      .eq('id', recipeId)
+      .eq('user_id', userId)
       .maybeSingle();
 
     if (mealHistory) {
@@ -947,7 +1232,7 @@ export class RecipeAdaptationService {
       // meal_data is of type Meal which doesn't have instructions
       // Instructions might be in ai_analysis if available, otherwise empty array
       const steps = (mealHistory as any).ai_analysis?.instructions || [];
-      
+
       console.log(`[RecipeAdaptation] Loaded meal_history:`, {
         mealName: mealHistory.meal_name,
         hasIngredientRefs: !!mealData.ingredientRefs,
@@ -955,14 +1240,17 @@ export class RecipeAdaptationService {
         hasIngredients: !!mealData.ingredients,
         ingredientsCount: mealData.ingredients?.length || 0,
         hasAiAnalysis: !!(mealHistory as any).ai_analysis,
-        aiAnalysisInstructions: (mealHistory as any).ai_analysis?.instructions?.length || 0,
+        aiAnalysisInstructions:
+          (mealHistory as any).ai_analysis?.instructions?.length || 0,
       });
-      
+
       return {
         mealData,
         mealName: mealHistory.meal_name,
         steps: Array.isArray(steps)
-          ? steps.map((s: any) => (typeof s === "string" ? s : s.text || s.step || String(s)))
+          ? steps.map((s: any) =>
+              typeof s === 'string' ? s : s.text || s.step || String(s),
+            )
           : [],
       };
     }
@@ -972,14 +1260,14 @@ export class RecipeAdaptationService {
 
   /**
    * Analyze original recipe and find violations
-   * 
+   *
    * @param recipe - Recipe data
    * @param ruleset - Diet ruleset
    * @returns Array of violations found
    */
   private analyzeRecipeForViolations(
     recipe: { mealData: any; mealName: string; steps: string[] },
-    ruleset: DietRuleset
+    ruleset: DietRuleset,
   ): ViolationDetail[] {
     const violations: ViolationDetail[] = [];
     const foundIngredients = new Set<string>(); // Track to avoid duplicates
@@ -991,21 +1279,31 @@ export class RecipeAdaptationService {
 
     console.log(`[RecipeAdaptation] ========================================`);
     console.log(`[RecipeAdaptation] Analyzing recipe: ${recipe.mealName}`);
-    console.log(`[RecipeAdaptation] Ruleset has ${ruleset.forbidden.length} forbidden rules`);
-    console.log(`[RecipeAdaptation] Found ${ingredients.length} ingredients to analyze`);
-    
+    console.log(
+      `[RecipeAdaptation] Ruleset has ${ruleset.forbidden.length} forbidden rules`,
+    );
+    console.log(
+      `[RecipeAdaptation] Found ${ingredients.length} ingredients to analyze`,
+    );
+
     // Log full ruleset for debugging
-    console.log(`[RecipeAdaptation] FULL RULESET:`, JSON.stringify(ruleset.forbidden, null, 2));
-    
+    console.log(
+      `[RecipeAdaptation] FULL RULESET:`,
+      JSON.stringify(ruleset.forbidden, null, 2),
+    );
+
     // Log all ingredient names for debugging
-    console.log(`[RecipeAdaptation] ALL INGREDIENTS:`, ingredients.map((ing: any) => ({
-      displayName: ing.displayName,
-      name: ing.name,
-      original_line: ing.original_line,
-      note: ing.note,
-      full: ing,
-    })));
-    
+    console.log(
+      `[RecipeAdaptation] ALL INGREDIENTS:`,
+      ingredients.map((ing: any) => ({
+        displayName: ing.displayName,
+        name: ing.name,
+        original_line: ing.original_line,
+        note: ing.note,
+        full: ing,
+      })),
+    );
+
     console.log(`[RecipeAdaptation] ========================================`);
 
     for (const ing of ingredients) {
@@ -1017,7 +1315,7 @@ export class RecipeAdaptationService {
         (ing.nevoCode ? `NEVO ${ing.nevoCode}` : null) ||
         String(ing);
 
-      if (!ingredientName || String(ingredientName).trim() === "") {
+      if (!ingredientName || String(ingredientName).trim() === '') {
         console.log(`[RecipeAdaptation] Skipping empty ingredient:`, ing);
         continue;
       }
@@ -1032,12 +1330,14 @@ export class RecipeAdaptationService {
         ing.name,
         ing.original_line,
         ing.note,
-      ].filter((v) => v != null && String(v).trim() !== "");
-      const searchText = searchParts.join(" ");
+      ].filter((v) => v != null && String(v).trim() !== '');
+      const searchText = searchParts.join(' ');
 
-      console.log(`[RecipeAdaptation] Checking ingredient: searchText="${searchText.substring(0, 80)}..."`);
+      console.log(
+        `[RecipeAdaptation] Checking ingredient: searchText="${searchText.substring(0, 80)}..."`,
+      );
 
-      const matches = findForbiddenMatches(searchText, ruleset, "ingredients");
+      const matches = findForbiddenMatches(searchText, ruleset, 'ingredients');
 
       if (matches.length > 0) {
         const match = matches[0];
@@ -1046,84 +1346,120 @@ export class RecipeAdaptationService {
           ruleCode: match.ruleCode,
           ruleLabel: match.ruleLabel,
           suggestion:
-            match.substitutionSuggestions && match.substitutionSuggestions.length > 0
-              ? `Vervang door ${match.substitutionSuggestions[0]}${match.substitutionSuggestions.length > 1 ? ` of ${match.substitutionSuggestions.slice(1, 3).join(", ")}` : ""}`
+            match.substitutionSuggestions &&
+            match.substitutionSuggestions.length > 0
+              ? `Vervang door ${match.substitutionSuggestions[0]}${match.substitutionSuggestions.length > 1 ? ` of ${match.substitutionSuggestions.slice(1, 3).join(', ')}` : ''}`
               : `Vervang dit ingrediënt voor een dieet-compatibele variant`,
         });
         foundIngredients.add(lowerName);
-        
+
         // Log for debugging
-        console.log(`[RecipeAdaptation] ✓ Found violation: ${ingredientName} -> ${match.ruleCode} (matched: ${match.matched})`);
+        console.log(
+          `[RecipeAdaptation] ✓ Found violation: ${ingredientName} -> ${match.ruleCode} (matched: ${match.matched})`,
+        );
       } else {
         // Log all forbidden terms to help debug why no match
-        const allForbiddenTerms = ruleset.forbidden.flatMap(f => [f.term, ...(f.synonyms || [])]);
-        const hasPotentialMatch = allForbiddenTerms.some(term => 
-          lowerName.includes(term.toLowerCase()) || term.toLowerCase().includes(lowerName)
+        const allForbiddenTerms = ruleset.forbidden.flatMap((f) => [
+          f.term,
+          ...(f.synonyms || []),
+        ]);
+        const hasPotentialMatch = allForbiddenTerms.some(
+          (term) =>
+            lowerName.includes(term.toLowerCase()) ||
+            term.toLowerCase().includes(lowerName),
         );
-        
+
         if (hasPotentialMatch) {
-          console.warn(`[RecipeAdaptation] ⚠ Potential match found but not detected: "${ingredientName}" (lower: "${lowerName}")`);
-          console.warn(`[RecipeAdaptation]   All forbidden terms:`, allForbiddenTerms);
+          console.warn(
+            `[RecipeAdaptation] ⚠ Potential match found but not detected: "${ingredientName}" (lower: "${lowerName}")`,
+          );
+          console.warn(
+            `[RecipeAdaptation]   All forbidden terms:`,
+            allForbiddenTerms,
+          );
           console.warn(`[RecipeAdaptation]   Testing manual match...`);
-          
+
           // Manual test of each forbidden term
           for (const forbidden of ruleset.forbidden) {
             const lowerTerm = forbidden.term.toLowerCase();
-            if (lowerName.includes(lowerTerm) || lowerTerm.includes(lowerName)) {
-              console.warn(`[RecipeAdaptation]   → Should match "${forbidden.term}" but didn't!`);
+            if (
+              lowerName.includes(lowerTerm) ||
+              lowerTerm.includes(lowerName)
+            ) {
+              console.warn(
+                `[RecipeAdaptation]   → Should match "${forbidden.term}" but didn't!`,
+              );
             }
             if (forbidden.synonyms) {
               for (const synonym of forbidden.synonyms) {
                 const lowerSyn = synonym.toLowerCase();
-                if (lowerName.includes(lowerSyn) || lowerSyn.includes(lowerName)) {
-                  console.warn(`[RecipeAdaptation]   → Should match synonym "${synonym}" of "${forbidden.term}" but didn't!`);
+                if (
+                  lowerName.includes(lowerSyn) ||
+                  lowerSyn.includes(lowerName)
+                ) {
+                  console.warn(
+                    `[RecipeAdaptation]   → Should match synonym "${synonym}" of "${forbidden.term}" but didn't!`,
+                  );
                 }
               }
             }
           }
         } else {
-          console.log(`[RecipeAdaptation]   No match for "${ingredientName}" (checked against ${allForbiddenTerms.length} terms)`);
+          console.log(
+            `[RecipeAdaptation]   No match for "${ingredientName}" (checked against ${allForbiddenTerms.length} terms)`,
+          );
         }
       }
     }
 
     // Analyze steps for forbidden ingredients and added sugar heuristics
     // Steps might contain ingredient names that weren't in the ingredients list
-    console.log(`[RecipeAdaptation] Analyzing ${recipe.steps.length} steps for violations`);
-    
+    console.log(
+      `[RecipeAdaptation] Analyzing ${recipe.steps.length} steps for violations`,
+    );
+
     for (const step of recipe.steps) {
-      const stepText = typeof step === "string" ? step : String(step);
-      
-      if (!stepText || stepText.trim() === "") {
+      const stepText = typeof step === 'string' ? step : String(step);
+
+      if (!stepText || stepText.trim() === '') {
         continue;
       }
-      
-      console.log(`[RecipeAdaptation] Checking step: "${stepText.substring(0, 50)}..."`);
-      
-      const matches = findForbiddenMatches(stepText, ruleset, "steps");
+
+      console.log(
+        `[RecipeAdaptation] Checking step: "${stepText.substring(0, 50)}..."`,
+      );
+
+      const matches = findForbiddenMatches(stepText, ruleset, 'steps');
 
       for (const match of matches) {
         // Check if this violation was already found in ingredients
         const alreadyFound = violations.some(
           (v) =>
-            v.ingredientName.toLowerCase().includes(match.matched.toLowerCase()) ||
-            match.matched.toLowerCase().includes(v.ingredientName.toLowerCase()) ||
-            v.ruleCode === match.ruleCode
+            v.ingredientName
+              .toLowerCase()
+              .includes(match.matched.toLowerCase()) ||
+            match.matched
+              .toLowerCase()
+              .includes(v.ingredientName.toLowerCase()) ||
+            v.ruleCode === match.ruleCode,
         );
 
         if (!alreadyFound) {
           // For sugar heuristics, add as violation
-          if (match.ruleCode === "LOW_SUGAR") {
+          if (match.ruleCode === 'LOW_SUGAR') {
             violations.push({
               ingredientName: match.matched,
               ruleCode: match.ruleCode,
               ruleLabel: match.ruleLabel,
               suggestion:
-                match.substitutionSuggestions && match.substitutionSuggestions.length > 0
+                match.substitutionSuggestions &&
+                match.substitutionSuggestions.length > 0
                   ? `Vervang door ${match.substitutionSuggestions[0]} of verminder de hoeveelheid`
                   : `Verminder of vervang dit ingrediënt`,
             });
-            console.log(`[RecipeAdaptation] ✓ Found sugar violation in step: ${match.matched}`);
+            console.log(
+              `[RecipeAdaptation] ✓ Found sugar violation in step: ${match.matched}`,
+            );
           } else {
             // For other forbidden ingredients found in steps (e.g., "voeg pasta toe")
             violations.push({
@@ -1131,23 +1467,28 @@ export class RecipeAdaptationService {
               ruleCode: match.ruleCode,
               ruleLabel: match.ruleLabel,
               suggestion:
-                match.substitutionSuggestions && match.substitutionSuggestions.length > 0
-                  ? `Vervang door ${match.substitutionSuggestions[0]}${match.substitutionSuggestions.length > 1 ? ` of ${match.substitutionSuggestions.slice(1, 3).join(", ")}` : ""}`
+                match.substitutionSuggestions &&
+                match.substitutionSuggestions.length > 0
+                  ? `Vervang door ${match.substitutionSuggestions[0]}${match.substitutionSuggestions.length > 1 ? ` of ${match.substitutionSuggestions.slice(1, 3).join(', ')}` : ''}`
                   : `Vervang dit ingrediënt voor een dieet-compatibele variant`,
             });
-            console.log(`[RecipeAdaptation] ✓ Found ingredient violation in step: ${match.matched} (${match.ruleCode})`);
+            console.log(
+              `[RecipeAdaptation] ✓ Found ingredient violation in step: ${match.matched} (${match.ruleCode})`,
+            );
           }
         }
       }
     }
 
-    console.log(`[RecipeAdaptation] Analysis complete: found ${violations.length} violation(s)`);
+    console.log(
+      `[RecipeAdaptation] Analysis complete: found ${violations.length} violation(s)`,
+    );
     return violations;
   }
 
   /**
    * Generate rewrite with substitutions
-   * 
+   *
    * @param recipe - Original recipe
    * @param violations - Found violations
    * @param ruleset - Diet ruleset
@@ -1158,7 +1499,7 @@ export class RecipeAdaptationService {
     recipe: { mealData: any; mealName: string; steps: string[] },
     violations: ViolationDetail[],
     ruleset: DietRuleset,
-    strict: boolean
+    strict: boolean,
   ): { ingredients: IngredientLine[]; steps: StepLine[] } {
     const ingredients: IngredientLine[] = [];
     const steps: StepLine[] = [];
@@ -1166,17 +1507,26 @@ export class RecipeAdaptationService {
     // Build substitution map
     // In strict mode, use ALL forbidden terms from ruleset, not just found violations
     const substitutionMap = new Map<string, string>();
-    
+
     if (strict) {
       // In strict mode, build map from all forbidden rules
       for (const rule of ruleset.forbidden) {
-        if (rule.substitutionSuggestions && rule.substitutionSuggestions.length > 0) {
+        if (
+          rule.substitutionSuggestions &&
+          rule.substitutionSuggestions.length > 0
+        ) {
           // Add main term
-          substitutionMap.set(rule.term.toLowerCase(), rule.substitutionSuggestions[0]);
+          substitutionMap.set(
+            rule.term.toLowerCase(),
+            rule.substitutionSuggestions[0],
+          );
           // Add all synonyms
           if (rule.synonyms) {
             for (const synonym of rule.synonyms) {
-              substitutionMap.set(synonym.toLowerCase(), rule.substitutionSuggestions[0]);
+              substitutionMap.set(
+                synonym.toLowerCase(),
+                rule.substitutionSuggestions[0],
+              );
             }
           }
         }
@@ -1184,11 +1534,16 @@ export class RecipeAdaptationService {
     } else {
       // In non-strict mode, only use found violations
       for (const violation of violations) {
-        const rule = ruleset.forbidden.find((r) => r.ruleCode === violation.ruleCode);
-        if (rule?.substitutionSuggestions && rule.substitutionSuggestions.length > 0) {
+        const rule = ruleset.forbidden.find(
+          (r) => r.ruleCode === violation.ruleCode,
+        );
+        if (
+          rule?.substitutionSuggestions &&
+          rule.substitutionSuggestions.length > 0
+        ) {
           substitutionMap.set(
             violation.ingredientName.toLowerCase(),
-            rule.substitutionSuggestions[0]
+            rule.substitutionSuggestions[0],
           );
         }
       }
@@ -1201,26 +1556,32 @@ export class RecipeAdaptationService {
 
     for (const ing of originalIngredients) {
       const ingredientName =
-        ing.displayName ||
-        ing.name ||
-        ing.original_line ||
-        String(ing);
-      const quantity = ing.quantityG || ing.quantity || ing.amount || "";
-      const unit = ing.unit || "g";
+        ing.displayName || ing.name || ing.original_line || String(ing);
+      const quantity = ing.quantityG || ing.quantity || ing.amount || '';
+      const unit = ing.unit || 'g';
       const note = ing.note || ing.notes;
 
       const lowerName = ingredientName.toLowerCase();
-      
+
       // Check if this ingredient matches any forbidden term (including synonyms)
       let substitution: string | undefined;
-      
+
       if (strict) {
         // In strict mode, use findForbiddenMatches for accurate matching
-        const matches = findForbiddenMatches(ingredientName, ruleset, "ingredients");
+        const matches = findForbiddenMatches(
+          ingredientName,
+          ruleset,
+          'ingredients',
+        );
         if (matches.length > 0) {
           const match = matches[0];
-          const rule = ruleset.forbidden.find((r) => r.ruleCode === match.ruleCode);
-          if (rule?.substitutionSuggestions && rule.substitutionSuggestions.length > 0) {
+          const rule = ruleset.forbidden.find(
+            (r) => r.ruleCode === match.ruleCode,
+          );
+          if (
+            rule?.substitutionSuggestions &&
+            rule.substitutionSuggestions.length > 0
+          ) {
             substitution = rule.substitutionSuggestions[0];
           }
         }
@@ -1250,16 +1611,16 @@ export class RecipeAdaptationService {
 
     // Rewrite steps
     recipe.steps.forEach((step, index) => {
-      const stepText = typeof step === "string" ? step : String(step);
+      const stepText = typeof step === 'string' ? step : String(step);
       let rewrittenText = stepText;
 
       // Replace forbidden terms in steps (both strict and non-strict mode)
       substitutionMap.forEach((substitution, original) => {
-        const escapedOriginal = original.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const regex = new RegExp(`\\b${escapedOriginal}\\b`, "gi");
+        const escapedOriginal = original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`\\b${escapedOriginal}\\b`, 'gi');
         rewrittenText = rewrittenText.replace(
           regex,
-          substitution.charAt(0).toUpperCase() + substitution.slice(1)
+          substitution.charAt(0).toUpperCase() + substitution.slice(1),
         );
       });
 
@@ -1274,10 +1635,10 @@ export class RecipeAdaptationService {
 
   /**
    * Generate draft with rewrite engine
-   * 
+   *
    * Analyzes the actual recipe and generates a draft based on real violations.
    * Bij twee-fase flow kan existingViolations worden meegegeven (dan wordt analyse overgeslagen).
-   * 
+   *
    * @param recipeId - Recipe ID
    * @param dietId - Diet ID
    * @param strict - Whether to use strict mode (for retry)
@@ -1288,7 +1649,7 @@ export class RecipeAdaptationService {
     recipeId: string,
     dietId: string,
     strict: boolean,
-    existingViolations?: ViolationDetail[]
+    existingViolations?: ViolationDetail[],
   ): Promise<RecipeAdaptationDraft> {
     // Load recipe, ruleset and diet name in parallel where possible
     const supabase = await createClient();
@@ -1297,7 +1658,7 @@ export class RecipeAdaptationService {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      throw new Error("User not authenticated");
+      throw new Error('User not authenticated');
     }
 
     const [recipe, ruleset, dietName] = await Promise.all([
@@ -1307,10 +1668,10 @@ export class RecipeAdaptationService {
     ]);
 
     if (!recipe) {
-      throw new Error("Recipe not found");
+      throw new Error('Recipe not found');
     }
     if (!ruleset) {
-      throw new Error("Ruleset not found");
+      throw new Error('Ruleset not found');
     }
 
     console.log(`[RecipeAdaptation] Loaded recipe:`, {
@@ -1323,28 +1684,38 @@ export class RecipeAdaptationService {
 
     // Log ingredient structure for debugging
     if (recipe.mealData?.ingredientRefs) {
-      console.log(`[RecipeAdaptation] IngredientRefs sample:`, recipe.mealData.ingredientRefs.slice(0, 3).map((ing: any) => ({
-        displayName: ing.displayName,
-        nevoCode: ing.nevoCode,
-        quantityG: ing.quantityG,
-      })));
+      console.log(
+        `[RecipeAdaptation] IngredientRefs sample:`,
+        recipe.mealData.ingredientRefs.slice(0, 3).map((ing: any) => ({
+          displayName: ing.displayName,
+          nevoCode: ing.nevoCode,
+          quantityG: ing.quantityG,
+        })),
+      );
     }
     if (recipe.mealData?.ingredients) {
-      console.log(`[RecipeAdaptation] Ingredients sample:`, recipe.mealData.ingredients.slice(0, 3).map((ing: any) => ({
-        name: ing.name,
-        original_line: ing.original_line,
-        quantity: ing.quantity,
-        unit: ing.unit,
-      })));
+      console.log(
+        `[RecipeAdaptation] Ingredients sample:`,
+        recipe.mealData.ingredients.slice(0, 3).map((ing: any) => ({
+          name: ing.name,
+          original_line: ing.original_line,
+          quantity: ing.quantity,
+          unit: ing.unit,
+        })),
+      );
     }
 
     if (ruleset.forbidden.length === 0) {
-      console.error(`[RecipeAdaptation] ⚠ ERROR: Ruleset has no forbidden rules! This will result in no violations being found.`);
+      console.error(
+        `[RecipeAdaptation] ⚠ ERROR: Ruleset has no forbidden rules! This will result in no violations being found.`,
+      );
       console.error(`[RecipeAdaptation]   dietId: ${dietId}`);
       console.error(`[RecipeAdaptation]   Falling back to default ruleset...`);
       const fallbackRuleset = this.getFallbackRuleset(dietId);
       if (fallbackRuleset.forbidden.length > 0) {
-        console.log(`[RecipeAdaptation]   Using fallback with ${fallbackRuleset.forbidden.length} rules`);
+        console.log(
+          `[RecipeAdaptation]   Using fallback with ${fallbackRuleset.forbidden.length} rules`,
+        );
         ruleset.forbidden = fallbackRuleset.forbidden;
       }
     }
@@ -1357,9 +1728,11 @@ export class RecipeAdaptationService {
 
     // Use Gemini for intelligent adaptation if violations found, otherwise use simple rewrite
     let draft: RecipeAdaptationDraft;
-    
+
     if (violations.length > 0) {
-      console.log(`[RecipeAdaptation] Using Gemini AI for intelligent adaptation (${violations.length} violations found)`);
+      console.log(
+        `[RecipeAdaptation] Using Gemini AI for intelligent adaptation (${violations.length} violations found)`,
+      );
       const GEMINI_ADAPTATION_TIMEOUT_MS = 45_000;
       let geminiTimeoutId: ReturnType<typeof setTimeout>;
       try {
@@ -1368,25 +1741,40 @@ export class RecipeAdaptationService {
             recipe,
             violations,
             ruleset,
-            dietName
+            dietName,
           ).finally(() => clearTimeout(geminiTimeoutId)),
           new Promise<RecipeAdaptationDraft>((_, reject) => {
             geminiTimeoutId = setTimeout(
-              () => reject(new Error("Gemini-aanpassing duurde te lang; gebruik simpele vervangingen.")),
-              GEMINI_ADAPTATION_TIMEOUT_MS
+              () =>
+                reject(
+                  new Error(
+                    'Gemini-aanpassing duurde te lang; gebruik simpele vervangingen.',
+                  ),
+                ),
+              GEMINI_ADAPTATION_TIMEOUT_MS,
             );
           }),
         ]);
-        console.log(`[RecipeAdaptation] Gemini adaptation completed successfully`);
+        console.log(
+          `[RecipeAdaptation] Gemini adaptation completed successfully`,
+        );
       } catch (error) {
-        console.error(`[RecipeAdaptation] Gemini adaptation failed, falling back to simple rewrite:`, error);
+        console.error(
+          `[RecipeAdaptation] Gemini adaptation failed, falling back to simple rewrite:`,
+          error,
+        );
         // Fallback to simple rewrite if Gemini fails
-        const rewrite = this.generateRewrite(recipe, violations, ruleset, strict);
+        const rewrite = this.generateRewrite(
+          recipe,
+          violations,
+          ruleset,
+          strict,
+        );
         const summary =
           violations.length === 0
-            ? "Geen afwijkingen gevonden! Dit recept past perfect bij jouw dieet."
-            : `${violations.length} ingrediënt${violations.length !== 1 ? "en" : ""} wijk${violations.length !== 1 ? "en" : "t"} af van je dieetvoorkeuren. Hieronder vind je aangepaste alternatieven.`;
-        
+            ? 'Geen afwijkingen gevonden! Dit recept past perfect bij jouw dieet.'
+            : `${violations.length} ingrediënt${violations.length !== 1 ? 'en' : ''} wijk${violations.length !== 1 ? 'en' : 't'} af van je dieetvoorkeuren. Hieronder vind je aangepaste alternatieven.`;
+
         draft = {
           analysis: {
             violations,
@@ -1399,16 +1787,22 @@ export class RecipeAdaptationService {
             ingredients: rewrite.ingredients,
             steps: rewrite.steps,
           },
-          confidence: violations.length === 0 ? 1.0 : Math.max(0.7, 1.0 - violations.length * 0.1),
+          confidence:
+            violations.length === 0
+              ? 1.0
+              : Math.max(0.7, 1.0 - violations.length * 0.1),
           openQuestions: violations.length > 0 ? [] : undefined,
         };
       }
     } else {
       // No violations, use simple rewrite
-      console.log(`[RecipeAdaptation] No violations found, using simple rewrite`);
+      console.log(
+        `[RecipeAdaptation] No violations found, using simple rewrite`,
+      );
       const rewrite = this.generateRewrite(recipe, violations, ruleset, strict);
-      const summary = "Geen afwijkingen gevonden! Dit recept past perfect bij jouw dieet.";
-      
+      const summary =
+        'Geen afwijkingen gevonden! Dit recept past perfect bij jouw dieet.';
+
       draft = {
         analysis: {
           violations,
@@ -1423,19 +1817,19 @@ export class RecipeAdaptationService {
         openQuestions: undefined,
       };
     }
-    
+
     console.log(`[RecipeAdaptation] Draft created successfully`);
     console.log(`[RecipeAdaptation] ========================================`);
-    
+
     return draft;
   }
 
   /**
    * Evaluate vNext guard rails in shadow mode
-   * 
+   *
    * Runs vNext evaluation in parallel to legacy validation for comparison.
    * Results are added to diagnostics field (non-breaking).
-   * 
+   *
    * @param draft - Recipe adaptation draft
    * @param dietId - Diet ID
    * @param locale - Locale
@@ -1447,18 +1841,18 @@ export class RecipeAdaptationService {
     dietId: string,
     locale: string | undefined,
     recipeId: string,
-    legacyValidation: ValidationReport
+    legacyValidation: ValidationReport,
   ): Promise<void> {
     try {
       // Map draft to vNext targets
       const targets = mapRecipeDraftToGuardrailsTargets(
         draft,
-        locale === 'en' ? 'en' : 'nl'
+        locale === 'en' ? 'en' : 'nl',
       );
 
       // Determine locale (default to 'nl')
       const vNextLocale = (locale === 'en' ? 'en' : 'nl') as Locale;
-      
+
       // Load vNext ruleset
       const ruleset = await loadGuardrailsRuleset({
         dietId,
@@ -1503,8 +1897,12 @@ export class RecipeAdaptationService {
       // Log discrepancy if legacy and vNext outcomes differ
       const legacyOutcome = legacyValidation.ok ? 'allowed' : 'blocked';
       const vNextOutcome = decision.outcome;
-      
-      if (legacyOutcome !== vNextOutcome && legacyOutcome === 'allowed' && vNextOutcome === 'blocked') {
+
+      if (
+        legacyOutcome !== vNextOutcome &&
+        legacyOutcome === 'allowed' &&
+        vNextOutcome === 'blocked'
+      ) {
         // Legacy allowed but vNext blocked - potential safety issue
         console.warn(
           `[RecipeAdaptation] Guard rails discrepancy: legacy=${legacyOutcome}, vNext=${vNextOutcome}`,
@@ -1514,9 +1912,13 @@ export class RecipeAdaptationService {
             legacyViolations: legacyValidation.matches.length,
             vNextMatches: decision.matches.length,
             vNextHash: ruleset.contentHash.substring(0, 8),
-          }
+          },
         );
-      } else if (legacyOutcome !== vNextOutcome && legacyOutcome === 'blocked' && vNextOutcome === 'allowed') {
+      } else if (
+        legacyOutcome !== vNextOutcome &&
+        legacyOutcome === 'blocked' &&
+        vNextOutcome === 'allowed'
+      ) {
         // Legacy blocked but vNext allowed - potential false positive in legacy
         console.warn(
           `[RecipeAdaptation] Guard rails discrepancy: legacy=${legacyOutcome}, vNext=${vNextOutcome}`,
@@ -1526,12 +1928,15 @@ export class RecipeAdaptationService {
             legacyViolations: legacyValidation.matches.length,
             vNextMatches: decision.matches.length,
             vNextHash: ruleset.contentHash.substring(0, 8),
-          }
+          },
         );
       }
     } catch (error) {
       // Don't throw - shadow mode should not break the request
-      console.error('[RecipeAdaptation] vNext guard rails evaluation error:', error);
+      console.error(
+        '[RecipeAdaptation] vNext guard rails evaluation error:',
+        error,
+      );
     }
   }
 }

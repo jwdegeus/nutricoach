@@ -1,8 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: "Authentication | NutriCoach",
-  description: "NutriCoach Authentication",
+  title: 'Authentication | NutriCoach',
+  description: 'NutriCoach Authentication',
 };
 
 export default function AuthLayout({

@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-import { ClientOnlyApplicationLayout } from "@/src/components/app/ClientOnlyApplicationLayout";
-import { getTranslations } from "next-intl/server";
+import type { Metadata } from 'next';
+import { ClientOnlyApplicationLayout } from '@/src/components/app/ClientOnlyApplicationLayout';
+import { getTranslations } from 'next-intl/server';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('metadata');

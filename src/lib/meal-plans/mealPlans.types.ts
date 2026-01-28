@@ -1,6 +1,6 @@
 /**
  * Meal Plans Types
- * 
+ *
  * Types for meal plan persistence and management.
  */
 
@@ -8,8 +8,8 @@ import type {
   MealPlanRequest,
   MealPlanResponse,
   DietRuleSet,
-} from "@/src/lib/diets";
-import type { MealPlanEnrichmentResponse } from "@/src/lib/agents/meal-planner";
+} from '@/src/lib/diets';
+import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner';
 
 /**
  * Meal plan record from database (snake_case)

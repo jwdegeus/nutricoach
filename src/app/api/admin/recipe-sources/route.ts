@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/src/lib/supabase/server";
-import { isAdmin } from "@/src/lib/auth/roles";
-import { revalidatePath } from "next/cache";
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/src/lib/supabase/server';
+import { isAdmin } from '@/src/lib/auth/roles';
+import { revalidatePath } from 'next/cache';
 
 /**
  * GET /api/admin/recipe-sources
@@ -15,11 +15,11 @@ export async function GET(request: NextRequest) {
         {
           ok: false,
           error: {
-            code: "AUTH_ERROR",
-            message: "Alleen admins kunnen bronnen bekijken",
+            code: 'AUTH_ERROR',
+            message: 'Alleen admins kunnen bronnen bekijken',
           },
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -27,20 +27,20 @@ export async function GET(request: NextRequest) {
 
     // Get all sources
     const { data: sources, error: sourcesError } = await supabase
-      .from("recipe_sources")
-      .select("*")
-      .order("name", { ascending: true });
+      .from('recipe_sources')
+      .select('*')
+      .order('name', { ascending: true });
 
     if (sourcesError) {
       return NextResponse.json(
         {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: sourcesError.message,
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -49,31 +49,31 @@ export async function GET(request: NextRequest) {
       (sources || []).map(async (source) => {
         // Count usage in custom_meals
         const { count: customMealsCount } = await supabase
-          .from("custom_meals")
-          .select("*", { count: "exact", head: true })
-          .eq("source", source.name);
+          .from('custom_meals')
+          .select('*', { count: 'exact', head: true })
+          .eq('source', source.name);
 
         // Count usage in meal_history
         const { count: mealHistoryCount } = await supabase
-          .from("meal_history")
-          .select("*", { count: "exact", head: true })
-          .eq("source", source.name);
+          .from('meal_history')
+          .select('*', { count: 'exact', head: true })
+          .eq('source', source.name);
 
         const actualUsage = (customMealsCount || 0) + (mealHistoryCount || 0);
 
         // Update usage_count in database if it differs
         if (actualUsage !== source.usage_count) {
           await supabase
-            .from("recipe_sources")
+            .from('recipe_sources')
             .update({ usage_count: actualUsage })
-            .eq("id", source.id);
+            .eq('id', source.id);
         }
 
         return {
           ...source,
           usage_count: actualUsage,
         };
-      })
+      }),
     );
 
     // Sort by usage count (descending), then by name
@@ -89,16 +89,16 @@ export async function GET(request: NextRequest) {
       data: sourcesWithUsage,
     });
   } catch (error) {
-    console.error("Error fetching recipe sources:", error);
+    console.error('Error fetching recipe sources:', error);
     return NextResponse.json(
       {
         ok: false,
         error: {
-          code: "FETCH_ERROR",
-          message: error instanceof Error ? error.message : "Onbekende fout",
+          code: 'FETCH_ERROR',
+          message: error instanceof Error ? error.message : 'Onbekende fout',
         },
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -115,27 +115,27 @@ export async function POST(request: NextRequest) {
         {
           ok: false,
           error: {
-            code: "AUTH_ERROR",
-            message: "Alleen admins kunnen bronnen aanmaken",
+            code: 'AUTH_ERROR',
+            message: 'Alleen admins kunnen bronnen aanmaken',
           },
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     const body = await request.json();
     const { name } = body;
 
-    if (!name || typeof name !== "string" || name.trim().length === 0) {
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json(
         {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Bron naam is vereist",
+            code: 'VALIDATION_ERROR',
+            message: 'Bron naam is vereist',
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -148,9 +148,9 @@ export async function POST(request: NextRequest) {
 
     // Check if source already exists
     const { data: existing } = await supabase
-      .from("recipe_sources")
-      .select("id")
-      .eq("name", trimmedName)
+      .from('recipe_sources')
+      .select('id')
+      .eq('name', trimmedName)
       .maybeSingle();
 
     if (existing) {
@@ -158,24 +158,24 @@ export async function POST(request: NextRequest) {
         {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Een bron met deze naam bestaat al",
+            code: 'VALIDATION_ERROR',
+            message: 'Een bron met deze naam bestaat al',
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Insert new source as system source
     const { data: newSource, error } = await supabase
-      .from("recipe_sources")
+      .from('recipe_sources')
       .insert({
         name: trimmedName,
         is_system: true,
         created_by_user_id: user?.id || null,
         usage_count: 0,
       })
-      .select("*")
+      .select('*')
       .single();
 
     if (error) {
@@ -183,11 +183,11 @@ export async function POST(request: NextRequest) {
         {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: error.message,
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -196,16 +196,16 @@ export async function POST(request: NextRequest) {
       data: newSource,
     });
   } catch (error) {
-    console.error("Error creating recipe source:", error);
+    console.error('Error creating recipe source:', error);
     return NextResponse.json(
       {
         ok: false,
         error: {
-          code: "CREATE_ERROR",
-          message: error instanceof Error ? error.message : "Onbekende fout",
+          code: 'CREATE_ERROR',
+          message: error instanceof Error ? error.message : 'Onbekende fout',
         },
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -222,27 +222,27 @@ export async function PUT(request: NextRequest) {
         {
           ok: false,
           error: {
-            code: "AUTH_ERROR",
-            message: "Alleen admins kunnen bronnen bijwerken",
+            code: 'AUTH_ERROR',
+            message: 'Alleen admins kunnen bronnen bijwerken',
           },
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     const body = await request.json();
     const { id, name } = body;
 
-    if (!id || !name || typeof name !== "string" || name.trim().length === 0) {
+    if (!id || !name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json(
         {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "ID en naam zijn vereist",
+            code: 'VALIDATION_ERROR',
+            message: 'ID en naam zijn vereist',
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -251,9 +251,9 @@ export async function PUT(request: NextRequest) {
 
     // Get the current source to find the old name
     const { data: currentSource, error: fetchError } = await supabase
-      .from("recipe_sources")
-      .select("name")
-      .eq("id", id)
+      .from('recipe_sources')
+      .select('name')
+      .eq('id', id)
       .single();
 
     if (fetchError || !currentSource) {
@@ -261,11 +261,11 @@ export async function PUT(request: NextRequest) {
         {
           ok: false,
           error: {
-            code: "DB_ERROR",
-            message: "Bron niet gevonden",
+            code: 'DB_ERROR',
+            message: 'Bron niet gevonden',
           },
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -273,10 +273,10 @@ export async function PUT(request: NextRequest) {
 
     // Check if another source with this name exists
     const { data: existing } = await supabase
-      .from("recipe_sources")
-      .select("id")
-      .eq("name", trimmedName)
-      .neq("id", id)
+      .from('recipe_sources')
+      .select('id')
+      .eq('name', trimmedName)
+      .neq('id', id)
       .maybeSingle();
 
     if (existing) {
@@ -284,71 +284,75 @@ export async function PUT(request: NextRequest) {
         {
           ok: false,
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Een bron met deze naam bestaat al",
+            code: 'VALIDATION_ERROR',
+            message: 'Een bron met deze naam bestaat al',
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // If the name is changing, update all meals that use this source
     if (oldName !== trimmedName) {
       console.log(`Updating source name from "${oldName}" to "${trimmedName}"`);
-      
+
       // Update all custom_meals using this source
       const { data: customMealsData, error: customMealsError } = await supabase
-        .from("custom_meals")
+        .from('custom_meals')
         .update({ source: trimmedName })
-        .eq("source", oldName)
-        .select("id");
+        .eq('source', oldName)
+        .select('id');
 
       if (customMealsError) {
-        console.error("Error updating custom_meals:", customMealsError);
+        console.error('Error updating custom_meals:', customMealsError);
         return NextResponse.json(
           {
             ok: false,
             error: {
-              code: "DB_ERROR",
+              code: 'DB_ERROR',
               message: `Fout bij bijwerken custom_meals: ${customMealsError.message}`,
             },
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
-      console.log(`Updated ${customMealsData?.length || 0} custom_meals records`);
+      console.log(
+        `Updated ${customMealsData?.length || 0} custom_meals records`,
+      );
 
       // Update all meal_history using this source
       const { data: mealHistoryData, error: mealHistoryError } = await supabase
-        .from("meal_history")
+        .from('meal_history')
         .update({ source: trimmedName })
-        .eq("source", oldName)
-        .select("id");
+        .eq('source', oldName)
+        .select('id');
 
       if (mealHistoryError) {
-        console.error("Error updating meal_history:", mealHistoryError);
+        console.error('Error updating meal_history:', mealHistoryError);
         return NextResponse.json(
           {
             ok: false,
             error: {
-              code: "DB_ERROR",
+              code: 'DB_ERROR',
               message: `Fout bij bijwerken meal_history: ${mealHistoryError.message}`,
             },
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
-      console.log(`Updated ${mealHistoryData?.length || 0} meal_history records`);
+      console.log(
+        `Updated ${mealHistoryData?.length || 0} meal_history records`,
+      );
     }
 
     // Update the source name in recipe_sources
     const { data: updatedSource, error } = await supabase
-      .from("recipe_sources")
+      .from('recipe_sources')
       .update({ name: trimmedName })
-      .eq("id", id)
-      .select("*")
+      .eq('id', id)
+      .select('*')
       .single();
 
     if (error) {
@@ -356,18 +360,18 @@ export async function PUT(request: NextRequest) {
         {
           ok: false,
           error: {
-            code: "DB_ERROR",
+            code: 'DB_ERROR',
             message: error.message,
           },
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     // Revalidate recipe pages to show updated source names
     if (oldName !== trimmedName) {
-      revalidatePath("/recipes");
-      revalidatePath("/recipes/[recipeId]", "page");
+      revalidatePath('/recipes');
+      revalidatePath('/recipes/[recipeId]', 'page');
     }
 
     return NextResponse.json({
@@ -375,16 +379,16 @@ export async function PUT(request: NextRequest) {
       data: updatedSource,
     });
   } catch (error) {
-    console.error("Error updating recipe source:", error);
+    console.error('Error updating recipe source:', error);
     return NextResponse.json(
       {
         ok: false,
         error: {
-          code: "UPDATE_ERROR",
-          message: error instanceof Error ? error.message : "Onbekende fout",
+          code: 'UPDATE_ERROR',
+          message: error instanceof Error ? error.message : 'Onbekende fout',
         },
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

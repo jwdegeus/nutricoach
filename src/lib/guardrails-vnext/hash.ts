@@ -1,6 +1,6 @@
 /**
  * Guard Rails vNext - Hash Utilities
- * 
+ *
  * Deterministic hashing for ruleset content.
  */
 
@@ -8,9 +8,9 @@ import { createHash } from 'crypto';
 
 /**
  * Canonical JSON serialization
- * 
+ *
  * Sorts object keys and arrays deterministically for stable hashing.
- * 
+ *
  * @param obj - Object to serialize
  * @returns Canonical JSON string
  */
@@ -18,7 +18,7 @@ export function canonicalJson(obj: unknown): string {
   if (obj === null || obj === undefined) {
     return JSON.stringify(obj);
   }
-  
+
   if (Array.isArray(obj)) {
     // Sort arrays if they contain objects (for determinism)
     const sorted = obj.map((item) => {
@@ -29,7 +29,7 @@ export function canonicalJson(obj: unknown): string {
     });
     return JSON.stringify(sorted);
   }
-  
+
   if (typeof obj === 'object') {
     // Sort object keys for determinism
     const sorted: Record<string, unknown> = {};
@@ -39,13 +39,13 @@ export function canonicalJson(obj: unknown): string {
     }
     return JSON.stringify(sorted);
   }
-  
+
   return JSON.stringify(obj);
 }
 
 /**
  * Calculate SHA-256 hash of canonical JSON
- * 
+ *
  * @param obj - Object to hash
  * @returns SHA-256 hash (hex string)
  */

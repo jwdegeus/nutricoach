@@ -19,7 +19,7 @@ De Recipe Adaptation AI feature maakt het mogelijk om bestaande recepten automat
 
 1. **User opent Recipe detail pagina** → Ziet "AI Magician" button
 2. **Klikt "AI Magician"** → Dialog opent met idle state
-3. **Klikt "Start analyse"** → 
+3. **Klikt "Start analyse"** →
    - `getCurrentDietIdAction()` haalt actief dieet op
    - `requestRecipeAdaptationAction({ recipeId, dietId })` wordt aangeroepen
 4. **Service laag**:
@@ -58,17 +58,17 @@ sequenceDiagram
 
     UI->>SA: requestRecipeAdaptationAction({ recipeId, dietId })
     SA->>Service: requestAdaptation(input)
-    
+
     Service->>Service: loadDietRuleset(dietId)
     Service->>Service: generateDraftWithEngine(recipeId, dietId, strict: false)
     Service->>Validator: validateDraft(draft, ruleset)
-    
+
     alt Validation fails
         Validator-->>Service: { ok: false, matches: [...] }
         Service->>Service: generateDraftWithEngine(..., strict: true)
         Service->>Validator: validateDraft(draft, ruleset)
     end
-    
+
     Validator-->>Service: { ok: true, matches: [] }
     Service-->>SA: { outcome: "success", adaptation, meta }
     SA-->>UI: RequestRecipeAdaptationResult
@@ -91,9 +91,9 @@ sequenceDiagram
 
 ```typescript
 type RequestRecipeAdaptationInput = {
-  recipeId: string;      // Required: UUID of recipe (custom_meals.id or meal_history.id)
-  dietId?: string;       // Optional: Diet ID (if missing → outcome "empty")
-  locale?: string;       // Optional: For future i18n support
+  recipeId: string; // Required: UUID of recipe (custom_meals.id or meal_history.id)
+  dietId?: string; // Optional: Diet ID (if missing → outcome "empty")
+  locale?: string; // Optional: For future i18n support
 };
 ```
 
@@ -104,18 +104,18 @@ Discriminated union op `outcome`:
 ```typescript
 type RequestRecipeAdaptationResult =
   | {
-      outcome: "success";
+      outcome: 'success';
       adaptation: RecipeAdaptationDraft;
       meta: AdaptationMeta;
     }
   | {
-      outcome: "empty";
-      reason: "NO_DIET_SELECTED";
+      outcome: 'empty';
+      reason: 'NO_DIET_SELECTED';
     }
   | {
-      outcome: "error";
+      outcome: 'error';
       message: string;
-      code: "INVALID_INPUT" | "INTERNAL_ERROR";
+      code: 'INVALID_INPUT' | 'INTERNAL_ERROR';
     };
 ```
 
@@ -132,8 +132,8 @@ type RecipeAdaptationDraft = {
     ingredients: IngredientLine[];
     steps: StepLine[];
   };
-  confidence?: number;        // 0.0 - 1.0
-  openQuestions?: string[];   // Optional questions for user
+  confidence?: number; // 0.0 - 1.0
+  openQuestions?: string[]; // Optional questions for user
 };
 ```
 
@@ -161,9 +161,7 @@ type RecipeAdaptationDraft = {
       "ingredients": [
         { "name": "Amandelmelk", "quantity": "250", "unit": "ml" }
       ],
-      "steps": [
-        { "step": 1, "text": "Verwarm de oven voor op 180°C." }
-      ]
+      "steps": [{ "step": 1, "text": "Verwarm de oven voor op 180°C." }]
     },
     "confidence": 0.85
   },
@@ -200,7 +198,8 @@ type RecipeAdaptationDraft = {
 
 **Locatie**: `src/app/(app)/recipes/[recipeId]/actions/recipe-ai.actions.ts`
 
-**Verantwoordelijkheid**: 
+**Verantwoordelijkheid**:
+
 - Valideert input met Zod schema
 - Roept `RecipeAdaptationService` aan
 - Retourneert discriminated union result
@@ -210,10 +209,12 @@ type RecipeAdaptationDraft = {
 **Output**: `RequestRecipeAdaptationResult`
 
 **Error Codes**:
+
 - `INVALID_INPUT`: recipeId ontbreekt of ongeldig
 - `INTERNAL_ERROR`: Onverwachte fout in service
 
-**Idempotency**: 
+**Idempotency**:
+
 - Herhaalde calls metzelfde input kunnen verschillende drafts genereren (engine is non-deterministic)
 - Elke call maakt een nieuwe run record
 
@@ -222,12 +223,14 @@ type RecipeAdaptationDraft = {
 **Locatie**: `src/app/(app)/recipes/[recipeId]/actions/recipe-ai.persist.actions.ts`
 
 **Verantwoordelijkheid**:
+
 - Haalt actief dieetprofiel op voor ingelogde user
 - Query: `user_diet_profiles` waar `ends_on IS NULL`
 
 **Output**: `ActionResult<{ dietId: string, dietName: string } | null>`
 
 **Error Codes**:
+
 - `AUTH_ERROR`: User niet ingelogd
 - `DB_ERROR`: Database fout
 
@@ -236,11 +239,13 @@ type RecipeAdaptationDraft = {
 **Locatie**: `src/app/(app)/recipes/[recipeId]/actions/recipe-ai.persist.actions.ts`
 
 **Verantwoordelijkheid**:
+
 - Persisteert draft naar `recipe_adaptations` (upsert op user_id + recipe_id + diet_id)
 - Maakt audit trail record in `recipe_adaptation_runs`
 - Status wordt gezet op 'draft'
 
-**Input**: 
+**Input**:
+
 ```typescript
 {
   recipeId: string;
@@ -254,11 +259,13 @@ type RecipeAdaptationDraft = {
 **Output**: `ActionResult<{ adaptationId: string }>`
 
 **Error Codes**:
+
 - `AUTH_ERROR`: User niet ingelogd
 - `VALIDATION_ERROR`: Ontbrekende required fields
 - `DB_ERROR`: Database fout bij insert/update
 
 **Idempotency**:
+
 - Upsert: als adaptation al bestaat (user_id + recipe_id + diet_id), wordt deze geupdate
 - Elke persist call maakt een nieuwe run record (niet idempotent voor runs)
 
@@ -267,6 +274,7 @@ type RecipeAdaptationDraft = {
 **Locatie**: `src/app/(app)/recipes/[recipeId]/actions/recipe-ai.persist.actions.ts`
 
 **Verantwoordelijkheid**:
+
 - Update status van adaptation naar 'applied'
 - Verifieert ownership via RLS + service check
 
@@ -275,11 +283,13 @@ type RecipeAdaptationDraft = {
 **Output**: `ActionResult<void>`
 
 **Error Codes**:
+
 - `AUTH_ERROR`: User niet ingelogd
 - `VALIDATION_ERROR`: adaptationId ontbreekt
 - `DB_ERROR`: Database fout of ownership check faalt
 
 **Idempotency**:
+
 - Idempotent: meerdere calls metzelfde adaptationId zijn veilig (status blijft 'applied')
 
 ## Service Layer & Validator
@@ -293,6 +303,7 @@ type RecipeAdaptationDraft = {
 #### requestAdaptation(input)
 
 Orchestreert het volledige adaptation proces:
+
 1. Normaliseert input (recipeId, dietId)
 2. Laadt diet ruleset
 3. Genereert draft via engine
@@ -303,11 +314,13 @@ Orchestreert het volledige adaptation proces:
 #### generateDraftWithEngine(recipeId, dietId, strict)
 
 **Stub implementatie** (wordt later vervangen door echte AI provider):
+
 - `strict: false`: Kan verboden ingrediënten bevatten (voor testen retry)
 - `strict: true`: Bevat geen verboden ingrediënten
 - Simuleert 400-800ms latency
 
 **Toekomstige implementatie**:
+
 - Roept AI provider aan (Gemini/OpenAI/etc.)
 - Gebruikt prompt met dieetregels
 - Structured output met schema validatie
@@ -344,6 +357,7 @@ type DietRuleset = {
 #### validateDraft(draft, ruleset)
 
 **Functionaliteit**:
+
 - Scant `draft.rewrite.ingredients[].name` en `draft.rewrite.steps[].text`
 - Word boundary matching (case-insensitive)
 - Synonym matching
@@ -357,13 +371,14 @@ type ValidationReport = {
   matches: Array<{
     term: string;
     matched: string;
-    where: "ingredients" | "steps";
+    where: 'ingredients' | 'steps';
   }>;
   summary: string;
 };
 ```
 
 **Bekende beperkingen**:
+
 - **False positives**: Woorden zoals "suikervrij" kunnen matchen op "suiker" (word boundary helpt maar is niet perfect)
 - **Heuristieken**: Added sugar detection is gebaseerd op woordenlijst, geen deep analysis
 - **Synonyms**: Moeten handmatig worden onderhouden in ruleset
@@ -375,6 +390,7 @@ type ValidationReport = {
 **Locatie**: `supabase/migrations/20260131000004_recipe_adaptations.sql`
 
 **Kolommen**:
+
 - `id` (UUID, PK)
 - `user_id` (UUID, FK → auth.users, CASCADE DELETE)
 - `recipe_id` (TEXT, NOT NULL) - **Geen FK**: flexibiliteit voor custom_meals/meal_history/externe IDs
@@ -392,11 +408,13 @@ type ValidationReport = {
 - `created_at`, `updated_at` (TIMESTAMPTZ)
 
 **Indexes**:
+
 - `(user_id, recipe_id, diet_id)` - Voor lookup van bestaande adaptations
 - `(user_id, status)` - Voor filtering op status
 - Individuele indexes op `recipe_id`, `diet_id`, `created_at`
 
 **Opmerking recipe_id als TEXT**:
+
 - Bewuste keuze: kan verwijzen naar `custom_meals.id`, `meal_history.id`, of externe recipe IDs
 - Geen FK constraint: voorkomt dependency issues bij recipe deletion
 - Trade-off: geen automatische cascade delete, maar wel flexibiliteit
@@ -404,6 +422,7 @@ type ValidationReport = {
 ### Tabel: recipe_adaptation_runs
 
 **Kolommen**:
+
 - `id` (UUID, PK)
 - `recipe_adaptation_id` (UUID, FK → recipe_adaptations, CASCADE DELETE)
 - `model` (TEXT, NULL) - AI model naam (bijv. "gemini-2.0-flash-exp")
@@ -417,10 +436,12 @@ type ValidationReport = {
 - `created_at` (TIMESTAMPTZ)
 
 **Indexes**:
+
 - `(recipe_adaptation_id, created_at DESC)` - Voor audit trail chronologie
 - Individuele indexes op `outcome`, `created_at`
 
 **Immutability**:
+
 - Runs zijn immutable: geen UPDATE/DELETE policies
 - Alleen SELECT en INSERT toegestaan
 - CASCADE DELETE: als adaptation wordt verwijderd, worden runs ook verwijderd
@@ -428,17 +449,20 @@ type ValidationReport = {
 ### RLS Policies
 
 **recipe_adaptations**:
+
 - **SELECT**: `auth.uid() = user_id` - Users zien alleen eigen adaptations
 - **INSERT**: `auth.uid() = user_id` - Users kunnen alleen eigen adaptations aanmaken
 - **UPDATE**: `auth.uid() = user_id` (zowel USING als WITH CHECK) - Users kunnen alleen eigen adaptations updaten
 - **DELETE**: `auth.uid() = user_id` - Users kunnen alleen eigen adaptations verwijderen
 
 **recipe_adaptation_runs**:
+
 - **SELECT**: EXISTS check via `recipe_adaptations.user_id = auth.uid()` - Users zien runs voor eigen adaptations
 - **INSERT**: EXISTS check - Users kunnen runs aanmaken voor eigen adaptations
 - **UPDATE/DELETE**: Geen policies - Runs zijn immutable
 
 **Security Notes**:
+
 - RLS is leidend: zelfs met service role client moet RLS correct zijn
 - Server actions gebruiken authenticated Supabase client (niet service role)
 - Alle queries respecteren automatisch RLS policies
@@ -472,6 +496,7 @@ type ValidationReport = {
 ### "Apply" Button Logic
 
 **Enabled wanneer**:
+
 - `state.type === "success"` EN
 - `adaptationId !== null` EN
 - `!isApplying` EN
@@ -479,6 +504,7 @@ type ValidationReport = {
 - `!isApplied`
 
 **Disabled wanneer**:
+
 - Analyse nog niet succesvol
 - Adaptation nog niet opgeslagen
 - Apply operatie bezig
@@ -487,11 +513,13 @@ type ValidationReport = {
 ### Error Handling in UI
 
 **Persist failures**:
+
 - Non-blocking: toont inline amber alert
 - Preview blijft zichtbaar
 - User kan alsnog "Apply" proberen (maar zal falen zonder adaptationId)
 
 **Apply failures**:
+
 - Inline red error message
 - Button blijft enabled voor retry
 - User kan opnieuw proberen
@@ -505,6 +533,7 @@ type ValidationReport = {
 **Symptoom**: UI toont "Geen dieet geselecteerd" message
 
 **Checks**:
+
 1. Verifieer `getCurrentDietIdAction()` response:
    ```typescript
    const result = await getCurrentDietIdAction();
@@ -512,8 +541,8 @@ type ValidationReport = {
    ```
 2. Check database:
    ```sql
-   SELECT * FROM user_diet_profiles 
-   WHERE user_id = '<user_id>' 
+   SELECT * FROM user_diet_profiles
+   WHERE user_id = '<user_id>'
    AND ends_on IS NULL;
    ```
 3. Als geen profiel: user moet onboarding voltooien
@@ -525,6 +554,7 @@ type ValidationReport = {
 **Symptoom**: `persistError` wordt getoond in UI
 
 **Checks**:
+
 1. **Auth context**: Verifieer dat user ingelogd is
    ```sql
    SELECT auth.uid(); -- In Supabase SQL editor
@@ -538,11 +568,12 @@ type ValidationReport = {
 3. **Database constraints**: Check of required fields aanwezig zijn
    ```sql
    -- Check voor NULL values in required fields
-   SELECT * FROM recipe_adaptations 
+   SELECT * FROM recipe_adaptations
    WHERE user_id IS NULL OR recipe_id IS NULL OR diet_id IS NULL;
    ```
 
-**Oplossing**: 
+**Oplossing**:
+
 - Als auth issue: verifieer Supabase client configuratie
 - Als RLS issue: check policy definities in migration
 - Als constraint issue: check input validatie in server action
@@ -552,22 +583,24 @@ type ValidationReport = {
 **Symptoom**: `applyError` wordt getoond, status blijft 'draft'
 
 **Checks**:
+
 1. **Ownership**: Verifieer dat adaptation bij user hoort
    ```sql
-   SELECT id, user_id, status 
-   FROM recipe_adaptations 
+   SELECT id, user_id, status
+   FROM recipe_adaptations
    WHERE id = '<adaptation_id>';
    ```
 2. **RLS**: Test update policy
    ```sql
    -- Als service role: test update
-   UPDATE recipe_adaptations 
-   SET status = 'applied' 
+   UPDATE recipe_adaptations
+   SET status = 'applied'
    WHERE id = '<adaptation_id>' AND user_id = '<user_id>';
    ```
 3. **AdaptationId**: Verifieer dat `adaptationId` niet null is in UI state
 
 **Oplossing**:
+
 - Als ownership issue: check `RecipeAdaptationDbService.updateStatus()` implementatie
 - Als RLS issue: verifieer UPDATE policy
 - Als adaptationId null: check persist flow
@@ -577,6 +610,7 @@ type ValidationReport = {
 **Symptoom**: Retry faalt ook, outcome blijft "error"
 
 **Checks**:
+
 1. **Ruleset**: Verifieer dat ruleset correct is geladen
    ```typescript
    // In RecipeAdaptationService.loadDietRuleset()
@@ -594,6 +628,7 @@ type ValidationReport = {
    ```
 
 **Oplossing**:
+
 - Als ruleset issue: update `loadDietRuleset()` met correcte regels
 - Als engine issue: update `generateDraftWithEngine()` stub
 - Als validator issue: check word boundary matching logic
@@ -603,7 +638,7 @@ type ValidationReport = {
 #### Adaptations per User
 
 ```sql
-SELECT 
+SELECT
   id,
   recipe_id,
   diet_id,
@@ -620,7 +655,7 @@ ORDER BY created_at DESC;
 #### Runs per Adaptation
 
 ```sql
-SELECT 
+SELECT
   id,
   outcome,
   model,
@@ -636,7 +671,7 @@ ORDER BY created_at DESC;
 #### Adaptations met Meeste Runs
 
 ```sql
-SELECT 
+SELECT
   ra.id,
   ra.title,
   ra.status,
@@ -651,15 +686,18 @@ ORDER BY run_count DESC;
 ### Logging
 
 **Server-side logs** (geen PII):
+
 - `console.error()` in server actions voor errors
 - `console.log()` in services voor debugging (alleen development)
 - Geen user emails, recipe names, of andere PII in logs
 
 **Log locations**:
+
 - Server actions: `src/app/(app)/recipes/[recipeId]/actions/*.actions.ts`
 - Services: `src/app/(app)/recipes/[recipeId]/services/*.service.ts`
 
 **Voorbeeld log output**:
+
 ```
 Error in requestRecipeAdaptationAction: Error: Dieet met ID "xyz" niet gevonden
 Error in RecipeAdaptationService.requestAdaptation: Validation failed after retry
@@ -674,6 +712,7 @@ Error in RecipeAdaptationService.requestAdaptation: Validation failed after retr
 **Huidige implementatie**: Stub met mock data
 
 **Toekomstige implementatie**:
+
 ```typescript
 private async generateDraftWithEngine(
   recipeId: string,
@@ -690,6 +729,7 @@ private async generateDraftWithEngine(
 ```
 
 **Aandachtspunten**:
+
 - Gebruik structured output (Zod schema → JSON schema)
 - Implementeer repair loop (zoals in meal planner)
 - Log tokens/latency voor cost tracking
@@ -700,6 +740,7 @@ private async generateDraftWithEngine(
 **Huidige implementatie**: `diet_ruleset_version` kolom bestaat maar wordt niet gebruikt
 
 **Toekomstige implementatie**:
+
 - Load ruleset versie uit database/config
 - Support meerdere versies per diet
 - Migration path voor oude adaptations naar nieuwe versie
@@ -710,6 +751,7 @@ private async generateDraftWithEngine(
 **Huidige implementatie**: Status 'archived' bestaat maar geen UI/flow
 
 **Toekomstige implementatie**:
+
 - "Archive" action in UI
 - "Restore" action om archived → draft/applied te zetten
 - History view van alle adaptations (inclusief archived)
@@ -720,6 +762,7 @@ private async generateDraftWithEngine(
 **Huidige implementatie**: Geen edit mogelijkheid
 
 **Toekomstige implementatie**:
+
 - Edit ingredients/steps in UI
 - Re-validate na edit
 - Save als nieuwe draft versie
@@ -730,6 +773,7 @@ private async generateDraftWithEngine(
 **Huidige implementatie**: `nutrition_estimate` kolom bestaat maar is NULL
 
 **Toekomstige implementatie**:
+
 - Bereken nutrition uit aangepaste ingrediënten (via NEVO codes)
 - Vergelijk met origineel recept
 - Toon diff in UI ("-50 kcal, +10g eiwit")

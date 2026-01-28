@@ -1,13 +1,13 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { MealHistoryService } from "@/src/lib/meal-history";
-import { MealScoringService } from "@/src/lib/meal-history";
-import { revalidatePath } from "next/cache";
+import { createClient } from '@/src/lib/supabase/server';
+import { MealHistoryService } from '@/src/lib/meal-history';
+import { MealScoringService } from '@/src/lib/meal-history';
+import { revalidatePath } from 'next/cache';
 
 /**
  * Extract original meal ID from potentially reused meal ID
- * 
+ *
  * Reused meals have format: {originalId}-{date}
  * This function extracts the original ID.
  */
@@ -16,7 +16,7 @@ function extractOriginalMealId(mealId: string): string {
   const datePattern = /-\d{4}-\d{2}-\d{2}$/;
   if (datePattern.test(mealId)) {
     // Extract original ID by removing the date suffix
-    return mealId.replace(datePattern, "");
+    return mealId.replace(datePattern, '');
   }
   // Not a reused meal, return as-is
   return mealId;
@@ -24,7 +24,7 @@ function extractOriginalMealId(mealId: string): string {
 
 /**
  * Rate a meal
- * 
+ *
  * @param mealId - Meal ID from meal plan (may be reused format: {originalId}-{date})
  * @param rating - Rating (1-5)
  * @param comment - Optional comment
@@ -32,7 +32,7 @@ function extractOriginalMealId(mealId: string): string {
 export async function rateMealAction(
   mealId: string,
   rating: number,
-  comment?: string
+  comment?: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();
 
@@ -43,7 +43,7 @@ export async function rateMealAction(
   if (!user) {
     return {
       ok: false,
-      error: "Je moet ingelogd zijn om een maaltijd te beoordelen",
+      error: 'Je moet ingelogd zijn om een maaltijd te beoordelen',
     };
   }
 
@@ -51,7 +51,7 @@ export async function rateMealAction(
   if (rating < 1 || rating > 5) {
     return {
       ok: false,
-      error: "Rating moet tussen 1 en 5 zijn",
+      error: 'Rating moet tussen 1 en 5 zijn',
     };
   }
 
@@ -67,28 +67,26 @@ export async function rateMealAction(
     await scoringService.updateMealScores(user.id, originalMealId);
 
     // Revalidate meal plan pages
-    revalidatePath("/meal-plans");
+    revalidatePath('/meal-plans');
 
     return { ok: true };
   } catch (error) {
     return {
       ok: false,
       error:
-        error instanceof Error
-          ? error.message
-          : "Fout bij opslaan van rating",
+        error instanceof Error ? error.message : 'Fout bij opslaan van rating',
     };
   }
 }
 
 /**
  * Get rating for a meal
- * 
+ *
  * @param mealId - Meal ID from meal plan (may be reused format: {originalId}-{date})
  * @returns Rating (1-5) or null if not rated
  */
 export async function getMealRatingAction(
-  mealId: string
+  mealId: string,
 ): Promise<{ ok: true; rating: number | null } | { ok: false; error: string }> {
   const supabase = await createClient();
 
@@ -99,7 +97,7 @@ export async function getMealRatingAction(
   if (!user) {
     return {
       ok: false,
-      error: "Je moet ingelogd zijn",
+      error: 'Je moet ingelogd zijn',
     };
   }
 
@@ -108,10 +106,10 @@ export async function getMealRatingAction(
 
   try {
     const { data, error } = await supabase
-      .from("meal_history")
-      .select("user_rating")
-      .eq("user_id", user.id)
-      .eq("meal_id", originalMealId)
+      .from('meal_history')
+      .select('user_rating')
+      .eq('user_id', user.id)
+      .eq('meal_id', originalMealId)
       .maybeSingle();
 
     if (error) {
@@ -129,9 +127,7 @@ export async function getMealRatingAction(
     return {
       ok: false,
       error:
-        error instanceof Error
-          ? error.message
-          : "Fout bij ophalen van rating",
+        error instanceof Error ? error.message : 'Fout bij ophalen van rating',
     };
   }
 }

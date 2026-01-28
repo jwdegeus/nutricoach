@@ -1,17 +1,17 @@
 /**
  * Meal Plan Calendar Actions
- * 
+ *
  * Server actions for calendar view of meal plans
  */
 
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { MealPlansService } from "@/src/lib/meal-plans/mealPlans.service";
-import { MealPlanEditabilityService } from "@/src/lib/meal-plans/mealPlanEditability.service";
-import { AppError } from "@/src/lib/errors/app-error";
-import type { MealPlanResponse, Meal } from "@/src/lib/diets";
-import type { MealSlot } from "@/src/lib/diets";
+import { createClient } from '@/src/lib/supabase/server';
+import { MealPlansService } from '@/src/lib/meal-plans/mealPlans.service';
+import { MealPlanEditabilityService } from '@/src/lib/meal-plans/mealPlanEditability.service';
+import { AppError } from '@/src/lib/errors/app-error';
+import type { MealPlanResponse, Meal } from '@/src/lib/diets';
+import type { MealSlot } from '@/src/lib/diets';
 
 /**
  * Calendar day with meals and editability info
@@ -32,9 +32,7 @@ export type CalendarDay = {
 /**
  * Get calendar view for a meal plan
  */
-export async function getMealPlanCalendarAction(
-  planId: string
-): Promise<{
+export async function getMealPlanCalendarAction(planId: string): Promise<{
   plan: MealPlanResponse;
   calendarDays: CalendarDay[];
   locks: Array<{
@@ -54,7 +52,7 @@ export async function getMealPlanCalendarAction(
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    throw new AppError("UNAUTHORIZED", "Not authenticated");
+    throw new AppError('UNAUTHORIZED', 'Not authenticated');
   }
 
   // Load meal plan
@@ -71,13 +69,13 @@ export async function getMealPlanCalendarAction(
   const calendarDays: CalendarDay[] = [];
 
   for (const day of plan.planSnapshot.days) {
-    const dayMeals: CalendarDay["meals"] = [];
+    const dayMeals: CalendarDay['meals'] = [];
 
     // Check day-level editability
     const dayEditability = await editabilityService.checkDayEditability(
       user.id,
       planId,
-      day.date
+      day.date,
     );
 
     // Check each meal
@@ -87,7 +85,7 @@ export async function getMealPlanCalendarAction(
         planId,
         day.date,
         meal.slot,
-        meal.id
+        meal.id,
       );
 
       dayMeals.push({
@@ -127,7 +125,7 @@ export async function checkMealEditabilityAction(
   planId: string,
   date: string,
   mealSlot: MealSlot,
-  mealId?: string
+  mealId?: string,
 ): Promise<{
   canEdit: boolean;
   canDelete: boolean;
@@ -142,7 +140,7 @@ export async function checkMealEditabilityAction(
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    throw new AppError("UNAUTHORIZED", "Not authenticated");
+    throw new AppError('UNAUTHORIZED', 'Not authenticated');
   }
 
   const editabilityService = new MealPlanEditabilityService();
@@ -151,7 +149,7 @@ export async function checkMealEditabilityAction(
     planId,
     date,
     mealSlot,
-    mealId
+    mealId,
   );
 
   return {

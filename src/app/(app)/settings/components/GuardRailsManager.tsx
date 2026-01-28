@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect } from 'react';
 import {
   getIngredientCategoriesAction,
   getDietCategoryConstraintsAction,
@@ -13,16 +13,29 @@ import {
   createIngredientCategoryItemAction,
   updateIngredientCategoryItemAction,
   deleteIngredientCategoryItemAction,
-} from "../actions/ingredient-categories-admin.actions";
-import { Button } from "@/components/catalyst/button";
-import { Checkbox, CheckboxField } from "@/components/catalyst/checkbox";
-import { Field, FieldGroup, Label, Description } from "@/components/catalyst/fieldset";
-import { Text } from "@/components/catalyst/text";
-import { Input } from "@/components/catalyst/input";
-import { Textarea } from "@/components/catalyst/textarea";
-import { Badge } from "@/components/catalyst/badge";
-import { ConfirmDialog } from "@/components/catalyst/confirm-dialog";
-import { ExclamationTriangleIcon, CheckCircleIcon, PlusIcon, PencilIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/20/solid";
+} from '../actions/ingredient-categories-admin.actions';
+import { Button } from '@/components/catalyst/button';
+import { Checkbox, CheckboxField } from '@/components/catalyst/checkbox';
+import {
+  Field,
+  FieldGroup,
+  Label,
+  Description,
+} from '@/components/catalyst/fieldset';
+import { Text } from '@/components/catalyst/text';
+import { Input } from '@/components/catalyst/input';
+import { Textarea } from '@/components/catalyst/textarea';
+import { Badge } from '@/components/catalyst/badge';
+import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
+import {
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  PlusIcon,
+  PencilIcon,
+  TrashIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from '@heroicons/react/20/solid';
 
 type GuardRailsManagerProps = {
   dietTypeId: string;
@@ -36,7 +49,7 @@ type Category = {
   name_nl: string;
   name_en: string | null;
   description: string | null;
-  category_type: "forbidden" | "required";
+  category_type: 'forbidden' | 'required';
   display_order: number;
   is_active: boolean;
   items_count?: number;
@@ -47,10 +60,10 @@ type Constraint = {
   category_id: string;
   category_code: string;
   category_name_nl: string;
-  category_type: "forbidden" | "required";
-  constraint_type: "forbidden" | "required";
-  rule_action: "allow" | "block";
-  strictness: "hard" | "soft";
+  category_type: 'forbidden' | 'required';
+  constraint_type: 'forbidden' | 'required';
+  rule_action: 'allow' | 'block';
+  strictness: 'hard' | 'soft';
   min_per_day: number | null;
   min_per_week: number | null;
   priority: number;
@@ -79,14 +92,18 @@ export function GuardRailsManager({
   const [selectedAllow, setSelectedAllow] = useState<Set<string>>(new Set());
   const [selectedBlock, setSelectedBlock] = useState<Set<string>>(new Set());
   // Legacy support: selectedForbidden/selectedRequired voor backward compatibility
-  const [selectedForbidden, setSelectedForbidden] = useState<Set<string>>(new Set());
-  const [selectedRequired, setSelectedRequired] = useState<Set<string>>(new Set());
+  const [selectedForbidden, setSelectedForbidden] = useState<Set<string>>(
+    new Set(),
+  );
+  const [selectedRequired, setSelectedRequired] = useState<Set<string>>(
+    new Set(),
+  );
   const [constraintDetails, setConstraintDetails] = useState<
     Record<
       string,
       {
-        rule_action?: "allow" | "block";
-        strictness: "hard" | "soft";
+        rule_action?: 'allow' | 'block';
+        strictness: 'hard' | 'soft';
         min_per_day?: number | null;
         min_per_week?: number | null;
         priority: number;
@@ -99,35 +116,47 @@ export function GuardRailsManager({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  
+
   // Category management state
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
+    null,
+  );
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
-  const [showDeleteCategoryDialog, setShowDeleteCategoryDialog] = useState(false);
-  const [deleteConstraintId, setDeleteConstraintId] = useState<string | null>(null);
-  const [showDeleteConstraintDialog, setShowDeleteConstraintDialog] = useState(false);
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [categoryItems, setCategoryItems] = useState<Record<string, CategoryItem[]>>({});
+  const [showDeleteCategoryDialog, setShowDeleteCategoryDialog] =
+    useState(false);
+  const [deleteConstraintId, setDeleteConstraintId] = useState<string | null>(
+    null,
+  );
+  const [showDeleteConstraintDialog, setShowDeleteConstraintDialog] =
+    useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set(),
+  );
+  const [categoryItems, setCategoryItems] = useState<
+    Record<string, CategoryItem[]>
+  >({});
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [creatingItemForCategory, setCreatingItemForCategory] = useState<string | null>(null);
+  const [creatingItemForCategory, setCreatingItemForCategory] = useState<
+    string | null
+  >(null);
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
   const [showDeleteItemDialog, setShowDeleteItemDialog] = useState(false);
-  
+
   // Category form state
   const [categoryFormData, setCategoryFormData] = useState({
-    code: "",
-    name_nl: "",
-    name_en: "",
-    description: "",
-    category_type: "forbidden" as "forbidden" | "required",
+    code: '',
+    name_nl: '',
+    name_en: '',
+    description: '',
+    category_type: 'forbidden' as 'forbidden' | 'required',
     display_order: 0,
   });
 
   // Item form state
   const [itemFormData, setItemFormData] = useState({
-    term: "",
-    term_nl: "",
+    term: '',
+    term_nl: '',
     synonyms: [] as string[],
     display_order: 0,
   });
@@ -166,17 +195,29 @@ export function GuardRailsManager({
       const requiredSet = new Set<string>();
       const details: typeof constraintDetails = {};
 
-      (constraintsResult.data || []).forEach((constraint) => {
-        const ruleAction = constraint.rule_action || (constraint.constraint_type === 'forbidden' ? 'block' : 'allow');
-        
-        if (ruleAction === "block") {
+      type ConstraintRow = {
+        category_id: string;
+        rule_action?: 'allow' | 'block';
+        constraint_type?: 'forbidden' | 'required';
+        strictness: 'hard' | 'soft';
+        min_per_day?: number | null;
+        min_per_week?: number | null;
+        priority: number;
+        rule_priority: number;
+      };
+      (constraintsResult.data || []).forEach((constraint: ConstraintRow) => {
+        const ruleAction =
+          constraint.rule_action ||
+          (constraint.constraint_type === 'forbidden' ? 'block' : 'allow');
+
+        if (ruleAction === 'block') {
           blockSet.add(constraint.category_id);
           forbiddenSet.add(constraint.category_id); // Legacy
-        } else if (ruleAction === "allow") {
+        } else if (ruleAction === 'allow') {
           allowSet.add(constraint.category_id);
           requiredSet.add(constraint.category_id); // Legacy
         }
-        
+
         // Store details per category (laatste constraint wint als er meerdere zijn)
         details[constraint.category_id] = {
           rule_action: ruleAction,
@@ -194,7 +235,7 @@ export function GuardRailsManager({
       setSelectedRequired(requiredSet); // Legacy
       setConstraintDetails(details);
     } catch (err) {
-      setError("Onverwachte fout bij laden data");
+      setError('Onverwachte fout bij laden data');
     } finally {
       setIsLoading(false);
     }
@@ -232,8 +273,9 @@ export function GuardRailsManager({
         setConstraintDetails({
           ...constraintDetails,
           [categoryId]: {
-            strictness: "hard",
+            strictness: 'hard',
             priority: 90,
+            rule_priority: 90,
           },
         });
       }
@@ -257,9 +299,10 @@ export function GuardRailsManager({
         setConstraintDetails({
           ...constraintDetails,
           [categoryId]: {
-            strictness: "hard",
+            strictness: 'hard',
             min_per_week: 2,
             priority: 80,
+            rule_priority: 80,
           },
         });
       }
@@ -277,8 +320,8 @@ export function GuardRailsManager({
 
   function updateConstraintDetail(
     categoryId: string,
-    field: keyof typeof constraintDetails[string],
-    value: any
+    field: keyof (typeof constraintDetails)[string],
+    value: any,
   ) {
     setConstraintDetails({
       ...constraintDetails,
@@ -298,9 +341,9 @@ export function GuardRailsManager({
       try {
         const constraintsToSave: Array<{
           category_id: string;
-          constraint_type?: "forbidden" | "required"; // Legacy
-          rule_action?: "allow" | "block";
-          strictness?: "hard" | "soft";
+          constraint_type?: 'forbidden' | 'required'; // Legacy
+          rule_action?: 'allow' | 'block';
+          strictness?: 'hard' | 'soft';
           min_per_day?: number | null;
           min_per_week?: number | null;
           priority?: number;
@@ -311,14 +354,14 @@ export function GuardRailsManager({
         // Firewall rules: allow
         selectedAllow.forEach((categoryId) => {
           const details = constraintDetails[categoryId] || {
-            strictness: "hard" as const,
+            strictness: 'hard' as const,
             priority: 80,
             rule_priority: 80,
           };
           constraintsToSave.push({
             category_id: categoryId,
-            constraint_type: "required", // Legacy
-            rule_action: "allow",
+            constraint_type: 'required', // Legacy
+            rule_action: 'allow',
             strictness: details.strictness,
             min_per_day: details.min_per_day ?? null,
             min_per_week: details.min_per_week ?? null,
@@ -331,14 +374,14 @@ export function GuardRailsManager({
         // Firewall rules: block
         selectedBlock.forEach((categoryId) => {
           const details = constraintDetails[categoryId] || {
-            strictness: "hard" as const,
+            strictness: 'hard' as const,
             priority: 90,
             rule_priority: 90,
           };
           constraintsToSave.push({
             category_id: categoryId,
-            constraint_type: "forbidden", // Legacy
-            rule_action: "block",
+            constraint_type: 'forbidden', // Legacy
+            rule_action: 'block',
             strictness: details.strictness,
             priority: details.priority,
             rule_priority: details.rule_priority ?? details.priority ?? 90,
@@ -348,13 +391,13 @@ export function GuardRailsManager({
 
         const result = await upsertDietCategoryConstraintsAction(
           dietTypeId,
-          constraintsToSave
+          constraintsToSave,
         );
 
         if (!result.ok) {
           setError(result.error.message);
         } else {
-          setSuccess("Dieetregels succesvol opgeslagen");
+          setSuccess('Dieetregels succesvol opgeslagen');
           await loadData();
           // Callback to notify parent (e.g., to switch back to overview)
           if (onSaved) {
@@ -362,7 +405,7 @@ export function GuardRailsManager({
           }
         }
       } catch (err) {
-        setError("Onverwachte fout bij opslaan");
+        setError('Onverwachte fout bij opslaan');
       } finally {
         setIsSaving(false);
       }
@@ -374,7 +417,7 @@ export function GuardRailsManager({
     setSuccess(null);
 
     if (!categoryFormData.code.trim() || !categoryFormData.name_nl.trim()) {
-      setError("Code en Nederlandse naam zijn verplicht");
+      setError('Code en Nederlandse naam zijn verplicht');
       return;
     }
 
@@ -400,19 +443,19 @@ export function GuardRailsManager({
         }
 
         if (!result || !result.ok) {
-          setError(result?.error.message || "Fout bij opslaan");
+          setError(result?.error.message || 'Fout bij opslaan');
         } else {
           setSuccess(
             isCreatingCategory
-              ? "Categorie succesvol aangemaakt"
-              : "Categorie succesvol bijgewerkt"
+              ? 'Categorie succesvol aangemaakt'
+              : 'Categorie succesvol bijgewerkt',
           );
           setIsCreatingCategory(false);
           setEditingCategoryId(null);
           await loadData();
         }
       } catch (err) {
-        setError("Onverwachte fout bij opslaan");
+        setError('Onverwachte fout bij opslaan');
       }
     });
   }
@@ -422,7 +465,7 @@ export function GuardRailsManager({
     setSuccess(null);
 
     if (!itemFormData.term.trim()) {
-      setError("Term is verplicht");
+      setError('Term is verplicht');
       return;
     }
 
@@ -447,18 +490,18 @@ export function GuardRailsManager({
         }
 
         if (!result || !result.ok) {
-          setError(result?.error.message || "Fout bij opslaan");
+          setError(result?.error.message || 'Fout bij opslaan');
         } else {
           setSuccess(
             creatingItemForCategory
-              ? "Ingrediënt succesvol toegevoegd"
-              : "Ingrediënt succesvol bijgewerkt"
+              ? 'Ingrediënt succesvol toegevoegd'
+              : 'Ingrediënt succesvol bijgewerkt',
           );
           setCreatingItemForCategory(null);
           setEditingItemId(null);
           setItemFormData({
-            term: "",
-            term_nl: "",
+            term: '',
+            term_nl: '',
             synonyms: [],
             display_order: 0,
           });
@@ -466,15 +509,19 @@ export function GuardRailsManager({
           await loadData(); // Refresh counts
         }
       } catch (err) {
-        setError("Onverwachte fout bij opslaan");
+        setError('Onverwachte fout bij opslaan');
       }
     });
   }
 
-  const forbiddenCategories = categories.filter((c) => c.category_type === "forbidden" && c.is_active);
-  const requiredCategories = categories.filter((c) => c.category_type === "required" && c.is_active);
+  const forbiddenCategories = categories.filter(
+    (c) => c.category_type === 'forbidden' && c.is_active,
+  );
+  const requiredCategories = categories.filter(
+    (c) => c.category_type === 'required' && c.is_active,
+  );
   const allCategories = [...forbiddenCategories, ...requiredCategories].sort(
-    (a, b) => a.display_order - b.display_order
+    (a, b) => a.display_order - b.display_order,
   );
 
   if (isLoading) {
@@ -494,7 +541,9 @@ export function GuardRailsManager({
               Dieetregels voor {dietTypeName}
             </h2>
             <Text className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Beheer categorieën, configureer allow/block regels met prioriteit. Regels worden geëvalueerd in volgorde van prioriteit (eerste match wint).
+              Beheer categorieën, configureer allow/block regels met prioriteit.
+              Regels worden geëvalueerd in volgorde van prioriteit (eerste match
+              wint).
             </Text>
           </div>
           <Button
@@ -502,11 +551,11 @@ export function GuardRailsManager({
               setIsCreatingCategory(true);
               setEditingCategoryId(null);
               setCategoryFormData({
-                code: "",
-                name_nl: "",
-                name_en: "",
-                description: "",
-                category_type: "forbidden",
+                code: '',
+                name_nl: '',
+                name_en: '',
+                description: '',
+                category_type: 'forbidden',
                 display_order: categories.length + 1,
               });
             }}
@@ -533,7 +582,7 @@ export function GuardRailsManager({
         {(isCreatingCategory || editingCategoryId) && (
           <div className="mb-6 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
             <h3 className="mb-3 text-base font-medium text-zinc-950 dark:text-white">
-              {isCreatingCategory ? "Nieuwe Categorie" : "Categorie Bewerken"}
+              {isCreatingCategory ? 'Nieuwe Categorie' : 'Categorie Bewerken'}
             </h3>
             <form
               onSubmit={(e) => {
@@ -559,7 +608,8 @@ export function GuardRailsManager({
                     placeholder="Bijv. dairy, gluten_containing_grains"
                   />
                   <Description>
-                    Unieke identifier (kleine letters, underscores). Kan niet worden gewijzigd na aanmaken.
+                    Unieke identifier (kleine letters, underscores). Kan niet
+                    worden gewijzigd na aanmaken.
                   </Description>
                 </Field>
 
@@ -618,7 +668,9 @@ export function GuardRailsManager({
                     onChange={(e) =>
                       setCategoryFormData({
                         ...categoryFormData,
-                        category_type: e.target.value as "forbidden" | "required",
+                        category_type: e.target.value as
+                          | 'forbidden'
+                          | 'required',
                       })
                     }
                     required
@@ -634,7 +686,9 @@ export function GuardRailsManager({
                 </Field>
 
                 <Field>
-                  <Label htmlFor="category-display-order">Weergave Volgorde</Label>
+                  <Label htmlFor="category-display-order">
+                    Weergave Volgorde
+                  </Label>
                   <Input
                     id="category-display-order"
                     type="number"
@@ -655,10 +709,10 @@ export function GuardRailsManager({
                 <div className="flex gap-2">
                   <Button type="submit" disabled={isPending}>
                     {isPending
-                      ? "Opslaan..."
+                      ? 'Opslaan...'
                       : isCreatingCategory
-                      ? "Aanmaken"
-                      : "Bijwerken"}
+                        ? 'Aanmaken'
+                        : 'Bijwerken'}
                   </Button>
                   <Button
                     type="button"
@@ -708,8 +762,8 @@ export function GuardRailsManager({
                               setConstraintDetails({
                                 ...constraintDetails,
                                 [category.id]: {
-                                  rule_action: "allow",
-                                  strictness: "hard",
+                                  rule_action: 'allow',
+                                  strictness: 'hard',
                                   priority: 80,
                                   rule_priority: 80,
                                 },
@@ -721,7 +775,9 @@ export function GuardRailsManager({
                           setSelectedAllow(newAllow);
                         }}
                       />
-                      <Label className="text-xs text-green-600 dark:text-green-400">Allow</Label>
+                      <Label className="text-xs text-green-600 dark:text-green-400">
+                        Allow
+                      </Label>
                     </CheckboxField>
                     <CheckboxField>
                       <Checkbox
@@ -734,8 +790,8 @@ export function GuardRailsManager({
                               setConstraintDetails({
                                 ...constraintDetails,
                                 [category.id]: {
-                                  rule_action: "block",
-                                  strictness: "hard",
+                                  rule_action: 'block',
+                                  strictness: 'hard',
                                   priority: 90,
                                   rule_priority: 90,
                                 },
@@ -747,23 +803,34 @@ export function GuardRailsManager({
                           setSelectedBlock(newBlock);
                         }}
                       />
-                      <Label className="text-xs text-red-600 dark:text-red-400">Block</Label>
+                      <Label className="text-xs text-red-600 dark:text-red-400">
+                        Block
+                      </Label>
                     </CheckboxField>
                   </div>
-                  
+
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <Text className="font-medium text-zinc-950 dark:text-white">
                         {category.name_nl}
                       </Text>
                       <Badge
-                        color={category.category_type === "forbidden" ? "red" : "green"}
+                        color={
+                          category.category_type === 'forbidden'
+                            ? 'red'
+                            : 'green'
+                        }
                       >
-                        {category.category_type === "forbidden" ? "Verboden" : "Vereist"}
+                        {category.category_type === 'forbidden'
+                          ? 'Verboden'
+                          : 'Vereist'}
                       </Badge>
-                      {category.items_count !== undefined && category.items_count > 0 && (
-                        <Badge color="zinc">{category.items_count} ingrediënten</Badge>
-                      )}
+                      {category.items_count !== undefined &&
+                        category.items_count > 0 && (
+                          <Badge color="zinc">
+                            {category.items_count} ingrediënten
+                          </Badge>
+                        )}
                     </div>
                     {category.description && (
                       <Text className="text-xs mt-1 text-zinc-500 dark:text-zinc-400">
@@ -775,15 +842,20 @@ export function GuardRailsManager({
                     {isSelected && (
                       <div className="mt-3 space-y-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">
                         <Field>
-                          <Label htmlFor={`rule-action-${category.id}`}>Rule Actie</Label>
+                          <Label htmlFor={`rule-action-${category.id}`}>
+                            Rule Actie
+                          </Label>
                           <select
                             id={`rule-action-${category.id}`}
-                            value={details?.rule_action || (isBlock ? "block" : "allow")}
+                            value={
+                              details?.rule_action ||
+                              (isBlock ? 'block' : 'allow')
+                            }
                             onChange={(e) =>
                               updateConstraintDetail(
                                 category.id,
-                                "rule_action",
-                                e.target.value as "allow" | "block"
+                                'rule_action',
+                                e.target.value as 'allow' | 'block',
                               )
                             }
                             className="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
@@ -792,19 +864,22 @@ export function GuardRailsManager({
                             <option value="block">Block (Blokkeren)</option>
                           </select>
                           <Description>
-                            Regel actie. Block heeft voorrang over allow bij gelijke prioriteit.
+                            Regel actie. Block heeft voorrang over allow bij
+                            gelijke prioriteit.
                           </Description>
                         </Field>
                         <Field>
-                          <Label htmlFor={`strictness-${category.id}`}>Striktheid</Label>
+                          <Label htmlFor={`strictness-${category.id}`}>
+                            Striktheid
+                          </Label>
                           <select
                             id={`strictness-${category.id}`}
-                            value={details?.strictness || "hard"}
+                            value={details?.strictness || 'hard'}
                             onChange={(e) =>
                               updateConstraintDetail(
                                 category.id,
-                                "strictness",
-                                e.target.value as "hard" | "soft"
+                                'strictness',
+                                e.target.value as 'hard' | 'soft',
                               )
                             }
                             className="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
@@ -813,7 +888,7 @@ export function GuardRailsManager({
                             <option value="soft">Soft</option>
                           </select>
                         </Field>
-                        {(isAllow || category.category_type === "required") && (
+                        {(isAllow || category.category_type === 'required') && (
                           <div className="grid grid-cols-2 gap-2">
                             <Field>
                               <Label htmlFor={`min-per-day-${category.id}`}>
@@ -823,12 +898,14 @@ export function GuardRailsManager({
                                 id={`min-per-day-${category.id}`}
                                 type="number"
                                 min={0}
-                                value={details?.min_per_day || ""}
+                                value={details?.min_per_day || ''}
                                 onChange={(e) =>
                                   updateConstraintDetail(
                                     category.id,
-                                    "min_per_day",
-                                    e.target.value ? parseInt(e.target.value) : null
+                                    'min_per_day',
+                                    e.target.value
+                                      ? parseInt(e.target.value)
+                                      : null,
                                   )
                                 }
                                 placeholder="0"
@@ -842,12 +919,14 @@ export function GuardRailsManager({
                                 id={`min-per-week-${category.id}`}
                                 type="number"
                                 min={0}
-                                value={details?.min_per_week || ""}
+                                value={details?.min_per_week || ''}
                                 onChange={(e) =>
                                   updateConstraintDetail(
                                     category.id,
-                                    "min_per_week",
-                                    e.target.value ? parseInt(e.target.value) : null
+                                    'min_per_week',
+                                    e.target.value
+                                      ? parseInt(e.target.value)
+                                      : null,
                                   )
                                 }
                                 placeholder="0"
@@ -857,7 +936,9 @@ export function GuardRailsManager({
                         )}
                         <div className="grid grid-cols-2 gap-2">
                           <Field>
-                            <Label htmlFor={`priority-${category.id}`}>Prioriteit (Legacy)</Label>
+                            <Label htmlFor={`priority-${category.id}`}>
+                              Prioriteit (Legacy)
+                            </Label>
                             <Input
                               id={`priority-${category.id}`}
                               type="number"
@@ -867,30 +948,40 @@ export function GuardRailsManager({
                               onChange={(e) =>
                                 updateConstraintDetail(
                                   category.id,
-                                  "priority",
-                                  parseInt(e.target.value) || (isBlock ? 90 : 80)
+                                  'priority',
+                                  parseInt(e.target.value) ||
+                                    (isBlock ? 90 : 80),
                                 )
                               }
                             />
                           </Field>
                           <Field>
-                            <Label htmlFor={`rule-priority-${category.id}`}>Rule Prioriteit *</Label>
+                            <Label htmlFor={`rule-priority-${category.id}`}>
+                              Rule Prioriteit *
+                            </Label>
                             <Input
                               id={`rule-priority-${category.id}`}
                               type="number"
                               min={0}
                               max={100}
-                              value={details?.rule_priority ?? details?.priority ?? (isBlock ? 90 : 80)}
+                              value={
+                                details?.rule_priority ??
+                                details?.priority ??
+                                (isBlock ? 90 : 80)
+                              }
                               onChange={(e) =>
                                 updateConstraintDetail(
                                   category.id,
-                                  "rule_priority",
-                                  parseInt(e.target.value) || (isBlock ? 90 : 80)
+                                  'rule_priority',
+                                  parseInt(e.target.value) ||
+                                    (isBlock ? 90 : 80),
                                 )
                               }
                             />
                             <Description>
-                              Evaluatie prioriteit (0-100, hoger = belangrijker). Regels worden geëvalueerd in volgorde van prioriteit.
+                              Evaluatie prioriteit (0-100, hoger =
+                              belangrijker). Regels worden geëvalueerd in
+                              volgorde van prioriteit.
                             </Description>
                           </Field>
                         </div>
@@ -916,14 +1007,16 @@ export function GuardRailsManager({
                         setCategoryFormData({
                           code: category.code,
                           name_nl: category.name_nl,
-                          name_en: category.name_en || "",
-                          description: category.description || "",
+                          name_en: category.name_en || '',
+                          description: category.description || '',
                           category_type: category.category_type,
                           display_order: category.display_order,
                         });
                       }}
                       color="zinc"
-                      disabled={isCreatingCategory || editingCategoryId === category.id}
+                      disabled={
+                        isCreatingCategory || editingCategoryId === category.id
+                      }
                     >
                       <PencilIcon className="h-4 w-4" />
                     </Button>
@@ -952,13 +1045,16 @@ export function GuardRailsManager({
                           setCreatingItemForCategory(category.id);
                           setEditingItemId(null);
                           setItemFormData({
-                            term: "",
-                            term_nl: "",
+                            term: '',
+                            term_nl: '',
                             synonyms: [],
                             display_order: items.length + 1,
                           });
                         }}
-                        disabled={creatingItemForCategory === category.id || editingItemId !== null}
+                        disabled={
+                          creatingItemForCategory === category.id ||
+                          editingItemId !== null
+                        }
                       >
                         <PlusIcon className="h-4 w-4" />
                         Toevoegen
@@ -966,10 +1062,13 @@ export function GuardRailsManager({
                     </div>
 
                     {/* Create/Edit Item Form */}
-                    {(creatingItemForCategory === category.id || editingItemId) && (
+                    {(creatingItemForCategory === category.id ||
+                      editingItemId) && (
                       <div className="mb-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
                         <h5 className="mb-3 text-sm font-medium text-zinc-950 dark:text-white">
-                          {creatingItemForCategory === category.id ? "Nieuw Ingrediënt" : "Ingrediënt Bewerken"}
+                          {creatingItemForCategory === category.id
+                            ? 'Nieuw Ingrediënt'
+                            : 'Ingrediënt Bewerken'}
                         </h5>
                         <form
                           onSubmit={(e) => {
@@ -996,7 +1095,9 @@ export function GuardRailsManager({
                             </Field>
 
                             <Field>
-                              <Label htmlFor="item-term-nl">Nederlandse Term</Label>
+                              <Label htmlFor="item-term-nl">
+                                Nederlandse Term
+                              </Label>
                               <Input
                                 id="item-term-nl"
                                 value={itemFormData.term_nl}
@@ -1011,15 +1112,17 @@ export function GuardRailsManager({
                             </Field>
 
                             <Field>
-                              <Label htmlFor="item-synonyms">Synoniemen (één per regel)</Label>
+                              <Label htmlFor="item-synonyms">
+                                Synoniemen (één per regel)
+                              </Label>
                               <Textarea
                                 id="item-synonyms"
-                                value={itemFormData.synonyms.join("\n")}
+                                value={itemFormData.synonyms.join('\n')}
                                 onChange={(e) =>
                                   setItemFormData({
                                     ...itemFormData,
                                     synonyms: e.target.value
-                                      .split("\n")
+                                      .split('\n')
                                       .map((s) => s.trim())
                                       .filter((s) => s),
                                   })
@@ -1028,12 +1131,16 @@ export function GuardRailsManager({
                                 placeholder="spaghetti&#10;penne&#10;fusilli"
                               />
                               <Description>
-                                Elke regel is een synoniem. Bijv. voor "pasta": spaghetti, penne, fusilli, etc.
+                                Elke regel is een synoniem. Bijv. voor
+                                &quot;pasta&quot;: spaghetti, penne, fusilli,
+                                etc.
                               </Description>
                             </Field>
 
                             <Field>
-                              <Label htmlFor="item-display-order">Weergave Volgorde</Label>
+                              <Label htmlFor="item-display-order">
+                                Weergave Volgorde
+                              </Label>
                               <Input
                                 id="item-display-order"
                                 type="number"
@@ -1042,7 +1149,8 @@ export function GuardRailsManager({
                                 onChange={(e) =>
                                   setItemFormData({
                                     ...itemFormData,
-                                    display_order: parseInt(e.target.value) || 0,
+                                    display_order:
+                                      parseInt(e.target.value) || 0,
                                   })
                                 }
                               />
@@ -1051,10 +1159,10 @@ export function GuardRailsManager({
                             <div className="flex gap-2">
                               <Button type="submit" disabled={isPending}>
                                 {isPending
-                                  ? "Opslaan..."
+                                  ? 'Opslaan...'
                                   : creatingItemForCategory === category.id
-                                  ? "Toevoegen"
-                                  : "Bijwerken"}
+                                    ? 'Toevoegen'
+                                    : 'Bijwerken'}
                               </Button>
                               <Button
                                 type="button"
@@ -1062,8 +1170,8 @@ export function GuardRailsManager({
                                   setCreatingItemForCategory(null);
                                   setEditingItemId(null);
                                   setItemFormData({
-                                    term: "",
-                                    term_nl: "",
+                                    term: '',
+                                    term_nl: '',
                                     synonyms: [],
                                     display_order: 0,
                                   });
@@ -1082,7 +1190,8 @@ export function GuardRailsManager({
                     <div className="space-y-2">
                       {items.length === 0 ? (
                         <Text className="text-sm text-zinc-500 dark:text-zinc-400">
-                          Geen ingrediënten toegevoegd. Klik op "Toevoegen" om te beginnen.
+                          Geen ingrediënten toegevoegd. Klik op
+                          &quot;Toevoegen&quot; om te beginnen.
                         </Text>
                       ) : (
                         items.map((item) => (
@@ -1118,13 +1227,16 @@ export function GuardRailsManager({
                                   setCreatingItemForCategory(null);
                                   setItemFormData({
                                     term: item.term,
-                                    term_nl: item.term_nl || "",
+                                    term_nl: item.term_nl || '',
                                     synonyms: item.synonyms,
                                     display_order: item.display_order,
                                   });
                                 }}
                                 color="zinc"
-                                disabled={creatingItemForCategory === category.id || editingItemId === item.id}
+                                disabled={
+                                  creatingItemForCategory === category.id ||
+                                  editingItemId === item.id
+                                }
                               >
                                 <PencilIcon className="h-4 w-4" />
                               </Button>
@@ -1152,7 +1264,7 @@ export function GuardRailsManager({
 
         <div className="mt-6 flex justify-end">
           <Button onClick={handleSave} disabled={isPending || isSaving}>
-            {isPending || isSaving ? "Opslaan..." : "Dieetregels Opslaan"}
+            {isPending || isSaving ? 'Opslaan...' : 'Dieetregels Opslaan'}
           </Button>
         </div>
       </div>
@@ -1172,15 +1284,16 @@ export function GuardRailsManager({
 
           startTransition(async () => {
             try {
-              const result = await deleteIngredientCategoryAction(deleteCategoryId);
+              const result =
+                await deleteIngredientCategoryAction(deleteCategoryId);
               if (!result.ok) {
                 setError(result.error.message);
               } else {
-                setSuccess("Categorie succesvol verwijderd");
+                setSuccess('Categorie succesvol verwijderd');
                 await loadData();
               }
             } catch (err) {
-              setError("Onverwachte fout bij verwijderen");
+              setError('Onverwachte fout bij verwijderen');
             } finally {
               setDeleteCategoryId(null);
             }
@@ -1209,14 +1322,18 @@ export function GuardRailsManager({
 
           startTransition(async () => {
             try {
-              const result = await deleteIngredientCategoryItemAction(deleteItemId);
+              const result =
+                await deleteIngredientCategoryItemAction(deleteItemId);
               if (!result.ok) {
                 setError(result.error.message);
               } else {
-                setSuccess("Ingrediënt succesvol verwijderd");
+                setSuccess('Ingrediënt succesvol verwijderd');
                 // Find which category this item belongs to
-                const itemCategoryId = Object.keys(categoryItems).find((catId) =>
-                  categoryItems[catId].some((item) => item.id === deleteItemId)
+                const itemCategoryId = Object.keys(categoryItems).find(
+                  (catId) =>
+                    categoryItems[catId].some(
+                      (item) => item.id === deleteItemId,
+                    ),
                 );
                 if (itemCategoryId) {
                   await loadCategoryItems(itemCategoryId);
@@ -1224,7 +1341,7 @@ export function GuardRailsManager({
                 }
               }
             } catch (err) {
-              setError("Onverwachte fout bij verwijderen");
+              setError('Onverwachte fout bij verwijderen');
             } finally {
               setDeleteItemId(null);
             }

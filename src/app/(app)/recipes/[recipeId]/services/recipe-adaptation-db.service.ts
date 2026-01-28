@@ -1,23 +1,23 @@
 /**
  * Recipe Adaptation Database Service
- * 
+ *
  * Server-side service for persisting recipe adaptations and runs.
  */
 
-import "server-only";
-import { createClient } from "@/src/lib/supabase/server";
+import 'server-only';
+import { createClient } from '@/src/lib/supabase/server';
 import type {
   RecipeAdaptationDraft,
   ViolationDetail,
   IngredientLine,
   StepLine,
-} from "../recipe-ai.types";
-import type { ValidationReport } from "./diet-validator";
+} from '../recipe-ai.types';
+import type { ValidationReport } from './diet-validator';
 
 /**
  * Recipe adaptation status
  */
-export type RecipeAdaptationStatus = "draft" | "applied" | "archived";
+export type RecipeAdaptationStatus = 'draft' | 'applied' | 'archived';
 
 /**
  * Recipe adaptation record from database
@@ -52,7 +52,7 @@ export type RecipeAdaptationRunRecord = {
   inputSnapshot: any;
   outputSnapshot: RecipeAdaptationDraft;
   validationReport: ValidationReport;
-  outcome: "success" | "needs_retry" | "failed";
+  outcome: 'success' | 'needs_retry' | 'failed';
   tokensIn: number | null;
   tokensOut: number | null;
   latencyMs: number | null;
@@ -81,7 +81,7 @@ export type CreateRecipeAdaptationRunInput = {
   inputSnapshot: any;
   outputSnapshot: RecipeAdaptationDraft;
   validationReport: ValidationReport;
-  outcome: "success" | "needs_retry" | "failed";
+  outcome: 'success' | 'needs_retry' | 'failed';
   tokensIn?: number | null;
   tokensOut?: number | null;
   latencyMs?: number | null;
@@ -93,15 +93,15 @@ export type CreateRecipeAdaptationRunInput = {
 export class RecipeAdaptationDbService {
   /**
    * Create or update a recipe adaptation
-   * 
+   *
    * If an adaptation with the same (userId, recipeId, dietId) exists,
    * it will be updated. Otherwise, a new one is created.
-   * 
+   *
    * @param input - Adaptation input
    * @returns Recipe adaptation record
    */
   async upsertAdaptation(
-    input: CreateRecipeAdaptationInput
+    input: CreateRecipeAdaptationInput,
   ): Promise<RecipeAdaptationRecord> {
     const supabase = await createClient();
 
@@ -112,7 +112,7 @@ export class RecipeAdaptationDbService {
       recipe_id: input.recipeId,
       diet_id: input.dietId,
       diet_ruleset_version: input.dietRulesetVersion || 1,
-      status: input.status || "draft",
+      status: input.status || 'draft',
       title: adaptation.rewrite.title,
       analysis_summary: adaptation.analysis.summary || null,
       analysis_violations: adaptation.analysis.violations as any,
@@ -125,20 +125,20 @@ export class RecipeAdaptationDbService {
 
     // Try to find existing adaptation
     const { data: existing } = await supabase
-      .from("recipe_adaptations")
-      .select("id")
-      .eq("user_id", input.userId)
-      .eq("recipe_id", input.recipeId)
-      .eq("diet_id", input.dietId)
+      .from('recipe_adaptations')
+      .select('id')
+      .eq('user_id', input.userId)
+      .eq('recipe_id', input.recipeId)
+      .eq('diet_id', input.dietId)
       .maybeSingle();
 
     let result;
     if (existing) {
       // Update existing
       const { data: updatedData, error } = await supabase
-        .from("recipe_adaptations")
+        .from('recipe_adaptations')
         .update(insertData)
-        .eq("id", existing.id)
+        .eq('id', existing.id)
         .select()
         .single();
 
@@ -150,7 +150,7 @@ export class RecipeAdaptationDbService {
     } else {
       // Insert new
       const { data: insertedData, error } = await supabase
-        .from("recipe_adaptations")
+        .from('recipe_adaptations')
         .insert(insertData)
         .select()
         .single();
@@ -167,22 +167,22 @@ export class RecipeAdaptationDbService {
 
   /**
    * Get recipe adaptation by ID
-   * 
+   *
    * @param adaptationId - Adaptation ID
    * @param userId - User ID (for authorization)
    * @returns Recipe adaptation record or null
    */
   async getAdaptationById(
     adaptationId: string,
-    userId: string
+    userId: string,
   ): Promise<RecipeAdaptationRecord | null> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("recipe_adaptations")
-      .select("*")
-      .eq("id", adaptationId)
-      .eq("user_id", userId)
+      .from('recipe_adaptations')
+      .select('*')
+      .eq('id', adaptationId)
+      .eq('user_id', userId)
       .maybeSingle();
 
     if (error) {
@@ -198,7 +198,7 @@ export class RecipeAdaptationDbService {
 
   /**
    * Get adaptations for a recipe
-   * 
+   *
    * @param recipeId - Recipe ID
    * @param userId - User ID
    * @param dietId - Optional diet ID filter
@@ -207,19 +207,19 @@ export class RecipeAdaptationDbService {
   async getAdaptationsForRecipe(
     recipeId: string,
     userId: string,
-    dietId?: string
+    dietId?: string,
   ): Promise<RecipeAdaptationRecord[]> {
     const supabase = await createClient();
 
     let query = supabase
-      .from("recipe_adaptations")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("recipe_id", recipeId)
-      .order("created_at", { ascending: false });
+      .from('recipe_adaptations')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('recipe_id', recipeId)
+      .order('created_at', { ascending: false });
 
     if (dietId) {
-      query = query.eq("diet_id", dietId);
+      query = query.eq('diet_id', dietId);
     }
 
     const { data, error } = await query;
@@ -233,7 +233,7 @@ export class RecipeAdaptationDbService {
 
   /**
    * Update adaptation status
-   * 
+   *
    * @param adaptationId - Adaptation ID
    * @param userId - User ID (for authorization)
    * @param status - New status
@@ -242,15 +242,15 @@ export class RecipeAdaptationDbService {
   async updateStatus(
     adaptationId: string,
     userId: string,
-    status: RecipeAdaptationStatus
+    status: RecipeAdaptationStatus,
   ): Promise<RecipeAdaptationRecord> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("recipe_adaptations")
+      .from('recipe_adaptations')
       .update({ status })
-      .eq("id", adaptationId)
-      .eq("user_id", userId)
+      .eq('id', adaptationId)
+      .eq('user_id', userId)
       .select()
       .single();
 
@@ -263,17 +263,17 @@ export class RecipeAdaptationDbService {
 
   /**
    * Create a recipe adaptation run
-   * 
+   *
    * @param input - Run input
    * @returns Recipe adaptation run record
    */
   async createRun(
-    input: CreateRecipeAdaptationRunInput
+    input: CreateRecipeAdaptationRunInput,
   ): Promise<RecipeAdaptationRunRecord> {
     const supabase = await createClient();
 
     const { data, error } = await supabase
-      .from("recipe_adaptation_runs")
+      .from('recipe_adaptation_runs')
       .insert({
         recipe_adaptation_id: input.recipeAdaptationId,
         model: input.model || null,
@@ -298,34 +298,34 @@ export class RecipeAdaptationDbService {
 
   /**
    * Get runs for an adaptation
-   * 
+   *
    * @param adaptationId - Adaptation ID
    * @param userId - User ID (for authorization check)
    * @returns Array of run records
    */
   async getRunsForAdaptation(
     adaptationId: string,
-    userId: string
+    userId: string,
   ): Promise<RecipeAdaptationRunRecord[]> {
     const supabase = await createClient();
 
     // First verify the adaptation belongs to the user
     const { data: adaptation } = await supabase
-      .from("recipe_adaptations")
-      .select("id")
-      .eq("id", adaptationId)
-      .eq("user_id", userId)
+      .from('recipe_adaptations')
+      .select('id')
+      .eq('id', adaptationId)
+      .eq('user_id', userId)
       .maybeSingle();
 
     if (!adaptation) {
-      throw new Error("Adaptation not found or access denied");
+      throw new Error('Adaptation not found or access denied');
     }
 
     const { data, error } = await supabase
-      .from("recipe_adaptation_runs")
-      .select("*")
-      .eq("recipe_adaptation_id", adaptationId)
-      .order("created_at", { ascending: false });
+      .from('recipe_adaptation_runs')
+      .select('*')
+      .eq('recipe_adaptation_id', adaptationId)
+      .order('created_at', { ascending: false });
 
     if (error) {
       throw new Error(`Failed to get adaptation runs: ${error.message}`);

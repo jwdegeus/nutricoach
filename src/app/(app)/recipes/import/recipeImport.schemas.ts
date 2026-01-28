@@ -1,20 +1,20 @@
 /**
  * Recipe Import Schemas
- * 
+ *
  * Zod validation schemas for recipe import types.
  */
 
-import { z } from "zod";
+import { z } from 'zod';
 
 /**
  * Recipe import status schema
  */
 export const recipeImportStatusSchema = z.enum([
-  "uploaded",
-  "processing",
-  "ready_for_review",
-  "failed",
-  "finalized",
+  'uploaded',
+  'processing',
+  'ready_for_review',
+  'failed',
+  'finalized',
 ]);
 
 /**
@@ -42,14 +42,14 @@ export const createRecipeImportInputSchema = z.object({
  * Load recipe import input schema
  */
 export const loadRecipeImportInputSchema = z.object({
-  jobId: z.string().uuid("jobId must be a valid UUID"),
+  jobId: z.string().uuid('jobId must be a valid UUID'),
 });
 
 /**
  * Update recipe import status input schema
  */
 export const updateRecipeImportStatusInputSchema = z.object({
-  jobId: z.string().uuid("jobId must be a valid UUID"),
+  jobId: z.string().uuid('jobId must be a valid UUID'),
   status: recipeImportStatusSchema,
   errorMessage: z.string().optional(),
 });
@@ -60,16 +60,16 @@ export const updateRecipeImportStatusInputSchema = z.object({
 export const importRecipeFromUrlInputSchema = z.object({
   url: z
     .string()
-    .min(1, "URL is verplicht")
-    .max(2048, "URL mag maximaal 2048 tekens lang zijn")
+    .min(1, 'URL is verplicht')
+    .max(2048, 'URL mag maximaal 2048 tekens lang zijn')
     .refine(
       (url) => {
         const trimmed = url.trim();
-        return trimmed.startsWith("http://") || trimmed.startsWith("https://");
+        return trimmed.startsWith('http://') || trimmed.startsWith('https://');
       },
       {
-        message: "URL moet beginnen met http:// of https://",
-      }
+        message: 'URL moet beginnen met http:// of https://',
+      },
     )
     .transform((url) => url.trim()),
 });

@@ -1,11 +1,11 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/src/lib/supabase/server";
-import { isAdmin } from "@/src/lib/auth/roles";
-import { RecipeSourcesAdminClient } from "./components/RecipeSourcesAdminClient";
+import { redirect } from 'next/navigation';
+import { createClient } from '@/src/lib/supabase/server';
+import { isAdmin } from '@/src/lib/auth/roles';
+import { RecipeSourcesAdminClient } from './components/RecipeSourcesAdminClient';
 
 export const metadata = {
-  title: "Recept Bronnen Beheer | NutriCoach Admin",
-  description: "Beheer recept bronnen",
+  title: 'Recept Bronnen Beheer | NutriCoach Admin',
+  description: 'Beheer recept bronnen',
 };
 
 export default async function RecipeSourcesAdminPage() {
@@ -15,12 +15,12 @@ export default async function RecipeSourcesAdminPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   const userIsAdmin = await isAdmin();
   if (!userIsAdmin) {
-    redirect("/dashboard");
+    redirect('/dashboard');
   }
 
   return <RecipeSourcesAdminClient />;

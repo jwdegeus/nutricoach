@@ -1,15 +1,15 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/catalyst/button";
-import { Select } from "@/components/catalyst/select";
-import { Field, Label } from "@/components/catalyst/fieldset";
-import { PencilIcon, CheckIcon, XMarkIcon } from "@heroicons/react/20/solid";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/catalyst/button';
+import { Select } from '@/components/catalyst/select';
+import { Field, Label } from '@/components/catalyst/fieldset';
+import { PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/20/solid';
 
 type RecipeSourceEditorProps = {
   currentSource: string | null;
   mealId: string;
-  source: "custom" | "gemini";
+  source: 'custom' | 'gemini';
   onSourceUpdated: (newSource: string | null) => void;
 };
 
@@ -27,8 +27,10 @@ export function RecipeSourceEditor({
   onSourceUpdated,
 }: RecipeSourceEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [selectedSource, setSelectedSource] = useState<string>(currentSource || "");
-  const [customSource, setCustomSource] = useState<string>("");
+  const [selectedSource, setSelectedSource] = useState<string>(
+    currentSource || '',
+  );
+  const [customSource, setCustomSource] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sources, setSources] = useState<RecipeSource[]>([]);
@@ -38,14 +40,14 @@ export function RecipeSourceEditor({
   useEffect(() => {
     async function loadSources() {
       try {
-        const response = await fetch("/api/recipes/sources");
+        const response = await fetch('/api/recipes/sources');
         const result = await response.json();
 
         if (result.ok) {
           setSources(result.data || []);
         }
       } catch (err) {
-        console.error("Error loading sources:", err);
+        console.error('Error loading sources:', err);
       } finally {
         setIsLoadingSources(false);
       }
@@ -63,20 +65,20 @@ export function RecipeSourceEditor({
     try {
       let finalSource: string | null = null;
 
-      if (selectedSource === "custom") {
+      if (selectedSource === 'custom') {
         // Custom source entered by user
         const trimmedCustom = customSource.trim();
         if (!trimmedCustom) {
-          setError("Voer een bron naam in");
+          setError('Voer een bron naam in');
           setIsSaving(false);
           return;
         }
 
         // First, ensure the custom source exists in the database
-        const createResponse = await fetch("/api/recipes/sources", {
-          method: "POST",
+        const createResponse = await fetch('/api/recipes/sources', {
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             name: trimmedCustom,
@@ -85,7 +87,9 @@ export function RecipeSourceEditor({
 
         const createResult = await createResponse.json();
         if (!createResult.ok) {
-          throw new Error(createResult.error?.message || "Fout bij aanmaken bron");
+          throw new Error(
+            createResult.error?.message || 'Fout bij aanmaken bron',
+          );
         }
 
         finalSource = trimmedCustom;
@@ -95,10 +99,10 @@ export function RecipeSourceEditor({
       }
 
       // Update the meal with the source
-      const response = await fetch("/api/recipes/update-source", {
-        method: "POST",
+      const response = await fetch('/api/recipes/update-source', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           mealId,
@@ -110,22 +114,22 @@ export function RecipeSourceEditor({
       const result = await response.json();
 
       if (!result.ok) {
-        throw new Error(result.error?.message || "Bijwerken mislukt");
+        throw new Error(result.error?.message || 'Bijwerken mislukt');
       }
 
       onSourceUpdated(finalSource);
       setIsEditing(false);
-      setCustomSource("");
+      setCustomSource('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Bijwerken mislukt");
+      setError(err instanceof Error ? err.message : 'Bijwerken mislukt');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleCancel = () => {
-    setSelectedSource(currentSource || "");
-    setCustomSource("");
+    setSelectedSource(currentSource || '');
+    setCustomSource('');
     setError(null);
     setIsEditing(false);
   };
@@ -142,11 +146,7 @@ export function RecipeSourceEditor({
             Geen bron ingesteld
           </span>
         )}
-        <Button
-          plain
-          onClick={() => setIsEditing(true)}
-          className="text-sm"
-        >
+        <Button plain onClick={() => setIsEditing(true)} className="text-sm">
           <PencilIcon className="h-4 w-4" />
         </Button>
       </div>
@@ -182,7 +182,7 @@ export function RecipeSourceEditor({
         </Select>
       </Field>
 
-      {selectedSource === "custom" && (
+      {selectedSource === 'custom' && (
         <Field>
           <Label>Aangepaste bron</Label>
           <input
@@ -203,12 +203,14 @@ export function RecipeSourceEditor({
       <div className="flex items-center gap-2">
         <Button
           onClick={handleSave}
-          disabled={isSaving || (selectedSource === "custom" && !customSource.trim())}
+          disabled={
+            isSaving || (selectedSource === 'custom' && !customSource.trim())
+          }
           color="primary"
           className="text-sm"
         >
           <CheckIcon className="h-4 w-4 mr-1" />
-          {isSaving ? "Opslaan..." : "Opslaan"}
+          {isSaving ? 'Opslaan...' : 'Opslaan'}
         </Button>
         <Button
           plain

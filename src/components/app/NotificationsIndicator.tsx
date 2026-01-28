@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 import {
   Dropdown,
   DropdownButton,
@@ -8,16 +8,21 @@ import {
   DropdownHeader,
   DropdownDivider,
   DropdownItem,
-} from "@/components/catalyst/dropdown";
-import { NavbarItem } from "@/components/catalyst/navbar";
-import { BellIcon, CheckCircleIcon, XCircleIcon, ArrowPathIcon } from "@heroicons/react/20/solid";
-import { getNotificationsAction } from "@/src/app/(app)/meal-plans/actions/notifications.actions";
+} from '@/components/catalyst/dropdown';
+import { NavbarItem } from '@/components/catalyst/navbar';
+import {
+  BellIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ArrowPathIcon,
+} from '@heroicons/react/20/solid';
+import { getNotificationsAction } from '@/src/app/(app)/meal-plans/actions/notifications.actions';
 
 export type Notification = {
   id: string;
   planId: string;
   runType: string;
-  status: "running" | "success" | "error";
+  status: 'running' | 'success' | 'error';
   createdAt: string;
   errorMessage?: string;
   summary?: string;
@@ -39,7 +44,9 @@ export function NotificationsIndicator() {
         const unread = result.data.filter((n) => {
           const created = new Date(n.createdAt).getTime();
           const hoursAgo = (now - created) / (1000 * 60 * 60);
-          return (n.status === "running" || n.status === "error") && hoursAgo < 24;
+          return (
+            (n.status === 'running' || n.status === 'error') && hoursAgo < 24
+          );
         }).length;
         setUnreadCount(unread);
       }
@@ -54,33 +61,39 @@ export function NotificationsIndicator() {
     return () => clearInterval(intervalId);
   }, []);
 
-  const getStatusIcon = (status: Notification["status"]) => {
+  const getStatusIcon = (status: Notification['status']) => {
     switch (status) {
-      case "running":
-        return <ArrowPathIcon className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />;
-      case "success":
-        return <CheckCircleIcon className="h-4 w-4 text-green-600 dark:text-green-400" />;
-      case "error":
-        return <XCircleIcon className="h-4 w-4 text-red-600 dark:text-red-400" />;
+      case 'running':
+        return (
+          <ArrowPathIcon className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
+        );
+      case 'success':
+        return (
+          <CheckCircleIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
+        );
+      case 'error':
+        return (
+          <XCircleIcon className="h-4 w-4 text-red-600 dark:text-red-400" />
+        );
     }
   };
 
-  const getStatusLabel = (status: Notification["status"]) => {
+  const getStatusLabel = (status: Notification['status']) => {
     switch (status) {
-      case "running":
-        return "Bezig";
-      case "success":
-        return "Voltooid";
-      case "error":
-        return "Fout";
+      case 'running':
+        return 'Bezig';
+      case 'success':
+        return 'Voltooid';
+      case 'error':
+        return 'Fout';
     }
   };
 
   const getRunTypeLabel = (runType: string) => {
     const labels: Record<string, string> = {
-      generate: "Genereren",
-      regenerate: "Regenereren",
-      enrich: "Verrijken",
+      generate: 'Genereren',
+      regenerate: 'Regenereren',
+      enrich: 'Verrijken',
     };
     return labels[runType] || runType;
   };
@@ -93,17 +106,19 @@ export function NotificationsIndicator() {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return "Zojuist";
+    if (diffMins < 1) return 'Zojuist';
     if (diffMins < 60) return `${diffMins} min geleden`;
     if (diffHours < 24) return `${diffHours} uur geleden`;
     if (diffDays < 7) return `${diffDays} dagen geleden`;
-    return date.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
+    return date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
   };
 
   // Group notifications by status
-  const running = notifications.filter((n) => n.status === "running");
-  const errors = notifications.filter((n) => n.status === "error").slice(0, 5);
-  const recent = notifications.filter((n) => n.status === "success").slice(0, 5);
+  const running = notifications.filter((n) => n.status === 'running');
+  const errors = notifications.filter((n) => n.status === 'error').slice(0, 5);
+  const recent = notifications
+    .filter((n) => n.status === 'success')
+    .slice(0, 5);
 
   return (
     <Dropdown>
@@ -111,14 +126,16 @@ export function NotificationsIndicator() {
         <BellIcon className="h-5 w-5" />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs font-semibold text-white">
-            {unreadCount > 9 ? "9+" : unreadCount}
+            {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </DropdownButton>
       <DropdownMenu anchor="bottom end" className="w-80 max-h-[32rem]">
         <DropdownHeader>
           <div className="flex items-center justify-between w-full">
-            <span className="font-semibold text-zinc-950 dark:text-white">Notificaties</span>
+            <span className="font-semibold text-zinc-950 dark:text-white">
+              Notificaties
+            </span>
             {unreadCount > 0 && (
               <span className="text-xs text-zinc-500 dark:text-zinc-400">
                 {unreadCount} nieuw
@@ -144,7 +161,7 @@ export function NotificationsIndicator() {
                 <div className="px-3.5 pt-2 pb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
                   Bezig
                 </div>
-                {running.map((notification) => (
+                {running.map((notification) =>
                   notification.planId ? (
                     <DropdownItem
                       key={notification.id}
@@ -179,9 +196,11 @@ export function NotificationsIndicator() {
                         </div>
                       </div>
                     </div>
-                  )
-                ))}
-                {(errors.length > 0 || recent.length > 0) && <DropdownDivider />}
+                  ),
+                )}
+                {(errors.length > 0 || recent.length > 0) && (
+                  <DropdownDivider />
+                )}
               </>
             )}
 
@@ -191,7 +210,7 @@ export function NotificationsIndicator() {
                 <div className="px-3.5 pt-2 pb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
                   Fouten
                 </div>
-                {errors.map((notification) => (
+                {errors.map((notification) =>
                   notification.planId ? (
                     <DropdownItem
                       key={notification.id}
@@ -204,7 +223,7 @@ export function NotificationsIndicator() {
                             {getRunTypeLabel(notification.runType)} - Fout
                           </div>
                           <div className="mt-0.5 text-xs/5 text-zinc-500 dark:text-zinc-400 sm:text-sm/5">
-                            {notification.errorMessage || "Onbekende fout"}
+                            {notification.errorMessage || 'Onbekende fout'}
                           </div>
                           <div className="mt-0.5 text-xs/4 text-zinc-400 dark:text-zinc-500">
                             {formatTime(notification.createdAt)}
@@ -224,7 +243,7 @@ export function NotificationsIndicator() {
                             {getRunTypeLabel(notification.runType)} - Fout
                           </div>
                           <div className="mt-0.5 text-xs/5 text-zinc-500 dark:text-zinc-400 sm:text-sm/5">
-                            {notification.errorMessage || "Onbekende fout"}
+                            {notification.errorMessage || 'Onbekende fout'}
                           </div>
                           <div className="mt-0.5 text-xs/4 text-zinc-400 dark:text-zinc-500">
                             {formatTime(notification.createdAt)}
@@ -232,8 +251,8 @@ export function NotificationsIndicator() {
                         </div>
                       </div>
                     </div>
-                  )
-                ))}
+                  ),
+                )}
                 {recent.length > 0 && <DropdownDivider />}
               </>
             )}
@@ -244,7 +263,7 @@ export function NotificationsIndicator() {
                 <div className="px-3.5 pt-2 pb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
                   Recent Voltooid
                 </div>
-                {recent.map((notification) => (
+                {recent.map((notification) =>
                   notification.planId ? (
                     <DropdownItem
                       key={notification.id}
@@ -279,8 +298,8 @@ export function NotificationsIndicator() {
                         </div>
                       </div>
                     </div>
-                  )
-                ))}
+                  ),
+                )}
               </>
             )}
           </div>

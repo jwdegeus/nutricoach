@@ -1,12 +1,13 @@
-import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { createClient } from "@/src/lib/supabase/server";
-import { listMealPlansAction } from "./actions/mealPlans.actions";
-import { MealPlansTable } from "./components/MealPlansTable";
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/src/lib/supabase/server';
+import { listMealPlansAction } from './actions/mealPlans.actions';
+import { MealPlansTable } from './components/MealPlansTable';
 
 export const metadata: Metadata = {
-  title: "Meal Plans | NutriCoach",
-  description: "Bekijk je meal plan geschiedenis",
+  title: 'Meal Plans | NutriCoach',
+  description: 'Bekijk je meal plan geschiedenis',
 };
 
 export default async function MealPlansPage() {
@@ -17,7 +18,7 @@ export default async function MealPlansPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   // Load meal plans
@@ -44,12 +45,12 @@ export default async function MealPlansPage() {
           </p>
         </div>
         {plansResult.data.length > 0 && (
-          <a
+          <Link
             href="/meal-plans/new"
             className="inline-flex items-center justify-center rounded-lg border border-transparent bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
             Nieuw Meal Plan
-          </a>
+          </Link>
         )}
       </div>
 

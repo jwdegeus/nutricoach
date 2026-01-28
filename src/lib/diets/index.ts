@@ -1,6 +1,6 @@
 /**
  * Diet Module - Barrel exports
- * 
+ *
  * Central export point for all diet-related types, schemas, and functions.
  * This module provides the foundation for the meal planning agent.
  */
@@ -28,7 +28,7 @@ export type {
   WeeklyVarietyConstraint,
   MacroConstraint,
   MealStructureConstraint,
-} from "./diet.types";
+} from './diet.types';
 
 // Schemas
 export {
@@ -38,7 +38,7 @@ export {
   mealPlanResponseSchema,
   mealPlanDayResponseSchema,
   mealResponseSchema,
-} from "./diet.schemas";
+} from './diet.schemas';
 
 export type {
   DietProfileInput,
@@ -47,7 +47,7 @@ export type {
   MealPlanResponseInput,
   MealPlanDayResponse,
   MealResponse,
-} from "./diet.schemas";
+} from './diet.schemas';
 
 // Functions
-export { deriveDietRuleSet } from "./diet-rules";
+export { deriveDietRuleSet } from './diet-rules';

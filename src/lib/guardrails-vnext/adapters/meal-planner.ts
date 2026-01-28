@@ -1,6 +1,6 @@
 /**
  * Guard Rails vNext - Meal Planner Adapter
- * 
+ *
  * Maps Meal Plan to GuardrailsEvaluateInput targets.
  * Pure mapping function (no side effects, deterministic).
  */
@@ -10,17 +10,17 @@ import type { MealPlanResponse, MealPlanDay, Meal } from '@/src/lib/diets';
 
 /**
  * Map Meal Plan to GuardrailsEvaluateInput targets
- * 
+ *
  * Converts meal plan ingredients, meal names, and metadata to TextAtom[] arrays
  * with stable paths for evaluation.
- * 
+ *
  * @param plan - Meal plan response
  * @param locale - Optional locale for text atoms
  * @returns GuardrailsEvaluateInput targets
  */
 export function mapMealPlanToGuardrailsTargets(
   plan: MealPlanResponse,
-  locale?: 'nl' | 'en'
+  locale?: 'nl' | 'en',
 ): {
   ingredient: TextAtom[];
   step: TextAtom[];
@@ -49,11 +49,16 @@ export function mapMealPlanToGuardrailsTargets(
 
       // Map ingredients from ingredientRefs (primary)
       if (meal.ingredientRefs && meal.ingredientRefs.length > 0) {
-        for (let ingIndex = 0; ingIndex < meal.ingredientRefs.length; ingIndex++) {
+        for (
+          let ingIndex = 0;
+          ingIndex < meal.ingredientRefs.length;
+          ingIndex++
+        ) {
           const ref = meal.ingredientRefs[ingIndex];
-          
+
           // Use displayName if available, otherwise use NEVO code as fallback
-          const ingredientText = ref.displayName?.trim() || `NEVO-${ref.nevoCode}`;
+          const ingredientText =
+            ref.displayName?.trim() || `NEVO-${ref.nevoCode}`;
           if (ingredientText) {
             ingredientAtoms.push({
               text: ingredientText.toLowerCase(),
@@ -134,14 +139,16 @@ export type DietLogicIngredientLike = { name: string };
  * @returns Array of ingredient arrays, one per day (zelfde volgorde als plan.days)
  */
 export function getMealPlanIngredientsPerDay(
-  plan: MealPlanResponse
+  plan: MealPlanResponse,
 ): DietLogicIngredientLike[][] {
   return plan.days.map((day) => {
     const names: string[] = [];
     for (const meal of day.meals) {
       if (meal.ingredientRefs?.length) {
         for (const ref of meal.ingredientRefs) {
-          const t = ref.displayName?.trim() || (ref.nevoCode ? `NEVO-${ref.nevoCode}` : null);
+          const t =
+            ref.displayName?.trim() ||
+            (ref.nevoCode ? `NEVO-${ref.nevoCode}` : null);
           if (t) names.push(t);
         }
       }

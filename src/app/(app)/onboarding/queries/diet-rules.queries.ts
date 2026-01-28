@@ -1,7 +1,7 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import type { DietRule } from "../types/diet-rules.types";
+import { createClient } from '@/src/lib/supabase/server';
+import type { DietRule } from '../types/diet-rules.types';
 
 /**
  * Haalt alle actieve regels op voor een specifiek dieettype
@@ -10,15 +10,15 @@ export async function getDietRules(dietTypeId: string): Promise<DietRule[]> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from("diet_rules")
-    .select("*")
-    .eq("diet_type_id", dietTypeId)
-    .eq("is_active", true)
-    .order("priority", { ascending: false })
-    .order("rule_type", { ascending: true });
+    .from('diet_rules')
+    .select('*')
+    .eq('diet_type_id', dietTypeId)
+    .eq('is_active', true)
+    .order('priority', { ascending: false })
+    .order('rule_type', { ascending: true });
 
   if (error) {
-    console.error("Error fetching diet rules:", error);
+    console.error('Error fetching diet rules:', error);
     return [];
   }
 
@@ -42,10 +42,10 @@ export async function validateDietType(dietTypeId: string): Promise<boolean> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from("diet_types")
-    .select("id")
-    .eq("id", dietTypeId)
-    .eq("is_active", true)
+    .from('diet_types')
+    .select('id')
+    .eq('id', dietTypeId)
+    .eq('is_active', true)
     .maybeSingle();
 
   if (error || !data) {

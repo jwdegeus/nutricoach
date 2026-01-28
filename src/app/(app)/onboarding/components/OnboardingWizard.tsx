@@ -1,15 +1,15 @@
-"use client";
+'use client';
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { saveOnboardingAction } from "../actions/onboarding.actions";
-import type { OnboardingInput } from "../onboarding.types";
-import { ProgressIndicator } from "./ProgressIndicator";
-import { Step1DietType } from "./Step1DietType";
-import { Step2AllergiesDislikes } from "./Step2AllergiesDislikes";
-import { Step3Practical } from "./Step3Practical";
-import { Step4Goal } from "./Step4Goal";
-import { Button } from "@/components/catalyst/button";
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { saveOnboardingAction } from '../actions/onboarding.actions';
+import type { OnboardingInput } from '../onboarding.types';
+import { ProgressIndicator } from './ProgressIndicator';
+import { Step1DietType } from './Step1DietType';
+import { Step2AllergiesDislikes } from './Step2AllergiesDislikes';
+import { Step3Practical } from './Step3Practical';
+import { Step4Goal } from './Step4Goal';
+import { Button } from '@/components/catalyst/button';
 
 const TOTAL_STEPS = 4;
 
@@ -21,7 +21,7 @@ export function OnboardingWizard() {
 
   // Form state
   const [formData, setFormData] = useState<Partial<OnboardingInput>>({
-    dietTypeId: "",
+    dietTypeId: '',
     strictness: undefined,
     allergies: [],
     dislikes: [],
@@ -72,7 +72,7 @@ export function OnboardingWizard() {
 
   const handleSubmit = () => {
     if (!canProceed()) {
-      setError("Vul alle verplichte velden in");
+      setError('Vul alle verplichte velden in');
       return;
     }
 
@@ -91,13 +91,13 @@ export function OnboardingWizard() {
 
       const result = await saveOnboardingAction(input);
 
-      if ("error" in result) {
+      if ('error' in result) {
         setError(result.error);
       } else {
         // Refresh to ensure middleware picks up the new onboarding status
         // Then redirect to dashboard
         router.refresh();
-        router.push("/dashboard");
+        router.push('/dashboard');
       }
     });
   };
@@ -107,7 +107,7 @@ export function OnboardingWizard() {
       case 1:
         return (
           <Step1DietType
-            value={formData.dietTypeId || ""}
+            value={formData.dietTypeId || ''}
             onChange={(dietTypeId) => updateFormData({ dietTypeId })}
           />
         );

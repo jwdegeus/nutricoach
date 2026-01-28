@@ -1,15 +1,15 @@
-import type { Metadata } from "next";
-import { ThemeProvider } from "@/src/components/theme-provider";
+import type { Metadata } from 'next';
+import { ThemeProvider } from '@/src/components/theme-provider';
 import { getLocale, getMessages, getTimeZone } from 'next-intl/server';
-import { I18nProvider } from "@/src/components/i18n-provider";
-import "./globals.css";
+import { I18nProvider } from '@/src/components/i18n-provider';
+import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    template: "%s - NutriCoach",
-    default: "NutriCoach",
+    template: '%s - NutriCoach',
+    default: 'NutriCoach',
   },
-  description: "NutriCoach - Nutrition Coaching Platform",
+  description: 'NutriCoach - Nutrition Coaching Platform',
 };
 
 export default async function RootLayout({

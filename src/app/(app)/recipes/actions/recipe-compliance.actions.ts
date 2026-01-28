@@ -1,9 +1,16 @@
-"use server";
+'use server';
 
-import { loadGuardrailsRuleset, evaluateGuardrails } from "@/src/lib/guardrails-vnext";
-import { mapMealToGuardrailsTargets } from "@/src/lib/guardrails-vnext/adapters/meal-to-targets";
-import type { GuardDecision, EvaluationContext, GuardrailsRuleset } from "@/src/lib/guardrails-vnext/types";
-import { getCurrentDietIdAction } from "../[recipeId]/actions/recipe-ai.persist.actions";
+import {
+  loadGuardrailsRuleset,
+  evaluateGuardrails,
+} from '@/src/lib/guardrails-vnext';
+import { mapMealToGuardrailsTargets } from '@/src/lib/guardrails-vnext/adapters/meal-to-targets';
+import type {
+  GuardDecision,
+  EvaluationContext,
+  GuardrailsRuleset,
+} from '@/src/lib/guardrails-vnext/types';
+import { getCurrentDietIdAction } from '../[recipeId]/actions/recipe-ai.persist.actions';
 
 type ActionResult<T> =
   | { ok: true; data: T }
@@ -23,13 +30,13 @@ export type RecipeComplianceResult = {
  */
 function complianceScoreFromDecision(
   decision: GuardDecision,
-  totalAtoms: number
+  totalAtoms: number,
 ): number {
   if (totalAtoms === 0) return 100;
   const violatingPaths = new Set(
     decision.matches
       .filter((m) => decision.appliedRuleIds.includes(m.ruleId))
-      .map((m) => m.targetPath)
+      .map((m) => m.targetPath),
   );
   const compliantCount = Math.max(0, totalAtoms - violatingPaths.size);
   return Math.round((compliantCount / totalAtoms) * 100);
@@ -40,7 +47,7 @@ function complianceScoreFromDecision(
  */
 export type RecipeComplianceInputItem = {
   id: string;
-  source: "custom" | "gemini";
+  source: 'custom' | 'gemini';
   mealData?: unknown;
   meal_data?: unknown;
 };
@@ -50,7 +57,7 @@ export type RecipeComplianceInputItem = {
  * Returns 0–100% per recipe; uses dieetregels (guardrails) for the active diet.
  */
 export async function getRecipeComplianceScoresAction(
-  items: RecipeComplianceInputItem[]
+  items: RecipeComplianceInputItem[],
 ): Promise<ActionResult<Record<string, RecipeComplianceResult>>> {
   const dietResult = await getCurrentDietIdAction();
   if (!dietResult.ok) {
@@ -71,32 +78,37 @@ export async function getRecipeComplianceScoresAction(
   try {
     ruleset = await loadGuardrailsRuleset({
       dietId,
-      mode: "recipe_adaptation",
-      locale: "nl",
+      mode: 'recipe_adaptation',
+      locale: 'nl',
     });
   } catch (err) {
     return {
       ok: false,
       error: {
-        code: "RULESET_LOAD_ERROR",
-        message: err instanceof Error ? err.message : "Regelset laden mislukt",
+        code: 'RULESET_LOAD_ERROR',
+        message: err instanceof Error ? err.message : 'Regelset laden mislukt',
       },
     };
   }
 
   // Geen echte dieetregels geconfigureerd → score niet tonen (fallback-regelset)
-  if (ruleset.provenance?.source === "fallback") {
+  if (ruleset.provenance?.source === 'fallback') {
     const noRules: Record<string, RecipeComplianceResult> = {};
     items.forEach((i) => {
-      noRules[i.id] = { scorePercent: 0, ok: true, dietId, noRulesConfigured: true };
+      noRules[i.id] = {
+        scorePercent: 0,
+        ok: true,
+        dietId,
+        noRulesConfigured: true,
+      };
     });
     return { ok: true, data: noRules };
   }
 
   const context: EvaluationContext = {
     dietId,
-    locale: "nl",
-    mode: "recipe_adaptation",
+    locale: 'nl',
+    mode: 'recipe_adaptation',
     timestamp: new Date().toISOString(),
   };
 
@@ -106,10 +118,9 @@ export async function getRecipeComplianceScoresAction(
     const mealPayload = item.mealData ?? item.meal_data ?? null;
     const targets = mapMealToGuardrailsTargets(
       mealPayload as Parameters<typeof mapMealToGuardrailsTargets>[0],
-      "nl"
+      'nl',
     );
-    const totalAtoms =
-      targets.ingredient.length + targets.step.length;
+    const totalAtoms = targets.ingredient.length + targets.step.length;
 
     if (totalAtoms === 0) {
       scores[item.id] = { scorePercent: 100, ok: true, dietId };

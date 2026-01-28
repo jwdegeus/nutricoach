@@ -1,12 +1,17 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Badge } from "@/components/catalyst/badge";
-import { Button } from "@/components/catalyst/button";
-import { Text } from "@/components/catalyst/text";
-import { Link } from "@/components/catalyst/link";
-import { ClipboardIcon, CheckIcon, ArrowPathIcon, MagnifyingGlassIcon } from "@heroicons/react/20/solid";
-import { formatReasonForBadge } from "@/src/lib/guardrails-vnext/ui/reasonLabels";
+import { useState } from 'react';
+import { Badge } from '@/components/catalyst/badge';
+import { Button } from '@/components/catalyst/button';
+import { Text } from '@/components/catalyst/text';
+import { Link } from '@/components/catalyst/link';
+import {
+  ClipboardIcon,
+  CheckIcon,
+  ArrowPathIcon,
+  MagnifyingGlassIcon,
+} from '@heroicons/react/20/solid';
+import { formatReasonForBadge } from '@/src/lib/guardrails-vnext/ui/reasonLabels';
 
 /** Ontbrekende FORCE-categorie voor “voeg toe”-feedback */
 export type ForceDeficitItem = {
@@ -44,7 +49,7 @@ export function GuardrailsViolationEmptyState({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error("Failed to copy:", error);
+      console.error('Failed to copy:', error);
     }
   };
 
@@ -58,7 +63,8 @@ export function GuardrailsViolationEmptyState({
           Plan kan niet worden gegenereerd door dieetregels
         </Text>
         <Text className="mt-2 text-sm text-red-800 dark:text-red-200">
-          De gegenereerde wijzigingen voldoen niet aan je dieetregels en zijn daarom geblokkeerd.
+          De gegenereerde wijzigingen voldoen niet aan je dieetregels en zijn
+          daarom geblokkeerd.
         </Text>
       </div>
 
@@ -69,13 +75,14 @@ export function GuardrailsViolationEmptyState({
             Voeg iets toe uit:
           </Text>
           <Text className="mt-1 text-sm text-amber-800 dark:text-amber-200">
-            {forceDeficits.map((d) => d.categoryNameNl).join(", ")}
+            {forceDeficits.map((d) => d.categoryNameNl).join(', ')}
           </Text>
           <Text className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
-            Het dag-quotum voor deze groepen is niet gehaald. Kies maaltijden of recepten die hieruit iets bevatten.
+            Het dag-quotum voor deze groepen is niet gehaald. Kies maaltijden of
+            recepten die hieruit iets bevatten.
           </Text>
           <Link
-            href={`/recipes?categories=${encodeURIComponent(forceDeficits.map((d) => d.categoryCode).join(","))}&categoryNames=${encodeURIComponent(forceDeficits.map((d) => d.categoryNameNl).join(","))}`}
+            href={`/recipes?categories=${encodeURIComponent(forceDeficits.map((d) => d.categoryCode).join(','))}&categoryNames=${encodeURIComponent(forceDeficits.map((d) => d.categoryNameNl).join(','))}`}
             className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-100 px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900/50 dark:text-amber-100 dark:hover:bg-amber-800/50"
           >
             <MagnifyingGlassIcon className="h-4 w-4" aria-hidden />
@@ -94,9 +101,9 @@ export function GuardrailsViolationEmptyState({
             {displayReasonCodes.map((code, idx) => {
               const { label, code: reasonCode } = formatReasonForBadge(code);
               return (
-                <Badge 
-                  key={idx} 
-                  color="red" 
+                <Badge
+                  key={idx}
+                  color="red"
                   className="text-xs"
                   title={reasonCode}
                 >
@@ -120,12 +127,7 @@ export function GuardrailsViolationEmptyState({
           <code className="rounded bg-red-100 px-2 py-0.5 font-mono text-xs text-red-900 dark:bg-red-900/50 dark:text-red-100">
             {shortHash}
           </code>
-          <Button
-            onClick={handleCopy}
-            color="zinc"
-            plain
-            className="h-6 px-2 text-xs"
-          >
+          <Button onClick={handleCopy} plain className="h-6 px-2 text-xs">
             {copied ? (
               <>
                 <CheckIcon className="h-3 w-3" />
@@ -149,11 +151,7 @@ export function GuardrailsViolationEmptyState({
       {/* Actions */}
       <div className="flex flex-wrap gap-3 pt-4 border-t border-red-200 dark:border-red-900/50">
         {onRetry && (
-          <Button
-            onClick={onRetry}
-            disabled={isRetrying}
-            color="blue"
-          >
+          <Button onClick={onRetry} disabled={isRetrying} color="blue">
             {isRetrying ? (
               <>
                 <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />

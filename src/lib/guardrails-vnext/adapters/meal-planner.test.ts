@@ -1,6 +1,6 @@
 /**
  * Guard Rails vNext - Meal Planner Adapter Tests
- * 
+ *
  * Unit tests for the meal planner adapter.
  */
 
@@ -10,7 +10,9 @@ import { mapMealPlanToGuardrailsTargets } from './meal-planner';
 import type { MealPlanResponse, MealPlanDay, Meal } from '@/src/lib/diets';
 
 // Helper to create a minimal meal plan
-function createMealPlan(overrides?: Partial<MealPlanResponse>): MealPlanResponse {
+function createMealPlan(
+  overrides?: Partial<MealPlanResponse>,
+): MealPlanResponse {
   return {
     requestId: 'test-request',
     days: [],
@@ -53,11 +55,17 @@ describe('mapMealPlanToGuardrailsTargets', () => {
 
       assert.strictEqual(result.ingredient.length, 2);
       assert.strictEqual(result.ingredient[0].text, 'eieren');
-      assert.strictEqual(result.ingredient[0].path, 'days[0].meals[0].ingredients[0]');
+      assert.strictEqual(
+        result.ingredient[0].path,
+        'days[0].meals[0].ingredients[0]',
+      );
       assert.strictEqual(result.ingredient[0].canonicalId, '123');
       assert.strictEqual(result.ingredient[0].locale, 'nl');
       assert.strictEqual(result.ingredient[1].text, 'brood');
-      assert.strictEqual(result.ingredient[1].path, 'days[0].meals[0].ingredients[1]');
+      assert.strictEqual(
+        result.ingredient[1].path,
+        'days[0].meals[0].ingredients[1]',
+      );
     });
 
     it('should use NEVO code as fallback when displayName is missing', () => {
@@ -67,9 +75,7 @@ describe('mapMealPlanToGuardrailsTargets', () => {
             date: '2026-01-26',
             meals: [
               createMeal({
-                ingredientRefs: [
-                  { nevoCode: '789', quantityG: 150 },
-                ],
+                ingredientRefs: [{ nevoCode: '789', quantityG: 150 }],
               }),
             ],
           },
@@ -226,7 +232,10 @@ describe('mapMealPlanToGuardrailsTargets', () => {
       const result = mapMealPlanToGuardrailsTargets(plan, 'nl');
 
       // Should only have 1 meal name in metadata
-      assert.strictEqual(result.metadata.filter((m) => m.path.includes('.name')).length, 1);
+      assert.strictEqual(
+        result.metadata.filter((m) => m.path.includes('.name')).length,
+        1,
+      );
     });
   });
 
@@ -255,7 +264,7 @@ describe('mapMealPlanToGuardrailsTargets', () => {
       // Paths should be identical
       assert.deepStrictEqual(
         result1.ingredient.map((a) => a.path),
-        result2.ingredient.map((a) => a.path)
+        result2.ingredient.map((a) => a.path),
       );
     });
   });

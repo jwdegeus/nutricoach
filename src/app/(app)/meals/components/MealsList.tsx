@@ -1,9 +1,8 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Badge } from "@/components/catalyst/badge";
-import { Button } from "@/components/catalyst/button";
+import { useState, type MouseEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import { Badge } from '@/components/catalyst/badge';
 import {
   Dropdown,
   DropdownButton,
@@ -11,7 +10,7 @@ import {
   DropdownItem,
   DropdownSection,
   DropdownDivider,
-} from "@/components/catalyst/dropdown";
+} from '@/components/catalyst/dropdown';
 import {
   Table,
   TableBody,
@@ -19,7 +18,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/catalyst/table";
+} from '@/components/catalyst/table';
 import {
   ClockIcon,
   UserGroupIcon,
@@ -29,16 +28,18 @@ import {
   PencilIcon,
   TrashIcon,
   CalendarIcon,
-} from "@heroicons/react/20/solid";
-import { logMealConsumptionAction } from "../actions/meals.actions";
-import type { CustomMealRecord } from "@/src/lib/custom-meals/customMeals.service";
-import type { MealSlot } from "@/src/lib/diets";
+} from '@heroicons/react/20/solid';
+import { logMealConsumptionAction } from '../actions/meals.actions';
+import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
+import type { MealSlot } from '@/src/lib/diets';
 
-type MealItem = (CustomMealRecord & { source: "custom" }) | (any & { source: "gemini" });
+type MealItem =
+  | (CustomMealRecord & { source: 'custom' })
+  | (any & { source: 'gemini' });
 
 type MealsListProps = {
   meals: MealItem[];
-  onConsumptionLogged?: (mealId: string, source: "custom" | "gemini") => void;
+  onConsumptionLogged?: (mealId: string, source: 'custom' | 'gemini') => void;
 };
 
 export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
@@ -55,8 +56,8 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
 
     try {
       const result = await logMealConsumptionAction({
-        customMealId: meal.source === "custom" ? meal.id : undefined,
-        mealHistoryId: meal.source === "gemini" ? meal.id : undefined,
+        customMealId: meal.source === 'custom' ? meal.id : undefined,
+        mealHistoryId: meal.source === 'gemini' ? meal.id : undefined,
         mealName: meal.name || meal.meal_name,
         mealSlot: (meal.mealSlot || meal.meal_slot) as MealSlot,
       });
@@ -70,7 +71,9 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
         alert(`Fout: ${result.error.message}`);
       }
     } catch (error) {
-      alert(`Fout: ${error instanceof Error ? error.message : "Unknown error"}`);
+      alert(
+        `Fout: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     } finally {
       setLoggingMealId(null);
     }
@@ -78,11 +81,11 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
 
   const formatMealSlot = (slot: string) => {
     const slotMap: Record<string, string> = {
-      breakfast: "Ontbijt",
-      lunch: "Lunch",
-      dinner: "Diner",
-      snack: "Snack",
-      smoothie: "Smoothie",
+      breakfast: 'Ontbijt',
+      lunch: 'Lunch',
+      dinner: 'Diner',
+      snack: 'Snack',
+      smoothie: 'Smoothie',
     };
     return slotMap[slot] || slot;
   };
@@ -93,26 +96,31 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
 
   const handleEdit = (meal: MealItem) => {
     // TODO: Implement edit functionality
-    console.log("Edit meal:", meal.id);
+    console.log('Edit meal:', meal.id);
   };
 
   const handleDelete = (meal: MealItem) => {
     // TODO: Implement delete functionality
-    if (confirm(`Weet je zeker dat je "${meal.name || meal.meal_name}" wilt verwijderen?`)) {
-      console.log("Delete meal:", meal.id);
+    if (
+      confirm(
+        `Weet je zeker dat je "${meal.name || meal.meal_name}" wilt verwijderen?`,
+      )
+    ) {
+      console.log('Delete meal:', meal.id);
     }
   };
 
   const handleAddToMealPlan = (meal: MealItem) => {
     // TODO: Implement add to meal plan functionality
-    console.log("Add to meal plan:", meal.id);
+    console.log('Add to meal plan:', meal.id);
   };
 
   if (meals.length === 0) {
     return (
       <div className="text-center py-12">
         <p className="text-zinc-500 dark:text-zinc-400">
-          Nog geen maaltijden. Voeg je eerste maaltijd toe via een foto, screenshot of bestand.
+          Nog geen maaltijden. Voeg je eerste maaltijd toe via een foto,
+          screenshot of bestand.
         </p>
       </div>
     );
@@ -135,13 +143,16 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
       </TableHead>
       <TableBody>
         {meals.map((meal) => (
-          <TableRow key={meal.id} href={`/meals/${meal.id}?source=${meal.source}`}>
+          <TableRow
+            key={meal.id}
+            href={`/meals/${meal.id}?source=${meal.source}`}
+          >
             <TableCell className="font-medium">
               {meal.name || meal.meal_name}
             </TableCell>
             <TableCell>
-              <Badge color={meal.source === "custom" ? "blue" : "zinc"}>
-                {meal.source === "custom" ? "Custom" : "Gemini"}
+              <Badge color={meal.source === 'custom' ? 'blue' : 'zinc'}>
+                {meal.source === 'custom' ? 'Custom' : 'Gemini'}
               </Badge>
             </TableCell>
             <TableCell className="capitalize">
@@ -168,24 +179,27 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
               )}
             </TableCell>
             <TableCell className="text-zinc-500">
-              {meal.source === "custom"
+              {meal.source === 'custom'
                 ? `${meal.consumptionCount || 0}x geconsumeerd`
                 : `${meal.usage_count || 0}x gebruikt`}
             </TableCell>
             <TableCell>
-              <div className="-mx-3 -my-1.5 sm:-mx-2.5" onClick={(e) => e.stopPropagation()}>
+              <div
+                className="-mx-3 -my-1.5 sm:-mx-2.5"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <Dropdown>
                   <DropdownButton
                     plain
                     className="p-1 no-hover-bg"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e: MouseEvent) => e.stopPropagation()}
                   >
                     <EllipsisVerticalIcon className="size-6 text-zinc-500" />
                   </DropdownButton>
                   <DropdownMenu anchor="bottom end">
                     <DropdownSection>
                       <DropdownItem
-                        onClick={(e) => {
+                        onClick={(e: MouseEvent) => {
                           e.stopPropagation();
                           handleView(meal);
                         }}
@@ -194,7 +208,7 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
                         <span>Bekijken</span>
                       </DropdownItem>
                       <DropdownItem
-                        onClick={(e) => {
+                        onClick={(e: MouseEvent) => {
                           e.stopPropagation();
                           handleEdit(meal);
                         }}
@@ -214,7 +228,9 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
                       >
                         <CheckIcon data-slot="icon" />
                         <span>
-                          {loggingMealId === meal.id ? "Loggen..." : "Geconsumeerd"}
+                          {loggingMealId === meal.id
+                            ? 'Loggen...'
+                            : 'Geconsumeerd'}
                         </span>
                       </DropdownItem>
                       <DropdownItem

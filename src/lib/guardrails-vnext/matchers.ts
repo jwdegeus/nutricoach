@@ -1,8 +1,8 @@
 /**
  * Guard Rails vNext - Matchers
- * 
+ *
  * Pure matching functions for different match modes.
- * 
+ *
  * @see docs/guardrails-vnext-semantics.md section 4.2 for matching modes
  */
 
@@ -10,7 +10,7 @@ import type { MatchMode, TextAtom } from './types';
 
 /**
  * Exact match - Case-insensitive exact match
- * 
+ *
  * @param text - Text to match against
  * @param term - Term to match
  * @returns True if exact match (case-insensitive)
@@ -21,9 +21,9 @@ export function matchExact(text: string, term: string): boolean {
 
 /**
  * Word boundary match - Regex word boundary match (prevents false positives)
- * 
+ *
  * Example: "suiker" matches "suiker" but not "suikervrij"
- * 
+ *
  * @param text - Text to match against
  * @param term - Term to match
  * @returns True if word boundary match found
@@ -31,22 +31,22 @@ export function matchExact(text: string, term: string): boolean {
 export function matchWordBoundary(text: string, term: string): boolean {
   const lowerText = text.toLowerCase();
   const lowerTerm = term.toLowerCase();
-  
+
   // Escape special regex characters
   const escapedTerm = lowerTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  
+
   // Create word boundary regex
   const regex = new RegExp(`\\b${escapedTerm}\\b`, 'i');
-  
+
   return regex.test(lowerText);
 }
 
 /**
  * Substring match - Case-insensitive substring match
- * 
+ *
  * WARNING: Can produce false positives (e.g., "pasta" matches "pastasaus")
  * Only use for ingredients, not for steps.
- * 
+ *
  * @param text - Text to match against
  * @param term - Term to match
  * @returns True if substring match found
@@ -57,24 +57,27 @@ export function matchSubstring(text: string, term: string): boolean {
 
 /**
  * Canonical ID match - Exact match on canonical identifier
- * 
+ *
  * @param textAtom - Text atom with optional canonicalId
  * @param canonicalId - Canonical ID to match
  * @returns True if canonical ID matches
  */
-export function matchCanonicalId(textAtom: TextAtom, canonicalId: string): boolean {
+export function matchCanonicalId(
+  textAtom: TextAtom,
+  canonicalId: string,
+): boolean {
   // Prefer canonicalId if available
   if (textAtom.canonicalId) {
     return textAtom.canonicalId === canonicalId;
   }
-  
+
   // Fallback to text exact match
   return textAtom.text === canonicalId;
 }
 
 /**
  * Match text atom against term using specified mode
- * 
+ *
  * @param textAtom - Text atom to match
  * @param term - Term to match
  * @param mode - Match mode to use
@@ -83,7 +86,7 @@ export function matchCanonicalId(textAtom: TextAtom, canonicalId: string): boole
 export function matchTextAtom(
   textAtom: TextAtom,
   term: string,
-  mode: MatchMode
+  mode: MatchMode,
 ): boolean {
   switch (mode) {
     case 'exact':
@@ -102,7 +105,7 @@ export function matchTextAtom(
 
 /**
  * Find all matches for a term across multiple text atoms
- * 
+ *
  * @param textAtoms - Array of text atoms to search
  * @param term - Term to match
  * @param mode - Match mode to use
@@ -111,10 +114,10 @@ export function matchTextAtom(
 export function findMatches(
   textAtoms: TextAtom[],
   term: string,
-  mode: MatchMode
+  mode: MatchMode,
 ): Array<{ atom: TextAtom; matchedText: string }> {
   const matches: Array<{ atom: TextAtom; matchedText: string }> = [];
-  
+
   for (const atom of textAtoms) {
     if (matchTextAtom(atom, term, mode)) {
       // Extract matched portion for better reporting
@@ -137,10 +140,10 @@ export function findMatches(
         // substring mode
         matchedText = term;
       }
-      
+
       matches.push({ atom, matchedText });
     }
   }
-  
+
   return matches;
 }

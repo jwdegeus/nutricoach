@@ -1,24 +1,28 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Heading } from "@/components/catalyst/heading";
-import { Button } from "@/components/catalyst/button";
-import { ArrowLeftIcon } from "@heroicons/react/20/solid";
-import Link from "next/link";
-import { MealDetail } from "./MealDetail";
-import { getMealByIdAction } from "../../actions/meals.actions";
-import { getNevoFoodByCode } from "@/src/lib/nevo/nutrition-calculator";
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Heading } from '@/components/catalyst/heading';
+import { Button } from '@/components/catalyst/button';
+import { ArrowLeftIcon } from '@heroicons/react/20/solid';
+import Link from 'next/link';
+import { MealDetail } from './MealDetail';
+import { getMealByIdAction } from '../../actions/meals.actions';
 
 type MealDetailPageClientProps = {
   mealId: string;
-  mealSource: "custom" | "gemini";
+  mealSource: 'custom' | 'gemini';
 };
 
-export function MealDetailPageClient({ mealId, mealSource }: MealDetailPageClientProps) {
+export function MealDetailPageClient({
+  mealId,
+  mealSource,
+}: MealDetailPageClientProps) {
   const router = useRouter();
   const [meal, setMeal] = useState<any>(null);
-  const [nevoFoodNamesByCode, setNevoFoodNamesByCode] = useState<Record<string, string>>({});
+  const [nevoFoodNamesByCode, setNevoFoodNamesByCode] = useState<
+    Record<string, string>
+  >({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,8 +38,8 @@ export function MealDetailPageClient({ mealId, mealSource }: MealDetailPageClien
         const mealResult = await getMealByIdAction(mealId, mealSource);
 
         if (!mealResult.ok) {
-          if (mealResult.error.code === "AUTH_ERROR") {
-            router.push("/login");
+          if (mealResult.error.code === 'AUTH_ERROR') {
+            router.push('/login');
             return;
           }
           setError(mealResult.error.message);
@@ -87,7 +91,7 @@ export function MealDetailPageClient({ mealId, mealSource }: MealDetailPageClien
         setLoading(false);
       } catch (err) {
         if (!isMounted) return;
-        setError(err instanceof Error ? err.message : "Onbekende fout");
+        setError(err instanceof Error ? err.message : 'Onbekende fout');
         setLoading(false);
       }
     }
@@ -112,7 +116,9 @@ export function MealDetailPageClient({ mealId, mealSource }: MealDetailPageClien
           <Heading level={1}>Laden...</Heading>
         </div>
         <div className="text-center py-12">
-          <p className="text-zinc-500 dark:text-zinc-400">Maaltijd details worden geladen...</p>
+          <p className="text-zinc-500 dark:text-zinc-400">
+            Maaltijd details worden geladen...
+          </p>
         </div>
       </div>
     );
@@ -132,7 +138,7 @@ export function MealDetailPageClient({ mealId, mealSource }: MealDetailPageClien
         </div>
         <div className="text-center py-12">
           <p className="text-red-600 dark:text-red-400">
-            {error || "Maaltijd niet gevonden"}
+            {error || 'Maaltijd niet gevonden'}
           </p>
         </div>
       </div>
@@ -149,12 +155,12 @@ export function MealDetailPageClient({ mealId, mealSource }: MealDetailPageClien
           </Button>
         </Link>
         <Heading level={1}>
-          {meal.name || meal.mealName || meal.meal_name || "Maaltijd Details"}
+          {meal.name || meal.mealName || meal.meal_name || 'Maaltijd Details'}
         </Heading>
       </div>
 
-      <MealDetail 
-        meal={meal} 
+      <MealDetail
+        meal={meal}
         mealSource={mealSource}
         nevoFoodNamesByCode={nevoFoodNamesByCode}
       />

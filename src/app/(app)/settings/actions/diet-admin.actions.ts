@@ -1,8 +1,8 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { isAdmin } from "@/src/lib/auth/roles";
-import type { ActionResult } from "@/src/lib/types";
+import { createClient } from '@/src/lib/supabase/server';
+import { isAdmin } from '@/src/lib/auth/roles';
+import type { ActionResult } from '@/src/lib/types';
 
 export type DietTypeInput = {
   name: string;
@@ -29,19 +29,21 @@ export async function getAllDietTypes(): Promise<
 > {
   const admin = await isAdmin();
   if (!admin) {
-    return { error: "Geen toegang: alleen admins kunnen alle dieettypes zien" };
+    return { error: 'Geen toegang: alleen admins kunnen alle dieettypes zien' };
   }
 
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from("diet_types")
-    .select("id, name, description, display_order, is_active, created_at, updated_at")
-    .order("display_order", { ascending: true })
-    .order("name", { ascending: true });
+    .from('diet_types')
+    .select(
+      'id, name, description, display_order, is_active, created_at, updated_at',
+    )
+    .order('display_order', { ascending: true })
+    .order('name', { ascending: true });
 
   if (error) {
-    console.error("Error fetching all diet types:", error);
+    console.error('Error fetching all diet types:', error);
     return { error: `Fout bij ophalen dieettypes: ${error.message}` };
   }
 
@@ -63,35 +65,37 @@ export async function getAllDietTypes(): Promise<
  * Create a new diet type (admin only)
  */
 export async function createDietType(
-  input: DietTypeInput
+  input: DietTypeInput,
 ): Promise<ActionResult<DietTypeOutput>> {
   const admin = await isAdmin();
   if (!admin) {
-    return { error: "Geen toegang: alleen admins kunnen dieettypes aanmaken" };
+    return { error: 'Geen toegang: alleen admins kunnen dieettypes aanmaken' };
   }
 
   if (!input.name || input.name.trim().length === 0) {
-    return { error: "Naam is verplicht" };
+    return { error: 'Naam is verplicht' };
   }
 
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from("diet_types")
+    .from('diet_types')
     .insert({
       name: input.name.trim(),
       description: input.description?.trim() || null,
       display_order: input.displayOrder,
       is_active: input.isActive,
     })
-    .select("id, name, description, display_order, is_active, created_at, updated_at")
+    .select(
+      'id, name, description, display_order, is_active, created_at, updated_at',
+    )
     .single();
 
   if (error) {
-    console.error("Error creating diet type:", error);
+    console.error('Error creating diet type:', error);
     // Check for unique constraint violation
-    if (error.code === "23505") {
-      return { error: "Een dieettype met deze naam bestaat al" };
+    if (error.code === '23505') {
+      return { error: 'Een dieettype met deze naam bestaat al' };
     }
     return { error: `Fout bij aanmaken dieettype: ${error.message}` };
   }
@@ -114,11 +118,11 @@ export async function createDietType(
  */
 export async function updateDietType(
   id: string,
-  input: Partial<DietTypeInput>
+  input: Partial<DietTypeInput>,
 ): Promise<ActionResult<DietTypeOutput>> {
   const admin = await isAdmin();
   if (!admin) {
-    return { error: "Geen toegang: alleen admins kunnen dieettypes bewerken" };
+    return { error: 'Geen toegang: alleen admins kunnen dieettypes bewerken' };
   }
 
   const supabase = await createClient();
@@ -138,20 +142,22 @@ export async function updateDietType(
   }
 
   if (Object.keys(updateData).length === 0) {
-    return { error: "Geen wijzigingen opgegeven" };
+    return { error: 'Geen wijzigingen opgegeven' };
   }
 
   const { data, error } = await supabase
-    .from("diet_types")
+    .from('diet_types')
     .update(updateData)
-    .eq("id", id)
-    .select("id, name, description, display_order, is_active, created_at, updated_at")
+    .eq('id', id)
+    .select(
+      'id, name, description, display_order, is_active, created_at, updated_at',
+    )
     .single();
 
   if (error) {
-    console.error("Error updating diet type:", error);
-    if (error.code === "23505") {
-      return { error: "Een dieettype met deze naam bestaat al" };
+    console.error('Error updating diet type:', error);
+    if (error.code === '23505') {
+      return { error: 'Een dieettype met deze naam bestaat al' };
     }
     return { error: `Fout bij bijwerken dieettype: ${error.message}` };
   }
@@ -172,23 +178,23 @@ export async function updateDietType(
 /**
  * Delete a diet type (soft delete by setting is_active = false)
  */
-export async function deleteDietType(
-  id: string
-): Promise<ActionResult<void>> {
+export async function deleteDietType(id: string): Promise<ActionResult<void>> {
   const admin = await isAdmin();
   if (!admin) {
-    return { error: "Geen toegang: alleen admins kunnen dieettypes verwijderen" };
+    return {
+      error: 'Geen toegang: alleen admins kunnen dieettypes verwijderen',
+    };
   }
 
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from("diet_types")
+    .from('diet_types')
     .update({ is_active: false })
-    .eq("id", id);
+    .eq('id', id);
 
   if (error) {
-    console.error("Error deleting diet type:", error);
+    console.error('Error deleting diet type:', error);
     return { error: `Fout bij verwijderen dieettype: ${error.message}` };
   }
 

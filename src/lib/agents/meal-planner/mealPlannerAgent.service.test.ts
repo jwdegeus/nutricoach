@@ -1,6 +1,6 @@
 /**
  * Meal Planner Agent Service - Enforcement Gate Tests
- * 
+ *
  * Tests for vNext guard rails enforcement gate in Meal Planner.
  * These tests prove that the gate blocks plan output when HARD violations are detected.
  */
@@ -8,24 +8,29 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { AppError } from '@/src/lib/errors/app-error';
-import type { GuardDecision, GuardrailsRuleset, EvaluationContext, MealPlanResponse } from '@/src/lib/guardrails-vnext/types';
+import type {
+  GuardDecision,
+  GuardrailsRuleset,
+  EvaluationContext,
+} from '@/src/lib/guardrails-vnext/types';
+import type { MealPlanResponse } from '@/src/lib/diets';
 
 /**
  * Helper: Simulate enforcement gate logic
- * 
+ *
  * This function simulates the enforcement gate logic from mealPlannerAgent.service.ts
  * to test it in isolation without importing the full service.
  */
 async function simulateEnforcementGate(
   plan: MealPlanResponse,
   decision: GuardDecision,
-  ruleset: GuardrailsRuleset
+  ruleset: GuardrailsRuleset,
 ): Promise<void> {
   // Check if plan should be blocked (HARD violations only)
   if (!decision.ok) {
     // Log for monitoring
     console.log(
-      `[MealPlanner] vNext guard rails blocked plan: dietKey=${ruleset.dietKey}, outcome=${decision.outcome}, reasonCodes=${decision.reasonCodes.slice(0, 5).join(",")}, hash=${ruleset.contentHash}`
+      `[MealPlanner] vNext guard rails blocked plan: dietKey=${ruleset.dietKey}, outcome=${decision.outcome}, reasonCodes=${decision.reasonCodes.slice(0, 5).join(',')}, hash=${ruleset.contentHash}`,
     );
 
     // Throw AppError to block plan
@@ -37,7 +42,7 @@ async function simulateEnforcementGate(
         reasonCodes: decision.reasonCodes,
         contentHash: ruleset.contentHash,
         rulesetVersion: ruleset.version,
-      }
+      },
     );
   }
 
@@ -86,8 +91,8 @@ describe('Meal Planner Enforcement Gate', () => {
         rules: [],
         contentHash: 'hash-123',
         provenance: {
-          sources: [],
-          counts: {},
+          source: 'database',
+          loadedAt: new Date().toISOString(),
         },
       };
 
@@ -97,12 +102,32 @@ describe('Meal Planner Enforcement Gate', () => {
         assert.fail('Should have thrown AppError');
       } catch (error) {
         assert.ok(error instanceof AppError, 'Should throw AppError');
-        assert.strictEqual(error.code, 'GUARDRAILS_VIOLATION', 'Error code should be GUARDRAILS_VIOLATION');
+        assert.strictEqual(
+          error.code,
+          'GUARDRAILS_VIOLATION',
+          'Error code should be GUARDRAILS_VIOLATION',
+        );
         assert.ok(error.guardrailsDetails, 'Should have guardrails details');
-        assert.strictEqual(error.guardrailsDetails?.outcome, 'blocked', 'Details outcome should be blocked');
-        assert.deepStrictEqual(error.guardrailsDetails?.reasonCodes, ['FORBIDDEN_INGREDIENT'], 'Reason codes should match');
-        assert.strictEqual(error.guardrailsDetails?.contentHash, 'hash-123', 'Content hash should match');
-        assert.strictEqual(error.guardrailsDetails?.rulesetVersion, 1, 'Ruleset version should match');
+        assert.strictEqual(
+          error.guardrailsDetails?.outcome,
+          'blocked',
+          'Details outcome should be blocked',
+        );
+        assert.deepStrictEqual(
+          error.guardrailsDetails?.reasonCodes,
+          ['FORBIDDEN_INGREDIENT'],
+          'Reason codes should match',
+        );
+        assert.strictEqual(
+          error.guardrailsDetails?.contentHash,
+          'hash-123',
+          'Content hash should match',
+        );
+        assert.strictEqual(
+          error.guardrailsDetails?.rulesetVersion,
+          1,
+          'Ruleset version should match',
+        );
       }
     });
 
@@ -146,18 +171,15 @@ describe('Meal Planner Enforcement Gate', () => {
         rules: [],
         contentHash: 'hash-123',
         provenance: {
-          sources: [],
-          counts: {},
+          source: 'database',
+          loadedAt: new Date().toISOString(),
         },
       };
 
       // Act & Assert: Should not throw
-      await assert.doesNotReject(
-        async () => {
-          await simulateEnforcementGate(plan, decision, ruleset);
-        },
-        'Should not throw on SOFT warnings'
-      );
+      await assert.doesNotReject(async () => {
+        await simulateEnforcementGate(plan, decision, ruleset);
+      }, 'Should not throw on SOFT warnings');
     });
 
     it('should not throw when no violations (ok === true, outcome === allowed)', async () => {
@@ -200,18 +222,15 @@ describe('Meal Planner Enforcement Gate', () => {
         rules: [],
         contentHash: 'hash-123',
         provenance: {
-          sources: [],
-          counts: {},
+          source: 'database',
+          loadedAt: new Date().toISOString(),
         },
       };
 
       // Act & Assert: Should not throw
-      await assert.doesNotReject(
-        async () => {
-          await simulateEnforcementGate(plan, decision, ruleset);
-        },
-        'Should not throw when no violations'
-      );
+      await assert.doesNotReject(async () => {
+        await simulateEnforcementGate(plan, decision, ruleset);
+      }, 'Should not throw when no violations');
     });
 
     it('should throw AppError with EVALUATOR_ERROR on evaluator errors', () => {
@@ -224,15 +243,27 @@ describe('Meal Planner Enforcement Gate', () => {
           outcome: 'blocked',
           reasonCodes: ['EVALUATOR_ERROR'],
           contentHash: '',
-        }
+        },
       );
 
       // Assert
       assert.ok(appError instanceof AppError, 'Should throw AppError');
-      assert.strictEqual(appError.code, 'GUARDRAILS_VIOLATION', 'Error code should be GUARDRAILS_VIOLATION');
+      assert.strictEqual(
+        appError.code,
+        'GUARDRAILS_VIOLATION',
+        'Error code should be GUARDRAILS_VIOLATION',
+      );
       assert.ok(appError.guardrailsDetails, 'Should have guardrails details');
-      assert.deepStrictEqual(appError.guardrailsDetails?.reasonCodes, ['EVALUATOR_ERROR'], 'Should have EVALUATOR_ERROR reason code');
-      assert.strictEqual(appError.guardrailsDetails?.outcome, 'blocked', 'Outcome should be blocked');
+      assert.deepStrictEqual(
+        appError.guardrailsDetails?.reasonCodes,
+        ['EVALUATOR_ERROR'],
+        'Should have EVALUATOR_ERROR reason code',
+      );
+      assert.strictEqual(
+        appError.guardrailsDetails?.outcome,
+        'blocked',
+        'Outcome should be blocked',
+      );
     });
   });
 });

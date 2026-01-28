@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Input } from "@/components/catalyst/input";
-import { Badge } from "@/components/catalyst/badge";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import { useState } from 'react';
+import { Input } from '@/components/catalyst/input';
+import { Badge } from '@/components/catalyst/badge';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 
 interface Step2AllergiesDislikesProps {
   allergies: string[];
@@ -14,24 +14,24 @@ interface Step2AllergiesDislikesProps {
 
 // Common suggestions
 const COMMON_ALLERGIES = [
-  "Gluten",
-  "Lactose",
-  "Noten",
+  'Gluten',
+  'Lactose',
+  'Noten',
   "Pinda's",
-  "Eieren",
-  "Vis",
-  "Schaal- en schelpdieren",
-  "Soja",
+  'Eieren',
+  'Vis',
+  'Schaal- en schelpdieren',
+  'Soja',
 ];
 
 const COMMON_DISLIKES = [
-  "Vis",
-  "Noten",
-  "Champignons",
-  "Olijven",
-  "Koriander",
-  "Anijs",
-  "Knoflook",
+  'Vis',
+  'Noten',
+  'Champignons',
+  'Olijven',
+  'Koriander',
+  'Anijs',
+  'Knoflook',
 ];
 
 export function Step2AllergiesDislikes({
@@ -40,21 +40,17 @@ export function Step2AllergiesDislikes({
   onAllergiesChange,
   onDislikesChange,
 }: Step2AllergiesDislikesProps) {
-  const [allergyInput, setAllergyInput] = useState("");
-  const [dislikeInput, setDislikeInput] = useState("");
+  const [allergyInput, setAllergyInput] = useState('');
+  const [dislikeInput, setDislikeInput] = useState('');
 
   const addTag = (
     value: string,
     current: string[],
     onChange: (tags: string[]) => void,
-    maxItems: number = 50
+    maxItems: number = 50,
   ) => {
     const trimmed = value.trim();
-    if (
-      trimmed &&
-      !current.includes(trimmed) &&
-      current.length < maxItems
-    ) {
+    if (trimmed && !current.includes(trimmed) && current.length < maxItems) {
       onChange([...current, trimmed]);
     }
   };
@@ -62,24 +58,24 @@ export function Step2AllergiesDislikes({
   const removeTag = (
     tag: string,
     current: string[],
-    onChange: (tags: string[]) => void
+    onChange: (tags: string[]) => void,
   ) => {
     onChange(current.filter((t) => t !== tag));
   };
 
   const handleAllergyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       e.preventDefault();
       addTag(allergyInput, allergies, onAllergiesChange);
-      setAllergyInput("");
+      setAllergyInput('');
     }
   };
 
   const handleDislikeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       e.preventDefault();
       addTag(dislikeInput, dislikes, onDislikesChange);
-      setDislikeInput("");
+      setDislikeInput('');
     }
   };
 
@@ -125,7 +121,9 @@ export function Step2AllergiesDislikes({
                 <span>{allergy}</span>
                 <button
                   type="button"
-                  onClick={() => removeTag(allergy, allergies, onAllergiesChange)}
+                  onClick={() =>
+                    removeTag(allergy, allergies, onAllergiesChange)
+                  }
                   className="rounded-full hover:bg-red-600/20 dark:hover:bg-red-500/20"
                   aria-label={`Verwijder ${allergy}`}
                 >
@@ -153,7 +151,7 @@ export function Step2AllergiesDislikes({
                   >
                     + {allergy}
                   </button>
-                )
+                ),
               )}
             </div>
           </div>
@@ -216,7 +214,7 @@ export function Step2AllergiesDislikes({
                   >
                     + {dislike}
                   </button>
-                )
+                ),
               )}
             </div>
           </div>

@@ -1,11 +1,11 @@
 /**
  * Meal Planner Enrichment Schemas
- * 
+ *
  * Zod validation schemas for meal enrichment types.
  */
 
-import { z } from "zod";
-import { mealSlotSchema } from "@/src/lib/diets/diet.schemas";
+import { z } from 'zod';
+import { mealSlotSchema } from '@/src/lib/diets/diet.schemas';
 
 /**
  * Enriched meal schema

@@ -6,14 +6,14 @@
 
 ## 1. Huidige situatie (kort)
 
-| Onderdeel | Huidige staat |
-|-----------|----------------|
-| **diet_category_constraints** | `constraint_type`: forbidden/required, `rule_action`: allow/block, `rule_priority`, `min_per_day`, `min_per_week`. UNIQUE(diet_type_id, category_id, rule_action). |
-| **ingredient_categories** | Global, o.a. wahls_leafy_greens, wahls_forbidden_gluten, wahls_limited_legumes. `category_type` alleen forbidden/required. |
-| **diet_types** | Één "Wahls Paleo" (Level 2). Geen aparte "Wahls Diet" (L1) of "Wahls Paleo Plus" (L3). |
-| **GuardRule (guardrails-vnext)** | `action`: allow \| block. Geen drop/force/limit/pass. |
-| **Meal planner** | `deriveDietRuleSet(profile)` in `diet-rules.ts` op basis van `dietKey` (wahls_paleo_plus, keto, …), geen gebruik van DB-constraints. |
-| **Recipe adaptation** | Laadt `diet_category_constraints` + `recipe_adaptation_rules` via `loadDietRuleset(dietId)`. |
+| Onderdeel                        | Huidige staat                                                                                                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **diet_category_constraints**    | `constraint_type`: forbidden/required, `rule_action`: allow/block, `rule_priority`, `min_per_day`, `min_per_week`. UNIQUE(diet_type_id, category_id, rule_action). |
+| **ingredient_categories**        | Global, o.a. wahls_leafy_greens, wahls_forbidden_gluten, wahls_limited_legumes. `category_type` alleen forbidden/required.                                         |
+| **diet_types**                   | Één "Wahls Paleo" (Level 2). Geen aparte "Wahls Diet" (L1) of "Wahls Paleo Plus" (L3).                                                                             |
+| **GuardRule (guardrails-vnext)** | `action`: allow \| block. Geen drop/force/limit/pass.                                                                                                              |
+| **Meal planner**                 | `deriveDietRuleSet(profile)` in `diet-rules.ts` op basis van `dietKey` (wahls_paleo_plus, keto, …), geen gebruik van DB-constraints.                               |
+| **Recipe adaptation**            | Laadt `diet_category_constraints` + `recipe_adaptation_rules` via `loadDietRuleset(dietId)`.                                                                       |
 
 Ingredientgroepen zijn nu goed opgezet; de volgende stap is **dieetregels** die per groep DROP/FORCE/LIMIT/PASS bepalen en **per Wahls-niveau** anders zijn.
 
@@ -21,12 +21,12 @@ Ingredientgroepen zijn nu goed opgezet; de volgende stap is **dieetregels** die 
 
 ## 2. Diet Logic-model (jouw P0–P3)
 
-| Priority | Rule Name   | Actie   | Omschrijving |
-|----------|-------------|---------|---------------|
-| **P0**   | DROP (Blocked) | Verwijder | Item in een “blocked” categorie → maaltijd/recept ongeldig. |
+| Priority | Rule Name        | Actie     | Omschrijving                                                                |
+| -------- | ---------------- | --------- | --------------------------------------------------------------------------- |
+| **P0**   | DROP (Blocked)   | Verwijder | Item in een “blocked” categorie → maaltijd/recept ongeldig.                 |
 | **P1**   | FORCE (Required) | Verplicht | AI moet uit deze groep voldoende kiezen om aan dag-/week-quotum te voldoen. |
-| **P2**   | LIMIT (Limited) | Beperk | Mag gebruikt worden, maar met harde limiet (bv. max 1/dag of x gram). |
-| **P3**   | PASS (Allow) | Optioneel | Vrije invulling op basis van caloriebehoefte en smaak. |
+| **P2**   | LIMIT (Limited)  | Beperk    | Mag gebruikt worden, maar met harde limiet (bv. max 1/dag of x gram).       |
+| **P3**   | PASS (Allow)     | Optioneel | Vrije invulling op basis van caloriebehoefte en smaak.                      |
 
 Evalueervolgorde: **Fase 1 DROP → Fase 2 FORCE-quotum → Fase 3 LIMIT-check → Fase 4 vul aan met PASS**.
 
@@ -68,11 +68,11 @@ Uniqueness: één rij per (diet_type_id, category_id) is voldoende als je één 
 
 Drie niveaus = drie diet_types, elk met eigen set `diet_category_constraints`:
 
-| Level | diet_types.name   | Gebruik |
-|-------|--------------------|---------|
-| 1     | **Wahls Diet**     | Wahls Level 1 (Wahls Diet) |
-| 2     | **Wahls Paleo**    | Huidige “Wahls Paleo” (Level 2) |
-| 3     | **Wahls Paleo Plus** | Wahls Level 3 |
+| Level | diet_types.name      | Gebruik                         |
+| ----- | -------------------- | ------------------------------- |
+| 1     | **Wahls Diet**       | Wahls Level 1 (Wahls Diet)      |
+| 2     | **Wahls Paleo**      | Huidige “Wahls Paleo” (Level 2) |
+| 3     | **Wahls Paleo Plus** | Wahls Level 3                   |
 
 - In `diet_types`: "Wahls Diet" en "Wahls Paleo Plus" toevoegen (als ze nog niet bestaan).
 - Per diet_type_id een eigen set rijen in `diet_category_constraints`:
@@ -117,7 +117,7 @@ In de DB wordt dit vertaald naar concrete rijen in `diet_category_constraints` m
 - **Plaats**: User-niveau, niet per dieet.
 - **Schema**: Op het profiel dat gekoppeld is aan de gebruiker en het gekozen dieet — bv. `user_diet_profiles` of een vergelijkbare tabel:
   - `is_inflamed` BOOLEAN NOT NULL DEFAULT false.
-- **Gedrag**:  
+- **Gedrag**:
   - Als `is_inflamed = true`: **runtime** `wahls_nightshades` toevoegen aan de DROP-lijst voor die user, ongeacht Wahls-niveau.
 - **Implementatie**: In de laag die het “effective ruleset” voor de user bouwt (bv. ruleset-loader of meal-planner): na het laden van constraints voor `diet_type_id`, als `is_inflamed` true is, extra “synthetic” DROP-regels voor de nightshade-categorie toevoegen (of één regel die naar de nightshade-ingredientgroep verwijst).
 
@@ -150,14 +150,14 @@ die een resultaat teruggeeft: `{ ok, phase, violations, forceDeficits, limitExce
 
 ### 3.6 Waar het in de codebase aangrijpt
 
-| Plek | Aanpassing |
-|------|------------|
-| **DB-migratie** | Nieuwe kolom `diet_logic` + `max_per_day`/`max_per_week` (en optioneel `limit_unit`) op `diet_category_constraints`; seed voor Wahls L1/L3 als aparte diet_types + hun constraints. |
-| **user_diet_profiles** (of gelijkwaardig) | Kolom `is_inflamed`; in onboarding/instellingen tonen als “Ontstekingsgevoelig / nachtschade vermijden”. |
-| **Ruleset-loader / Diet-loader** | Constraints ophalen met `diet_logic` en eventueel `is_inflamed`; voor meal planner + recipe adaptation een “effective ruleset” bouwen waarin DROP/FORCE/LIMIT/PASS en nightshades zitten. |
-| **Guardrails-vnext** | Blijft voor recept/ingredient-blocking vooral op `rule_action` (allow/block) werken; onder water kan die afgeleid worden uit `diet_logic` (drop/limit → block, force/pass → allow) zodat bestaande evaluator blijft werken. Later kun je evaluator uitbreiden met aparte “force/limit”-checks. |
-| **Meal planner** | Ofwel (a) ruleset uit DB gebruiken voor DROP/FORCE/LIMIT i.p.v. alleen `deriveDietRuleSet`, ofwel (b) `deriveDietRuleSet` laten vullen vanuit de DB per diet_type_id. In beide gevallen moet de validatie (mealPlannerAgent.validate, etc.) de 4 fases ondersteunen. |
-| **Recipe adaptation** | `loadDietRuleset` en validatie uitbreiden zodat na “verboden term”-check ook FORCE-quotum en LIMIT (per recept of per dag) toegepast kunnen worden waar relevant. |
+| Plek                                      | Aanpassing                                                                                                                                                                                                                                                                                     |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **DB-migratie**                           | Nieuwe kolom `diet_logic` + `max_per_day`/`max_per_week` (en optioneel `limit_unit`) op `diet_category_constraints`; seed voor Wahls L1/L3 als aparte diet_types + hun constraints.                                                                                                            |
+| **user_diet_profiles** (of gelijkwaardig) | Kolom `is_inflamed`; in onboarding/instellingen tonen als “Ontstekingsgevoelig / nachtschade vermijden”.                                                                                                                                                                                       |
+| **Ruleset-loader / Diet-loader**          | Constraints ophalen met `diet_logic` en eventueel `is_inflamed`; voor meal planner + recipe adaptation een “effective ruleset” bouwen waarin DROP/FORCE/LIMIT/PASS en nightshades zitten.                                                                                                      |
+| **Guardrails-vnext**                      | Blijft voor recept/ingredient-blocking vooral op `rule_action` (allow/block) werken; onder water kan die afgeleid worden uit `diet_logic` (drop/limit → block, force/pass → allow) zodat bestaande evaluator blijft werken. Later kun je evaluator uitbreiden met aparte “force/limit”-checks. |
+| **Meal planner**                          | Ofwel (a) ruleset uit DB gebruiken voor DROP/FORCE/LIMIT i.p.v. alleen `deriveDietRuleSet`, ofwel (b) `deriveDietRuleSet` laten vullen vanuit de DB per diet_type_id. In beide gevallen moet de validatie (mealPlannerAgent.validate, etc.) de 4 fases ondersteunen.                           |
+| **Recipe adaptation**                     | `loadDietRuleset` en validatie uitbreiden zodat na “verboden term”-check ook FORCE-quotum en LIMIT (per recept of per dag) toegepast kunnen worden waar relevant.                                                                                                                              |
 
 ---
 

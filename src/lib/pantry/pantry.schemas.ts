@@ -1,10 +1,10 @@
 /**
  * Pantry Schemas
- * 
+ *
  * Zod validation schemas for pantry types.
  */
 
-import { z } from "zod";
+import { z } from 'zod';
 
 /**
  * Pantry item schema

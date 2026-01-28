@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { DietEditPage } from "./diet-edit-page";
-import type { DietTypeOutput } from "../../../actions/diet-admin.actions";
+import { useEffect, useState } from 'react';
+import { DietEditPage } from './diet-edit-page';
+import type { DietTypeOutput } from '../../../actions/diet-admin.actions';
 
 /**
  * Client-only wrapper for DietEditPage to prevent hydration mismatches
@@ -13,7 +13,7 @@ export function DietEditPageClient({ dietType }: { dietType: DietTypeOutput }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    queueMicrotask(() => setMounted(true));
   }, []);
 
   // During SSR and initial render, return a simple loading state

@@ -1,11 +1,11 @@
-import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { createClient } from "@/src/lib/supabase/server";
-import { CreateMealPlanForm } from "./components/CreateMealPlanForm";
+import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/src/lib/supabase/server';
+import { CreateMealPlanForm } from './components/CreateMealPlanForm';
 
 export const metadata: Metadata = {
-  title: "Nieuw Meal Plan | NutriCoach",
-  description: "Maak een nieuw meal plan aan",
+  title: 'Nieuw Meal Plan | NutriCoach',
+  description: 'Maak een nieuw meal plan aan',
 };
 
 /**
@@ -19,7 +19,7 @@ export default async function NewMealPlanPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   return (

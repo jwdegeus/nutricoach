@@ -1,15 +1,15 @@
 /**
  * Meal History Service
- * 
+ *
  * Manages meal history: extraction, storage, retrieval, and scoring.
  * Enables reuse of rated meals to reduce Gemini API calls.
  */
 
-import "server-only";
-import { createClient } from "@/src/lib/supabase/server";
-import type { Meal, MealPlanResponse } from "@/src/lib/diets";
-import { calcMealMacros } from "@/src/lib/agents/meal-planner/mealPlannerAgent.tools";
-import type { DietKey, MealSlot } from "@/src/lib/diets";
+import 'server-only';
+import { createClient } from '@/src/lib/supabase/server';
+import type { Meal, MealPlanResponse } from '@/src/lib/diets';
+import { calcMealMacros } from '@/src/lib/agents/meal-planner/mealPlannerAgent.tools';
+import type { DietKey, MealSlot } from '@/src/lib/diets';
 
 /**
  * Meal history record from database
@@ -63,7 +63,7 @@ export type FindMealsOptions = {
 export class MealHistoryService {
   /**
    * Extract all meals from a meal plan and store them in history
-   * 
+   *
    * @param userId - User ID
    * @param plan - Meal plan response
    * @param dietKey - Diet key
@@ -71,7 +71,7 @@ export class MealHistoryService {
   async extractAndStoreMeals(
     userId: string,
     plan: MealPlanResponse,
-    dietKey: DietKey
+    dietKey: DietKey,
   ): Promise<void> {
     const supabase = await createClient();
 
@@ -95,10 +95,10 @@ export class MealHistoryService {
 
   /**
    * Store a single meal in history
-   * 
+   *
    * Calculates nutrition score and stores meal with metadata.
    * Uses upsert to prevent duplicates (based on user_id + meal_id).
-   * 
+   *
    * @param input - Store meal input
    */
   async storeMeal(input: StoreMealInput): Promise<void> {
@@ -110,10 +110,10 @@ export class MealHistoryService {
 
     // Check if meal already exists
     const { data: existing } = await supabase
-      .from("meal_history")
-      .select("id, usage_count, last_used_at")
-      .eq("user_id", userId)
-      .eq("meal_id", meal.id)
+      .from('meal_history')
+      .select('id, usage_count, last_used_at')
+      .eq('user_id', userId)
+      .eq('meal_id', meal.id)
       .maybeSingle();
 
     if (existing) {
@@ -123,37 +123,33 @@ export class MealHistoryService {
     }
 
     // Insert new meal
-    const { error } = await supabase
-      .from("meal_history")
-      .insert({
-        user_id: userId,
-        meal_id: meal.id,
-        meal_name: meal.name,
-        meal_slot: meal.slot,
-        diet_key: dietKey,
-        meal_data: meal as any, // JSONB
-        nutrition_score: nutritionScore,
-        usage_count: 0,
-        first_used_at: new Date().toISOString(),
-        last_used_at: null,
-      });
+    const { error } = await supabase.from('meal_history').insert({
+      user_id: userId,
+      meal_id: meal.id,
+      meal_name: meal.name,
+      meal_slot: meal.slot,
+      diet_key: dietKey,
+      meal_data: meal as any, // JSONB
+      nutrition_score: nutritionScore,
+      usage_count: 0,
+      first_used_at: new Date().toISOString(),
+      last_used_at: null,
+    });
 
     if (error) {
-      throw new Error(
-        `Failed to store meal in history: ${error.message}`
-      );
+      throw new Error(`Failed to store meal in history: ${error.message}`);
     }
   }
 
   /**
    * Calculate nutrition score for a meal (0-100)
-   * 
+   *
    * Score based on:
    * - Balanced macros (protein, carbs, fat ratios)
    * - Adequate protein
    * - Not too high in saturated fat
    * - Adequate fiber
-   * 
+   *
    * @param meal - Meal to score
    * @returns Nutrition score (0-100)
    */
@@ -168,7 +164,7 @@ export class MealHistoryService {
         meal.ingredientRefs.map((ref) => ({
           nevoCode: ref.nevoCode,
           quantityG: ref.quantityG,
-        }))
+        })),
       );
 
       const { calories, proteinG, carbsG, fatG } = macros;
@@ -228,14 +224,14 @@ export class MealHistoryService {
       // Clamp to 0-100
       return Math.max(0, Math.min(100, score));
     } catch (error) {
-      console.error("Error calculating nutrition score:", error);
+      console.error('Error calculating nutrition score:', error);
       return 50; // Default on error
     }
   }
 
   /**
    * Find meals from history matching criteria
-   * 
+   *
    * @param options - Find meals options
    * @returns Array of meal history records
    */
@@ -256,45 +252,43 @@ export class MealHistoryService {
 
     // Build query
     let query = supabase
-      .from("meal_history")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("diet_key", dietKey)
-      .eq("meal_slot", mealSlot)
-      .order("combined_score", { ascending: false, nullsFirst: false })
+      .from('meal_history')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('diet_key', dietKey)
+      .eq('meal_slot', mealSlot)
+      .order('combined_score', { ascending: false, nullsFirst: false })
       .limit(limit);
 
     // Apply filters
     if (minRating !== undefined) {
-      query = query.gte("user_rating", minRating);
+      query = query.gte('user_rating', minRating);
     }
 
     if (minCombinedScore !== undefined) {
-      query = query.gte("combined_score", minCombinedScore);
+      query = query.gte('combined_score', minCombinedScore);
     }
 
     if (excludeMealIds.length > 0) {
-      query = query.not("meal_id", "in", `(${excludeMealIds.join(",")})`);
+      query = query.not('meal_id', 'in', `(${excludeMealIds.join(',')})`);
     }
 
     if (maxUsageCount !== undefined) {
-      query = query.lte("usage_count", maxUsageCount);
+      query = query.lte('usage_count', maxUsageCount);
     }
 
     if (daysSinceLastUse !== undefined) {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysSinceLastUse);
       query = query.or(
-        `last_used_at.is.null,last_used_at.lt.${cutoffDate.toISOString()}`
+        `last_used_at.is.null,last_used_at.lt.${cutoffDate.toISOString()}`,
       );
     }
 
     const { data, error } = await query;
 
     if (error) {
-      throw new Error(
-        `Failed to find meals from history: ${error.message}`
-      );
+      throw new Error(`Failed to find meals from history: ${error.message}`);
     }
 
     // Map to MealHistoryRecord
@@ -320,32 +314,38 @@ export class MealHistoryService {
 
   /**
    * Update meal usage (increment usage count and set last_used_at)
-   * 
+   *
    * @param userId - User ID
    * @param mealId - Meal ID
    */
   async updateMealUsage(userId: string, mealId: string): Promise<void> {
     const supabase = await createClient();
 
+    // Fetch current usage_count then increment (Supabase client has no .raw())
+    const { data: row } = await supabase
+      .from('meal_history')
+      .select('usage_count')
+      .eq('user_id', userId)
+      .eq('meal_id', mealId)
+      .single();
+    const nextCount = (row?.usage_count ?? 0) + 1;
     const { error } = await supabase
-      .from("meal_history")
+      .from('meal_history')
       .update({
-        usage_count: supabase.raw("usage_count + 1"),
+        usage_count: nextCount,
         last_used_at: new Date().toISOString(),
       })
-      .eq("user_id", userId)
-      .eq("meal_id", mealId);
+      .eq('user_id', userId)
+      .eq('meal_id', mealId);
 
     if (error) {
-      throw new Error(
-        `Failed to update meal usage: ${error.message}`
-      );
+      throw new Error(`Failed to update meal usage: ${error.message}`);
     }
   }
 
   /**
    * Rate a meal
-   * 
+   *
    * @param userId - User ID
    * @param mealId - Meal ID
    * @param rating - Rating (1-5)
@@ -355,40 +355,36 @@ export class MealHistoryService {
     userId: string,
     mealId: string,
     rating: number,
-    comment?: string
+    comment?: string,
   ): Promise<void> {
     if (rating < 1 || rating > 5) {
-      throw new Error("Rating must be between 1 and 5");
+      throw new Error('Rating must be between 1 and 5');
     }
 
     const supabase = await createClient();
 
     // Find meal_history_id
     const { data: mealHistory } = await supabase
-      .from("meal_history")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("meal_id", mealId)
+      .from('meal_history')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('meal_id', mealId)
       .single();
 
     if (!mealHistory) {
-      throw new Error("Meal not found in history");
+      throw new Error('Meal not found in history');
     }
 
     // Insert rating (trigger will update meal_history.user_rating)
-    const { error } = await supabase
-      .from("meal_ratings")
-      .insert({
-        user_id: userId,
-        meal_history_id: mealHistory.id,
-        rating,
-        comment: comment || null,
-      });
+    const { error } = await supabase.from('meal_ratings').insert({
+      user_id: userId,
+      meal_history_id: mealHistory.id,
+      rating,
+      comment: comment || null,
+    });
 
     if (error) {
-      throw new Error(
-        `Failed to rate meal: ${error.message}`
-      );
+      throw new Error(`Failed to rate meal: ${error.message}`);
     }
   }
 }

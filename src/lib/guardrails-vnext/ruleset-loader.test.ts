@@ -1,13 +1,16 @@
 /**
  * Guard Rails vNext - Ruleset Loader Tests
- * 
+ *
  * Unit tests for the ruleset loader module.
  */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { loadGuardrailsRuleset } from './ruleset-loader';
-import type { GuardrailsRepo, LoadGuardrailsRulesetInput } from './ruleset-loader';
+import type {
+  GuardrailsRepo,
+  LoadGuardrailsRulesetInput,
+} from './ruleset-loader';
 import type { GuardrailsRuleset } from './types';
 
 // Helper to create mock repository
@@ -201,6 +204,8 @@ describe('loadGuardrailsRuleset', () => {
               rule_label: 'Gluten (additional)',
               substitution_suggestions: ['rijst'],
               priority: 70,
+              target: 'ingredient',
+              match_mode: 'word_boundary',
               updated_at: '2026-01-02T00:00:00Z',
             },
           ],
@@ -220,7 +225,9 @@ describe('loadGuardrailsRuleset', () => {
       assert(result.rules.some((r) => r.match.term === 'pasta'));
       assert(result.rules.some((r) => r.match.term === 'gluten'));
       assert(result.provenance.metadata?.sources);
-      const sources = result.provenance.metadata?.sources as Array<{ ref: string }>;
+      const sources = result.provenance.metadata?.sources as Array<{
+        ref: string;
+      }>;
       assert(sources.some((s) => s.ref === 'diet_category_constraints'));
       assert(sources.some((s) => s.ref === 'recipe_adaptation_rules'));
     });
@@ -267,6 +274,8 @@ describe('loadGuardrailsRuleset', () => {
               rule_label: 'Pasta (overlay)',
               substitution_suggestions: ['rijstnoedels'],
               priority: 90, // Higher priority
+              target: 'ingredient',
+              match_mode: 'word_boundary',
               updated_at: '2026-01-02T00:00:00Z',
             },
           ],
@@ -615,6 +624,8 @@ describe('loadGuardrailsRuleset', () => {
               rule_label: 'Gluten',
               substitution_suggestions: ['rijst'],
               priority: 70,
+              target: 'ingredient',
+              match_mode: 'word_boundary',
               is_active: true, // Active rule
               updated_at: '2026-01-02T00:00:00Z',
             },
@@ -627,6 +638,8 @@ describe('loadGuardrailsRuleset', () => {
               rule_label: 'Melk',
               substitution_suggestions: ['amandelmelk'],
               priority: 70,
+              target: 'ingredient',
+              match_mode: 'word_boundary',
               is_active: false, // Deleted rule
               updated_at: '2026-01-02T00:00:00Z',
             },

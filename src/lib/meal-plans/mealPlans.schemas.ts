@@ -1,17 +1,17 @@
 /**
  * Meal Plans Schemas
- * 
+ *
  * Zod schemas for meal plan persistence.
  */
 
-import { z } from "zod";
+import { z } from 'zod';
 import {
   mealPlanRequestSchema,
   mealPlanResponseSchema,
   dietRuleSetSchema,
-} from "@/src/lib/diets";
-import type { MealPlanEnrichmentResponse } from "@/src/lib/agents/meal-planner";
-import { mealPlanEnrichmentResponseSchema } from "@/src/lib/agents/meal-planner";
+} from '@/src/lib/diets';
+import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner';
+import { mealPlanEnrichmentResponseSchema } from '@/src/lib/agents/meal-planner';
 
 /**
  * Schema for create meal plan input
@@ -33,5 +33,8 @@ export const createMealPlanInputSchema = z.object({
  */
 export const regenerateMealPlanInputSchema = z.object({
   planId: z.string().uuid(),
-  onlyDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  onlyDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });

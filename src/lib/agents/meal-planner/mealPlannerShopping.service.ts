@@ -1,14 +1,14 @@
 /**
  * Meal Planner Shopping Service
- * 
+ *
  * Calculates pantry coverage and generates shopping lists based on meal plan ingredientRefs.
- * 
+ *
  * This service is read-only (no database writes).
  */
 
-import type { MealPlanResponse } from "@/src/lib/diets";
-import { getNevoFoodByCode } from "@/src/lib/nevo/nutrition-calculator";
-import { PantryService } from "@/src/lib/pantry/pantry.service";
+import type { MealPlanResponse } from '@/src/lib/diets';
+import { getNevoFoodByCode } from '@/src/lib/nevo/nutrition-calculator';
+import { PantryService } from '@/src/lib/pantry/pantry.service';
 import type {
   PantryAvailability,
   MealPlanCoverage,
@@ -17,21 +17,18 @@ import type {
   ShoppingListGroup,
   MealCoverage,
   MealIngredientCoverage,
-} from "./mealPlannerShopping.types";
+} from './mealPlannerShopping.types';
 import {
   mealPlanCoverageSchema,
   shoppingListResponseSchema,
-} from "./mealPlannerShopping.schemas";
+} from './mealPlannerShopping.schemas';
 
 /**
  * In-memory cache for NEVO food lookups
  * Key: nevoCode (string)
  * Value: { food, timestamp }
  */
-const nevoFoodCache = new Map<
-  string,
-  { food: any; timestamp: number }
->();
+const nevoFoodCache = new Map<string, { food: any; timestamp: number }>();
 
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -73,70 +70,70 @@ function deriveCategory(food: any): string | undefined {
   if (food?.food_group_nl) {
     // Map common food groups to categories
     const group = food.food_group_nl.toLowerCase();
-    
+
     // Protein sources
     if (
-      group.includes("vlees") ||
-      group.includes("vis") ||
-      group.includes("gevogelte") ||
-      group.includes("eieren") ||
-      group.includes("zuivel") ||
-      group.includes("peulvruchten") ||
-      group.includes("noten") ||
-      group.includes("zaden")
+      group.includes('vlees') ||
+      group.includes('vis') ||
+      group.includes('gevogelte') ||
+      group.includes('eieren') ||
+      group.includes('zuivel') ||
+      group.includes('peulvruchten') ||
+      group.includes('noten') ||
+      group.includes('zaden')
     ) {
-      return "Eiwit";
+      return 'Eiwit';
     }
-    
+
     // Vegetables
-    if (group.includes("groente") || group.includes("groenten")) {
-      return "Groente";
+    if (group.includes('groente') || group.includes('groenten')) {
+      return 'Groente';
     }
-    
+
     // Fruits
-    if (group.includes("fruit")) {
-      return "Fruit";
+    if (group.includes('fruit')) {
+      return 'Fruit';
     }
-    
+
     // Fats
     if (
-      group.includes("vet") ||
-      group.includes("olie") ||
-      group.includes("boter")
+      group.includes('vet') ||
+      group.includes('olie') ||
+      group.includes('boter')
     ) {
-      return "Vetten";
+      return 'Vetten';
     }
-    
+
     // Carbs
     if (
-      group.includes("graan") ||
-      group.includes("brood") ||
-      group.includes("pasta") ||
-      group.includes("rijst") ||
-      group.includes("aardappel")
+      group.includes('graan') ||
+      group.includes('brood') ||
+      group.includes('pasta') ||
+      group.includes('rijst') ||
+      group.includes('aardappel')
     ) {
-      return "Koolhydraten";
+      return 'Koolhydraten';
     }
-    
+
     // Return original group name if no mapping found
     return food.food_group_nl;
   }
-  
+
   return undefined;
 }
 
 /**
  * Load pantry availability by NEVO codes
- * 
+ *
  * Uses PantryService to load actual pantry data from database.
- * 
+ *
  * @param userId - User ID (required for real pantry lookup)
  * @param nevoCodes - Array of NEVO codes to check
  * @returns Array of pantry availability
  */
 async function loadPantryAvailabilityByNevoCodes(
   userId: string | undefined,
-  nevoCodes: string[]
+  nevoCodes: string[],
 ): Promise<PantryAvailability[]> {
   // If no userId provided, return empty array (backward compatibility)
   if (!userId) {
@@ -151,7 +148,7 @@ async function loadPantryAvailabilityByNevoCodes(
     const service = new PantryService();
     return await service.loadAvailabilityByNevoCodes(userId, nevoCodes);
   } catch (error) {
-    console.error("Error loading pantry availability:", error);
+    console.error('Error loading pantry availability:', error);
     // Return empty array on error (graceful degradation)
     return [];
   }
@@ -160,9 +157,7 @@ async function loadPantryAvailabilityByNevoCodes(
 /**
  * Calculate available quantity from pantry availability
  */
-function calculateAvailableG(
-  pantry: PantryAvailability | undefined
-): number {
+function calculateAvailableG(pantry: PantryAvailability | undefined): number {
   if (!pantry) {
     return 0;
   }
@@ -187,10 +182,10 @@ function calculateAvailableG(
 export class MealPlannerShoppingService {
   /**
    * Build coverage for a meal plan
-   * 
+   *
    * Calculates pantry coverage per meal and per day, showing which ingredients
    * are available and which are missing.
-   * 
+   *
    * @param args - Coverage calculation arguments
    * @returns Meal plan coverage with per-meal and totals
    */
@@ -262,7 +257,9 @@ export class MealPlannerShoppingService {
     const coveragePct =
       totalRequiredG === 0
         ? 100
-        : Math.round(((totalRequiredG - totalMissingG) / totalRequiredG) * 100 * 10) / 10;
+        : Math.round(
+            ((totalRequiredG - totalMissingG) / totalRequiredG) * 100 * 10,
+          ) / 10;
 
     const coverage: MealPlanCoverage = {
       days: mealCoverages,
@@ -281,10 +278,10 @@ export class MealPlannerShoppingService {
 
   /**
    * Build shopping list for a meal plan
-   * 
+   *
    * Aggregates ingredients across all meals/days, groups by category,
    * and calculates missing quantities.
-   * 
+   *
    * @param args - Shopping list calculation arguments
    * @returns Shopping list grouped by category
    */
@@ -344,7 +341,7 @@ export class MealPlannerShoppingService {
       // Get NEVO food data (with caching)
       const food = await getNevoFoodCached(nevoCode);
       const name = food?.name_nl || food?.name_en || `NEVO ${nevoCode}`;
-      const category = deriveCategory(food) || data.category || "Overig";
+      const category = deriveCategory(food) || data.category || 'Overig';
       const tags = data.tags || [];
 
       // Get pantry availability
@@ -370,7 +367,7 @@ export class MealPlannerShoppingService {
     // Group by category
     const groupMap = new Map<string, ShoppingListItem[]>();
     for (const item of shoppingListItems) {
-      const category = item.category || "Overig";
+      const category = item.category || 'Overig';
       const existing = groupMap.get(category);
       if (existing) {
         existing.push(item);
@@ -404,16 +401,16 @@ export class MealPlannerShoppingService {
 
   /**
    * Build coverage for a meal plan with pantry lookup
-   * 
+   *
    * Convenience method that automatically loads pantry data for the user.
-   * 
+   *
    * @param plan - Meal plan
    * @param userId - User ID for pantry lookup
    * @returns Meal plan coverage with per-meal and totals
    */
   async buildCoverageWithPantry(
     plan: MealPlanResponse,
-    userId: string
+    userId: string,
   ): Promise<MealPlanCoverage> {
     // Collect all unique nevoCodes from plan
     const nevoCodes = new Set<string>();
@@ -430,7 +427,7 @@ export class MealPlannerShoppingService {
     // Load pantry availability
     const pantry = await loadPantryAvailabilityByNevoCodes(
       userId,
-      Array.from(nevoCodes)
+      Array.from(nevoCodes),
     );
 
     return this.buildCoverage({ plan, pantry });
@@ -438,16 +435,16 @@ export class MealPlannerShoppingService {
 
   /**
    * Build shopping list for a meal plan with pantry lookup
-   * 
+   *
    * Convenience method that automatically loads pantry data for the user.
-   * 
+   *
    * @param plan - Meal plan
    * @param userId - User ID for pantry lookup
    * @returns Shopping list grouped by category
    */
   async buildShoppingListWithPantry(
     plan: MealPlanResponse,
-    userId: string
+    userId: string,
   ): Promise<ShoppingListResponse> {
     // Collect all unique nevoCodes from plan
     const nevoCodes = new Set<string>();
@@ -464,7 +461,7 @@ export class MealPlannerShoppingService {
     // Load pantry availability
     const pantry = await loadPantryAvailabilityByNevoCodes(
       userId,
-      Array.from(nevoCodes)
+      Array.from(nevoCodes),
     );
 
     return this.buildShoppingList({ plan, pantry });

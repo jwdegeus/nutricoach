@@ -1,21 +1,21 @@
 /**
  * Meal Planner Enrichment Prompts
- * 
+ *
  * Builds prompts for enriching meal plans with titles, instructions, and cook plans.
  */
 
-import type { MealPlanResponse } from "@/src/lib/diets";
-import type { MealEnrichmentOptions } from "./mealPlannerEnrichment.types";
+import type { MealPlanResponse } from '@/src/lib/diets';
+import type { MealEnrichmentOptions } from './mealPlannerEnrichment.types';
 
 /**
  * Format ingredients for a meal
  */
 function formatMealIngredients(
-  meal: MealPlanResponse["days"][0]["meals"][0],
-  nevoFoodNamesByCode: Record<string, string>
+  meal: MealPlanResponse['days'][0]['meals'][0],
+  nevoFoodNamesByCode: Record<string, string>,
 ): string {
   if (!meal.ingredientRefs || meal.ingredientRefs.length === 0) {
-    return "No ingredients";
+    return 'No ingredients';
   }
 
   const items = meal.ingredientRefs.map((ref) => {
@@ -23,15 +23,15 @@ function formatMealIngredients(
     return `- ${name} (nevoCode: ${ref.nevoCode}, quantity: ${ref.quantityG}g)`;
   });
 
-  return items.join("\n");
+  return items.join('\n');
 }
 
 /**
  * Build meal enrichment prompt
- * 
+ *
  * Creates a prompt that instructs Gemini to generate meal titles, instructions,
  * and cook plans using ONLY the provided ingredients (no new ingredients).
- * 
+ *
  * @param args - Enrichment prompt arguments
  * @returns Formatted prompt string
  */
@@ -49,25 +49,26 @@ export function buildMealEnrichmentPrompt(args: {
     for (const meal of day.meals) {
       const ingredients = formatMealIngredients(meal, nevoFoodNamesByCode);
       mealsList.push(
-        `MEAL: ${meal.name || "Unnamed meal"}
+        `MEAL: ${meal.name || 'Unnamed meal'}
 Date: ${meal.date}
 Slot: ${meal.slot}
 Ingredients:
-${ingredients}`
+${ingredients}`,
       );
     }
   }
 
   const pantryStaplesNote = options.allowPantryStaples
-    ? ""
+    ? ''
     : "\n\nCRITICAL: Do NOT mention or use any pantry staples (water, salt, pepper, oil, etc.) unless they are explicitly listed as ingredients above. Only use the ingredients provided in each meal's ingredient list.";
 
   const maxSteps = options.maxInstructionSteps || 8;
 
   // Language instruction
-  const languageInstruction = language === 'nl' 
-    ? "CRITICAL LANGUAGE REQUIREMENT: All meal titles, instructions, cook plans, and any text you generate MUST be in Dutch (Nederlands). Write all instructions, tips, and descriptions in Dutch."
-    : "CRITICAL LANGUAGE REQUIREMENT: All meal titles, instructions, cook plans, and any text you generate MUST be in English. Write all instructions, tips, and descriptions in English.";
+  const languageInstruction =
+    language === 'nl'
+      ? 'CRITICAL LANGUAGE REQUIREMENT: All meal titles, instructions, cook plans, and any text you generate MUST be in Dutch (Nederlands). Write all instructions, tips, and descriptions in Dutch.'
+      : 'CRITICAL LANGUAGE REQUIREMENT: All meal titles, instructions, cook plans, and any text you generate MUST be in English. Write all instructions, tips, and descriptions in English.';
 
   const prompt = `You are a meal planning assistant that enriches meal plans with cooking instructions and cook plans.
 
@@ -76,7 +77,7 @@ ${languageInstruction}
 TASK: Generate enriched meal data (titles, instructions, prep/cook times) and daily cook plans for the following meal plan.
 
 MEAL PLAN:
-${mealsList.join("\n\n")}
+${mealsList.join('\n\n')}
 
 REQUIREMENTS:
 1. Output MUST be exactly ONE valid JSON object conforming to the provided schema
@@ -141,15 +142,15 @@ Generate the repaired enriched meal plan now. Output ONLY the JSON object, nothi
 
 /**
  * Build prompt for enriching a single meal
- * 
+ *
  * Creates a prompt that instructs Gemini to generate meal title, instructions,
  * and timing for a single meal using ONLY the provided ingredients.
- * 
+ *
  * @param args - Single meal enrichment prompt arguments
  * @returns Formatted prompt string
  */
 export function buildSingleMealEnrichmentPrompt(args: {
-  meal: MealPlanResponse["days"][0]["meals"][0];
+  meal: MealPlanResponse['days'][0]['meals'][0];
   options: MealEnrichmentOptions;
   nevoFoodNamesByCode: Record<string, string>;
   language?: 'nl' | 'en';
@@ -159,15 +160,16 @@ export function buildSingleMealEnrichmentPrompt(args: {
   const ingredients = formatMealIngredients(meal, nevoFoodNamesByCode);
 
   const pantryStaplesNote = options.allowPantryStaples
-    ? ""
+    ? ''
     : "\n\nCRITICAL: Do NOT mention or use any pantry staples (water, salt, pepper, oil, etc.) unless they are explicitly listed as ingredients above. Only use the ingredients provided in the meal's ingredient list.";
 
   const maxSteps = options.maxInstructionSteps || 8;
 
   // Language instruction
-  const languageInstruction = language === 'nl' 
-    ? "CRITICAL LANGUAGE REQUIREMENT: All meal titles, instructions, and any text you generate MUST be in Dutch (Nederlands). Write all instructions and descriptions in Dutch."
-    : "CRITICAL LANGUAGE REQUIREMENT: All meal titles, instructions, and any text you generate MUST be in English. Write all instructions and descriptions in English.";
+  const languageInstruction =
+    language === 'nl'
+      ? 'CRITICAL LANGUAGE REQUIREMENT: All meal titles, instructions, and any text you generate MUST be in Dutch (Nederlands). Write all instructions and descriptions in Dutch.'
+      : 'CRITICAL LANGUAGE REQUIREMENT: All meal titles, instructions, and any text you generate MUST be in English. Write all instructions and descriptions in English.';
 
   const prompt = `You are a meal planning assistant that enriches a single meal with cooking instructions.
 
@@ -176,7 +178,7 @@ ${languageInstruction}
 TASK: Generate enriched meal data (title, instructions, prep/cook times) for the following meal.
 
 MEAL:
-Name: ${meal.name || "Unnamed meal"}
+Name: ${meal.name || 'Unnamed meal'}
 Date: ${meal.date}
 Slot: ${meal.slot}
 Ingredients:

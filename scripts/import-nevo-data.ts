@@ -1,10 +1,10 @@
 #!/usr/bin/env tsx
 /**
  * NEVO Data Import Script
- * 
+ *
  * Imports all NEVO CSV data into Supabase database.
  * Handles pipe-delimited CSV with Dutch comma notation for decimals.
- * 
+ *
  * Usage: npm run import:nevo
  * Or: tsx scripts/import-nevo-data.ts
  */
@@ -23,7 +23,9 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('❌ Missing environment variables:');
-  console.error('   NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+  console.error(
+    '   NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required',
+  );
   process.exit(1);
 }
 
@@ -36,17 +38,17 @@ function parseDutchNumber(value: string | undefined): number | null {
   if (!value || value.trim() === '' || value === '""' || value === '') {
     return null;
   }
-  
+
   // Remove quotes if present
   const cleaned = value.replace(/^"|"$/g, '').trim();
-  
+
   if (cleaned === '' || cleaned === '0' || cleaned === '""') {
     return null;
   }
-  
+
   // Replace comma with dot
   const normalized = cleaned.replace(',', '.');
-  
+
   const parsed = parseFloat(normalized);
   return isNaN(parsed) ? null : parsed;
 }
@@ -55,16 +57,16 @@ function parseDutchNumber(value: string | undefined): number | null {
  * Simple CSV parser for pipe-delimited files
  */
 function parsePipeDelimitedCSV(csvContent: string): string[][] {
-  const lines = csvContent.split('\n').filter(line => line.trim() !== '');
+  const lines = csvContent.split('\n').filter((line) => line.trim() !== '');
   const dataRows: string[][] = [];
-  
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     // Parse pipe-delimited line, handling quoted fields
     const fields: string[] = [];
     let currentField = '';
     let inQuotes = false;
-    
+
     for (let j = 0; j < line.length; j++) {
       const char = line[j];
       if (char === '"') {
@@ -79,7 +81,7 @@ function parsePipeDelimitedCSV(csvContent: string): string[][] {
     fields.push(currentField); // Add last field
     dataRows.push(fields);
   }
-  
+
   return dataRows;
 }
 
@@ -99,7 +101,7 @@ function parseNevoFoodRow(row: string[]): any {
     note: row[8]?.replace(/^"|"$/g, '') || null,
     contains_traces_of: row[9]?.replace(/^"|"$/g, '') || null,
     is_fortified_with: row[10]?.replace(/^"|"$/g, '') || null,
-    
+
     // Energie en macronutriënten
     energy_kj: parseDutchNumber(row[11]),
     energy_kcal: parseDutchNumber(row[12]),
@@ -126,7 +128,7 @@ function parseNevoFoodRow(row: string[]): any {
     alcohol_g: parseDutchNumber(row[33]),
     organic_acids_g: parseDutchNumber(row[34]),
     ash_g: parseDutchNumber(row[35]),
-    
+
     // Mineralen en spoorelementen
     cholesterol_mg: parseDutchNumber(row[36]),
     sodium_mg: parseDutchNumber(row[37]),
@@ -141,7 +143,7 @@ function parseNevoFoodRow(row: string[]): any {
     selenium_ug: parseDutchNumber(row[46]),
     zinc_mg: parseDutchNumber(row[47]),
     iodine_ug: parseDutchNumber(row[48]),
-    
+
     // Vitamines (vetoplosbaar)
     vit_a_rae_ug: parseDutchNumber(row[49]),
     vit_a_re_ug: parseDutchNumber(row[50]),
@@ -163,7 +165,7 @@ function parseNevoFoodRow(row: string[]): any {
     vit_k_ug: parseDutchNumber(row[66]),
     vit_k1_ug: parseDutchNumber(row[67]),
     vit_k2_ug: parseDutchNumber(row[68]),
-    
+
     // Vitamines (wateroplosbaar)
     vit_b1_mg: parseDutchNumber(row[69]),
     vit_b2_mg: parseDutchNumber(row[70]),
@@ -176,7 +178,7 @@ function parseNevoFoodRow(row: string[]): any {
     folic_acid_ug: parseDutchNumber(row[77]),
     vit_c_mg: parseDutchNumber(row[78]),
   };
-  
+
   return record;
 }
 
@@ -219,15 +221,20 @@ function parseReferenceRow(row: string[]): any {
   if (row.length < 2) {
     return null;
   }
-  
+
   const sourceCode = row[0]?.replace(/^"|"$/g, '').trim() || '';
   // Join remaining fields as reference (in case reference contains pipes)
-  const reference = row.slice(1).map(f => f.replace(/^"|"$/g, '')).join('|').trim() || null;
-  
+  const reference =
+    row
+      .slice(1)
+      .map((f) => f.replace(/^"|"$/g, ''))
+      .join('|')
+      .trim() || null;
+
   if (!sourceCode) {
     return null;
   }
-  
+
   return {
     source_code: sourceCode,
     reference: reference,
@@ -239,39 +246,39 @@ function parseReferenceRow(row: string[]): any {
  */
 async function importNevoFoods() {
   const csvPath = path.join(process.cwd(), 'temp', 'NEVO2025_v9.0.csv');
-  
+
   if (!fs.existsSync(csvPath)) {
     console.error(`❌ CSV file not found: ${csvPath}`);
     return false;
   }
-  
+
   console.log('📖 Reading NEVO foods CSV...');
   const csvContent = fs.readFileSync(csvPath, 'utf-8');
   const rows = parsePipeDelimitedCSV(csvContent);
-  
+
   // Skip header row
   const dataRows = rows.slice(1);
   const totalRows = dataRows.length;
-  
+
   console.log(`📊 Found ${totalRows} food items to import`);
-  
+
   const batchSize = 100;
   let imported = 0;
   let errors = 0;
-  
+
   for (let i = 0; i < totalRows; i += batchSize) {
     const batch = dataRows.slice(i, i + batchSize);
-    const records = batch.map(parseNevoFoodRow).filter(r => r.nevo_code > 0);
-    
-    console.log(`📦 Importing foods batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(totalRows / batchSize)} (${records.length} items)...`);
-    
-    const { error } = await supabase
-      .from('nevo_foods')
-      .upsert(records, {
-        onConflict: 'nevo_code',
-        ignoreDuplicates: false,
-      });
-    
+    const records = batch.map(parseNevoFoodRow).filter((r) => r.nevo_code > 0);
+
+    console.log(
+      `📦 Importing foods batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(totalRows / batchSize)} (${records.length} items)...`,
+    );
+
+    const { error } = await supabase.from('nevo_foods').upsert(records, {
+      onConflict: 'nevo_code',
+      ignoreDuplicates: false,
+    });
+
     if (error) {
       console.error(`❌ Error importing batch:`, error);
       errors += records.length;
@@ -280,8 +287,10 @@ async function importNevoFoods() {
       console.log(`✅ Imported ${imported}/${totalRows} food items`);
     }
   }
-  
-  console.log(`\n✨ Foods import complete: ${imported} items imported, ${errors} errors`);
+
+  console.log(
+    `\n✨ Foods import complete: ${imported} items imported, ${errors} errors`,
+  );
   return errors === 0;
 }
 
@@ -289,40 +298,48 @@ async function importNevoFoods() {
  * Import recipe ingredients from CSV
  */
 async function importRecipeIngredients() {
-  const csvPath = path.join(process.cwd(), 'temp', 'NEVO2025_v9.0_Recepten_Recipes.csv');
-  
+  const csvPath = path.join(
+    process.cwd(),
+    'temp',
+    'NEVO2025_v9.0_Recepten_Recipes.csv',
+  );
+
   if (!fs.existsSync(csvPath)) {
     console.log(`⚠️  Recipe CSV not found: ${csvPath} - skipping`);
     return true;
   }
-  
+
   console.log('\n📖 Reading recipe ingredients CSV...');
   const csvContent = fs.readFileSync(csvPath, 'utf-8');
   const rows = parsePipeDelimitedCSV(csvContent);
-  
+
   // Skip header row
   const dataRows = rows.slice(1);
   const totalRows = dataRows.length;
-  
+
   console.log(`📊 Found ${totalRows} recipe ingredient entries to import`);
-  
+
   const batchSize = 500;
   let imported = 0;
   let errors = 0;
-  
+
   for (let i = 0; i < totalRows; i += batchSize) {
     const batch = dataRows.slice(i, i + batchSize);
-    const records = batch.map(parseRecipeRow).filter(r => r.recipe_nevo_code > 0 && r.ingredient_nevo_code > 0);
-    
-    console.log(`📦 Importing recipes batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(totalRows / batchSize)} (${records.length} items)...`);
-    
+    const records = batch
+      .map(parseRecipeRow)
+      .filter((r) => r.recipe_nevo_code > 0 && r.ingredient_nevo_code > 0);
+
+    console.log(
+      `📦 Importing recipes batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(totalRows / batchSize)} (${records.length} items)...`,
+    );
+
     const { error } = await supabase
       .from('nevo_recipe_ingredients')
       .upsert(records, {
         onConflict: 'id',
         ignoreDuplicates: false,
       });
-    
+
     if (error) {
       console.error(`❌ Error importing batch:`, error);
       errors += records.length;
@@ -331,8 +348,10 @@ async function importRecipeIngredients() {
       console.log(`✅ Imported ${imported}/${totalRows} recipe ingredients`);
     }
   }
-  
-  console.log(`\n✨ Recipe ingredients import complete: ${imported} items imported, ${errors} errors`);
+
+  console.log(
+    `\n✨ Recipe ingredients import complete: ${imported} items imported, ${errors} errors`,
+  );
   return errors === 0;
 }
 
@@ -340,45 +359,55 @@ async function importRecipeIngredients() {
  * Import nutrients definitions from CSV
  */
 async function importNutrients() {
-  const csvPath = path.join(process.cwd(), 'temp', 'NEVO2025_v9.0_Nutrienten_Nutrients.csv');
-  
+  const csvPath = path.join(
+    process.cwd(),
+    'temp',
+    'NEVO2025_v9.0_Nutrienten_Nutrients.csv',
+  );
+
   if (!fs.existsSync(csvPath)) {
     console.log(`⚠️  Nutrients CSV not found: ${csvPath} - skipping`);
     return true;
   }
-  
+
   console.log('\n📖 Reading nutrients CSV...');
   const csvContent = fs.readFileSync(csvPath, 'utf-8');
   const rows = parsePipeDelimitedCSV(csvContent);
-  
+
   // Skip header row
   const dataRows = rows.slice(1);
   const totalRows = dataRows.length;
-  
+
   console.log(`📊 Found ${totalRows} nutrient definitions to import`);
-  
-  const allRecords = dataRows.map(parseNutrientRow).filter(r => r.nutrient_code);
-  
+
+  const allRecords = dataRows
+    .map(parseNutrientRow)
+    .filter((r) => r.nutrient_code);
+
   // Remove duplicates based on nutrient_code
   const uniqueRecords = Array.from(
-    new Map(allRecords.map(r => [r.nutrient_code, r])).values()
+    new Map(allRecords.map((r) => [r.nutrient_code, r])).values(),
   );
-  
-  console.log(`📦 Importing ${uniqueRecords.length} unique nutrient definitions (${allRecords.length - uniqueRecords.length} duplicates removed)...`);
-  
+
+  console.log(
+    `📦 Importing ${uniqueRecords.length} unique nutrient definitions (${allRecords.length - uniqueRecords.length} duplicates removed)...`,
+  );
+
   const { error } = await supabase
     .from('nevo_nutrients')
     .upsert(uniqueRecords, {
       onConflict: 'nutrient_code',
       ignoreDuplicates: false,
     });
-  
+
   if (error) {
     console.error(`❌ Error importing nutrients:`, error);
     return false;
   }
-  
-  console.log(`\n✨ Nutrients import complete: ${uniqueRecords.length} items imported`);
+
+  console.log(
+    `\n✨ Nutrients import complete: ${uniqueRecords.length} items imported`,
+  );
   return true;
 }
 
@@ -386,49 +415,55 @@ async function importNutrients() {
  * Import references from CSV
  */
 async function importReferences() {
-  const csvPath = path.join(process.cwd(), 'temp', 'NEVO2025_v9.0_Referenties_References.csv');
-  
+  const csvPath = path.join(
+    process.cwd(),
+    'temp',
+    'NEVO2025_v9.0_Referenties_References.csv',
+  );
+
   if (!fs.existsSync(csvPath)) {
     console.log(`⚠️  References CSV not found: ${csvPath} - skipping`);
     return true;
   }
-  
+
   console.log('\n📖 Reading references CSV...');
   const csvContent = fs.readFileSync(csvPath, 'utf-8');
   const rows = parsePipeDelimitedCSV(csvContent);
-  
+
   // Skip header row
   const dataRows = rows.slice(1);
   const totalRows = dataRows.length;
-  
+
   console.log(`📊 Found ${totalRows} references to import`);
-  
+
   const batchSize = 500;
   let imported = 0;
   let errors = 0;
-  
+
   // First, collect all records and remove duplicates
   const allRecords = dataRows
     .map(parseReferenceRow)
-    .filter(r => r !== null && r !== undefined && r.source_code);
+    .filter((r) => r !== null && r !== undefined && r.source_code);
   const uniqueRecords = Array.from(
-    new Map(allRecords.map(r => [r.source_code, r])).values()
+    new Map(allRecords.map((r) => [r.source_code, r])).values(),
   );
-  
-  console.log(`📊 Processing ${uniqueRecords.length} unique references (${allRecords.length - uniqueRecords.length} duplicates removed)...`);
-  
+
+  console.log(
+    `📊 Processing ${uniqueRecords.length} unique references (${allRecords.length - uniqueRecords.length} duplicates removed)...`,
+  );
+
   for (let i = 0; i < uniqueRecords.length; i += batchSize) {
     const batch = uniqueRecords.slice(i, i + batchSize);
-    
-    console.log(`📦 Importing references batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(uniqueRecords.length / batchSize)} (${batch.length} items)...`);
-    
-    const { error } = await supabase
-      .from('nevo_references')
-      .upsert(batch, {
-        onConflict: 'source_code',
-        ignoreDuplicates: false,
-      });
-    
+
+    console.log(
+      `📦 Importing references batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(uniqueRecords.length / batchSize)} (${batch.length} items)...`,
+    );
+
+    const { error } = await supabase.from('nevo_references').upsert(batch, {
+      onConflict: 'source_code',
+      ignoreDuplicates: false,
+    });
+
     if (error) {
       console.error(`❌ Error importing batch:`, error);
       errors += batch.length;
@@ -437,8 +472,10 @@ async function importReferences() {
       console.log(`✅ Imported ${imported}/${uniqueRecords.length} references`);
     }
   }
-  
-  console.log(`\n✨ References import complete: ${imported} items imported, ${errors} errors`);
+
+  console.log(
+    `\n✨ References import complete: ${imported} items imported, ${errors} errors`,
+  );
   return errors === 0;
 }
 
@@ -447,14 +484,14 @@ async function importReferences() {
  */
 async function importAllNevoData() {
   console.log('🚀 Starting NEVO data import...\n');
-  
+
   const results = {
     foods: await importNevoFoods(),
     recipes: await importRecipeIngredients(),
     nutrients: await importNutrients(),
     references: await importReferences(),
   };
-  
+
   console.log('\n' + '='.repeat(50));
   console.log('📊 Import Summary:');
   console.log('='.repeat(50));
@@ -463,15 +500,15 @@ async function importAllNevoData() {
   console.log(`Nutrients:   ${results.nutrients ? '✅' : '❌'}`);
   console.log(`References:  ${results.references ? '✅' : '❌'}`);
   console.log('='.repeat(50));
-  
-  const allSuccess = Object.values(results).every(r => r === true);
-  
+
+  const allSuccess = Object.values(results).every((r) => r === true);
+
   if (allSuccess) {
     console.log('\n🎉 All imports completed successfully!');
   } else {
     console.log('\n⚠️  Some imports had errors. Check the logs above.');
   }
-  
+
   return allSuccess;
 }
 

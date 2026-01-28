@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { MealPlanActions } from "./MealPlanActions";
-import type { MealPlanResponse } from "@/src/lib/diets";
+import { useEffect, useState } from 'react';
+import { MealPlanActions } from './MealPlanActions';
+import type { MealPlanResponse } from '@/src/lib/diets';
 
 type GuardrailsViolationState = {
   reasonCodes: string[];
@@ -27,7 +27,7 @@ export function MealPlanActionsClient({
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    queueMicrotask(() => setMounted(true));
   }, []);
 
   // During SSR and initial render, return a simple loading state
@@ -49,5 +49,11 @@ export function MealPlanActionsClient({
     );
   }
 
-  return <MealPlanActions planId={planId} plan={plan} onGuardrailsViolation={onGuardrailsViolation} />;
+  return (
+    <MealPlanActions
+      planId={planId}
+      plan={plan}
+      onGuardrailsViolation={onGuardrailsViolation}
+    />
+  );
 }

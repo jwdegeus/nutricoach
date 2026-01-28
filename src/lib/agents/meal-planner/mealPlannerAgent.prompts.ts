@@ -1,12 +1,17 @@
 /**
  * Meal Planner Agent Prompts
- * 
+ *
  * Builds prompts for the meal planning agent that explicitly enforce
  * hard and soft constraints from the diet rule set.
  */
 
-import type { MealPlanRequest, DietRuleSet, MealPlanResponse, Meal } from "@/src/lib/diets";
-import type { CandidatePool } from "./mealPlannerAgent.tools";
+import type {
+  MealPlanRequest,
+  DietRuleSet,
+  MealPlanResponse,
+  Meal,
+} from '@/src/lib/diets';
+import type { CandidatePool } from './mealPlannerAgent.tools';
 
 /**
  * Format a date range for display
@@ -14,9 +19,10 @@ import type { CandidatePool } from "./mealPlannerAgent.tools";
 function formatDateRange(start: string, end: string): string {
   const startDate = new Date(start);
   const endDate = new Date(end);
-  const days = Math.ceil(
-    (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-  ) + 1;
+  const days =
+    Math.ceil(
+      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+    ) + 1;
   return `${start} to ${end} (${days} days)`;
 }
 
@@ -25,12 +31,12 @@ function formatDateRange(start: string, end: string): string {
  */
 function formatMealSlots(slots: string[]): string {
   const slotNames: Record<string, string> = {
-    breakfast: "Breakfast",
-    lunch: "Lunch",
-    dinner: "Dinner",
-    snack: "Snack",
+    breakfast: 'Breakfast',
+    lunch: 'Lunch',
+    dinner: 'Dinner',
+    snack: 'Snack',
   };
-  return slots.map((slot) => slotNames[slot] || slot).join(", ");
+  return slots.map((slot) => slotNames[slot] || slot).join(', ');
 }
 
 /**
@@ -45,18 +51,19 @@ function buildConstraintSummary(rules: DietRuleSet): string {
 
   // Ingredient constraints
   rules.ingredientConstraints.forEach((constraint) => {
-    const items = constraint.items.length > 0
-      ? constraint.items.join(", ")
-      : "N/A";
-    const categories = constraint.categories?.length > 0
-      ? constraint.categories.join(", ")
-      : "";
-    
-    const desc = constraint.type === "forbidden"
-      ? `FORBIDDEN: ${items}${categories ? ` (categories: ${categories})` : ""}`
-      : `ALLOWED ONLY: ${items}${categories ? ` (categories: ${categories})` : ""}`;
-    
-    if (constraint.constraintType === "hard") {
+    const items =
+      constraint.items.length > 0 ? constraint.items.join(', ') : 'N/A';
+    const categories =
+      (constraint.categories?.length ?? 0) > 0
+        ? (constraint.categories ?? []).join(', ')
+        : '';
+
+    const desc =
+      constraint.type === 'forbidden'
+        ? `FORBIDDEN: ${items}${categories ? ` (categories: ${categories})` : ''}`
+        : `ALLOWED ONLY: ${items}${categories ? ` (categories: ${categories})` : ''}`;
+
+    if (constraint.constraintType === 'hard') {
       hardConstraints.push(`  - ${desc} [HARD]`);
     } else {
       softConstraints.push(`  - ${desc} [SOFT]`);
@@ -65,10 +72,11 @@ function buildConstraintSummary(rules: DietRuleSet): string {
 
   // Required categories
   rules.requiredCategories.forEach((req) => {
-    const items = req.items?.length > 0 ? req.items.join(", ") : "";
-    const desc = `REQUIRED: ${req.category}${req.minPerDay ? ` (min ${req.minPerDay}/day)` : ""}${req.minPerWeek ? ` (min ${req.minPerWeek}/week)` : ""}${items ? ` - items: ${items}` : ""}`;
-    
-    if (req.constraintType === "hard") {
+    const items =
+      (req.items?.length ?? 0) > 0 ? (req.items ?? []).join(', ') : '';
+    const desc = `REQUIRED: ${req.category}${req.minPerDay ? ` (min ${req.minPerDay}/day)` : ''}${req.minPerWeek ? ` (min ${req.minPerWeek}/week)` : ''}${items ? ` - items: ${items}` : ''}`;
+
+    if (req.constraintType === 'hard') {
       hardConstraints.push(`  - ${desc} [HARD]`);
     } else {
       softConstraints.push(`  - ${desc} [SOFT]`);
@@ -78,14 +86,17 @@ function buildConstraintSummary(rules: DietRuleSet): string {
   // Macro constraints
   rules.macroConstraints.forEach((macro) => {
     const parts: string[] = [];
-    if (macro.maxCarbs !== undefined) parts.push(`max carbs: ${macro.maxCarbs}g`);
-    if (macro.maxSaturatedFat !== undefined) parts.push(`max saturated fat: ${macro.maxSaturatedFat}g`);
-    if (macro.minProtein !== undefined) parts.push(`min protein: ${macro.minProtein}g`);
+    if (macro.maxCarbs !== undefined)
+      parts.push(`max carbs: ${macro.maxCarbs}g`);
+    if (macro.maxSaturatedFat !== undefined)
+      parts.push(`max saturated fat: ${macro.maxSaturatedFat}g`);
+    if (macro.minProtein !== undefined)
+      parts.push(`min protein: ${macro.minProtein}g`);
     if (macro.minFat !== undefined) parts.push(`min fat: ${macro.minFat}g`);
-    
+
     if (parts.length > 0) {
-      const desc = `${macro.scope === "daily" ? "Daily" : "Per-meal"} macro limits: ${parts.join(", ")}`;
-      if (macro.constraintType === "hard") {
+      const desc = `${macro.scope === 'daily' ? 'Daily' : 'Per-meal'} macro limits: ${parts.join(', ')}`;
+      if (macro.constraintType === 'hard') {
         hardConstraints.push(`  - ${desc} [HARD]`);
       } else {
         softConstraints.push(`  - ${desc} [SOFT]`);
@@ -95,10 +106,13 @@ function buildConstraintSummary(rules: DietRuleSet): string {
 
   // Meal structure constraints
   rules.mealStructure.forEach((structure) => {
-    if (structure.type === "vegetable_cups" && structure.vegetableCupsRequirement) {
+    if (
+      structure.type === 'vegetable_cups' &&
+      structure.vegetableCupsRequirement
+    ) {
       const req = structure.vegetableCupsRequirement;
       const desc = `Vegetable cups requirement: ${req.totalCups} total (${req.leafyCups} leafy, ${req.sulfurCups} sulfur, ${req.coloredCups} colored)`;
-      if (structure.constraintType === "hard") {
+      if (structure.constraintType === 'hard') {
         hardConstraints.push(`  - ${desc} [HARD]`);
       } else {
         softConstraints.push(`  - ${desc} [SOFT]`);
@@ -109,26 +123,26 @@ function buildConstraintSummary(rules: DietRuleSet): string {
   // Weekly variety
   if (rules.weeklyVariety.maxRepeats !== undefined) {
     softConstraints.push(
-      `  - Max repeats per week: ${rules.weeklyVariety.maxRepeats} [SOFT]`
+      `  - Max repeats per week: ${rules.weeklyVariety.maxRepeats} [SOFT]`,
     );
   }
   if (rules.weeklyVariety.minUniqueMeals !== undefined) {
     softConstraints.push(
-      `  - Min unique meals per week: ${rules.weeklyVariety.minUniqueMeals} [SOFT]`
+      `  - Min unique meals per week: ${rules.weeklyVariety.minUniqueMeals} [SOFT]`,
     );
   }
 
   if (hardConstraints.length > 0) {
-    parts.push("HARD CONSTRAINTS (must be followed 100%):");
+    parts.push('HARD CONSTRAINTS (must be followed 100%):');
     parts.push(...hardConstraints);
   }
 
   if (softConstraints.length > 0) {
-    parts.push("\nSOFT CONSTRAINTS (optimize where possible):");
+    parts.push('\nSOFT CONSTRAINTS (optimize where possible):');
     parts.push(...softConstraints);
   }
 
-  return parts.join("\n");
+  return parts.join('\n');
 }
 
 /**
@@ -136,29 +150,32 @@ function buildConstraintSummary(rules: DietRuleSet): string {
  */
 function formatCandidatePool(candidates: CandidatePool): string {
   const parts: string[] = [];
-  
+
   for (const [category, items] of Object.entries(candidates)) {
     if (items.length === 0) continue;
-    
+
     parts.push(`\n${category.toUpperCase()} (${items.length} candidates):`);
-    for (const item of items.slice(0, 20)) { // Limit to 20 per category in prompt
-      parts.push(`  - ${item.name} (nevoCode: ${item.nevoCode})${item.tags ? ` [tags: ${item.tags.join(", ")}]` : ""}`);
+    for (const item of items.slice(0, 20)) {
+      // Limit to 20 per category in prompt
+      parts.push(
+        `  - ${item.name} (nevoCode: ${item.nevoCode})${item.tags ? ` [tags: ${item.tags.join(', ')}]` : ''}`,
+      );
     }
     if (items.length > 20) {
       parts.push(`  ... and ${items.length - 20} more`);
     }
   }
-  
-  return parts.join("\n");
+
+  return parts.join('\n');
 }
 
 /**
  * Build the meal plan prompt
- * 
+ *
  * Creates a comprehensive prompt that instructs the agent to generate
  * a meal plan conforming to the provided diet rules and constraints.
  * The agent must choose ingredients ONLY from the provided candidate pool.
- * 
+ *
  * @param input - Request, rules, and candidate pool for meal planning
  * @returns Formatted prompt string
  */
@@ -175,59 +192,80 @@ export function buildMealPlanPrompt(input: {
   /** Bij retry na FORCE-quotum-fout: zorg dat elke dag voldoende uit deze groepen bevat */
   forceDeficitHint?: ForceDeficitHint;
 }): string {
-  const { request, rules, candidates, language = 'nl', forceDeficitHint } = input;
+  const {
+    request,
+    rules,
+    candidates,
+    language = 'nl',
+    forceDeficitHint,
+  } = input;
 
   const dateRange = formatDateRange(
     request.dateRange.start,
-    request.dateRange.end
+    request.dateRange.end,
   );
   const slots = formatMealSlots(request.slots);
 
   // Calorie target
-  let calorieInfo = "";
+  let calorieInfo = '';
   if (rules.calorieTarget.target) {
     calorieInfo = `Target calories: ${rules.calorieTarget.target} kcal/day`;
   } else if (rules.calorieTarget.min || rules.calorieTarget.max) {
     const range = [
-      rules.calorieTarget.min ? `${rules.calorieTarget.min}` : "",
-      rules.calorieTarget.max ? `${rules.calorieTarget.max}` : "",
+      rules.calorieTarget.min ? `${rules.calorieTarget.min}` : '',
+      rules.calorieTarget.max ? `${rules.calorieTarget.max}` : '',
     ]
       .filter(Boolean)
-      .join("-");
+      .join('-');
     calorieInfo = `Calorie range: ${range} kcal/day`;
   }
 
   // Prep time
   const prepTime = request.maxPrepTime ?? rules.prepTimeConstraints.globalMax;
-  const prepTimeInfo = prepTime ? `Max prep time per meal: ${prepTime} minutes` : "";
+  const prepTimeInfo = prepTime
+    ? `Max prep time per meal: ${prepTime} minutes`
+    : '';
 
   // Additional exclusions/preferences
-  const additionalExclusions = request.excludeIngredients?.length > 0
-    ? `Additional exclusions: ${request.excludeIngredients.join(", ")}`
-    : "";
-  const preferredIngredients = request.preferIngredients?.length > 0
-    ? `Preferred ingredients: ${request.preferIngredients.join(", ")}`
-    : "";
+  const additionalExclusions =
+    (request.excludeIngredients?.length ?? 0) > 0
+      ? `Additional exclusions: ${(request.excludeIngredients ?? []).join(', ')}`
+      : '';
+  const preferredIngredients =
+    (request.preferIngredients?.length ?? 0) > 0
+      ? `Preferred ingredients: ${(request.preferIngredients ?? []).join(', ')}`
+      : '';
 
   // Meal preferences (as tags/arrays)
   const mealPrefs = request.profile.mealPreferences;
-  const mealPreferencesInfo = mealPrefs && (
-    (mealPrefs.breakfast?.length || 0) > 0 || 
-    (mealPrefs.lunch?.length || 0) > 0 || 
-    (mealPrefs.dinner?.length || 0) > 0
-  ) ? [
-    mealPrefs.breakfast?.length ? `Breakfast: ${mealPrefs.breakfast.join(", ")}` : null,
-    mealPrefs.lunch?.length ? `Lunch: ${mealPrefs.lunch.join(", ")}` : null,
-    mealPrefs.dinner?.length ? `Dinner: ${mealPrefs.dinner.join(", ")}` : null,
-  ].filter(Boolean).join("\n") : "";
+  const mealPreferencesInfo =
+    mealPrefs &&
+    ((mealPrefs.breakfast?.length || 0) > 0 ||
+      (mealPrefs.lunch?.length || 0) > 0 ||
+      (mealPrefs.dinner?.length || 0) > 0)
+      ? [
+          mealPrefs.breakfast?.length
+            ? `Breakfast: ${mealPrefs.breakfast.join(', ')}`
+            : null,
+          mealPrefs.lunch?.length
+            ? `Lunch: ${mealPrefs.lunch.join(', ')}`
+            : null,
+          mealPrefs.dinner?.length
+            ? `Dinner: ${mealPrefs.dinner.join(', ')}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : '';
 
   // Diet-specific rules summary
   const constraintSummary = buildConstraintSummary(rules);
 
   // Language instruction
-  const languageInstruction = language === 'nl' 
-    ? "CRITICAL LANGUAGE REQUIREMENT: All meal names, descriptions, and any text you generate MUST be in Dutch (Nederlands). Use Dutch names for meals, ingredients, and any descriptive text."
-    : "CRITICAL LANGUAGE REQUIREMENT: All meal names, descriptions, and any text you generate MUST be in English. Use English names for meals, ingredients, and any descriptive text.";
+  const languageInstruction =
+    language === 'nl'
+      ? 'CRITICAL LANGUAGE REQUIREMENT: All meal names, descriptions, and any text you generate MUST be in Dutch (Nederlands). Use Dutch names for meals, ingredients, and any descriptive text.'
+      : 'CRITICAL LANGUAGE REQUIREMENT: All meal names, descriptions, and any text you generate MUST be in English. Use English names for meals, ingredients, and any descriptive text.';
 
   const prompt = `You are a meal planning assistant that generates personalized meal plans based on strict dietary requirements.
 
@@ -240,20 +278,22 @@ PERIOD:
 - Meal slots per day: ${slots}
 
 CALORIE & MACRO TARGETS:
-${calorieInfo ? `- ${calorieInfo}` : "- No specific calorie target"}
-${prepTimeInfo ? `- ${prepTimeInfo}` : ""}
+${calorieInfo ? `- ${calorieInfo}` : '- No specific calorie target'}
+${prepTimeInfo ? `- ${prepTimeInfo}` : ''}
 
 DIET RULES & CONSTRAINTS:
 ${constraintSummary}
-${forceDeficitHint && forceDeficitHint.categoryNames.length > 0
-    ? `\nCRITICAL - DAG-QUOTUM (vorige poging afgekeurd): Zorg dat ELKE dag voldoende ingrediënten bevat uit deze groepen: ${forceDeficitHint.categoryNames.join(", ")}. Het dag-quotum voor deze groepen moet op elke afzonderlijke dag gehaald worden.\n`
-    : ""}
+${
+  forceDeficitHint && forceDeficitHint.categoryNames.length > 0
+    ? `\nCRITICAL - DAG-QUOTUM (vorige poging afgekeurd): Zorg dat ELKE dag voldoende ingrediënten bevat uit deze groepen: ${forceDeficitHint.categoryNames.join(', ')}. Het dag-quotum voor deze groepen moet op elke afzonderlijke dag gehaald worden.\n`
+    : ''
+}
 
-${additionalExclusions ? `\n${additionalExclusions}` : ""}
-${preferredIngredients ? `\n${preferredIngredients}` : ""}
-${mealPreferencesInfo ? `\nMEAL PREFERENCES (REQUIRED):\nThe user has REQUIRED preferences for meal types. You MUST generate meals that match these preferences:\n${mealPreferencesInfo}\n\nIMPORTANT: For each meal slot, the generated meal MUST match at least one of the specified preferences. For example, if breakfast preference is "eiwit shake", the breakfast meal MUST be an eiwit shake (protein shake), not eggs or other breakfast items.\n` : ""}
+${additionalExclusions ? `\n${additionalExclusions}` : ''}
+${preferredIngredients ? `\n${preferredIngredients}` : ''}
+${mealPreferencesInfo ? `\nMEAL PREFERENCES (REQUIRED):\nThe user has REQUIRED preferences for meal types. You MUST generate meals that match these preferences:\n${mealPreferencesInfo}\n\nIMPORTANT: For each meal slot, the generated meal MUST match at least one of the specified preferences. For example, if breakfast preference is "eiwit shake", the breakfast meal MUST be an eiwit shake (protein shake), not eggs or other breakfast items.\n` : ''}
 
-${candidates ? `\nAVAILABLE INGREDIENTS (CANDIDATE POOL):\nYou MUST choose ingredients ONLY from this list. Use the exact nevoCode values provided.\n${formatCandidatePool(candidates)}\n` : ""}
+${candidates ? `\nAVAILABLE INGREDIENTS (CANDIDATE POOL):\nYou MUST choose ingredients ONLY from this list. Use the exact nevoCode values provided.\n${formatCandidatePool(candidates)}\n` : ''}
 
 CRITICAL REQUIREMENTS:
 1. Output MUST be exactly ONE valid JSON object conforming to the provided schema
@@ -261,7 +301,7 @@ CRITICAL REQUIREMENTS:
 3. Do NOT include any text outside the JSON object
 4. All HARD constraints must be followed 100% - violations are not acceptable
 5. SOFT constraints should be optimized where possible, but never at the expense of hard constraints
-6. ${candidates ? "You MUST use ONLY ingredients from the candidate pool above. Each ingredient must have:" : "Each ingredient must have:"}
+6. ${candidates ? 'You MUST use ONLY ingredients from the candidate pool above. Each ingredient must have:' : 'Each ingredient must have:'}
    - nevoCode: exact NEVO code from candidate pool (as string)
    - quantityG: amount in grams (minimum 1)
    - displayName: optional display name for UI
@@ -275,11 +315,11 @@ CRITICAL REQUIREMENTS:
    - Optional estimatedMacros (informative only - actual calculation happens server-side)
    - Optional prep time in minutes
    - Optional servings count
-${candidates ? "8. DO NOT invent nevoCodes - use ONLY codes from the candidate pool above" : ""}
-${mealPreferencesInfo ? `${candidates ? "9" : "8"}. MEAL PREFERENCES MUST be respected - each meal slot MUST match the specified preferences` : ""}
-${candidates ? (mealPreferencesInfo ? "10" : "9") : (mealPreferencesInfo ? "9" : "8")}. Ensure variety across the week (respect weekly variety constraints)
-${candidates ? (mealPreferencesInfo ? "11" : "10") : (mealPreferencesInfo ? "10" : "9")}. Ensure each day's meals together meet calorie/macro targets if specified
-${candidates ? (mealPreferencesInfo ? "12" : "11") : (mealPreferencesInfo ? "11" : "10")}. Ensure all meals respect prep time constraints
+${candidates ? '8. DO NOT invent nevoCodes - use ONLY codes from the candidate pool above' : ''}
+${mealPreferencesInfo ? `${candidates ? '9' : '8'}. MEAL PREFERENCES MUST be respected - each meal slot MUST match the specified preferences` : ''}
+${candidates ? (mealPreferencesInfo ? '10' : '9') : mealPreferencesInfo ? '9' : '8'}. Ensure variety across the week (respect weekly variety constraints)
+${candidates ? (mealPreferencesInfo ? '11' : '10') : mealPreferencesInfo ? '10' : '9'}. Ensure each day's meals together meet calorie/macro targets if specified
+${candidates ? (mealPreferencesInfo ? '12' : '11') : mealPreferencesInfo ? '11' : '10'}. Ensure all meals respect prep time constraints
 
 Generate the meal plan now. Output ONLY the JSON object, nothing else.`;
 
@@ -288,11 +328,11 @@ Generate the meal plan now. Output ONLY the JSON object, nothing else.`;
 
 /**
  * Build prompt for generating a single day of meals
- * 
+ *
  * Creates a focused prompt for generating meals for one specific date.
  * Supports minimal-change objective: if existingDay is provided, instructs
  * the agent to preserve as many ingredients as possible.
- * 
+ *
  * @param input - Day generation request with optional existing day
  * @returns Formatted prompt string
  */
@@ -301,64 +341,86 @@ export function buildMealPlanDayPrompt(input: {
   request: MealPlanRequest;
   rules: DietRuleSet;
   candidates?: CandidatePool;
-  existingDay?: MealPlanResponse["days"][number];
+  existingDay?: MealPlanResponse['days'][number];
   language?: 'nl' | 'en';
 }): string {
-  const { date, request, rules, candidates, existingDay, language = 'nl' } = input;
+  const {
+    date,
+    request,
+    rules,
+    candidates,
+    existingDay,
+    language = 'nl',
+  } = input;
 
   const slots = formatMealSlots(request.slots);
 
   // Calorie target
-  let calorieInfo = "";
+  let calorieInfo = '';
   if (rules.calorieTarget.target) {
     calorieInfo = `Target calories: ${rules.calorieTarget.target} kcal/day`;
   } else if (rules.calorieTarget.min || rules.calorieTarget.max) {
     const range = [
-      rules.calorieTarget.min ? `${rules.calorieTarget.min}` : "",
-      rules.calorieTarget.max ? `${rules.calorieTarget.max}` : "",
+      rules.calorieTarget.min ? `${rules.calorieTarget.min}` : '',
+      rules.calorieTarget.max ? `${rules.calorieTarget.max}` : '',
     ]
       .filter(Boolean)
-      .join("-");
+      .join('-');
     calorieInfo = `Calorie range: ${range} kcal/day`;
   }
 
   // Prep time
   const prepTime = request.maxPrepTime ?? rules.prepTimeConstraints.globalMax;
-  const prepTimeInfo = prepTime ? `Max prep time per meal: ${prepTime} minutes` : "";
+  const prepTimeInfo = prepTime
+    ? `Max prep time per meal: ${prepTime} minutes`
+    : '';
 
   // Additional exclusions/preferences
-  const additionalExclusions = request.excludeIngredients?.length > 0
-    ? `Additional exclusions: ${request.excludeIngredients.join(", ")}`
-    : "";
-  const preferredIngredients = request.preferIngredients?.length > 0
-    ? `Preferred ingredients: ${request.preferIngredients.join(", ")}`
-    : "";
+  const additionalExclusions =
+    (request.excludeIngredients?.length ?? 0) > 0
+      ? `Additional exclusions: ${(request.excludeIngredients ?? []).join(', ')}`
+      : '';
+  const preferredIngredients =
+    (request.preferIngredients?.length ?? 0) > 0
+      ? `Preferred ingredients: ${(request.preferIngredients ?? []).join(', ')}`
+      : '';
 
   // Meal preferences (as tags/arrays) - REQUIRED constraints
   const mealPrefs = request.profile.mealPreferences;
-  const mealPreferencesInfo = mealPrefs && (
-    (mealPrefs.breakfast?.length || 0) > 0 || 
-    (mealPrefs.lunch?.length || 0) > 0 || 
-    (mealPrefs.dinner?.length || 0) > 0
-  ) ? [
-    mealPrefs.breakfast?.length ? `Breakfast: ${mealPrefs.breakfast.join(", ")}` : null,
-    mealPrefs.lunch?.length ? `Lunch: ${mealPrefs.lunch.join(", ")}` : null,
-    mealPrefs.dinner?.length ? `Dinner: ${mealPrefs.dinner.join(", ")}` : null,
-  ].filter(Boolean).join("\n") : "";
+  const mealPreferencesInfo =
+    mealPrefs &&
+    ((mealPrefs.breakfast?.length || 0) > 0 ||
+      (mealPrefs.lunch?.length || 0) > 0 ||
+      (mealPrefs.dinner?.length || 0) > 0)
+      ? [
+          mealPrefs.breakfast?.length
+            ? `Breakfast: ${mealPrefs.breakfast.join(', ')}`
+            : null,
+          mealPrefs.lunch?.length
+            ? `Lunch: ${mealPrefs.lunch.join(', ')}`
+            : null,
+          mealPrefs.dinner?.length
+            ? `Dinner: ${mealPrefs.dinner.join(', ')}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : '';
 
   // Diet-specific rules summary
   const constraintSummary = buildConstraintSummary(rules);
 
   // Language instruction
-  const languageInstruction = language === 'nl' 
-    ? "CRITICAL LANGUAGE REQUIREMENT: All meal names, descriptions, and any text you generate MUST be in Dutch (Nederlands). Use Dutch names for meals, ingredients, and any descriptive text."
-    : "CRITICAL LANGUAGE REQUIREMENT: All meal names, descriptions, and any text you generate MUST be in English. Use English names for meals, ingredients, and any descriptive text.";
+  const languageInstruction =
+    language === 'nl'
+      ? 'CRITICAL LANGUAGE REQUIREMENT: All meal names, descriptions, and any text you generate MUST be in Dutch (Nederlands). Use Dutch names for meals, ingredients, and any descriptive text.'
+      : 'CRITICAL LANGUAGE REQUIREMENT: All meal names, descriptions, and any text you generate MUST be in English. Use English names for meals, ingredients, and any descriptive text.';
 
   // Minimal-change instructions if existing day provided
-  let minimalChangeInstructions = "";
+  let minimalChangeInstructions = '';
   if (existingDay) {
     const existingIngredientRefs = existingDay.meals.flatMap(
-      (meal) => meal.ingredientRefs || []
+      (meal) => meal.ingredientRefs || [],
     );
     const existingNevoCodes = existingIngredientRefs.map((ref) => ref.nevoCode);
     const uniqueNevoCodes = [...new Set(existingNevoCodes)];
@@ -367,10 +429,12 @@ export function buildMealPlanDayPrompt(input: {
 
 MINIMAL-CHANGE OBJECTIVE:
 You are regenerating meals for ${date}. An existing plan for this day exists with the following ingredients:
-${uniqueNevoCodes.map((code) => {
-  const ref = existingIngredientRefs.find((r) => r.nevoCode === code);
-  return `  - ${ref?.displayName || code} (nevoCode: ${code}, quantityG: ${ref?.quantityG || 0}g)`;
-}).join("\n")}
+${uniqueNevoCodes
+  .map((code) => {
+    const ref = existingIngredientRefs.find((r) => r.nevoCode === code);
+    return `  - ${ref?.displayName || code} (nevoCode: ${code}, quantityG: ${ref?.quantityG || 0}g)`;
+  })
+  .join('\n')}
 
 CRITICAL MINIMAL-CHANGE RULES:
 1. PRESERVE existing ingredients (nevoCodes) wherever possible
@@ -396,17 +460,17 @@ DATE & MEAL SLOTS:
 - Meal slots: ${slots}
 
 CALORIE & MACRO TARGETS:
-${calorieInfo ? `- ${calorieInfo}` : "- No specific calorie target"}
-${prepTimeInfo ? `- ${prepTimeInfo}` : ""}
+${calorieInfo ? `- ${calorieInfo}` : '- No specific calorie target'}
+${prepTimeInfo ? `- ${prepTimeInfo}` : ''}
 
 DIET RULES & CONSTRAINTS:
 ${constraintSummary}
 
-${additionalExclusions ? `\n${additionalExclusions}` : ""}
-${preferredIngredients ? `\n${preferredIngredients}` : ""}
-${mealPreferencesInfo ? `\nMEAL PREFERENCES (REQUIRED - HARD CONSTRAINT):\nThe user has REQUIRED preferences for meal types. You MUST generate meals that match these preferences:\n${mealPreferencesInfo}\n\nCRITICAL: For each meal slot, the generated meal MUST match at least one of the specified preferences. The meal name and ingredients MUST clearly reflect the preference.\n` : ""}
+${additionalExclusions ? `\n${additionalExclusions}` : ''}
+${preferredIngredients ? `\n${preferredIngredients}` : ''}
+${mealPreferencesInfo ? `\nMEAL PREFERENCES (REQUIRED - HARD CONSTRAINT):\nThe user has REQUIRED preferences for meal types. You MUST generate meals that match these preferences:\n${mealPreferencesInfo}\n\nCRITICAL: For each meal slot, the generated meal MUST match at least one of the specified preferences. The meal name and ingredients MUST clearly reflect the preference.\n` : ''}
 
-${candidates ? `\nAVAILABLE INGREDIENTS (CANDIDATE POOL):\nYou MUST choose ingredients ONLY from this list. Use the exact nevoCode values provided.\n${formatCandidatePool(candidates)}\n` : ""}
+${candidates ? `\nAVAILABLE INGREDIENTS (CANDIDATE POOL):\nYou MUST choose ingredients ONLY from this list. Use the exact nevoCode values provided.\n${formatCandidatePool(candidates)}\n` : ''}
 
 ${minimalChangeInstructions}
 
@@ -415,9 +479,9 @@ CRITICAL REQUIREMENTS:
 2. Do NOT include markdown formatting, code blocks, or explanations
 3. Do NOT include any text outside the JSON object
 4. All HARD constraints must be followed 100% - violations are not acceptable
-5. ${mealPreferencesInfo ? "MEAL PREFERENCES are REQUIRED - each meal MUST match the user's preferences for that meal slot. This is a HARD constraint." : ""}
+5. ${mealPreferencesInfo ? "MEAL PREFERENCES are REQUIRED - each meal MUST match the user's preferences for that meal slot. This is a HARD constraint." : ''}
 6. SOFT constraints should be optimized where possible, but never at the expense of hard constraints
-6. ${candidates ? "You MUST use ONLY ingredients from the candidate pool above. Each ingredient must have:" : "Each ingredient must have:"}
+6. ${candidates ? 'You MUST use ONLY ingredients from the candidate pool above. Each ingredient must have:' : 'Each ingredient must have:'}
    - nevoCode: exact NEVO code from candidate pool (as string)
    - quantityG: amount in grams (minimum 1)
    - displayName: optional display name for UI
@@ -431,9 +495,9 @@ CRITICAL REQUIREMENTS:
    - Optional estimatedMacros (informative only - actual calculation happens server-side)
    - Optional prep time in minutes
    - Optional servings count
-${candidates ? "8. DO NOT invent nevoCodes - use ONLY codes from the candidate pool above" : ""}
-${candidates ? "9" : "8"}. Ensure the day's meals together meet calorie/macro targets if specified
-${candidates ? "10" : "9"}. Ensure all meals respect prep time constraints
+${candidates ? '8. DO NOT invent nevoCodes - use ONLY codes from the candidate pool above' : ''}
+${candidates ? '9' : '8'}. Ensure the day's meals together meet calorie/macro targets if specified
+${candidates ? '10' : '9'}. Ensure all meals respect prep time constraints
 
 Generate the meals for ${date} now. Output ONLY the JSON object, nothing else.`;
 
@@ -442,11 +506,11 @@ Generate the meals for ${date} now. Output ONLY the JSON object, nothing else.`;
 
 /**
  * Build prompt for generating a single meal (slot-only)
- * 
+ *
  * Creates a focused prompt for generating one meal for a specific date and slot.
  * Supports minimal-change objective: if existingMeal is provided, instructs
  * the agent to preserve as many ingredients as possible.
- * 
+ *
  * @param input - Meal generation request with optional existing meal and constraints
  * @returns Formatted prompt string
  */
@@ -466,10 +530,19 @@ export function buildMealPrompt(input: {
   };
   language?: 'nl' | 'en';
 }): string {
-  const { date, mealSlot, request, rules, candidates, existingMeal, constraints, language = 'nl' } = input;
+  const {
+    date,
+    mealSlot,
+    request,
+    rules,
+    candidates,
+    existingMeal,
+    constraints,
+    language = 'nl',
+  } = input;
 
   // Calorie target
-  let calorieInfo = "";
+  let calorieInfo = '';
   if (constraints?.targetCalories) {
     calorieInfo = `Target calories for this meal: ${constraints.targetCalories} kcal`;
   } else if (rules.calorieTarget.target) {
@@ -479,59 +552,72 @@ export function buildMealPrompt(input: {
     calorieInfo = `Estimated target calories for this meal: ~${mealTarget} kcal (based on daily target ${rules.calorieTarget.target} kcal / ${slotsCount} meals)`;
   } else if (rules.calorieTarget.min || rules.calorieTarget.max) {
     const slotsCount = request.slots.length;
-    const minMeal = rules.calorieTarget.min ? Math.round(rules.calorieTarget.min / slotsCount) : undefined;
-    const maxMeal = rules.calorieTarget.max ? Math.round(rules.calorieTarget.max / slotsCount) : undefined;
+    const minMeal = rules.calorieTarget.min
+      ? Math.round(rules.calorieTarget.min / slotsCount)
+      : undefined;
+    const maxMeal = rules.calorieTarget.max
+      ? Math.round(rules.calorieTarget.max / slotsCount)
+      : undefined;
     if (minMeal || maxMeal) {
-      calorieInfo = `Estimated calorie range for this meal: ${minMeal || "?"}-${maxMeal || "?"} kcal`;
+      calorieInfo = `Estimated calorie range for this meal: ${minMeal || '?'}-${maxMeal || '?'} kcal`;
     }
   }
 
   // Prep time
-  const prepTime = constraints?.maxPrepMinutes 
-    ?? request.maxPrepTime 
-    ?? rules.prepTimeConstraints.perMeal?.[mealSlot as keyof typeof rules.prepTimeConstraints.perMeal]
-    ?? rules.prepTimeConstraints.globalMax;
-  const prepTimeInfo = prepTime ? `Max prep time: ${prepTime} minutes` : "";
+  const prepTime =
+    constraints?.maxPrepMinutes ??
+    request.maxPrepTime ??
+    rules.prepTimeConstraints.perMeal?.[
+      mealSlot as keyof typeof rules.prepTimeConstraints.perMeal
+    ] ??
+    rules.prepTimeConstraints.globalMax;
+  const prepTimeInfo = prepTime ? `Max prep time: ${prepTime} minutes` : '';
 
   // Additional exclusions/preferences
   const additionalExclusions = [
     ...(request.excludeIngredients || []),
     ...(constraints?.avoidIngredients || []),
   ];
-  const exclusionsInfo = additionalExclusions.length > 0
-    ? `Additional exclusions: ${additionalExclusions.join(", ")}`
-    : "";
+  const exclusionsInfo =
+    additionalExclusions.length > 0
+      ? `Additional exclusions: ${additionalExclusions.join(', ')}`
+      : '';
 
-  const preferredIngredients = request.preferIngredients?.length > 0
-    ? `Preferred ingredients: ${request.preferIngredients.join(", ")}`
-    : "";
+  const preferredIngredients =
+    (request.preferIngredients?.length ?? 0) > 0
+      ? `Preferred ingredients: ${(request.preferIngredients ?? []).join(', ')}`
+      : '';
 
   // Meal preferences (for this specific slot, as tags/array) - REQUIRED
   const mealPrefs = request.profile.mealPreferences;
   const mealPreferenceForSlot = mealPrefs?.[mealSlot as keyof typeof mealPrefs];
-  const mealPreferenceInfo = mealPreferenceForSlot && mealPreferenceForSlot.length > 0
-    ? `REQUIRED MEAL PREFERENCE for ${mealSlot}: ${mealPreferenceForSlot.join(", ")}. The generated meal MUST match this preference. For example, if the preference is "eiwit shake", the meal MUST be an eiwit shake (protein shake) with protein powder ingredients, not eggs, toast, or other items. The meal name and ingredients MUST clearly reflect the preference.`
-    : "";
+  const mealPreferenceInfo =
+    mealPreferenceForSlot && mealPreferenceForSlot.length > 0
+      ? `REQUIRED MEAL PREFERENCE for ${mealSlot}: ${mealPreferenceForSlot.join(', ')}. The generated meal MUST match this preference. For example, if the preference is "eiwit shake", the meal MUST be an eiwit shake (protein shake) with protein powder ingredients, not eggs, toast, or other items. The meal name and ingredients MUST clearly reflect the preference.`
+      : '';
 
   // Constraint overrides
   const constraintOverrides: string[] = [];
   if (constraints?.highProtein) {
-    constraintOverrides.push("High protein preference: prioritize protein-rich ingredients");
+    constraintOverrides.push(
+      'High protein preference: prioritize protein-rich ingredients',
+    );
   }
   if (constraints?.vegetarian) {
-    constraintOverrides.push("Vegetarian: no meat, fish, or animal products");
+    constraintOverrides.push('Vegetarian: no meat, fish, or animal products');
   }
 
   // Diet-specific rules summary (meal-scoped)
   const constraintSummary = buildConstraintSummary(rules);
 
   // Language instruction
-  const languageInstruction = language === 'nl' 
-    ? "CRITICAL LANGUAGE REQUIREMENT: All meal names, descriptions, and any text you generate MUST be in Dutch (Nederlands). Use Dutch names for meals, ingredients, and any descriptive text."
-    : "CRITICAL LANGUAGE REQUIREMENT: All meal names, descriptions, and any text you generate MUST be in English. Use English names for meals, ingredients, and any descriptive text.";
+  const languageInstruction =
+    language === 'nl'
+      ? 'CRITICAL LANGUAGE REQUIREMENT: All meal names, descriptions, and any text you generate MUST be in Dutch (Nederlands). Use Dutch names for meals, ingredients, and any descriptive text.'
+      : 'CRITICAL LANGUAGE REQUIREMENT: All meal names, descriptions, and any text you generate MUST be in English. Use English names for meals, ingredients, and any descriptive text.';
 
   // Minimal-change instructions if existing meal provided
-  let minimalChangeInstructions = "";
+  let minimalChangeInstructions = '';
   if (existingMeal) {
     const existingIngredientRefs = existingMeal.ingredientRefs || [];
     const existingNevoCodes = existingIngredientRefs.map((ref) => ref.nevoCode);
@@ -541,10 +627,12 @@ export function buildMealPrompt(input: {
 
 MINIMAL-CHANGE OBJECTIVE:
 You are replacing the ${mealSlot} meal for ${date}. An existing meal exists with the following ingredients:
-${uniqueNevoCodes.map((code) => {
-  const ref = existingIngredientRefs.find((r) => r.nevoCode === code);
-  return `  - ${ref?.displayName || code} (nevoCode: ${code}, quantityG: ${ref?.quantityG || 0}g)`;
-}).join("\n")}
+${uniqueNevoCodes
+  .map((code) => {
+    const ref = existingIngredientRefs.find((r) => r.nevoCode === code);
+    return `  - ${ref?.displayName || code} (nevoCode: ${code}, quantityG: ${ref?.quantityG || 0}g)`;
+  })
+  .join('\n')}
 
 CRITICAL MINIMAL-CHANGE RULES:
 1. PRESERVE existing ingredients (nevoCodes) wherever possible
@@ -570,18 +658,18 @@ DATE & MEAL SLOT:
 - Meal slot: ${mealSlot}
 
 CALORIE & MACRO TARGETS:
-${calorieInfo ? `- ${calorieInfo}` : "- No specific calorie target for this meal"}
-${prepTimeInfo ? `- ${prepTimeInfo}` : ""}
+${calorieInfo ? `- ${calorieInfo}` : '- No specific calorie target for this meal'}
+${prepTimeInfo ? `- ${prepTimeInfo}` : ''}
 
 DIET RULES & CONSTRAINTS:
 ${constraintSummary}
 
-${exclusionsInfo ? `\n${exclusionsInfo}` : ""}
-${preferredIngredients ? `\n${preferredIngredients}` : ""}
-${mealPreferenceInfo ? `\n${mealPreferenceInfo}` : ""}
-${constraintOverrides.length > 0 ? `\nCONSTRAINT OVERRIDES:\n${constraintOverrides.map(c => `- ${c}`).join("\n")}` : ""}
+${exclusionsInfo ? `\n${exclusionsInfo}` : ''}
+${preferredIngredients ? `\n${preferredIngredients}` : ''}
+${mealPreferenceInfo ? `\n${mealPreferenceInfo}` : ''}
+${constraintOverrides.length > 0 ? `\nCONSTRAINT OVERRIDES:\n${constraintOverrides.map((c) => `- ${c}`).join('\n')}` : ''}
 
-${candidates ? `\nAVAILABLE INGREDIENTS (CANDIDATE POOL):\nYou MUST choose ingredients ONLY from this list. Use the exact nevoCode values provided.\n${formatCandidatePool(candidates)}\n` : ""}
+${candidates ? `\nAVAILABLE INGREDIENTS (CANDIDATE POOL):\nYou MUST choose ingredients ONLY from this list. Use the exact nevoCode values provided.\n${formatCandidatePool(candidates)}\n` : ''}
 
 ${minimalChangeInstructions}
 
@@ -591,7 +679,7 @@ CRITICAL REQUIREMENTS:
 3. Do NOT include any text outside the JSON object
 4. All HARD constraints must be followed 100% - violations are not acceptable
 5. SOFT constraints should be optimized where possible, but never at the expense of hard constraints
-6. ${candidates ? "You MUST use ONLY ingredients from the candidate pool above. Each ingredient must have:" : "Each ingredient must have:"}
+6. ${candidates ? 'You MUST use ONLY ingredients from the candidate pool above. Each ingredient must have:' : 'Each ingredient must have:'}
    - nevoCode: exact NEVO code from candidate pool (as string)
    - quantityG: amount in grams (minimum 1)
    - displayName: optional display name for UI
@@ -605,9 +693,9 @@ CRITICAL REQUIREMENTS:
    - Optional estimatedMacros (informative only - actual calculation happens server-side)
    - Optional prep time in minutes
    - Optional servings count
-${candidates ? "8. DO NOT invent nevoCodes - use ONLY codes from the candidate pool above" : ""}
-${candidates ? "9" : "8"}. Ensure the meal respects prep time constraints
-${candidates ? "10" : "9"}. Ensure the meal meets calorie/macro targets if specified
+${candidates ? '8. DO NOT invent nevoCodes - use ONLY codes from the candidate pool above' : ''}
+${candidates ? '9' : '8'}. Ensure the meal respects prep time constraints
+${candidates ? '10' : '9'}. Ensure the meal meets calorie/macro targets if specified
 
 Generate the meal for ${date}, ${mealSlot} now. Output ONLY the JSON object, nothing else.`;
 

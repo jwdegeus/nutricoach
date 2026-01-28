@@ -1,19 +1,19 @@
 /**
  * Storage Service
- * 
+ *
  * Handles file storage with support for local filesystem (now) and future CDN/S3 support.
- * 
+ *
  * Storage Strategy:
  * - Local: Files stored in public/uploads/recipe-images/
  * - Future: Can be extended to support CDN (Cloudflare, etc.) or S3
  */
 
-import "server-only";
-import { writeFile, mkdir, access } from "fs/promises";
-import { join } from "path";
-import { existsSync } from "fs";
+import 'server-only';
+import { writeFile, mkdir, access } from 'fs/promises';
+import { join } from 'path';
+import { existsSync } from 'fs';
 
-export type StorageProvider = "local" | "cdn" | "s3";
+export type StorageProvider = 'local' | 'cdn' | 's3';
 
 export interface StorageConfig {
   provider: StorageProvider;
@@ -31,16 +31,18 @@ export class StorageService {
 
   constructor(config?: Partial<StorageConfig>) {
     this.config = {
-      provider: (process.env.STORAGE_PROVIDER as StorageProvider) || "local",
+      provider: (process.env.STORAGE_PROVIDER as StorageProvider) || 'local',
       baseUrl: process.env.STORAGE_BASE_URL || undefined,
-      localPath: process.env.STORAGE_LOCAL_PATH || join(process.cwd(), "public", "uploads", "recipe-images"),
+      localPath:
+        process.env.STORAGE_LOCAL_PATH ||
+        join(process.cwd(), 'public', 'uploads', 'recipe-images'),
       ...config,
     };
   }
 
   /**
    * Upload an image file
-   * 
+   *
    * @param file - File buffer or base64 data
    * @param filename - Filename (will be sanitized)
    * @param userId - User ID for organizing files
@@ -49,47 +51,49 @@ export class StorageService {
   async uploadImage(
     file: Buffer | string,
     filename: string,
-    userId: string
+    userId: string,
   ): Promise<UploadResult> {
     switch (this.config.provider) {
-      case "local":
+      case 'local':
         return this.uploadLocal(file, filename, userId);
-      case "cdn":
+      case 'cdn':
         return this.uploadCDN(file, filename, userId);
-      case "s3":
+      case 's3':
         return this.uploadS3(file, filename, userId);
       default:
-        throw new Error(`Unsupported storage provider: ${this.config.provider}`);
+        throw new Error(
+          `Unsupported storage provider: ${this.config.provider}`,
+        );
     }
   }
 
   /**
    * Get public URL for a stored file
-   * 
+   *
    * @param path - Storage path
    * @returns Public URL
    */
   getPublicUrl(path: string): string {
     switch (this.config.provider) {
-      case "local":
+      case 'local':
         // For local storage, return relative path from public directory
         // Remove process.cwd() and ensure it starts with /
         let relativePath = path;
         if (path.includes(process.cwd())) {
-          relativePath = path.replace(process.cwd(), "");
+          relativePath = path.replace(process.cwd(), '');
         }
         // Ensure it starts with /uploads (not /public/uploads since public is served at root)
-        if (relativePath.includes("public")) {
-          relativePath = relativePath.replace(/^.*?public/, "");
+        if (relativePath.includes('public')) {
+          relativePath = relativePath.replace(/^.*?public/, '');
         }
-        return relativePath.startsWith("/") ? relativePath : `/${relativePath}`;
-      case "cdn":
-      case "s3":
-        return this.config.baseUrl
-          ? `${this.config.baseUrl}/${path}`
-          : path;
+        return relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+      case 'cdn':
+      case 's3':
+        return this.config.baseUrl ? `${this.config.baseUrl}/${path}` : path;
       default:
-        throw new Error(`Unsupported storage provider: ${this.config.provider}`);
+        throw new Error(
+          `Unsupported storage provider: ${this.config.provider}`,
+        );
     }
   }
 
@@ -99,7 +103,7 @@ export class StorageService {
   private async uploadLocal(
     file: Buffer | string,
     filename: string,
-    userId: string
+    userId: string,
   ): Promise<UploadResult> {
     // Sanitize filename
     const sanitizedFilename = this.sanitizeFilename(filename);
@@ -114,14 +118,15 @@ export class StorageService {
 
     // Write file
     const filePath = join(userDir, finalFilename);
-    const fileBuffer = typeof file === "string" ? Buffer.from(file, "base64") : file;
+    const fileBuffer =
+      typeof file === 'string' ? Buffer.from(file, 'base64') : file;
     await writeFile(filePath, fileBuffer);
 
     // Return relative path from public directory for URL
     // Files are stored in public/uploads/recipe-images/{userId}/{filename}
     // So the URL should be /uploads/recipe-images/{userId}/{filename}
-    const publicPath = filePath.replace(join(process.cwd(), "public"), "");
-    const url = publicPath.startsWith("/") ? publicPath : `/${publicPath}`;
+    const publicPath = filePath.replace(join(process.cwd(), 'public'), '');
+    const url = publicPath.startsWith('/') ? publicPath : `/${publicPath}`;
 
     return {
       url,
@@ -135,10 +140,10 @@ export class StorageService {
   private async uploadCDN(
     file: Buffer | string,
     filename: string,
-    userId: string
+    userId: string,
   ): Promise<UploadResult> {
     // TODO: Implement CDN upload (e.g., Cloudflare R2, Cloudinary, etc.)
-    throw new Error("CDN storage not yet implemented");
+    throw new Error('CDN storage not yet implemented');
   }
 
   /**
@@ -147,10 +152,10 @@ export class StorageService {
   private async uploadS3(
     file: Buffer | string,
     filename: string,
-    userId: string
+    userId: string,
   ): Promise<UploadResult> {
     // TODO: Implement S3 upload
-    throw new Error("S3 storage not yet implemented");
+    throw new Error('S3 storage not yet implemented');
   }
 
   /**
@@ -158,8 +163,8 @@ export class StorageService {
    */
   private sanitizeFilename(filename: string): string {
     return filename
-      .replace(/[^a-zA-Z0-9.-]/g, "_")
-      .replace(/\.\./g, "_")
+      .replace(/[^a-zA-Z0-9.-]/g, '_')
+      .replace(/\.\./g, '_')
       .substring(0, 100); // Limit length
   }
 }

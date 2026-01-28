@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect } from 'react';
 import {
   getRecipeAdaptationRulesForAdmin,
   createRecipeAdaptationRule,
@@ -8,16 +8,21 @@ import {
   deleteRecipeAdaptationRule,
   type RecipeAdaptationRuleInput,
   type RecipeAdaptationRuleOutput,
-} from "../actions/recipe-adaptation-rules-admin.actions";
-import { Button } from "@/components/catalyst/button";
-import { Input } from "@/components/catalyst/input";
-import { Field, FieldGroup, Label, Description } from "@/components/catalyst/fieldset";
-import { Text } from "@/components/catalyst/text";
-import { Textarea } from "@/components/catalyst/textarea";
-import { Checkbox, CheckboxField } from "@/components/catalyst/checkbox";
-import { ConfirmDialog } from "@/components/catalyst/confirm-dialog";
-import { Badge } from "@/components/catalyst/badge";
-import { PencilIcon, TrashIcon, PlusIcon } from "@heroicons/react/16/solid";
+} from '../actions/recipe-adaptation-rules-admin.actions';
+import { Button } from '@/components/catalyst/button';
+import { Input } from '@/components/catalyst/input';
+import {
+  Field,
+  FieldGroup,
+  Label,
+  Description,
+} from '@/components/catalyst/fieldset';
+import { Text } from '@/components/catalyst/text';
+import { Textarea } from '@/components/catalyst/textarea';
+import { Checkbox, CheckboxField } from '@/components/catalyst/checkbox';
+import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
+import { Badge } from '@/components/catalyst/badge';
+import { PencilIcon, TrashIcon, PlusIcon } from '@heroicons/react/16/solid';
 
 type RecipeAdaptationRulesManagerProps = {
   dietTypeId: string;
@@ -41,17 +46,17 @@ export function RecipeAdaptationRulesManager({
 
   const [formData, setFormData] = useState<RecipeAdaptationRuleInput>({
     dietTypeId,
-    term: "",
+    term: '',
     synonyms: [],
-    ruleCode: "",
-    ruleLabel: "",
+    ruleCode: '',
+    ruleLabel: '',
     substitutionSuggestions: [],
     priority: 50,
     isActive: true,
   });
 
-  const [synonymsText, setSynonymsText] = useState("");
-  const [substitutionsText, setSubstitutionsText] = useState("");
+  const [synonymsText, setSynonymsText] = useState('');
+  const [substitutionsText, setSubstitutionsText] = useState('');
 
   useEffect(() => {
     if (expanded) {
@@ -64,13 +69,13 @@ export function RecipeAdaptationRulesManager({
     setError(null);
     try {
       const result = await getRecipeAdaptationRulesForAdmin(dietTypeId);
-      if ("error" in result) {
+      if ('error' in result) {
         setError(result.error);
       } else if (result.data) {
         setRules(result.data);
       }
     } catch (err) {
-      setError("Onverwachte fout bij laden regels");
+      setError('Onverwachte fout bij laden regels');
     } finally {
       setIsLoading(false);
     }
@@ -87,8 +92,8 @@ export function RecipeAdaptationRulesManager({
       priority: rule.priority,
       isActive: rule.isActive,
     });
-    setSynonymsText(rule.synonyms.join(", "));
-    setSubstitutionsText(rule.substitutionSuggestions.join(", "));
+    setSynonymsText(rule.synonyms.join(', '));
+    setSubstitutionsText(rule.substitutionSuggestions.join(', '));
     setEditingId(rule.id);
     setIsCreating(false);
     setError(null);
@@ -98,16 +103,16 @@ export function RecipeAdaptationRulesManager({
   function startCreate() {
     setFormData({
       dietTypeId,
-      term: "",
+      term: '',
       synonyms: [],
-      ruleCode: "",
-      ruleLabel: "",
+      ruleCode: '',
+      ruleLabel: '',
       substitutionSuggestions: [],
       priority: 50,
       isActive: true,
     });
-    setSynonymsText("");
-    setSubstitutionsText("");
+    setSynonymsText('');
+    setSubstitutionsText('');
     setEditingId(null);
     setIsCreating(true);
     setError(null);
@@ -128,11 +133,11 @@ export function RecipeAdaptationRulesManager({
 
     // Parse synonyms and substitutions from text
     const synonyms = synonymsText
-      .split(",")
+      .split(',')
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
     const substitutions = substitutionsText
-      .split(",")
+      .split(',')
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
 
@@ -151,19 +156,19 @@ export function RecipeAdaptationRulesManager({
           result = await createRecipeAdaptationRule(submitData);
         }
 
-        if ("error" in result) {
+        if ('error' in result) {
           setError(result.error);
         } else {
           setSuccess(
             editingId
-              ? "Recipe adaptation rule bijgewerkt"
-              : "Recipe adaptation rule aangemaakt"
+              ? 'Recipe adaptation rule bijgewerkt'
+              : 'Recipe adaptation rule aangemaakt',
           );
           await loadRules();
           cancelEdit();
         }
       } catch (err) {
-        setError("Onverwachte fout bij opslaan");
+        setError('Onverwachte fout bij opslaan');
       }
     });
   }
@@ -174,16 +179,16 @@ export function RecipeAdaptationRulesManager({
     startTransition(async () => {
       try {
         const result = await deleteRecipeAdaptationRule(deleteRuleId);
-        if ("error" in result) {
+        if ('error' in result) {
           setError(result.error);
         } else {
-          setSuccess("Recipe adaptation rule verwijderd");
+          setSuccess('Recipe adaptation rule verwijderd');
           await loadRules();
         }
         setShowDeleteDialog(false);
         setDeleteRuleId(null);
       } catch (err) {
-        setError("Onverwachte fout bij verwijderen");
+        setError('Onverwachte fout bij verwijderen');
       }
     });
   }
@@ -227,7 +232,10 @@ export function RecipeAdaptationRulesManager({
           )}
 
           {(isCreating || editingId) && (
-            <form onSubmit={handleSubmit} className="mb-6 space-y-4 border-b border-zinc-200 pb-6 dark:border-zinc-800">
+            <form
+              onSubmit={handleSubmit}
+              className="mb-6 space-y-4 border-b border-zinc-200 pb-6 dark:border-zinc-800"
+            >
               <FieldGroup>
                 <Field>
                   <Label htmlFor="term">Term *</Label>
@@ -241,7 +249,8 @@ export function RecipeAdaptationRulesManager({
                     placeholder="Bijv. pasta, melk, suiker"
                   />
                   <Description>
-                    Het verboden ingrediënt (wordt automatisch lowercase opgeslagen)
+                    Het verboden ingrediënt (wordt automatisch lowercase
+                    opgeslagen)
                   </Description>
                 </Field>
 
@@ -255,7 +264,7 @@ export function RecipeAdaptationRulesManager({
                     placeholder="spaghetti, penne, orzo (gescheiden door komma's)"
                   />
                   <Description>
-                    Synoniemen voor deze term (gescheiden door komma's)
+                    Synoniemen voor deze term (gescheiden door komma&apos;s)
                   </Description>
                 </Field>
 
@@ -286,7 +295,9 @@ export function RecipeAdaptationRulesManager({
                 </Field>
 
                 <Field>
-                  <Label htmlFor="substitutionSuggestions">Substitutie Suggesties</Label>
+                  <Label htmlFor="substitutionSuggestions">
+                    Substitutie Suggesties
+                  </Label>
                   <Textarea
                     id="substitutionSuggestions"
                     value={substitutionsText}
@@ -295,7 +306,7 @@ export function RecipeAdaptationRulesManager({
                     placeholder="rijstnoedels, zucchininoedels (gescheiden door komma's)"
                   />
                   <Description>
-                    Suggesties voor vervanging (gescheiden door komma's)
+                    Suggesties voor vervanging (gescheiden door komma&apos;s)
                   </Description>
                 </Field>
 
@@ -332,7 +343,7 @@ export function RecipeAdaptationRulesManager({
 
               <div className="flex gap-2">
                 <Button type="submit" disabled={isPending}>
-                  {editingId ? "Bijwerken" : "Aanmaken"}
+                  {editingId ? 'Bijwerken' : 'Aanmaken'}
                 </Button>
                 <Button type="button" plain onClick={cancelEdit}>
                   Annuleren
@@ -345,7 +356,8 @@ export function RecipeAdaptationRulesManager({
             <Text className="text-sm text-zinc-500">Laden...</Text>
           ) : rules.length === 0 ? (
             <Text className="text-sm text-zinc-500">
-              Geen recipe adaptation rules gevonden. Maak er een aan om te beginnen.
+              Geen recipe adaptation rules gevonden. Maak er een aan om te
+              beginnen.
             </Text>
           ) : (
             <div className="space-y-4">
@@ -360,8 +372,8 @@ export function RecipeAdaptationRulesManager({
                         <Text className="font-semibold text-zinc-950 dark:text-white">
                           {rule.term}
                         </Text>
-                        <Badge color={rule.isActive ? "green" : "zinc"}>
-                          {rule.isActive ? "Actief" : "Inactief"}
+                        <Badge color={rule.isActive ? 'green' : 'zinc'}>
+                          {rule.isActive ? 'Actief' : 'Inactief'}
                         </Badge>
                         <Badge>{rule.ruleCode}</Badge>
                       </div>
@@ -396,7 +408,7 @@ export function RecipeAdaptationRulesManager({
                         Synoniemen:
                       </Text>
                       <Text className="text-sm text-zinc-700 dark:text-zinc-300">
-                        {rule.synonyms.join(", ")}
+                        {rule.synonyms.join(', ')}
                       </Text>
                     </div>
                   )}
@@ -407,7 +419,7 @@ export function RecipeAdaptationRulesManager({
                         Substitutie suggesties:
                       </Text>
                       <Text className="text-sm text-zinc-700 dark:text-zinc-300">
-                        {rule.substitutionSuggestions.join(", ")}
+                        {rule.substitutionSuggestions.join(', ')}
                       </Text>
                     </div>
                   )}
@@ -430,9 +442,9 @@ export function RecipeAdaptationRulesManager({
         }}
         onConfirm={handleDelete}
         title="Recipe adaptation rule verwijderen"
-        message="Weet je zeker dat je deze regel wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
-        confirmText="Verwijderen"
-        cancelText="Annuleren"
+        description="Weet je zeker dat je deze regel wilt verwijderen? Dit kan niet ongedaan worden gemaakt."
+        confirmLabel="Verwijderen"
+        cancelLabel="Annuleren"
       />
     </div>
   );

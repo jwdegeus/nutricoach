@@ -1,6 +1,6 @@
 /**
  * Recipe Draft Types
- * 
+ *
  * Type definitions for recipe drafts extracted from external sources.
  * These are intermediate representations before finalization.
  */
@@ -21,7 +21,7 @@ export type RecipeDraftStep = {
 
 /**
  * Recipe draft
- * 
+ *
  * Minimal representation of a recipe extracted from external sources.
  * This is an intermediate format before finalization into the database.
  */

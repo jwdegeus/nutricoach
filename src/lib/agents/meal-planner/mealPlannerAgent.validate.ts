@@ -1,6 +1,6 @@
 /**
  * Hard Constraint Validator
- * 
+ *
  * Validates that a generated meal plan adheres to hard constraints
  * from the diet rule set. This is a "best effort" enforcement that
  * will be refined later with NEVO codes and taxonomy.
@@ -11,13 +11,13 @@ import type {
   MealPlanRequest,
   DietRuleSet,
   MealPlanDay,
-} from "@/src/lib/diets";
+} from '@/src/lib/diets';
 import {
   calcMealMacros,
   calcDayMacros,
   verifyNevoCode,
   adjustDayQuantitiesToTargets,
-} from "./mealPlannerAgent.tools";
+} from './mealPlannerAgent.tools';
 
 /**
  * Validation issue found in the meal plan
@@ -25,14 +25,14 @@ import {
 export type ValidationIssue = {
   path: string; // e.g., "days[0].meals[0].ingredients[2]"
   code:
-    | "FORBIDDEN_INGREDIENT"
-    | "ALLERGEN_PRESENT"
-    | "DISLIKED_INGREDIENT"
-    | "MISSING_REQUIRED_CATEGORY"
-    | "INVALID_NEVO_CODE"
-    | "CALORIE_TARGET_MISS"
-    | "MACRO_TARGET_MISS"
-    | "MEAL_PREFERENCE_MISS";
+    | 'FORBIDDEN_INGREDIENT'
+    | 'ALLERGEN_PRESENT'
+    | 'DISLIKED_INGREDIENT'
+    | 'MISSING_REQUIRED_CATEGORY'
+    | 'INVALID_NEVO_CODE'
+    | 'CALORIE_TARGET_MISS'
+    | 'MACRO_TARGET_MISS'
+    | 'MEAL_PREFERENCE_MISS';
   message: string;
 };
 
@@ -41,7 +41,7 @@ export type ValidationIssue = {
  */
 function matchesIngredient(
   ingredientName: string,
-  searchTerm: string
+  searchTerm: string,
 ): boolean {
   return ingredientName.toLowerCase().includes(searchTerm.toLowerCase());
 }
@@ -52,12 +52,12 @@ function matchesIngredient(
 function isForbiddenIngredient(
   ingredientName: string,
   tags: string[] | undefined,
-  rules: DietRuleSet
+  rules: DietRuleSet,
 ): boolean {
   // Check hard ingredient constraints
   for (const constraint of rules.ingredientConstraints) {
-    if (constraint.constraintType !== "hard") continue;
-    if (constraint.type !== "forbidden") continue;
+    if (constraint.constraintType !== 'hard') continue;
+    if (constraint.type !== 'forbidden') continue;
 
     // Check items
     if (constraint.items.length > 0) {
@@ -87,7 +87,7 @@ function isForbiddenIngredient(
 function isAllergen(
   ingredientName: string,
   tags: string[] | undefined,
-  allergies: string[]
+  allergies: string[],
 ): boolean {
   for (const allergen of allergies) {
     if (matchesIngredient(ingredientName, allergen)) {
@@ -111,7 +111,7 @@ function isAllergen(
 function isDisliked(
   ingredientName: string,
   tags: string[] | undefined,
-  dislikes: string[]
+  dislikes: string[],
 ): boolean {
   for (const dislike of dislikes) {
     if (matchesIngredient(ingredientName, dislike)) {
@@ -133,18 +133,18 @@ function isDisliked(
  * Check if required categories are present in a day's meals
  */
 function checkRequiredCategories(
-  dayMeals: MealPlanResponse["days"][0]["meals"],
-  rules: DietRuleSet
+  dayMeals: MealPlanResponse['days'][0]['meals'],
+  rules: DietRuleSet,
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
   for (const required of rules.requiredCategories) {
-    if (required.constraintType !== "hard") continue;
+    if (required.constraintType !== 'hard') continue;
 
     // Check if category is present in any meal of the day
     let found = false;
     for (const meal of dayMeals) {
-      for (const ingredient of meal.ingredients) {
+      for (const ingredient of meal.ingredients ?? []) {
         // Check if ingredient name matches required items
         if (required.items && required.items.length > 0) {
           for (const item of required.items) {
@@ -173,8 +173,8 @@ function checkRequiredCategories(
     // If minPerDay is specified and not found, create issue
     if (required.minPerDay && !found) {
       issues.push({
-        path: `day[${dayMeals[0]?.date || "unknown"}]`,
-        code: "MISSING_REQUIRED_CATEGORY",
+        path: `day[${dayMeals[0]?.date || 'unknown'}]`,
+        code: 'MISSING_REQUIRED_CATEGORY',
         message: `Required category "${required.category}" (min ${required.minPerDay}/day) not found in any meal`,
       });
     }
@@ -187,7 +187,7 @@ function checkRequiredCategories(
  * Validate NEVO codes in ingredient references
  */
 async function validateNevoCodes(
-  plan: MealPlanResponse
+  plan: MealPlanResponse,
 ): Promise<ValidationIssue[]> {
   const issues: ValidationIssue[] = [];
 
@@ -212,7 +212,7 @@ async function validateNevoCodes(
           if (!isValid) {
             issues.push({
               path,
-              code: "INVALID_NEVO_CODE",
+              code: 'INVALID_NEVO_CODE',
               message: `Invalid NEVO code: ${ref.nevoCode} (not found in database)`,
             });
           }
@@ -228,16 +228,16 @@ async function validateNevoCodes(
  * Validate macro targets for a day
  */
 async function validateDayMacros(
-  dayMeals: MealPlanResponse["days"][0]["meals"],
+  dayMeals: MealPlanResponse['days'][0]['meals'],
   dayIndex: number,
   rules: DietRuleSet,
-  request: MealPlanRequest
+  request: MealPlanRequest,
 ): Promise<ValidationIssue[]> {
   const issues: ValidationIssue[] = [];
 
   // Only validate if there are hard macro constraints or hard calorie targets
   const hasHardMacroConstraints = rules.macroConstraints.some(
-    (c) => c.constraintType === "hard"
+    (c) => c.constraintType === 'hard',
   );
   const hasHardCalorieTarget =
     rules.calorieTarget.min !== undefined ||
@@ -259,7 +259,7 @@ async function validateDayMacros(
     ) {
       issues.push({
         path: dayPath,
-        code: "CALORIE_TARGET_MISS",
+        code: 'CALORIE_TARGET_MISS',
         message: `Day calories (${dayMacros.calories.toFixed(0)}) below minimum target (${rules.calorieTarget.min})`,
       });
     }
@@ -269,7 +269,7 @@ async function validateDayMacros(
     ) {
       issues.push({
         path: dayPath,
-        code: "CALORIE_TARGET_MISS",
+        code: 'CALORIE_TARGET_MISS',
         message: `Day calories (${dayMacros.calories.toFixed(0)}) above maximum target (${rules.calorieTarget.max})`,
       });
     }
@@ -277,8 +277,8 @@ async function validateDayMacros(
 
   // Check macro constraints (hard constraints only)
   for (const macroConstraint of rules.macroConstraints) {
-    if (macroConstraint.constraintType !== "hard") continue;
-    if (macroConstraint.scope !== "daily") continue;
+    if (macroConstraint.constraintType !== 'hard') continue;
+    if (macroConstraint.scope !== 'daily') continue;
 
     if (
       macroConstraint.maxCarbs !== undefined &&
@@ -286,7 +286,7 @@ async function validateDayMacros(
     ) {
       issues.push({
         path: dayPath,
-        code: "MACRO_TARGET_MISS",
+        code: 'MACRO_TARGET_MISS',
         message: `Day carbs (${dayMacros.carbsG.toFixed(1)}g) exceed maximum (${macroConstraint.maxCarbs}g)`,
       });
     }
@@ -297,7 +297,7 @@ async function validateDayMacros(
     ) {
       issues.push({
         path: dayPath,
-        code: "MACRO_TARGET_MISS",
+        code: 'MACRO_TARGET_MISS',
         message: `Day protein (${dayMacros.proteinG.toFixed(1)}g) below minimum (${macroConstraint.minProtein}g)`,
       });
     }
@@ -308,7 +308,7 @@ async function validateDayMacros(
     ) {
       issues.push({
         path: dayPath,
-        code: "MACRO_TARGET_MISS",
+        code: 'MACRO_TARGET_MISS',
         message: `Day fat (${dayMacros.fatG.toFixed(1)}g) below minimum (${macroConstraint.minFat}g)`,
       });
     }
@@ -319,7 +319,7 @@ async function validateDayMacros(
 
 /**
  * Validate hard constraints in a meal plan
- * 
+ *
  * Checks for:
  * - Forbidden ingredients (from diet rules)
  * - Allergens (from user profile)
@@ -327,7 +327,7 @@ async function validateDayMacros(
  * - Missing required categories (from diet rules)
  * - Invalid NEVO codes (if ingredientRefs are present)
  * - Macro/calorie target violations (hard constraints only)
- * 
+ *
  * @param args - Validation arguments
  * @returns Array of validation issues (empty if all constraints are met)
  */
@@ -355,21 +355,21 @@ export async function validateHardConstraints(args: {
       // Validate meal preferences (hard constraint)
       const mealPreferences = request.profile.mealPreferences;
       if (mealPreferences) {
-        const slotPreferences = mealPreferences[meal.slot as keyof typeof mealPreferences];
+        const slotPreferences =
+          mealPreferences[meal.slot as keyof typeof mealPreferences];
         if (slotPreferences && slotPreferences.length > 0) {
-          const { mealMatchesPreferences } = await import(
-            "@/src/lib/meal-history/mealPreferenceMatcher"
-          );
+          const { mealMatchesPreferences } =
+            await import('@/src/lib/meal-history/mealPreferenceMatcher');
           const matches = mealMatchesPreferences(
             meal,
             meal.slot,
-            slotPreferences
+            slotPreferences,
           );
           if (!matches) {
             issues.push({
               path: mealPath,
-              code: "MEAL_PREFERENCE_MISS",
-              message: `Meal "${meal.name}" does not match required preferences for ${meal.slot}: ${slotPreferences.join(", ")}`,
+              code: 'MEAL_PREFERENCE_MISS',
+              message: `Meal "${meal.name}" does not match required preferences for ${meal.slot}: ${slotPreferences.join(', ')}`,
             });
           }
         }
@@ -389,10 +389,10 @@ export async function validateHardConstraints(args: {
           if (isAllergen(ingredient.name, ingredient.tags, allergies)) {
             issues.push({
               path,
-              code: "ALLERGEN_PRESENT",
+              code: 'ALLERGEN_PRESENT',
               message: `Ingredient "${ingredient.name}" contains or matches an allergen: ${allergies
                 .filter((a) => matchesIngredient(ingredient.name, a))
-                .join(", ")}`,
+                .join(', ')}`,
             });
           }
 
@@ -400,18 +400,16 @@ export async function validateHardConstraints(args: {
           if (isDisliked(ingredient.name, ingredient.tags, dislikes)) {
             issues.push({
               path,
-              code: "DISLIKED_INGREDIENT",
+              code: 'DISLIKED_INGREDIENT',
               message: `Ingredient "${ingredient.name}" is in the user's dislikes list`,
             });
           }
 
           // Check for forbidden ingredients from diet rules
-          if (
-            isForbiddenIngredient(ingredient.name, ingredient.tags, rules)
-          ) {
+          if (isForbiddenIngredient(ingredient.name, ingredient.tags, rules)) {
             issues.push({
               path,
-              code: "FORBIDDEN_INGREDIENT",
+              code: 'FORBIDDEN_INGREDIENT',
               message: `Ingredient "${ingredient.name}" is forbidden by diet rules`,
             });
           }
@@ -433,7 +431,7 @@ export async function validateHardConstraints(args: {
             if (isAllergen(ref.displayName, ref.tags, allergies)) {
               issues.push({
                 path,
-                code: "ALLERGEN_PRESENT",
+                code: 'ALLERGEN_PRESENT',
                 message: `Ingredient "${ref.displayName}" (nevoCode: ${ref.nevoCode}) contains or matches an allergen`,
               });
             }
@@ -441,17 +439,15 @@ export async function validateHardConstraints(args: {
             if (isDisliked(ref.displayName, ref.tags, dislikes)) {
               issues.push({
                 path,
-                code: "DISLIKED_INGREDIENT",
+                code: 'DISLIKED_INGREDIENT',
                 message: `Ingredient "${ref.displayName}" (nevoCode: ${ref.nevoCode}) is in the user's dislikes list`,
               });
             }
 
-            if (
-              isForbiddenIngredient(ref.displayName, ref.tags, rules)
-            ) {
+            if (isForbiddenIngredient(ref.displayName, ref.tags, rules)) {
               issues.push({
                 path,
-                code: "FORBIDDEN_INGREDIENT",
+                code: 'FORBIDDEN_INGREDIENT',
                 message: `Ingredient "${ref.displayName}" (nevoCode: ${ref.nevoCode}) is forbidden by diet rules`,
               });
             }
@@ -469,24 +465,24 @@ export async function validateHardConstraints(args: {
       day.meals,
       dayIndex,
       rules,
-      request
+      request,
     );
     issues.push(...macroIssues);
   }
 
-    // Validate NEVO codes (async)
-    const nevoCodeIssues = await validateNevoCodes(plan);
-    issues.push(...nevoCodeIssues);
+  // Validate NEVO codes (async)
+  const nevoCodeIssues = await validateNevoCodes(plan);
+  issues.push(...nevoCodeIssues);
 
   return issues;
 }
 
 /**
  * Validate hard constraints for a single day
- * 
+ *
  * Similar to validateHardConstraints but for a single day only.
  * Used in partial regenerate scenarios.
- * 
+ *
  * @param args - Validation arguments for a single day
  * @returns Array of validation issues (empty if all constraints are met)
  */
@@ -511,21 +507,21 @@ export async function validateDayHardConstraints(args: {
     // Validate meal preferences (hard constraint)
     const mealPreferences = request.profile.mealPreferences;
     if (mealPreferences) {
-      const slotPreferences = mealPreferences[meal.slot as keyof typeof mealPreferences];
+      const slotPreferences =
+        mealPreferences[meal.slot as keyof typeof mealPreferences];
       if (slotPreferences && slotPreferences.length > 0) {
-        const { mealMatchesPreferences } = await import(
-          "@/src/lib/meal-history/mealPreferenceMatcher"
-        );
+        const { mealMatchesPreferences } =
+          await import('@/src/lib/meal-history/mealPreferenceMatcher');
         const matches = mealMatchesPreferences(
           meal,
           meal.slot,
-          slotPreferences
+          slotPreferences,
         );
         if (!matches) {
           issues.push({
             path: mealPath,
-            code: "MEAL_PREFERENCE_MISS",
-            message: `Meal "${meal.name}" does not match required preferences for ${meal.slot}: ${slotPreferences.join(", ")}`,
+            code: 'MEAL_PREFERENCE_MISS',
+            message: `Meal "${meal.name}" does not match required preferences for ${meal.slot}: ${slotPreferences.join(', ')}`,
           });
         }
       }
@@ -545,10 +541,10 @@ export async function validateDayHardConstraints(args: {
         if (isAllergen(ingredient.name, ingredient.tags, allergies)) {
           issues.push({
             path,
-            code: "ALLERGEN_PRESENT",
+            code: 'ALLERGEN_PRESENT',
             message: `Ingredient "${ingredient.name}" contains or matches an allergen: ${allergies
               .filter((a) => matchesIngredient(ingredient.name, a))
-              .join(", ")}`,
+              .join(', ')}`,
           });
         }
 
@@ -556,18 +552,16 @@ export async function validateDayHardConstraints(args: {
         if (isDisliked(ingredient.name, ingredient.tags, dislikes)) {
           issues.push({
             path,
-            code: "DISLIKED_INGREDIENT",
+            code: 'DISLIKED_INGREDIENT',
             message: `Ingredient "${ingredient.name}" is in the user's dislikes list`,
           });
         }
 
         // Check for forbidden ingredients from diet rules
-        if (
-          isForbiddenIngredient(ingredient.name, ingredient.tags, rules)
-        ) {
+        if (isForbiddenIngredient(ingredient.name, ingredient.tags, rules)) {
           issues.push({
             path,
-            code: "FORBIDDEN_INGREDIENT",
+            code: 'FORBIDDEN_INGREDIENT',
             message: `Ingredient "${ingredient.name}" is forbidden by diet rules`,
           });
         }
@@ -589,7 +583,7 @@ export async function validateDayHardConstraints(args: {
           if (isAllergen(ref.displayName, ref.tags, allergies)) {
             issues.push({
               path,
-              code: "ALLERGEN_PRESENT",
+              code: 'ALLERGEN_PRESENT',
               message: `Ingredient "${ref.displayName}" (nevoCode: ${ref.nevoCode}) contains or matches an allergen`,
             });
           }
@@ -597,17 +591,15 @@ export async function validateDayHardConstraints(args: {
           if (isDisliked(ref.displayName, ref.tags, dislikes)) {
             issues.push({
               path,
-              code: "DISLIKED_INGREDIENT",
+              code: 'DISLIKED_INGREDIENT',
               message: `Ingredient "${ref.displayName}" (nevoCode: ${ref.nevoCode}) is in the user's dislikes list`,
             });
           }
 
-          if (
-            isForbiddenIngredient(ref.displayName, ref.tags, rules)
-          ) {
+          if (isForbiddenIngredient(ref.displayName, ref.tags, rules)) {
             issues.push({
               path,
-              code: "FORBIDDEN_INGREDIENT",
+              code: 'FORBIDDEN_INGREDIENT',
               message: `Ingredient "${ref.displayName}" (nevoCode: ${ref.nevoCode}) is forbidden by diet rules`,
             });
           }
@@ -618,7 +610,7 @@ export async function validateDayHardConstraints(args: {
         if (!isValidCode) {
           issues.push({
             path,
-            code: "INVALID_NEVO_CODE",
+            code: 'INVALID_NEVO_CODE',
             message: `Invalid NEVO code: ${ref.nevoCode}`,
           });
         }
@@ -635,7 +627,7 @@ export async function validateDayHardConstraints(args: {
     day.meals,
     dayIndex,
     rules,
-    request
+    request,
   );
   issues.push(...macroIssues);
 
@@ -644,10 +636,10 @@ export async function validateDayHardConstraints(args: {
 
 /**
  * Validate and optionally adjust day macros deterministically
- * 
+ *
  * Validates day macros and if only macro issues exist, attempts
  * deterministic quantity adjustment before returning issues.
- * 
+ *
  * @param args - Day validation arguments
  * @returns Validation result with optional adjusted day
  */
@@ -672,10 +664,14 @@ export async function validateAndAdjustDayMacros(args: {
 
   // Check if only macro issues exist (no ingredient/constraint violations)
   const macroOnlyIssues = allIssues.filter(
-    (issue) => issue.code === "CALORIE_TARGET_MISS" || issue.code === "MACRO_TARGET_MISS"
+    (issue) =>
+      issue.code === 'CALORIE_TARGET_MISS' ||
+      issue.code === 'MACRO_TARGET_MISS',
   );
   const nonMacroIssues = allIssues.filter(
-    (issue) => issue.code !== "CALORIE_TARGET_MISS" && issue.code !== "MACRO_TARGET_MISS"
+    (issue) =>
+      issue.code !== 'CALORIE_TARGET_MISS' &&
+      issue.code !== 'MACRO_TARGET_MISS',
   );
 
   // If there are non-macro issues, return all issues (can't fix with adjustment)
@@ -702,28 +698,34 @@ export async function validateAndAdjustDayMacros(args: {
 
     // Extract macro constraints
     for (const macro of rules.macroConstraints) {
-      if (macro.constraintType === "hard" && macro.scope === "daily") {
+      if (macro.constraintType === 'hard' && macro.scope === 'daily') {
         if (macro.minProtein !== undefined) {
-          targets.proteinG = { ...targets.proteinG, min: macro.minProtein };
+          targets.proteinG = {
+            ...targets.proteinG,
+            min: macro.minProtein,
+            max: targets.proteinG?.max ?? 999,
+          };
         }
         if (macro.maxCarbs !== undefined) {
           targets.carbsG = { max: macro.maxCarbs };
         }
-        if (macro.minFat !== undefined) {
-          targets.fatG = { ...targets.fatG, min: macro.minFat };
-        }
-        if (macro.maxFat !== undefined) {
-          targets.fatG = { ...targets.fatG, max: macro.maxFat };
+        if (macro.minFat !== undefined || macro.maxFat !== undefined) {
+          targets.fatG = {
+            ...targets.fatG,
+            min: macro.minFat ?? targets.fatG?.min ?? 0,
+            max: macro.maxFat ?? targets.fatG?.max ?? 999,
+          };
         }
       }
     }
 
     // Attempt adjustment
     try {
-      const { day: adjustedDay, adjustments } = await adjustDayQuantitiesToTargets({
-        day,
-        targets,
-      });
+      const { day: adjustedDay, adjustments } =
+        await adjustDayQuantitiesToTargets({
+          day,
+          targets,
+        });
 
       // Re-validate adjusted day
       const adjustedIssues = await validateDayHardConstraints({
@@ -750,7 +752,7 @@ export async function validateAndAdjustDayMacros(args: {
       };
     } catch (error) {
       // Adjustment failed - return original issues
-      console.warn("Deterministic macro adjustment failed:", error);
+      console.warn('Deterministic macro adjustment failed:', error);
       return { issues: allIssues };
     }
   }

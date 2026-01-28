@@ -1,17 +1,17 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { cn } from "@/src/lib/utils";
-import { useTranslatedNavItems } from "@/src/lib/nav-hooks";
-import { Divider } from "@/components/catalyst/divider";
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/src/lib/utils';
+import { useTranslatedNavItems } from '@/src/lib/nav-hooks';
+import { Divider } from '@/components/catalyst/divider';
 
 export function Sidebar() {
   const pathname = usePathname();
   const navItems = useTranslatedNavItems();
 
   const mainItems = navItems.filter((item) => !item.group);
-  const secondaryItems = navItems.filter((item) => item.group === "secondary");
+  const secondaryItems = navItems.filter((item) => item.group === 'secondary');
 
   return (
     <aside className="hidden w-64 shrink-0 border-r bg-card md:flex md:flex-col md:fixed md:left-0 md:top-0 md:h-screen md:z-10">
@@ -36,10 +36,10 @@ export function Sidebar() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                     isActive
-                      ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -63,10 +63,10 @@ export function Sidebar() {
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                         isActive
-                          ? "bg-accent text-accent-foreground"
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                          ? 'bg-accent text-accent-foreground'
+                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                       )}
                     >
                       <Icon className="h-4 w-4" />

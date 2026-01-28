@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { usePathname } from "next/navigation";
+import { usePathname } from 'next/navigation';
 import {
   Sidebar,
   SidebarBody,
@@ -8,21 +8,21 @@ import {
   SidebarItem,
   SidebarLabel,
   SidebarSection,
-} from "@/components/catalyst/sidebar";
-import { navItems } from "@/src/lib/nav";
-import { ThemeSwitcher } from "./theme-switcher";
+} from '@/components/catalyst/sidebar';
+import { navItems } from '@/src/lib/nav';
+import { ThemeSwitcher } from './theme-switcher';
 
 export function CatalystSidebar() {
   const pathname = usePathname();
 
   const mainItems = navItems.filter((item) => !item.group);
-  const secondaryItems = navItems.filter((item) => item.group === "secondary");
+  const secondaryItems = navItems.filter((item) => item.group === 'secondary');
 
   return (
     <Sidebar>
       <SidebarHeader>
         <SidebarSection>
-          <SidebarItem href="/dashboard" current={pathname === "/dashboard"}>
+          <SidebarItem href="/dashboard" current={pathname === '/dashboard'}>
             <SidebarLabel>NutriCoach</SidebarLabel>
           </SidebarItem>
         </SidebarSection>
@@ -50,7 +50,11 @@ export function CatalystSidebar() {
               const isActive = pathname === item.href;
 
               return (
-                <SidebarItem key={item.href} href={item.href} current={isActive}>
+                <SidebarItem
+                  key={item.href}
+                  href={item.href}
+                  current={isActive}
+                >
                   <Icon data-slot="icon" />
                   <SidebarLabel>{item.label}</SidebarLabel>
                 </SidebarItem>

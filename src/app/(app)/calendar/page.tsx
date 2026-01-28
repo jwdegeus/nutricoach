@@ -1,13 +1,13 @@
 /**
  * Calendar Page
- * 
+ *
  * Calendar view showing all meals from all meal plans per day
  */
 
-import { redirect } from "next/navigation";
-import { createClient } from "@/src/lib/supabase/server";
-import { MealPlansService } from "@/src/lib/meal-plans/mealPlans.service";
-import { CalendarView } from "./components/CalendarView";
+import { redirect } from 'next/navigation';
+import { createClient } from '@/src/lib/supabase/server';
+import { MealPlansService } from '@/src/lib/meal-plans/mealPlans.service';
+import { CalendarView } from './components/CalendarView';
 
 export default async function CalendarPage() {
   const supabase = await createClient();
@@ -17,7 +17,7 @@ export default async function CalendarPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   // Load all meal plans for the user

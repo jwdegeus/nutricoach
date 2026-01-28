@@ -1,5 +1,5 @@
-import { createServerClient } from "@supabase/ssr";
-import { type NextRequest, NextResponse } from "next/server";
+import { createServerClient } from '@supabase/ssr';
+import { type NextRequest, NextResponse } from 'next/server';
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -14,19 +14,42 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            request.cookies.set(name, value);
-          });
+        setAll(
+          cookiesToSet: Array<{
+            name: string;
+            value: string;
+            options?: Record<string, unknown>;
+          }>,
+        ) {
+          cookiesToSet.forEach(
+            ({
+              name,
+              value,
+            }: {
+              name: string;
+              value: string;
+              options?: Record<string, unknown>;
+            }) => {
+              request.cookies.set(name, value);
+            },
+          );
           supabaseResponse = NextResponse.next({
             request,
           });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+          cookiesToSet.forEach(
+            ({
+              name,
+              value,
+              options,
+            }: {
+              name: string;
+              value: string;
+              options?: Record<string, unknown>;
+            }) => supabaseResponse.cookies.set(name, value, options),
           );
         },
       },
-    }
+    },
   );
 
   // Refresh session if expired - required for Server Components
@@ -37,27 +60,36 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Define public routes that don't require authentication
-  const publicRoutes = ["/login", "/register", "/reset-password", "/auth/callback"];
-  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
+  const publicRoutes = [
+    '/login',
+    '/register',
+    '/reset-password',
+    '/auth/callback',
+  ];
+  const isPublicRoute = publicRoutes.some((route) =>
+    pathname.startsWith(route),
+  );
 
   // If user is not authenticated and trying to access protected route
-  if (!user && !isPublicRoute && pathname !== "/") {
-    const redirectUrl = new URL("/login", request.url);
-    redirectUrl.searchParams.set("redirect", pathname);
+  if (!user && !isPublicRoute && pathname !== '/') {
+    const redirectUrl = new URL('/login', request.url);
+    redirectUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(redirectUrl);
   }
 
   // If user is authenticated and trying to access auth pages, check onboarding first
-  if (user && isPublicRoute && pathname !== "/auth/callback") {
+  if (user && isPublicRoute && pathname !== '/auth/callback') {
     // Check onboarding status before redirecting
     const { data: preferences } = await supabase
-      .from("user_preferences")
-      .select("onboarding_completed")
-      .eq("user_id", user.id)
+      .from('user_preferences')
+      .select('onboarding_completed')
+      .eq('user_id', user.id)
       .maybeSingle();
 
     // Redirect to onboarding if not completed, otherwise to dashboard
-    const redirectPath = preferences?.onboarding_completed ? "/dashboard" : "/onboarding";
+    const redirectPath = preferences?.onboarding_completed
+      ? '/dashboard'
+      : '/onboarding';
     return NextResponse.redirect(new URL(redirectPath, request.url));
   }
 
@@ -66,19 +98,19 @@ export async function middleware(request: NextRequest) {
   if (
     user &&
     !isPublicRoute &&
-    pathname !== "/" &&
-    !pathname.startsWith("/onboarding")
+    pathname !== '/' &&
+    !pathname.startsWith('/onboarding')
   ) {
     // Lightweight check: only fetch onboarding_completed flag
     const { data: preferences } = await supabase
-      .from("user_preferences")
-      .select("onboarding_completed")
-      .eq("user_id", user.id)
+      .from('user_preferences')
+      .select('onboarding_completed')
+      .eq('user_id', user.id)
       .maybeSingle();
 
     // If onboarding is not completed, redirect to onboarding
     if (!preferences?.onboarding_completed) {
-      return NextResponse.redirect(new URL("/onboarding", request.url));
+      return NextResponse.redirect(new URL('/onboarding', request.url));
     }
   }
 
@@ -94,6 +126,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * - public folder
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

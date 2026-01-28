@@ -1,6 +1,6 @@
 /**
  * Nutrition Calculator
- * 
+ *
  * Helper functions for calculating nutritional values per meal using NEVO data
  */
 
@@ -13,7 +13,7 @@ export interface NutritionalProfile {
   // Energie
   energy_kj: number | null;
   energy_kcal: number | null;
-  
+
   // Macronutriënten
   water_g: number | null;
   protein_g: number | null;
@@ -30,7 +30,7 @@ export interface NutritionalProfile {
   starch_g: number | null;
   fiber_g: number | null;
   alcohol_g: number | null;
-  
+
   // Mineralen en spoorelementen
   cholesterol_mg: number | null;
   sodium_mg: number | null;
@@ -43,7 +43,7 @@ export interface NutritionalProfile {
   selenium_ug: number | null;
   zinc_mg: number | null;
   iodine_ug: number | null;
-  
+
   // Vitamines
   vit_a_rae_ug: number | null;
   vit_d_ug: number | null;
@@ -68,40 +68,46 @@ export interface MealIngredient {
 
 /**
  * Calculate nutritional values for a single ingredient
- * 
+ *
  * @param nevoFoodId - NEVO food ID
  * @param amountG - Amount in grams
  * @returns Nutritional profile for the specified amount
  */
 export async function calculateIngredientNutrition(
   nevoFoodId: number,
-  amountG: number
+  amountG: number,
 ): Promise<NutritionalProfile | null> {
   const supabase = await createServerClient();
-  
+
   const { data: food, error } = await supabase
     .from('nevo_foods')
     .select('*')
     .eq('nevo_code', nevoFoodId)
     .single();
-  
+
   if (error || !food) {
     console.error('Error fetching NEVO food:', error);
     return null;
   }
-  
+
   // Calculate values based on amount (NEVO data is per 100g)
   const multiplier = amountG / 100;
-  
+
   return {
     energy_kj: food.energy_kj ? food.energy_kj * multiplier : null,
     energy_kcal: food.energy_kcal ? food.energy_kcal * multiplier : null,
     water_g: food.water_g ? food.water_g * multiplier : null,
     protein_g: food.protein_g ? food.protein_g * multiplier : null,
     fat_g: food.fat_g ? food.fat_g * multiplier : null,
-    saturated_fat_g: food.saturated_fat_g ? food.saturated_fat_g * multiplier : null,
-    monounsaturated_fat_g: food.monounsaturated_fat_g ? food.monounsaturated_fat_g * multiplier : null,
-    polyunsaturated_fat_g: food.polyunsaturated_fat_g ? food.polyunsaturated_fat_g * multiplier : null,
+    saturated_fat_g: food.saturated_fat_g
+      ? food.saturated_fat_g * multiplier
+      : null,
+    monounsaturated_fat_g: food.monounsaturated_fat_g
+      ? food.monounsaturated_fat_g * multiplier
+      : null,
+    polyunsaturated_fat_g: food.polyunsaturated_fat_g
+      ? food.polyunsaturated_fat_g * multiplier
+      : null,
     omega3_fat_g: food.omega3_fat_g ? food.omega3_fat_g * multiplier : null,
     omega6_fat_g: food.omega6_fat_g ? food.omega6_fat_g * multiplier : null,
     trans_fat_g: food.trans_fat_g ? food.trans_fat_g * multiplier : null,
@@ -111,7 +117,9 @@ export async function calculateIngredientNutrition(
     starch_g: food.starch_g ? food.starch_g * multiplier : null,
     fiber_g: food.fiber_g ? food.fiber_g * multiplier : null,
     alcohol_g: food.alcohol_g ? food.alcohol_g * multiplier : null,
-    cholesterol_mg: food.cholesterol_mg ? food.cholesterol_mg * multiplier : null,
+    cholesterol_mg: food.cholesterol_mg
+      ? food.cholesterol_mg * multiplier
+      : null,
     sodium_mg: food.sodium_mg ? food.sodium_mg * multiplier : null,
     potassium_mg: food.potassium_mg ? food.potassium_mg * multiplier : null,
     calcium_mg: food.calcium_mg ? food.calcium_mg * multiplier : null,
@@ -130,25 +138,31 @@ export async function calculateIngredientNutrition(
     vit_b2_mg: food.vit_b2_mg ? food.vit_b2_mg * multiplier : null,
     vit_b6_mg: food.vit_b6_mg ? food.vit_b6_mg * multiplier : null,
     vit_b12_ug: food.vit_b12_ug ? food.vit_b12_ug * multiplier : null,
-    niacin_equiv_mg: food.niacin_equiv_mg ? food.niacin_equiv_mg * multiplier : null,
-    folate_equiv_ug: food.folate_equiv_ug ? food.folate_equiv_ug * multiplier : null,
+    niacin_equiv_mg: food.niacin_equiv_mg
+      ? food.niacin_equiv_mg * multiplier
+      : null,
+    folate_equiv_ug: food.folate_equiv_ug
+      ? food.folate_equiv_ug * multiplier
+      : null,
     vit_c_mg: food.vit_c_mg ? food.vit_c_mg * multiplier : null,
   };
 }
 
 /**
  * Calculate nutritional values for multiple ingredients (a meal)
- * 
+ *
  * @param ingredients - Array of meal ingredients with amounts
  * @returns Combined nutritional profile for all ingredients
  */
 export async function calculateMealNutrition(
-  ingredients: MealIngredient[]
+  ingredients: MealIngredient[],
 ): Promise<NutritionalProfile> {
   const profiles = await Promise.all(
-    ingredients.map(ing => calculateIngredientNutrition(ing.nevo_food_id, ing.amount_g))
+    ingredients.map((ing) =>
+      calculateIngredientNutrition(ing.nevo_food_id, ing.amount_g),
+    ),
   );
-  
+
   // Aggregate all profiles
   const aggregated: NutritionalProfile = {
     energy_kj: 0,
@@ -191,77 +205,81 @@ export async function calculateMealNutrition(
     folate_equiv_ug: 0,
     vit_c_mg: 0,
   };
-  
+
   // Sum all values
-  profiles.forEach(profile => {
+  profiles.forEach((profile) => {
     if (!profile) return;
-    
-    Object.keys(aggregated).forEach(key => {
+
+    Object.keys(aggregated).forEach((key) => {
       const value = profile[key as keyof NutritionalProfile];
       if (value !== null && value !== undefined) {
         (aggregated[key as keyof NutritionalProfile] as number) += value;
       }
     });
   });
-  
+
   // Convert zeros to null for consistency
-  Object.keys(aggregated).forEach(key => {
+  Object.keys(aggregated).forEach((key) => {
     const value = aggregated[key as keyof NutritionalProfile];
     if (value === 0) {
       (aggregated[key as keyof NutritionalProfile] as number | null) = null;
     }
   });
-  
+
   return aggregated;
 }
 
 /**
  * Search for NEVO foods by name
- * 
+ *
  * @param searchTerm - Search term (Dutch or English)
  * @param limit - Maximum number of results
  * @returns Array of matching NEVO foods
  */
 export async function searchNevoFoods(
   searchTerm: string,
-  limit: number = 20
+  limit: number = 20,
 ): Promise<any[]> {
   const supabase = await createServerClient();
-  
+
   const { data, error } = await supabase
     .from('nevo_foods')
-    .select('nevo_code, name_nl, name_en, food_group_nl, energy_kcal, protein_g, fat_g, carbs_g')
-    .or(`name_nl.ilike.%${searchTerm}%,name_en.ilike.%${searchTerm}%,synonym.ilike.%${searchTerm}%`)
+    .select(
+      'nevo_code, name_nl, name_en, food_group_nl, energy_kcal, protein_g, fat_g, carbs_g',
+    )
+    .or(
+      `name_nl.ilike.%${searchTerm}%,name_en.ilike.%${searchTerm}%,synonym.ilike.%${searchTerm}%`,
+    )
     .limit(limit);
-  
+
   if (error) {
     console.error('Error searching NEVO foods:', error);
     return [];
   }
-  
+
   return data || [];
 }
 
 /**
  * Get NEVO food by code
- * 
+ *
  * @param nevoCode - NEVO food code
  * @returns NEVO food data or null
  */
 export async function getNevoFoodByCode(nevoCode: number): Promise<any | null> {
   const supabase = await createServerClient();
-  
+
   const { data, error } = await supabase
     .from('nevo_foods')
     .select('*')
     .eq('nevo_code', nevoCode)
     .single();
-  
+
   if (error) {
     console.error('Error fetching NEVO food:', error);
     return null;
   }
-  
+
   return data;
 }
 
@@ -272,10 +290,10 @@ export type NutriScoreGrade = 'A' | 'B' | 'C' | 'D' | 'E';
 
 /**
  * Calculate NutriScore for a food item based on NEVO data
- * 
+ *
  * Based on FSA-NPS (Food Standards Agency Nutrient Profiling System)
  * Final Score = Negative Points - Positive Points
- * 
+ *
  * @param food - NEVO food data (per 100g)
  * @returns NutriScore grade (A-E) or null if calculation not possible
  */
@@ -289,7 +307,7 @@ export function calculateNutriScore(food: any): NutriScoreGrade | null {
   const sodiumMg = food.sodium_mg ?? 0;
   const fiberG = food.fiber_g ?? 0;
   const proteinG = food.protein_g ?? 0;
-  
+
   // Convert sodium from mg to g for calculation
   const saltG = (sodiumMg / 1000) * 2.5; // Sodium to salt conversion
 
@@ -354,13 +372,13 @@ export function calculateNutriScore(food: any): NutriScoreGrade | null {
   // Fruits/Vegetables/Nuts points (0-5)
   // Note: NEVO doesn't have a direct field for this, so we'll use food_group_nl as approximation
   const foodGroup = (food.food_group_nl || '').toLowerCase();
-  const isFruitVeg = 
-    foodGroup.includes('fruit') || 
-    foodGroup.includes('groente') || 
+  const isFruitVeg =
+    foodGroup.includes('fruit') ||
+    foodGroup.includes('groente') ||
     foodGroup.includes('groenten') ||
     foodGroup.includes('noten') ||
     foodGroup.includes('zaden');
-  
+
   if (isFruitVeg) {
     // Approximate: if it's in fruit/veg category, assume high content
     positivePoints += 5;

@@ -9,24 +9,24 @@ Diet Logic bepaalt **per ingredientgroep** welke actie geldt: **DROP**, **FORCE*
 
 ## Acties (P0–P3)
 
-| Priority | Diet Logic | Betekenis |
-|----------|------------|-----------|
-| P0 | **DROP** | Ingrediënt in deze groep → recept/maaltijd ongeldig. |
-| P1 | **FORCE** | Verplicht quotum (min per dag/week) moet gehaald worden. |
-| P2 | **LIMIT** | Max per dag/week; overschrijding = overtreding. |
-| P3 | **PASS** | Toegestaan; vrije invulling. |
+| Priority | Diet Logic | Betekenis                                                |
+| -------- | ---------- | -------------------------------------------------------- |
+| P0       | **DROP**   | Ingrediënt in deze groep → recept/maaltijd ongeldig.     |
+| P1       | **FORCE**  | Verplicht quotum (min per dag/week) moet gehaald worden. |
+| P2       | **LIMIT**  | Max per dag/week; overschrijding = overtreding.          |
+| P3       | **PASS**   | Toegestaan; vrije invulling.                             |
 
 ## Gebruik
 
 ```ts
-import { loadDietLogicRuleset, evaluateDietLogic } from "@/src/lib/diet-logic";
+import { loadDietLogicRuleset, evaluateDietLogic } from '@/src/lib/diet-logic';
 
 // Laden (bij isInflamed wordt nightshade extra aan DROP toegevoegd)
 const ruleset = await loadDietLogicRuleset(dietTypeId, { isInflamed: true });
 
 // Evalueren
 const result = evaluateDietLogic(ruleset, {
-  ingredients: [{ name: "spinazie" }, { name: "pasta" }],
+  ingredients: [{ name: 'spinazie' }, { name: 'pasta' }],
 });
 
 if (!result.ok) {

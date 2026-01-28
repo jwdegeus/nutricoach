@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { Input } from "@/components/catalyst/input";
-import { Radio, RadioField, RadioGroup } from "@/components/catalyst/radio";
-import { Label } from "@/components/catalyst/fieldset";
-import type { DietStrictness, VarietyLevel } from "../onboarding.types";
+import { Input } from '@/components/catalyst/input';
+import { Radio, RadioField, RadioGroup } from '@/components/catalyst/radio';
+import { Label } from '@/components/catalyst/fieldset';
+import type { DietStrictness, VarietyLevel } from '../onboarding.types';
 
 interface Step4GoalProps {
   kcalTarget: number | null;
@@ -14,21 +14,25 @@ interface Step4GoalProps {
   onStrictnessChange: (strictness: DietStrictness) => void;
 }
 
-const VARIETY_OPTIONS: Array<{ value: VarietyLevel; label: string; description: string }> = [
+const VARIETY_OPTIONS: Array<{
+  value: VarietyLevel;
+  label: string;
+  description: string;
+}> = [
   {
-    value: "low",
-    label: "Laag",
-    description: "Meer herhaling, minder variatie (3 dagen)",
+    value: 'low',
+    label: 'Laag',
+    description: 'Meer herhaling, minder variatie (3 dagen)',
   },
   {
-    value: "std",
-    label: "Standaard",
-    description: "Gebalanceerde variatie (7 dagen)",
+    value: 'std',
+    label: 'Standaard',
+    description: 'Gebalanceerde variatie (7 dagen)',
   },
   {
-    value: "high",
-    label: "Hoog",
-    description: "Veel variatie, weinig herhaling (14 dagen)",
+    value: 'high',
+    label: 'Hoog',
+    description: 'Veel variatie, weinig herhaling (14 dagen)',
   },
 ];
 
@@ -42,7 +46,7 @@ export function Step4Goal({
 }: Step4GoalProps) {
   const handleKcalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (value === "") {
+    if (value === '') {
       onKcalTargetChange(null);
     } else {
       const num = Number.parseInt(value, 10);
@@ -81,7 +85,7 @@ export function Step4Goal({
             type="number"
             min="800"
             max="6000"
-            value={kcalTarget ?? ""}
+            value={kcalTarget ?? ''}
             onChange={handleKcalChange}
             placeholder="Bijv. 2000"
           />
@@ -99,7 +103,7 @@ export function Step4Goal({
             Variatie niveau
           </label>
           <RadioGroup
-            value={varietyLevel ?? "std"}
+            value={varietyLevel ?? 'std'}
             onChange={(value) => onVarietyLevelChange(value as VarietyLevel)}
           >
             {VARIETY_OPTIONS.map((option) => (
@@ -125,7 +129,7 @@ export function Step4Goal({
             Striktheid
           </label>
           <RadioGroup
-            value={strictness ?? "flexible"}
+            value={strictness ?? 'flexible'}
             onChange={(value) => onStrictnessChange(value as DietStrictness)}
           >
             <RadioField>

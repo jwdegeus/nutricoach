@@ -1,26 +1,31 @@
 /**
  * Plan Chat Service
- * 
+ *
  * Service for handling plan chat/composer interactions.
  * Uses Gemini structured output to generate PlanEdit objects.
  */
 
-import "server-only";
-import { getGeminiClient } from "@/src/lib/ai/gemini/gemini.client";
-import { MealPlansService } from "@/src/lib/meal-plans/mealPlans.service";
-import { PantryService } from "@/src/lib/pantry/pantry.service";
-import { AppError } from "@/src/lib/errors/app-error";
-import { deriveDietRuleSet } from "@/src/lib/diets";
-import { getNevoFoodByCode } from "@/src/lib/nevo/nutrition-calculator";
-import { planEditSchema, planChatRequestSchema } from "./planEdit.schemas";
-import { buildPlanChatPrompt } from "./planChat.prompts";
-import { applyPlanEdit, type ApplyPlanEditResult } from "./planEdit.apply";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import 'server-only';
+import { getGeminiClient } from '@/src/lib/ai/gemini/gemini.client';
+import { MealPlansService } from '@/src/lib/meal-plans/mealPlans.service';
+import { PantryService } from '@/src/lib/pantry/pantry.service';
+import { AppError } from '@/src/lib/errors/app-error';
+import { deriveDietRuleSet } from '@/src/lib/diets';
+import { getNevoFoodByCode } from '@/src/lib/nevo/nutrition-calculator';
+import { planEditSchema, planChatRequestSchema } from './planEdit.schemas';
+import { buildPlanChatPrompt } from './planChat.prompts';
+import { applyPlanEdit, type ApplyPlanEditResult } from './planEdit.apply';
+import type { PlanEdit } from './planEdit.types';
+import type { MealPlanResponse } from '@/src/lib/diets';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 // vNext guard rails (shadow mode) + Diet Logic (Dieetregels)
-import { loadRulesetWithDietLogic, evaluateGuardrails } from "@/src/lib/guardrails-vnext";
-import { mapPlanEditToGuardrailsTargets } from "@/src/lib/guardrails-vnext/adapters/plan-chat";
-import type { EvaluationContext } from "@/src/lib/guardrails-vnext/types";
-import { evaluateDietLogic } from "@/src/lib/diet-logic";
+import {
+  loadRulesetWithDietLogic,
+  evaluateGuardrails,
+} from '@/src/lib/guardrails-vnext';
+import { mapPlanEditToGuardrailsTargets } from '@/src/lib/guardrails-vnext/adapters/plan-chat';
+import type { EvaluationContext } from '@/src/lib/guardrails-vnext/types';
+import { evaluateDietLogic } from '@/src/lib/diet-logic';
 
 /**
  * Plan Chat Service
@@ -28,7 +33,7 @@ import { evaluateDietLogic } from "@/src/lib/diet-logic";
 export class PlanChatService {
   /**
    * Handle a chat message and apply the resulting edit
-   * 
+   *
    * @param args - Chat arguments
    * @returns Reply message and optional applied edit result
    */
@@ -44,8 +49,8 @@ export class PlanChatService {
       chatRequest = planChatRequestSchema.parse(raw);
     } catch (error) {
       throw new AppError(
-        "VALIDATION_ERROR",
-        `Invalid chat request: ${error instanceof Error ? error.message : "Unknown validation error"}`
+        'VALIDATION_ERROR',
+        `Invalid chat request: ${error instanceof Error ? error.message : 'Unknown validation error'}`,
       );
     }
 
@@ -53,7 +58,7 @@ export class PlanChatService {
     const mealPlansService = new MealPlansService();
     const plan = await mealPlansService.loadPlanForUser(
       userId,
-      chatRequest.planId
+      chatRequest.planId,
     );
 
     // Step 3: Build context
@@ -66,23 +71,28 @@ export class PlanChatService {
 
     // Extract available meal slots from plan (unique slots across all days)
     const availableMealSlots: string[] = Array.from(
-      new Set(planSnapshot.days.flatMap((day) => day.meals.map((meal) => meal.slot)))
+      new Set(
+        planSnapshot.days.flatMap((day) => day.meals.map((meal) => meal.slot)),
+      ),
     );
 
     // Build guardrails summary
-    const allergies = request.profile.allergies.length > 0
-      ? `Allergies: ${request.profile.allergies.join(", ")}`
-      : "";
-    const dislikes = request.profile.dislikes.length > 0
-      ? `Dislikes: ${request.profile.dislikes.join(", ")}`
-      : "";
+    const allergies =
+      request.profile.allergies.length > 0
+        ? `Allergies: ${request.profile.allergies.join(', ')}`
+        : '';
+    const dislikes =
+      request.profile.dislikes.length > 0
+        ? `Dislikes: ${request.profile.dislikes.join(', ')}`
+        : '';
     const maxPrep = request.profile.prepPreferences.maxPrepMinutes
       ? `Max prep time: ${request.profile.prepPreferences.maxPrepMinutes} minutes`
-      : "";
+      : '';
     const guardrailsParts = [allergies, dislikes, maxPrep].filter(Boolean);
-    const guardrailsSummary = guardrailsParts.length > 0
-      ? guardrailsParts.join("; ")
-      : "Hard constraints enforced; diet rules active";
+    const guardrailsSummary =
+      guardrailsParts.length > 0
+        ? guardrailsParts.join('; ')
+        : 'Hard constraints enforced; diet rules active';
 
     // Step 4: Load pantry context (Stap 15)
     // Collect nevoCodes from current plan
@@ -101,7 +111,7 @@ export class PlanChatService {
     const pantryService = new PantryService();
     const pantryAvailability = await pantryService.loadAvailabilityByNevoCodes(
       userId,
-      Array.from(planNevoCodes).slice(0, 30)
+      Array.from(planNevoCodes).slice(0, 30),
     );
 
     // Build pantry context with names
@@ -115,7 +125,7 @@ export class PlanChatService {
           name,
           availableG: item.availableG,
         };
-      })
+      }),
     );
 
     // Step 5: Build prompt
@@ -133,8 +143,8 @@ export class PlanChatService {
 
     // Step 6: Convert Zod schema to JSON schema
     const jsonSchema = zodToJsonSchema(planEditSchema, {
-      name: "PlanEdit",
-      target: "openApi3",
+      name: 'PlanEdit',
+      target: 'openApi3',
     });
 
     // Step 7: Call Gemini structured output
@@ -145,12 +155,12 @@ export class PlanChatService {
         prompt,
         jsonSchema,
         temperature: 0.2,
-        purpose: "plan",
+        purpose: 'plan',
       });
     } catch (error) {
       throw new AppError(
-        "AGENT_ERROR",
-        `Failed to generate plan edit from Gemini API: ${error instanceof Error ? error.message : "Unknown error"}`
+        'AGENT_ERROR',
+        `Failed to generate plan edit from Gemini API: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
 
@@ -161,19 +171,25 @@ export class PlanChatService {
       edit = planEditSchema.parse(parsed);
     } catch (error) {
       throw new AppError(
-        "VALIDATION_ERROR",
-        `Invalid plan edit from Gemini: ${error instanceof Error ? error.message : "Unknown validation error"}`
+        'VALIDATION_ERROR',
+        `Invalid plan edit from Gemini: ${error instanceof Error ? error.message : 'Unknown validation error'}`,
       );
     }
 
     // Shadow mode: vNext guard rails evaluation (feature flag)
-    const useVNextGuardrails = process.env.USE_VNEXT_GUARDRAILS === "true";
+    const useVNextGuardrails = process.env.USE_VNEXT_GUARDRAILS === 'true';
     if (useVNextGuardrails) {
       try {
-        await this.evaluateVNextGuardrails(edit, planSnapshot, plan.dietKey, chatRequest.planId, userId);
+        await this.evaluateVNextGuardrails(
+          edit,
+          planSnapshot,
+          plan.dietKey,
+          chatRequest.planId,
+          userId,
+        );
       } catch (error) {
         // Don't fail the request if vNext evaluation fails (shadow mode only)
-        console.error("[PlanChat] vNext guard rails evaluation failed:", error);
+        console.error('[PlanChat] vNext guard rails evaluation failed:', error);
       }
     }
 
@@ -181,11 +197,16 @@ export class PlanChatService {
     // TODO [GUARD-RAILS-vNext]: RISK #3 - No Post-Validation in Plan Chat
     // This gate closes the bypass by blocking applyPlanEdit when HARD violations are detected.
     // See: docs/guard-rails-rebuild-plan.md section 6.2
-    const enforceVNext = process.env.ENFORCE_VNEXT_GUARDRAILS_PLAN_CHAT === "true";
+    const enforceVNext =
+      process.env.ENFORCE_VNEXT_GUARDRAILS_PLAN_CHAT === 'true';
     if (enforceVNext) {
       try {
         // Map edit and plan snapshot to vNext targets
-        const targets = mapPlanEditToGuardrailsTargets(edit, planSnapshot, 'nl');
+        const targets = mapPlanEditToGuardrailsTargets(
+          edit,
+          planSnapshot,
+          'nl',
+        );
 
         // Load guardrails + Diet Logic (Dieetregels); use userId for is_inflamed from profile
         const { guardrails, dietLogic } = await loadRulesetWithDietLogic({
@@ -232,7 +253,7 @@ export class PlanChatService {
               : 'Deze wijziging voldoet niet aan de dieetregels';
 
           console.log(
-            `[PlanChat] vNext guard rails blocked apply: planId=${chatRequest.planId}, dietKey=${plan.dietKey}, outcome=${decision.outcome}, reasonCodes=${reasonCodes.slice(0, 5).join(',')}, hash=${guardrails.contentHash}`
+            `[PlanChat] vNext guard rails blocked apply: planId=${chatRequest.planId}, dietKey=${plan.dietKey}, outcome=${decision.outcome}, reasonCodes=${reasonCodes.slice(0, 5).join(',')}, hash=${guardrails.contentHash}`,
           );
 
           throw new AppError('GUARDRAILS_VIOLATION', message, {
@@ -244,24 +265,27 @@ export class PlanChatService {
         }
       } catch (error) {
         // Fail-closed on evaluator/loader errors (policy A: safest)
-        if (error instanceof AppError && error.code === "GUARDRAILS_VIOLATION") {
+        if (
+          error instanceof AppError &&
+          error.code === 'GUARDRAILS_VIOLATION'
+        ) {
           // Re-throw guardrails violations as-is
           throw error;
         }
 
         // Evaluator/loader error: block apply
         console.error(
-          `[PlanChat] vNext guard rails evaluation error: planId=${chatRequest.planId}, error=${error instanceof Error ? error.message : String(error)}`
+          `[PlanChat] vNext guard rails evaluation error: planId=${chatRequest.planId}, error=${error instanceof Error ? error.message : String(error)}`,
         );
 
         throw new AppError(
-          "GUARDRAILS_VIOLATION",
-          "Fout bij evalueren dieetregels",
+          'GUARDRAILS_VIOLATION',
+          'Fout bij evalueren dieetregels',
           {
-            outcome: "blocked",
-            reasonCodes: ["EVALUATOR_ERROR"],
-            contentHash: "",
-          }
+            outcome: 'blocked',
+            reasonCodes: ['EVALUATOR_ERROR'],
+            contentHash: '',
+          },
         );
       }
     }
@@ -279,8 +303,8 @@ export class PlanChatService {
         throw error;
       }
       throw new AppError(
-        "DB_ERROR",
-        `Failed to apply plan edit: ${error instanceof Error ? error.message : "Unknown error"}`
+        'DB_ERROR',
+        `Failed to apply plan edit: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
 
@@ -312,7 +336,7 @@ export class PlanChatService {
     planSnapshot: MealPlanResponse,
     dietKey: string,
     planId: string,
-    userId?: string
+    userId?: string,
   ): Promise<void> {
     try {
       const targets = mapPlanEditToGuardrailsTargets(edit, planSnapshot, 'nl');

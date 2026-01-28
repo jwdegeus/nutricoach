@@ -1,12 +1,12 @@
-"use server";
+'use server';
 
-import { createClient } from "@/src/lib/supabase/server";
-import { PantryService } from "@/src/lib/pantry/pantry.service";
-import type { PantryAvailability } from "@/src/lib/pantry/pantry.types";
+import { createClient } from '@/src/lib/supabase/server';
+import { PantryService } from '@/src/lib/pantry/pantry.service';
+import type { PantryAvailability } from '@/src/lib/pantry/pantry.types';
 import {
   upsertPantryItemInputSchema,
   bulkUpsertPantryItemsInputSchema,
-} from "@/src/lib/pantry/pantry.schemas";
+} from '@/src/lib/pantry/pantry.schemas';
 
 /**
  * Action result type
@@ -16,19 +16,19 @@ type ActionResult<T> =
   | {
       ok: false;
       error: {
-        code: "AUTH_ERROR" | "VALIDATION_ERROR" | "DB_ERROR";
+        code: 'AUTH_ERROR' | 'VALIDATION_ERROR' | 'DB_ERROR';
         message: string;
       };
     };
 
 /**
  * Load pantry availability for given NEVO codes
- * 
+ *
  * @param nevoCodes - Array of NEVO codes to check
  * @returns Pantry availability array
  */
 export async function loadPantryAvailabilityAction(
-  nevoCodes: string[]
+  nevoCodes: string[],
 ): Promise<ActionResult<PantryAvailability[]>> {
   try {
     // Get authenticated user
@@ -41,8 +41,8 @@ export async function loadPantryAvailabilityAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om pantry data op te halen",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om pantry data op te halen',
         },
       };
     }
@@ -51,7 +51,7 @@ export async function loadPantryAvailabilityAction(
     const service = new PantryService();
     const availability = await service.loadAvailabilityByNevoCodes(
       user.id,
-      nevoCodes
+      nevoCodes,
     );
 
     return {
@@ -59,15 +59,15 @@ export async function loadPantryAvailabilityAction(
       data: availability,
     };
   } catch (error) {
-    console.error("Error loading pantry availability:", error);
+    console.error('Error loading pantry availability:', error);
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
+        code: 'DB_ERROR',
         message:
           error instanceof Error
             ? error.message
-            : "Fout bij ophalen pantry data",
+            : 'Fout bij ophalen pantry data',
       },
     };
   }
@@ -75,12 +75,12 @@ export async function loadPantryAvailabilityAction(
 
 /**
  * Upsert a single pantry item
- * 
+ *
  * @param raw - Raw input (will be validated)
  * @returns Success or error
  */
 export async function upsertPantryItemAction(
-  raw: unknown
+  raw: unknown,
 ): Promise<ActionResult<void>> {
   try {
     // Get authenticated user
@@ -93,8 +93,8 @@ export async function upsertPantryItemAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om pantry items te bewerken",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om pantry items te bewerken',
         },
       };
     }
@@ -107,11 +107,11 @@ export async function upsertPantryItemAction(
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
+          code: 'VALIDATION_ERROR',
           message:
             error instanceof Error
               ? error.message
-              : "Ongeldige pantry item data",
+              : 'Ongeldige pantry item data',
         },
       };
     }
@@ -125,15 +125,15 @@ export async function upsertPantryItemAction(
       data: undefined,
     };
   } catch (error) {
-    console.error("Error upserting pantry item:", error);
+    console.error('Error upserting pantry item:', error);
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
+        code: 'DB_ERROR',
         message:
           error instanceof Error
             ? error.message
-            : "Fout bij opslaan pantry item",
+            : 'Fout bij opslaan pantry item',
       },
     };
   }
@@ -141,12 +141,12 @@ export async function upsertPantryItemAction(
 
 /**
  * Bulk upsert pantry items
- * 
+ *
  * @param raw - Raw input (will be validated)
  * @returns Success or error
  */
 export async function bulkUpsertPantryItemsAction(
-  raw: unknown
+  raw: unknown,
 ): Promise<ActionResult<void>> {
   try {
     // Get authenticated user
@@ -159,8 +159,8 @@ export async function bulkUpsertPantryItemsAction(
       return {
         ok: false,
         error: {
-          code: "AUTH_ERROR",
-          message: "Je moet ingelogd zijn om pantry items te bewerken",
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om pantry items te bewerken',
         },
       };
     }
@@ -173,11 +173,11 @@ export async function bulkUpsertPantryItemsAction(
       return {
         ok: false,
         error: {
-          code: "VALIDATION_ERROR",
+          code: 'VALIDATION_ERROR',
           message:
             error instanceof Error
               ? error.message
-              : "Ongeldige pantry items data",
+              : 'Ongeldige pantry items data',
         },
       };
     }
@@ -191,15 +191,15 @@ export async function bulkUpsertPantryItemsAction(
       data: undefined,
     };
   } catch (error) {
-    console.error("Error bulk upserting pantry items:", error);
+    console.error('Error bulk upserting pantry items:', error);
     return {
       ok: false,
       error: {
-        code: "DB_ERROR",
+        code: 'DB_ERROR',
         message:
           error instanceof Error
             ? error.message
-            : "Fout bij opslaan pantry items",
+            : 'Fout bij opslaan pantry items',
       },
     };
   }

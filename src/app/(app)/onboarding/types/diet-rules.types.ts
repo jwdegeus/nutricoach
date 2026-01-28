@@ -7,10 +7,10 @@
  * Rule types die ondersteund worden
  */
 export type DietRuleType =
-  | "exclude_ingredient" // Uitsluiten van specifieke ingrediënten of categorieën
-  | "require_ingredient" // Vereisen van specifieke ingrediënten
-  | "macro_constraint" // Macro nutriënt constraints (carbs, fats, proteins)
-  | "meal_structure"; // Structuur regels (aantal maaltijden, timing, etc.)
+  | 'exclude_ingredient' // Uitsluiten van specifieke ingrediënten of categorieën
+  | 'require_ingredient' // Vereisen van specifieke ingrediënten
+  | 'macro_constraint' // Macro nutriënt constraints (carbs, fats, proteins)
+  | 'meal_structure'; // Structuur regels (aantal maaltijden, timing, etc.)
 
 /**
  * Basis dieetregel structuur
@@ -38,7 +38,7 @@ export type ExcludeIngredientRule = {
  */
 export type RequireIngredientRule = {
   requiredIngredients?: string[]; // Bijv. ["liver", "heart", "flaxseed_oil"]
-  frequency?: "daily" | "weekly" | "2x_weekly" | "monthly";
+  frequency?: 'daily' | 'weekly' | '2x_weekly' | 'monthly';
   minimumAmount?: number | string; // Amount required
   minAmountMl?: number; // Minimum amount in ml (for oils)
   maxAmountMl?: number; // Maximum amount in ml (for oils)
@@ -86,7 +86,7 @@ export type MealStructureRule = {
   // Low Histamine: Freshness requirement
   freshnessRequirement?: {
     maxLeftoverHours: number; // Leftovers > 24h forbidden
-    meatRequirement: "fresh_or_flash_frozen" | "any";
+    meatRequirement: 'fresh_or_flash_frozen' | 'any';
     forbiddenStates?: string[]; // ["leftover_over_24h", "aged", "cured"]
   };
   // SCD: Permitted foods
@@ -99,12 +99,13 @@ export type MealStructureRule = {
 /**
  * Helper type voor type-safe rule values
  */
-export type DietRuleValue<T extends DietRuleType> = T extends "exclude_ingredient"
-  ? ExcludeIngredientRule
-  : T extends "require_ingredient"
-  ? RequireIngredientRule
-  : T extends "macro_constraint"
-  ? MacroConstraintRule
-  : T extends "meal_structure"
-  ? MealStructureRule
-  : unknown;
+export type DietRuleValue<T extends DietRuleType> =
+  T extends 'exclude_ingredient'
+    ? ExcludeIngredientRule
+    : T extends 'require_ingredient'
+      ? RequireIngredientRule
+      : T extends 'macro_constraint'
+        ? MacroConstraintRule
+        : T extends 'meal_structure'
+          ? MealStructureRule
+          : unknown;

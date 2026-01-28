@@ -5,6 +5,7 @@ Deze documentatie beschrijft de integratie van de NEVO (Nederlands Voedingsstoff
 ## Overzicht
 
 De NEVO integratie bestaat uit:
+
 - **Database tabellen** voor NEVO voedingsmiddelen
 - **Import script** voor het importeren van CSV data
 - **Helper functies** voor het berekenen van nutriëntenwaarden per maaltijd
@@ -20,6 +21,7 @@ npm run db:push
 ```
 
 Dit creëert de volgende tabellen:
+
 - `nevo_foods` - Alle voedingsmiddelen met nutriëntenwaarden (per 100g)
 - `meal_ingredients` - Koppelt ingrediënten aan maaltijden met hoeveelheden
 
@@ -28,20 +30,24 @@ Dit creëert de volgende tabellen:
 **Let op:** De CSV bestanden zijn verwijderd uit de `temp/` map. Als je de data nog niet hebt geïmporteerd, download de NEVO dataset opnieuw van https://nevo-online.rivm.nl/ en plaats `NEVO2025_v9.0.csv` in de `temp/` map.
 
 Zorg ervoor dat je environment variabelen zijn ingesteld in `.env.local`:
+
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY` (vereist voor import)
 
 Installeer dependencies (als nog niet gedaan):
+
 ```bash
 npm install
 ```
 
 Importeer de data:
+
 ```bash
 npm run import:nevo
 ```
 
 Het script:
+
 - Leest `temp/NEVO2025_v9.0.csv`
 - Parseert pipe-delimited CSV met Nederlandse komma notatie
 - Importeert alle voedingsmiddelen in batches van 100
@@ -70,7 +76,10 @@ const nutrition = await calculateIngredientNutrition(123, 150);
 ### Berekenen van Nutriëntenwaarden voor een Maaltijd
 
 ```typescript
-import { calculateMealNutrition, MealIngredient } from '@/lib/nevo/nutrition-calculator';
+import {
+  calculateMealNutrition,
+  MealIngredient,
+} from '@/lib/nevo/nutrition-calculator';
 
 const ingredients: MealIngredient[] = [
   { nevo_food_id: 123, amount_g: 150 }, // 150g appel
@@ -105,6 +114,7 @@ De `nevo_foods` tabel bevat alle voedingsmiddelen met hun nutriëntenwaarden per
 ### Meal Ingredients Tabel
 
 De `meal_ingredients` tabel koppelt ingrediënten aan maaltijden:
+
 - `meal_id` - UUID van de maaltijd (toekomstige implementatie)
 - `nevo_food_id` - Referentie naar nevo_foods
 - `amount_g` - Hoeveelheid in grammen
