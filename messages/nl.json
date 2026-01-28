@@ -119,6 +119,7 @@
     "errorFileTooLargeForProcessing": "Bestand is te groot voor verwerking. Maximum grootte is 4MB.",
     "errorJobNotFound": "Recipe import niet gevonden of geen toegang",
     "errorUnknown": "Onbekende fout opgetreden",
+    "errorNetworkOrTimeout": "Netwerkfout of time-out. Controleer je verbinding en probeer het opnieuw.",
     "errorNoFileForProcessing": "Geen bestand beschikbaar voor verwerking. Selecteer eerst een receptfoto.",
     "errorStage": "Fase",
     "errorStagegemini_call": "Gemini API aanroep",
@@ -151,7 +152,10 @@
     "totalTime": "Totale tijd",
     "minutes": "minuten",
     "original": "Origineel",
-    "noExtractedData": "Geen geëxtraheerde data beschikbaar. Probeer opnieuw."
+    "noExtractedData": "Geen geëxtraheerde data beschikbaar. Probeer opnieuw.",
+    "translateToDutch": "Vertaal naar Nederlands",
+    "translating": "Vertalen...",
+    "translateFailed": "Vertalen mislukt. Probeer het opnieuw."
   },
   "recipes": {
     "pageTitle": "Recepten Database",

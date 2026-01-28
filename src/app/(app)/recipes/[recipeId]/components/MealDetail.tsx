@@ -13,14 +13,19 @@ import { RecipeAIMagician } from "./RecipeAIMagician";
 import { RecipePrepTimeAndServingsEditor } from "./RecipePrepTimeAndServingsEditor";
 import { updateRecipeNotesAction } from "../../actions/meals.actions";
 import type { CustomMealRecord } from "@/src/lib/custom-meals/customMeals.service";
+import type { RecipeComplianceResult } from "../../actions/recipe-compliance.actions";
 
 type MealDetailProps = {
   meal: CustomMealRecord | any;
   mealSource: "custom" | "gemini";
   nevoFoodNamesByCode: Record<string, string>;
+  /** Compliance score 0–100% volgens dieetregels */
+  complianceScore?: RecipeComplianceResult | null;
+  /** Wordt aangeroepen nadat AI Magician een aangepaste versie heeft toegepast, zodat de pagina kan verversen */
+  onRecipeApplied?: () => void;
 };
 
-export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetailProps) {
+export function MealDetail({ meal, mealSource, nevoFoodNamesByCode, complianceScore, onRecipeApplied }: MealDetailProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [aiMagicianOpen, setAiMagicianOpen] = useState(false);
   
@@ -119,6 +124,29 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
               {formatDietTypeName(dietKey) && (
                 <Badge color="green" className="text-xs">
                   {formatDietTypeName(dietKey)}
+                </Badge>
+              )}
+              {complianceScore != null && (
+                <Badge
+                  color={
+                    complianceScore.noRulesConfigured
+                      ? "zinc"
+                      : complianceScore.scorePercent >= 80
+                        ? "green"
+                        : complianceScore.scorePercent >= 50
+                          ? "amber"
+                          : "red"
+                  }
+                  className={complianceScore.noRulesConfigured ? "text-xs" : "font-mono text-xs"}
+                  title={
+                    complianceScore.noRulesConfigured
+                      ? "Geen dieetregels geconfigureerd voor dit dieet"
+                      : complianceScore.ok
+                        ? "Voldoet aan dieetregels"
+                        : "Schendt één of meer dieetregels"
+                  }
+                >
+                  Compliance {complianceScore.noRulesConfigured ? "N.v.t." : `${complianceScore.scorePercent}%`}
                 </Badge>
               )}
               {recipeSource && (
@@ -407,6 +435,7 @@ export function MealDetail({ meal, mealSource, nevoFoodNamesByCode }: MealDetail
         onClose={() => setAiMagicianOpen(false)}
         recipeId={meal.id}
         recipeName={mealName}
+        onApplied={onRecipeApplied}
       />
     </div>
   );

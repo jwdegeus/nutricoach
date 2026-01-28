@@ -322,6 +322,22 @@ export type MealPlanDay = {
 };
 
 /**
+ * Guard Rails vNext diagnostics (shadow mode)
+ * Re-exported from recipe-ai.types for consistency
+ */
+export type GuardrailsVNextDiagnostics = {
+  rulesetVersion: number;
+  contentHash: string;
+  outcome: 'allowed' | 'blocked' | 'warned';
+  ok: boolean;
+  reasonCodes: string[];
+  counts: {
+    matches: number;
+    applied: number;
+  };
+};
+
+/**
  * Meal plan response - Output from the agent
  */
 export type MealPlanResponse = {
@@ -332,5 +348,7 @@ export type MealPlanResponse = {
     dietKey: DietKey;
     totalDays: number;
     totalMeals: number;
+    /** Guard Rails vNext diagnostics (shadow mode, optional) */
+    guardrailsVnext?: GuardrailsVNextDiagnostics;
   };
 };

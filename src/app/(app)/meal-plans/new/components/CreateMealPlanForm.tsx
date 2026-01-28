@@ -10,12 +10,24 @@ import { Field, Label } from "@/components/catalyst/fieldset";
 import { Text } from "@/components/catalyst/text";
 import { createMealPlanAction } from "../../actions/mealPlans.actions";
 import { getLatestRunningRunAction } from "../../../runs/actions/runs.actions";
+import { getCurrentDietIdAction } from "@/src/app/(app)/recipes/[recipeId]/actions/recipe-ai.persist.actions";
+import { GuardrailsViolationEmptyState } from "../../[planId]/components/GuardrailsViolationEmptyState";
 import { Loader2, Calendar } from "lucide-react";
+
+type GuardrailsViolationState = {
+  reasonCodes: string[];
+  contentHash: string;
+  rulesetVersion?: number;
+  forceDeficits?: Array<{ categoryCode: string; categoryNameNl: string; minPerDay?: number; minPerWeek?: number }>;
+};
 
 export function CreateMealPlanForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [guardrailsViolation, setGuardrailsViolation] = useState<GuardrailsViolationState | null>(null);
+  const [dietTypeId, setDietTypeId] = useState<string | undefined>(undefined);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const [hasSubmitted, setHasSubmitted] = useState(() => {
@@ -40,6 +52,17 @@ export function CreateMealPlanForm() {
       }
     };
   }, []);
+
+  // Fetch dietTypeId when violation occurs
+  useEffect(() => {
+    if (guardrailsViolation && !dietTypeId) {
+      getCurrentDietIdAction().then((result) => {
+        if (result.ok && result.data) {
+          setDietTypeId(result.data.dietId);
+        }
+      });
+    }
+  }, [guardrailsViolation, dietTypeId]);
 
   // Poll for progress when generating
   useEffect(() => {
@@ -97,6 +120,7 @@ export function CreateMealPlanForm() {
     }
     
     setError(null);
+    setGuardrailsViolation(null);
     setHasSubmitted(true);
     
     // Mark as submitting in sessionStorage to prevent double submission
@@ -150,8 +174,16 @@ export function CreateMealPlanForm() {
           if (typeof window !== 'undefined') {
             sessionStorage.removeItem('meal-plan-submitting');
           }
-          // Show user-friendly error message
-          if (result.error.code === "CONFLICT") {
+          // Check for guardrails violation
+          if (result.error.code === "GUARDRAILS_VIOLATION" && result.error.details) {
+            const d = result.error.details;
+            setGuardrailsViolation({
+              reasonCodes: d.reasonCodes,
+              contentHash: d.contentHash,
+              rulesetVersion: d.rulesetVersion,
+              ...("forceDeficits" in d && Array.isArray(d.forceDeficits) && { forceDeficits: d.forceDeficits }),
+            });
+          } else if (result.error.code === "CONFLICT") {
             setError(
               "Er is al een generatie bezig. Wacht even en probeer het opnieuw. Als dit probleem aanhoudt, wacht 10 minuten en probeer het dan opnieuw."
             );
@@ -170,6 +202,99 @@ export function CreateMealPlanForm() {
       }
     });
   };
+
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    setGuardrailsViolation(null);
+    setError(null);
+    
+    // Trigger form submission again
+    const daysNum = parseInt(days, 10);
+    if (isNaN(daysNum) || daysNum < 1 || daysNum > 30) {
+      setError("Aantal dagen moet tussen 1 en 30 zijn");
+      setIsRetrying(false);
+      return;
+    }
+
+    if (!dateFrom) {
+      setError("Selecteer een startdatum");
+      setIsRetrying(false);
+      return;
+    }
+
+    setHasSubmitted(true);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('meal-plan-submitting', 'true');
+    }
+
+    startTransition(async () => {
+      try {
+        const result = await createMealPlanAction({
+          dateFrom,
+          days: daysNum,
+        });
+
+        if (result.ok) {
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('meal-plan-submitting');
+          }
+          window.dispatchEvent(new CustomEvent('meal-plan-changed'));
+          router.replace(`/meal-plans/${result.data.planId}`);
+          return;
+        } else {
+          setHasSubmitted(false);
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('meal-plan-submitting');
+          }
+          if (result.error.code === "GUARDRAILS_VIOLATION" && result.error.details) {
+            const d = result.error.details;
+            setGuardrailsViolation({
+              reasonCodes: d.reasonCodes,
+              contentHash: d.contentHash,
+              rulesetVersion: d.rulesetVersion,
+              ...("forceDeficits" in d && Array.isArray(d.forceDeficits) && { forceDeficits: d.forceDeficits }),
+            });
+          } else if (result.error.code === "CONFLICT") {
+            setError(
+              "Er is al een generatie bezig. Wacht even en probeer het opnieuw. Als dit probleem aanhoudt, wacht 10 minuten en probeer het dan opnieuw."
+            );
+          } else {
+            setError(result.error.message);
+          }
+        }
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Fout bij aanmaken meal plan"
+        );
+        setHasSubmitted(false);
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('meal-plan-submitting');
+        }
+      } finally {
+        setIsRetrying(false);
+      }
+    });
+  };
+
+  // Show guardrails violation empty state instead of form
+  if (guardrailsViolation) {
+    return (
+      <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+        <Heading>Plan Instellingen</Heading>
+        <div className="mt-4">
+          <GuardrailsViolationEmptyState
+            reasonCodes={guardrailsViolation.reasonCodes}
+            contentHash={guardrailsViolation.contentHash}
+            rulesetVersion={guardrailsViolation.rulesetVersion}
+            forceDeficits={guardrailsViolation.forceDeficits}
+            dietTypeId={dietTypeId}
+            onRetry={handleRetry}
+            isRetrying={isRetrying}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">

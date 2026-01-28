@@ -21,8 +21,15 @@ type ActionResult<T> =
   | {
       ok: false;
       error: {
-        code: "AUTH_ERROR" | "VALIDATION_ERROR" | "DB_ERROR" | "AGENT_ERROR" | "RATE_LIMIT" | "CONFLICT";
+        code: "AUTH_ERROR" | "VALIDATION_ERROR" | "DB_ERROR" | "AGENT_ERROR" | "RATE_LIMIT" | "CONFLICT" | "GUARDRAILS_VIOLATION";
         message: string;
+        details?: {
+          outcome: "blocked";
+          reasonCodes: string[];
+          contentHash: string;
+          rulesetVersion?: number;
+          forceDeficits?: Array<{ categoryCode: string; categoryNameNl: string; minPerDay?: number; minPerWeek?: number }>;
+        };
       };
     };
 
@@ -82,6 +89,7 @@ export async function createMealPlanAction(
         error: {
           code: error.code,
           message: error.safeMessage,
+          ...(error.guardrailsDetails && { details: error.guardrailsDetails }),
         },
       };
     }
@@ -164,6 +172,7 @@ export async function regenerateMealPlanAction(
         error: {
           code: error.code,
           message: error.safeMessage,
+          ...(error.guardrailsDetails && { details: error.guardrailsDetails }),
         },
       };
     }
@@ -319,6 +328,7 @@ export async function deleteMealPlanAction(
         error: {
           code: error.code,
           message: error.safeMessage,
+          ...(error.guardrailsDetails && { details: error.guardrailsDetails }),
         },
       };
     }

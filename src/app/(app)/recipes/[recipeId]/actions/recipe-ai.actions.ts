@@ -4,6 +4,8 @@ import { z } from "zod";
 import type {
   RequestRecipeAdaptationInput,
   RequestRecipeAdaptationResult,
+  GetRecipeAnalysisInput,
+  GetRecipeAnalysisResult,
 } from "../recipe-ai.types";
 import { RecipeAdaptationService } from "../services/recipe-adaptation.service";
 
@@ -14,6 +16,27 @@ const requestRecipeAdaptationInputSchema = z.object({
   recipeId: z.string().min(1, "recipeId is vereist"),
   dietId: z.string().min(1).optional(),
   locale: z.string().optional(),
+  existingAnalysis: z
+    .object({
+      violations: z.array(
+        z.object({
+          ingredientName: z.string(),
+          ruleCode: z.string(),
+          ruleLabel: z.string(),
+          suggestion: z.string(),
+        })
+      ),
+      recipeName: z.string(),
+    })
+    .optional(),
+});
+
+/**
+ * Zod schema for get recipe analysis input
+ */
+const getRecipeAnalysisInputSchema = z.object({
+  recipeId: z.string().min(1, "recipeId is vereist"),
+  dietId: z.string().min(1, "dietId is vereist"),
 });
 
 /**
@@ -69,6 +92,47 @@ export async function requestRecipeAdaptationAction(
           ? error.message
           : "Er is een onverwachte fout opgetreden",
       code: "INTERNAL_ERROR",
+    };
+  }
+}
+
+/**
+ * Alleen recept analyseren tegen dieetregels (geen AI-rewrite).
+ * Fase 1 van twee-fase flow: snel violations + advies uit dieetregels tonen.
+ */
+export async function getRecipeAnalysisAction(
+  raw: unknown
+): Promise<GetRecipeAnalysisResult> {
+  try {
+    const parsed = getRecipeAnalysisInputSchema.safeParse(raw);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: {
+          code: "INVALID_INPUT",
+          message: parsed.error.errors[0]?.message ?? "Ongeldige invoer",
+        },
+      };
+    }
+    const { recipeId, dietId } = parsed.data as GetRecipeAnalysisInput;
+    if (!dietId) {
+      return {
+        ok: false,
+        error: {
+          code: "NO_DIET_SELECTED",
+          message: "Selecteer eerst een dieettype in je instellingen.",
+        },
+      };
+    }
+    const service = new RecipeAdaptationService();
+    const data = await service.getAnalysisOnly(recipeId, dietId);
+    return { ok: true, data };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Er is een fout opgetreden bij de analyse.";
+    return {
+      ok: false,
+      error: { code: "INTERNAL_ERROR", message },
     };
   }
 }

@@ -5,7 +5,7 @@ import { loadMealPlanAction } from "../actions/mealPlans.actions";
 import { getNevoFoodByCode } from "@/src/lib/nevo/nutrition-calculator";
 import { MealPlanSummary } from "./components/MealPlanSummary";
 import { MealPlanActionsClient } from "./components/MealPlanActionsClient";
-import { MealPlanPageClient } from "./components/MealPlanPageClient";
+import { MealPlanPageWrapper } from "./components/MealPlanPageWrapper";
 import { Heading } from "@/components/catalyst/heading";
 import { Text } from "@/components/catalyst/text";
 
@@ -144,11 +144,26 @@ export default async function MealPlanDetailPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <MealPlanSummary plan={plan} dietTypeName={dietTypeName} />
-        <MealPlanActionsClient planId={plan.id} plan={plan.planSnapshot} />
+        <MealPlanActionsClient 
+          planId={plan.id} 
+          plan={plan.planSnapshot}
+          onGuardrailsViolation={(violation) => {
+            // Communicate violation state to MealPlanPageWrapper via custom event
+            if (violation) {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('guardrails-violation', { detail: violation }));
+              }
+            } else {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('guardrails-violation-cleared'));
+              }
+            }
+          }}
+        />
       </div>
 
-      {/* Plan Cards */}
-      <MealPlanPageClient
+      {/* Plan Cards or Guardrails Violation */}
+      <MealPlanPageWrapper
         planId={plan.id}
         plan={plan.planSnapshot}
         enrichment={plan.enrichmentSnapshot}

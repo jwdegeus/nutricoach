@@ -5,14 +5,16 @@ import { NextIntlClientProvider } from 'next-intl'
 export function I18nProvider({ 
   children, 
   locale, 
-  messages 
+  messages,
+  timeZone 
 }: { 
   children: React.ReactNode
   locale: string
-  messages: any 
+  messages: any
+  timeZone?: string
 }) {
   return (
-    <NextIntlClientProvider locale={locale} messages={messages}>
+    <NextIntlClientProvider locale={locale} messages={messages} timeZone={timeZone}>
       {children}
     </NextIntlClientProvider>
   )

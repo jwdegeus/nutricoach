@@ -44,6 +44,50 @@ export type ValidationReport = {
 };
 
 /**
+ * Extra synoniemen voor ingrediënten-matching.
+ * Keys zijn zowel NL als EN: ruleset uit DB gebruikt vaak Engelse termen (cheese, sugar, corn, soy),
+ * recepten gebruiken vaak Nederlandse namen (mozzarella, honing, maiskorrels, sojasaus).
+ * Wordt gebruikt voor substring-matching: "verse mozzarella" matcht via cheese→mozzarella.
+ */
+const EXTRA_INGREDIENT_SYNONYMS: Record<string, string[]> = {
+  // Nederlands (als ruleset term "kaas" gebruikt)
+  kaas: ["mozzarella", "geitenkaas", "blauwe kaas", "feta", "parmezaan", "cheddar", "brie", "camembert", "roomkaas", "buffalo mozzarella", "verse mozzarella"],
+  suiker: ["honing", "ahornsiroop", "agavesiroop", "maissiroop", "rietsuiker", "basterdsuiker", "poedersuiker"],
+  mais: ["maiskorrels", "maïs", "corn", "corn kernels", "maismeel", "cornmeal"],
+  paprika: ["paprikapoeder", "zoete paprika", "gerookte paprikapoeder", "zoete paprikapoeder", "sweet paprika"],
+  tomaat: ["cherrytomaat", "cherrytomaatjes", "tomaatjes", "tomaten"],
+  soja: ["sojasaus", "tamari", "ketjap", "sojabonen"],
+  // Engels (ruleset uit ingredient_category_items gebruikt vaak Engelse term)
+  cheese: ["mozzarella", "geitenkaas", "blauwe kaas", "feta", "parmezaan", "cheddar", "brie", "camembert", "roomkaas", "buffalo mozzarella", "verse mozzarella"],
+  dairy: ["mozzarella", "melk", "yoghurt", "boter", "room", "kaas", "geitenkaas", "feta"],
+  sugar: ["honing", "ahornsiroop", "agavesiroop", "maissiroop", "rietsuiker", "basterdsuiker", "poedersuiker", "maple syrup", "agave"],
+  corn: ["maiskorrels", "maïs", "corn", "corn kernels", "maismeel", "cornmeal"],
+  soy: ["sojasaus", "tamari", "ketjap", "sojabonen", "tofu", "tempeh", "miso"],
+  tomato: ["cherrytomaat", "cherrytomaatjes", "cherry tomato", "tomaatjes", "tomaten", "tomatoes"],
+};
+
+/**
+ * False positives voor substring-match: als de tekst één van deze strings bevat, dan is
+ * een match op de key géén echte violation (bijv. "bloem" in "zonnebloempitten" = zaden).
+ * Waarde is string of string[] voor meerdere uitsluitpatronen.
+ */
+const SUBSTRING_FALSE_POSITIVE_IF_CONTAINS: Record<string, string | string[]> = {
+  bloem: "zonnebloem",
+  ei: ["romeinse", "romaine"],
+  ijs: "radijs",
+  oca: "avocado",
+};
+
+/**
+ * Normaliseer tekst voor matching: lowercase, trim, meerdere spaties → één.
+ * Behoud context (bijv. "verse mozzarella (in blokjes)") zodat substring-match werkt.
+ */
+export function normalizeForMatching(text: string): string {
+  if (!text || typeof text !== "string") return "";
+  return text.toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+/**
  * Case-insensitive word boundary match
  * Matches whole words, not substrings (e.g., "suiker" won't match "suikervrij")
  */
@@ -78,7 +122,7 @@ export function findForbiddenMatches(
   context: "ingredients" | "steps"
 ): Array<{ term: string; matched: string; ruleCode: string; ruleLabel: string; substitutionSuggestions?: string[] }> {
   const matches: Array<{ term: string; matched: string; ruleCode: string; ruleLabel: string; substitutionSuggestions?: string[] }> = [];
-  const lowerText = text.toLowerCase().trim();
+  const lowerText = normalizeForMatching(text);
 
   // Debug logging
   if (context === "ingredients") {
@@ -138,34 +182,31 @@ export function findForbiddenMatches(
       continue;
     }
 
-    // For ingredients, also try substring matching (e.g., "pasta" in "spaghetti pasta")
-    // This is important for cases like "orzo pasta" where "pasta" should match
+    // For ingredients, also try substring matching (e.g. "pasta" in "spaghetti pasta")
+    // Inclusief extra Nederlandse synoniemen (kaas → mozzarella, suiker → honing, etc.)
     if (context === "ingredients") {
       const lowerTerm = forbidden.term.toLowerCase();
-      if (lowerText.includes(lowerTerm)) {
-        console.log(`[DietValidator] ✓ Substring match: "${forbidden.term}" in "${text}"`);
-        // Extract the matched portion for better reporting
-        const matchedPortion = lowerText.includes(` ${lowerTerm} `) || 
-                              lowerText.startsWith(`${lowerTerm} `) || 
-                              lowerText.endsWith(` ${lowerTerm}`) ||
-                              lowerText === lowerTerm
-          ? forbidden.term
-          : lowerText.substring(
-              Math.max(0, lowerText.indexOf(lowerTerm) - 10),
-              Math.min(lowerText.length, lowerText.indexOf(lowerTerm) + lowerTerm.length + 10)
-            );
-        
-        matches.push({ 
-          term: forbidden.term, 
-          matched: matchedPortion,
+      const extra = (EXTRA_INGREDIENT_SYNONYMS[forbidden.term] || []).map((s) => s.toLowerCase());
+      const allToCheck = [lowerTerm, ...(forbidden.synonyms || []).map((s) => s.toLowerCase()), ...extra];
+      const found = allToCheck.find((t) => lowerText.includes(t));
+      if (found) {
+        const excludeIfContains = SUBSTRING_FALSE_POSITIVE_IF_CONTAINS[found];
+        if (excludeIfContains) {
+          const patterns = Array.isArray(excludeIfContains) ? excludeIfContains : [excludeIfContains];
+          if (patterns.some((p) => lowerText.includes(p))) {
+            continue; // bv. "ei" in "romeinse sla", "ijs" in "radijsjes", "oca" in "avocado"
+          }
+        }
+        const matchedLabel = found === lowerTerm ? forbidden.term : found;
+        console.log(`[DietValidator] ✓ Substring match: "${matchedLabel}" (term: ${forbidden.term}) in "${text}"`);
+        matches.push({
+          term: forbidden.term,
+          matched: matchedLabel,
           ruleCode: forbidden.ruleCode,
           ruleLabel: forbidden.ruleLabel,
           substitutionSuggestions: forbidden.substitutionSuggestions,
         });
         continue;
-      } else if (context === "ingredients") {
-        // Debug: log why substring didn't match
-        console.log(`[DietValidator]   No substring match: "${lowerTerm}" not in "${lowerText}"`);
       }
     }
 
@@ -208,17 +249,21 @@ export function findForbiddenMatches(
       if (context === "ingredients") {
         for (const synonym of forbidden.synonyms) {
           const lowerSynonym = synonym.toLowerCase();
-          if (lowerText.includes(lowerSynonym) && !matches.some(m => m.term === forbidden.term)) {
-            console.log(`[DietValidator] ✓ Substring synonym match: "${synonym}" (synonym of "${forbidden.term}") in "${text}"`);
-            matches.push({ 
-              term: forbidden.term, 
-              matched: synonym,
-              ruleCode: forbidden.ruleCode,
-              ruleLabel: forbidden.ruleLabel,
-              substitutionSuggestions: forbidden.substitutionSuggestions,
-            });
-            break; // Only report once per forbidden term
+          if (!lowerText.includes(lowerSynonym) || matches.some(m => m.term === forbidden.term)) continue;
+          const excludeIfContains = SUBSTRING_FALSE_POSITIVE_IF_CONTAINS[lowerSynonym];
+          if (excludeIfContains) {
+            const patterns = Array.isArray(excludeIfContains) ? excludeIfContains : [excludeIfContains];
+            if (patterns.some((p) => lowerText.includes(p))) continue;
           }
+          console.log(`[DietValidator] ✓ Substring synonym match: "${synonym}" (synonym of "${forbidden.term}") in "${text}"`);
+          matches.push({
+            term: forbidden.term,
+            matched: synonym,
+            ruleCode: forbidden.ruleCode,
+            ruleLabel: forbidden.ruleLabel,
+            substitutionSuggestions: forbidden.substitutionSuggestions,
+          });
+          break;
         }
       }
     }

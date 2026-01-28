@@ -12,12 +12,20 @@ import { Loader2, RefreshCw, Calendar, Trash2 } from "lucide-react";
 import Link from "next/link";
 import type { MealPlanResponse } from "@/src/lib/diets";
 
+type GuardrailsViolationState = {
+  reasonCodes: string[];
+  contentHash: string;
+  rulesetVersion?: number;
+  forceDeficits?: Array<{ categoryCode: string; categoryNameNl: string; minPerDay?: number; minPerWeek?: number }>;
+};
+
 type MealPlanActionsProps = {
   planId: string;
   plan: MealPlanResponse;
+  onGuardrailsViolation?: (violation: GuardrailsViolationState | null) => void;
 };
 
-export function MealPlanActions({ planId, plan }: MealPlanActionsProps) {
+export function MealPlanActions({ planId, plan, onGuardrailsViolation }: MealPlanActionsProps) {
   const router = useRouter();
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isRegeneratingDay, setIsRegeneratingDay] = useState(false);
@@ -32,6 +40,7 @@ export function MealPlanActions({ planId, plan }: MealPlanActionsProps) {
   const handleRegenerateFull = async () => {
     setIsRegenerating(true);
     setError(null);
+    onGuardrailsViolation?.(null);
 
     try {
       const result = await regenerateMealPlanAction({ planId });
@@ -42,7 +51,18 @@ export function MealPlanActions({ planId, plan }: MealPlanActionsProps) {
         // Navigate to shopping to see updated plan
         router.push(`/meal-plans/${planId}/shopping`);
       } else {
-        setError(result.error.message);
+        // Check for guardrails violation
+        if (result.error.code === "GUARDRAILS_VIOLATION" && result.error.details) {
+          const d = result.error.details;
+          onGuardrailsViolation?.({
+            reasonCodes: d.reasonCodes,
+            contentHash: d.contentHash,
+            rulesetVersion: d.rulesetVersion,
+            ...("forceDeficits" in d && Array.isArray(d.forceDeficits) && { forceDeficits: d.forceDeficits }),
+          });
+        } else {
+          setError(result.error.message);
+        }
       }
     } catch (err) {
       setError(
@@ -61,6 +81,7 @@ export function MealPlanActions({ planId, plan }: MealPlanActionsProps) {
 
     setIsRegeneratingDay(true);
     setError(null);
+    onGuardrailsViolation?.(null);
 
     try {
       const result = await regenerateMealPlanAction({
@@ -72,7 +93,18 @@ export function MealPlanActions({ planId, plan }: MealPlanActionsProps) {
         // Refresh page to show updated plan
         router.refresh();
       } else {
-        setError(result.error.message);
+        // Check for guardrails violation
+        if (result.error.code === "GUARDRAILS_VIOLATION" && result.error.details) {
+          const d = result.error.details;
+          onGuardrailsViolation?.({
+            reasonCodes: d.reasonCodes,
+            contentHash: d.contentHash,
+            rulesetVersion: d.rulesetVersion,
+            ...("forceDeficits" in d && Array.isArray(d.forceDeficits) && { forceDeficits: d.forceDeficits }),
+          });
+        } else {
+          setError(result.error.message);
+        }
       }
     } catch (err) {
       setError(

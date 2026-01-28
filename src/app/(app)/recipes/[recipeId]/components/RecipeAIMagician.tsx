@@ -11,22 +11,54 @@ import {
 import { Button } from "@/components/catalyst/button";
 import { Text } from "@/components/catalyst/text";
 import { Badge } from "@/components/catalyst/badge";
+import { Checkbox } from "@/components/catalyst/checkbox";
 import { SparklesIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/20/solid";
 import { ArrowPathIcon } from "@heroicons/react/16/solid";
-import { requestRecipeAdaptationAction } from "../actions/recipe-ai.actions";
+import {
+  requestRecipeAdaptationAction,
+  getRecipeAnalysisAction,
+} from "../actions/recipe-ai.actions";
 import {
   persistRecipeAdaptationDraftAction,
   applyRecipeAdaptationAction,
   getCurrentDietIdAction,
 } from "../actions/recipe-ai.persist.actions";
-import type { RecipeAIState, RecipeAIData, RecipeAdaptationDraft } from "../recipe-ai.types";
+import type {
+  RecipeAIState,
+  RecipeAIData,
+  RecipeAdaptationDraft,
+  ViolationDetail,
+} from "../recipe-ai.types";
+import { GuardrailsViolationCallout } from "./GuardrailsViolationCallout";
+import { SoftWarningsCallout } from "@/src/app/(app)/components/SoftWarningsCallout";
 
 type RecipeAIMagicianProps = {
   open: boolean;
   onClose: () => void;
   recipeId: string;
   recipeName?: string;
+  /** Wordt aangeroepen nadat de aangepaste versie succesvol is toegepast, zodat de pagina kan verversen */
+  onApplied?: () => void;
 };
+
+/** Severity voor weergave: verboden / beter van niet / niet gewenst */
+type ViolationSeverity = "verboden" | "niet_gewenst" | "beter_van_niet";
+
+function getViolationSeverity(v: {
+  ruleCode?: string;
+  ruleLabel?: string;
+  rule?: string;
+}): { level: ViolationSeverity; label: string } {
+  const code = v.ruleCode ?? "";
+  const label = (v.ruleLabel ?? v.rule ?? "").toLowerCase();
+  if (/HARD|FORBIDDEN_HARD|strikt verboden/i.test(code) || label.includes("strikt verboden")) {
+    return { level: "verboden", label: "Verboden" };
+  }
+  if (label.includes("beter") || label.includes("liever niet")) {
+    return { level: "beter_van_niet", label: "Beter van niet" };
+  }
+  return { level: "niet_gewenst", label: "Niet gewenst" };
+}
 
 /**
  * Convert RecipeAdaptationDraft to RecipeAIData format for UI compatibility
@@ -53,6 +85,7 @@ export function RecipeAIMagician({
   onClose,
   recipeId,
   recipeName = "Recept",
+  onApplied,
 }: RecipeAIMagicianProps) {
   const [state, setState] = useState<RecipeAIState>({ type: "idle" });
   const [activeTab, setActiveTab] = useState<"analyse" | "rewrite">("analyse");
@@ -63,6 +96,15 @@ export function RecipeAIMagician({
   const [persistError, setPersistError] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [dietId, setDietId] = useState<string | null>(null);
+  const [guardrailsViolation, setGuardrailsViolation] = useState<{
+    reasonCodes: string[];
+    contentHash: string;
+    rulesetVersion?: number;
+  } | null>(null);
+  const [currentDraft, setCurrentDraft] = useState<RecipeAdaptationDraft | null>(null);
+  const [rewriteError, setRewriteError] = useState<string | null>(null);
+  /** Per index: false = niet laten vervangen. Ongespecificeerd = wel vervangen. */
+  const [replaceViolationByIndex, setReplaceViolationByIndex] = useState<Record<number, boolean>>({});
 
   // Load diet ID when dialog opens
   useEffect(() => {
@@ -86,6 +128,10 @@ export function RecipeAIMagician({
       setIsApplying(false);
       setPersistError(null);
       setApplyError(null);
+      setGuardrailsViolation(null);
+      setCurrentDraft(null);
+      setRewriteError(null);
+      setReplaceViolationByIndex({});
     }
   }, [open]);
 
@@ -100,75 +146,121 @@ export function RecipeAIMagician({
   }, [open, recipeId]);
 
   const handleStartAnalysis = async () => {
-    console.log("[RecipeAIMagician] handleStartAnalysis called");
-    console.log("[RecipeAIMagician] recipeId:", recipeId);
-    console.log("[RecipeAIMagician] dietId:", dietId);
-    
     if (!recipeId || recipeId === "undefined") {
-      console.error("[RecipeAIMagician] Invalid recipeId");
-      setState({
-        type: "error",
-        message: "Recept ID ontbreekt.",
-      });
+      setState({ type: "error", message: "Recept ID ontbreekt." });
       return;
     }
 
-    // Get diet ID if not already loaded
     let currentDietId = dietId;
     if (!currentDietId) {
-      console.log("[RecipeAIMagician] Fetching diet ID...");
       const dietResult = await getCurrentDietIdAction();
-      console.log("[RecipeAIMagician] Diet result:", dietResult);
-      
       if (!dietResult.ok) {
-        console.error("[RecipeAIMagician] Diet fetch failed:", dietResult.error);
-        setState({
-          type: "error",
-          message: dietResult.error.message,
-        });
+        setState({ type: "error", message: dietResult.error.message });
         return;
       }
-      if (!dietResult.data) {
-        console.warn("[RecipeAIMagician] No diet selected");
+      if (!dietResult.data?.dietId) {
         setState({
           type: "empty",
-          reason: "NO_DIET_SELECTED",
+          reason: "Selecteer eerst een dieettype in je instellingen.",
         });
         return;
       }
       currentDietId = dietResult.data.dietId;
       setDietId(currentDietId);
-      console.log("[RecipeAIMagician] Diet ID set to:", currentDietId);
     }
 
-    console.log("[RecipeAIMagician] Starting analysis with:", { recipeId, dietId: currentDietId });
     setState({ type: "loading" });
     setPersistError(null);
     setApplyError(null);
 
+    const ANALYSIS_TIMEOUT_MS = 45_000;
+    let timeoutId: ReturnType<typeof setTimeout>;
     try {
-      console.log("[RecipeAIMagician] Calling requestRecipeAdaptationAction...");
+      const result = await Promise.race([
+        getRecipeAnalysisAction({ recipeId, dietId: currentDietId! }).finally(() =>
+          clearTimeout(timeoutId)
+        ),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(
+            () =>
+              reject(
+                new Error(
+                  "Analyse duurde te lang. Controleer je internetverbinding en probeer het opnieuw."
+                )
+              ),
+            ANALYSIS_TIMEOUT_MS
+          );
+        }),
+      ]);
+      if (result.ok) {
+        setState({
+          type: "analysis_only",
+          data: result.data,
+        });
+      } else {
+        if (result.error.code === "NO_DIET_SELECTED" || result.error.message.includes("dieet")) {
+          setState({
+            type: "empty",
+            reason: result.error.message,
+          });
+        } else {
+          setState({ type: "error", message: result.error.message });
+        }
+      }
+    } catch (error) {
+      setState({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Er is een fout opgetreden bij de analyse.",
+      });
+    }
+  };
+
+  const handleGenerateRewrite = async () => {
+    if (
+      !recipeId ||
+      recipeId === "undefined" ||
+      !dietId ||
+      (state.type !== "analysis_only" && state.type !== "loading_rewrite")
+    ) {
+      return;
+    }
+    const analysisData = state.type === "analysis_only" ? state.data : (state as { data: { violations: ViolationDetail[]; summary: string; recipeName: string } }).data;
+    const violationsToReplace = analysisData.violations.filter(
+      (_, i) => replaceViolationByIndex[i] !== false
+    );
+    setRewriteError(null);
+    setPersistError(null);
+    setApplyError(null);
+    setState({
+      type: "loading_rewrite",
+      data: analysisData,
+    });
+
+    try {
       const result = await requestRecipeAdaptationAction({
         recipeId,
-        dietId: currentDietId,
+        dietId,
+        existingAnalysis: {
+          violations: violationsToReplace,
+          recipeName: analysisData.recipeName,
+        },
       });
-      console.log("[RecipeAIMagician] Result received:", result.outcome);
 
       if (result.outcome === "success") {
-        // Convert draft to UI format
         const data = draftToAIData(result.adaptation);
         setState({ type: "success", data });
-
-        // Persist draft
+        setCurrentDraft(result.adaptation);
         setIsPersisting(true);
         try {
           const persistResult = await persistRecipeAdaptationDraftAction({
             recipeId,
-            dietId: currentDietId,
+            dietId,
             draft: result.adaptation,
             meta: result.meta,
           });
-
           if (persistResult.ok) {
             setAdaptationId(persistResult.data.adaptationId);
           } else {
@@ -184,22 +276,17 @@ export function RecipeAIMagician({
       } else if (result.outcome === "empty") {
         setState({
           type: "empty",
-          reason: result.reason,
+          reason: result.reason ?? "Geen dieet geselecteerd",
         });
       } else {
-        setState({
-          type: "error",
-          message: result.message,
-        });
+        setState({ type: "analysis_only", data: analysisData });
+        setRewriteError(result.message);
       }
     } catch (error) {
-      setState({
-        type: "error",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Er is een fout opgetreden bij de analyse.",
-      });
+      setState({ type: "analysis_only", data: analysisData });
+      setRewriteError(
+        error instanceof Error ? error.message : "Fout bij genereren aangepaste versie"
+      );
     }
   };
 
@@ -207,6 +294,7 @@ export function RecipeAIMagician({
     setState({ type: "idle" });
     setPersistError(null);
     setApplyError(null);
+    setGuardrailsViolation(null);
   };
 
   const handleApply = async () => {
@@ -216,6 +304,7 @@ export function RecipeAIMagician({
 
     setIsApplying(true);
     setApplyError(null);
+    setGuardrailsViolation(null);
 
     try {
       const result = await applyRecipeAdaptationAction({
@@ -224,8 +313,19 @@ export function RecipeAIMagician({
 
       if (result.ok) {
         setIsApplied(true);
+        onApplied?.();
       } else {
-        setApplyError(result.error.message);
+        // Check for GUARDRAILS_VIOLATION
+        if (result.error.code === "GUARDRAILS_VIOLATION" && result.error.details) {
+          setGuardrailsViolation({
+            reasonCodes: result.error.details.reasonCodes,
+            contentHash: result.error.details.contentHash,
+            rulesetVersion: result.error.details.rulesetVersion,
+          });
+          // Don't set generic applyError for GUARDRAILS_VIOLATION
+        } else {
+          setApplyError(result.error.message);
+        }
       }
     } catch (error) {
       setApplyError(
@@ -237,8 +337,7 @@ export function RecipeAIMagician({
   };
 
   const handleClose = () => {
-    // Reset to idle when closing during loading
-    if (state.type === "loading") {
+    if (state.type === "loading" || state.type === "loading_rewrite") {
       setState({ type: "idle" });
     }
     onClose();
@@ -252,8 +351,11 @@ export function RecipeAIMagician({
       </DialogDescription>
 
       <DialogBody>
-        {/* Tabs */}
-        {(state.type === "success" || state.type === "loading") && (
+        {/* Tabs: tonen bij analyse-only, loading-rewrite, loading of success */}
+        {(state.type === "success" ||
+          state.type === "loading" ||
+          state.type === "analysis_only" ||
+          state.type === "loading_rewrite") && (
           <div className="border-b border-zinc-200 dark:border-zinc-800 mb-6" role="tablist">
             <nav className="-mb-px flex space-x-8">
               <button
@@ -281,7 +383,12 @@ export function RecipeAIMagician({
                 role="tab"
                 aria-controls="rewrite-panel"
                 id="rewrite-tab"
-                disabled={state.type === "loading" || (state.type === "success" && !state.data.rewrite)}
+                disabled={
+                  state.type === "loading" ||
+                  state.type === "analysis_only" ||
+                  state.type === "loading_rewrite" ||
+                  (state.type === "success" && !state.data.rewrite)
+                }
               >
                 Aangepaste versie
               </button>
@@ -299,7 +406,7 @@ export function RecipeAIMagician({
               </Text>
             </div>
             <div className="flex justify-center pt-4">
-              <Button onClick={handleStartAnalysis} disabled={state.type === "loading"}>
+              <Button onClick={handleStartAnalysis}>
                 <SparklesIcon data-slot="icon" />
                 Start analyse
               </Button>
@@ -359,6 +466,158 @@ export function RecipeAIMagician({
           </div>
         )}
 
+        {/* Analyse-tab content: analysis_only of loading_rewrite (fase 1) */}
+        {(state.type === "analysis_only" || state.type === "loading_rewrite") &&
+          activeTab === "analyse" && (
+            <div className="space-y-4 py-2" role="tabpanel" id="analyse-panel" aria-labelledby="analyse-tab">
+              {"noRulesConfigured" in state.data && state.data.noRulesConfigured ? (
+                <div className="space-y-4 py-2">
+                  <div className="text-center py-8 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+                    <ExclamationTriangleIcon className="h-12 w-12 text-amber-500 dark:text-amber-400 mx-auto mb-4" />
+                    <Text className="text-zinc-700 dark:text-zinc-300 font-medium mb-2">
+                      Geen dieetregels geconfigureerd
+                    </Text>
+                    <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                      Er zijn geen dieetregels ingesteld voor dit dieet. Voeg regels toe via Instellingen → Dieettype bewerken → Dieetregels om afwijkingen te kunnen controleren.
+                    </Text>
+                  </div>
+                </div>
+              ) : state.data.violations.length > 0 ? (
+                <>
+                  <div className="flex items-center gap-2 mb-4">
+                    <ExclamationTriangleIcon className="h-5 w-5 text-amber-500 dark:text-amber-400" />
+                    <Text className="font-semibold text-zinc-900 dark:text-white">
+                      {state.data.violations.length}{" "}
+                      {state.data.violations.length === 1 ? "afwijking gevonden" : "afwijkingen gevonden"}
+                    </Text>
+                  </div>
+                  <div
+                    className="max-h-[min(40vh,320px)] overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-800 p-1 space-y-4 pr-2"
+                    role="region"
+                    aria-label="Afwijkingsmeldingen"
+                  >
+                    {state.data.violations.map((violation, idx) => {
+                      const severity = getViolationSeverity(violation);
+                      const replaceChecked = replaceViolationByIndex[idx] !== false;
+                      return (
+                        <div
+                          key={idx}
+                          className={`rounded-lg border p-4 ${
+                            severity.level === "verboden"
+                              ? "border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-950/30"
+                              : severity.level === "beter_van_niet"
+                                ? "border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-950/20"
+                                : "border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50"
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="flex-1 space-y-2 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge
+                                  color={
+                                    severity.level === "verboden"
+                                      ? "red"
+                                      : severity.level === "beter_van_niet"
+                                        ? "amber"
+                                        : "zinc"
+                                  }
+                                  className="text-xs"
+                                >
+                                  {severity.label}
+                                </Badge>
+                                <Badge color="red" className="text-xs">
+                                  {violation.ingredientName}
+                                </Badge>
+                              </div>
+                              <div>
+                                <Text className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                  Regel
+                                </Text>
+                                <Text className="text-sm text-zinc-900 dark:text-white">
+                                  {violation.ruleLabel}
+                                </Text>
+                              </div>
+                              <div>
+                                <Text className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                  Advies uit dieetregels
+                                </Text>
+                                <Text className="text-sm text-zinc-700 dark:text-zinc-300">
+                                  {violation.suggestion}
+                                </Text>
+                              </div>
+                              <label className="flex items-center gap-2 cursor-pointer mt-3">
+                                <Checkbox
+                                  checked={replaceChecked}
+                                  onChange={(checked) =>
+                                    setReplaceViolationByIndex((prev) => ({
+                                      ...prev,
+                                      [idx]: checked,
+                                    }))
+                                  }
+                                  color="dark/zinc"
+                                />
+                                <Text className="text-sm text-zinc-700 dark:text-zinc-300">
+                                  Vervangen in aangepaste versie
+                                </Text>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                    {state.type === "loading_rewrite" ? (
+                      <div className="flex items-center justify-center gap-2 py-4">
+                        <ArrowPathIcon className="h-5 w-5 text-blue-500 dark:text-blue-400 animate-spin" />
+                        <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                          Aangepaste versie wordt gegenereerd...
+                        </Text>
+                      </div>
+                    ) : (
+                      <>
+                        {rewriteError && (
+                          <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-3 mb-4">
+                            <div className="flex items-start gap-2">
+                              <ExclamationTriangleIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                              <Text className="text-sm text-amber-800 dark:text-amber-200">
+                                {rewriteError}
+                              </Text>
+                            </div>
+                          </div>
+                        )}
+                        {state.data.violations.filter((_, i) => replaceViolationByIndex[i] !== false).length === 0 && (
+                          <Text className="text-xs text-amber-600 dark:text-amber-400 mb-2">
+                            Vink ten minste één afwijking aan om te laten vervangen.
+                          </Text>
+                        )}
+                        <Button
+                          onClick={handleGenerateRewrite}
+                          className="w-full"
+                          disabled={
+                            state.data.violations.filter((_, i) => replaceViolationByIndex[i] !== false).length === 0
+                          }
+                        >
+                          <SparklesIcon data-slot="icon" />
+                          Genereer aangepaste versie
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-4 py-2">
+                  <div className="text-center py-8">
+                    <CheckCircleIcon className="h-12 w-12 text-green-500 dark:text-green-400 mx-auto mb-4" />
+                    <Text className="text-zinc-600 dark:text-zinc-400">
+                      Geen afwijkingen gevonden! Dit recept past perfect bij jouw dieet.
+                    </Text>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
         {/* Success State - Analyse Tab */}
         {state.type === "success" && activeTab === "analyse" && (
           <div className="space-y-4 py-2" role="tabpanel" id="analyse-panel" aria-labelledby="analyse-tab">
@@ -370,29 +629,64 @@ export function RecipeAIMagician({
                     {state.data.analysis.violations.length} {state.data.analysis.violations.length === 1 ? "afwijking gevonden" : "afwijkingen gevonden"}
                   </Text>
                 </div>
-                <div className="space-y-4">
-                  {state.data.analysis.violations.map((violation, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 bg-zinc-50 dark:bg-zinc-900/50"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Badge color="red" className="text-xs">
-                              {violation.ingredientName}
-                            </Badge>
-                            <Text className="text-sm font-medium text-zinc-900 dark:text-white">
-                              {violation.rule}
-                            </Text>
+                <div
+                  className="max-h-[min(40vh,320px)] overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-800 p-1 space-y-4 pr-2"
+                  role="region"
+                  aria-label="Afwijkingsmeldingen"
+                >
+                  {state.data.analysis.violations.map((violation, idx) => {
+                    const severity = getViolationSeverity({ rule: violation.rule });
+                    return (
+                      <div
+                        key={idx}
+                        className={`rounded-lg border p-4 ${
+                          severity.level === "verboden"
+                            ? "border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-950/30"
+                            : severity.level === "beter_van_niet"
+                              ? "border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-950/20"
+                              : "border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1 space-y-2 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge
+                                color={
+                                  severity.level === "verboden"
+                                    ? "red"
+                                    : severity.level === "beter_van_niet"
+                                      ? "amber"
+                                      : "zinc"
+                                }
+                                className="text-xs"
+                              >
+                                {severity.label}
+                              </Badge>
+                              <Badge color="red" className="text-xs">
+                                {violation.ingredientName}
+                              </Badge>
+                            </div>
+                            <div>
+                              <Text className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                Regel
+                              </Text>
+                              <Text className="text-sm text-zinc-900 dark:text-white">
+                                {violation.rule}
+                              </Text>
+                            </div>
+                            <div>
+                              <Text className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                Advies uit dieetregels
+                              </Text>
+                              <Text className="text-sm text-zinc-700 dark:text-zinc-300">
+                                {violation.suggestion}
+                              </Text>
+                            </div>
                           </div>
-                          <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                            <span className="font-medium">Suggestie:</span> {violation.suggestion}
-                          </Text>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             ) : (
@@ -449,9 +743,9 @@ export function RecipeAIMagician({
                   Aangepaste bereidingswijze
                 </Text>
                 <ol className="space-y-3">
-                  {state.data.rewrite.steps.map((step) => (
+                  {state.data.rewrite.steps.map((step, index) => (
                     <li
-                      key={step.step}
+                      key={`step-${index}`}
                       className="flex gap-3 text-sm text-zinc-600 dark:text-zinc-400"
                     >
                       <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-medium text-xs">
@@ -475,6 +769,28 @@ export function RecipeAIMagician({
                     </Text>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Soft Warnings (non-blocking) */}
+            {currentDraft?.diagnostics?.guardrailsVnext?.outcome === "warned" && (
+              <SoftWarningsCallout
+                reasonCodes={currentDraft.diagnostics.guardrailsVnext.reasonCodes}
+                dietTypeId={dietId || undefined}
+                contentHash={currentDraft.diagnostics.guardrailsVnext.contentHash}
+              />
+            )}
+
+            {/* Guardrails Violation Callout */}
+            {guardrailsViolation && (
+              <div className="mt-4">
+                <GuardrailsViolationCallout
+                  reasonCodes={guardrailsViolation.reasonCodes}
+                  contentHash={guardrailsViolation.contentHash}
+                  rulesetVersion={guardrailsViolation.rulesetVersion}
+                  dietId={dietId || undefined}
+                  onDismiss={() => setGuardrailsViolation(null)}
+                />
               </div>
             )}
 

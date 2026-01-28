@@ -7,6 +7,7 @@
 
 import "server-only";
 import { createClient } from "@/src/lib/supabase/server";
+import { getGeminiClient } from "@/src/lib/ai/gemini/gemini.client";
 import { MealPlannerAgentService } from "./mealPlannerAgent.service";
 import { MealPlannerEnrichmentService } from "./mealPlannerEnrichment.service";
 import { MealPlansService } from "@/src/lib/meal-plans/mealPlans.service";
@@ -16,6 +17,21 @@ import { AppError } from "@/src/lib/errors/app-error";
 import { mealPlanResponseSchema } from "@/src/lib/diets";
 import type { MealPlanResponse, MealPlanDay, Meal } from "@/src/lib/diets";
 import type { PlanEdit } from "./planEdit.types";
+
+/**
+ * Guard Rails vNext diagnostics (shadow mode)
+ */
+export type GuardrailsVNextDiagnostics = {
+  rulesetVersion: number;
+  contentHash: string;
+  outcome: 'allowed' | 'blocked' | 'warned';
+  ok: boolean;
+  reasonCodes: string[];
+  counts: {
+    matches: number;
+    applied: number;
+  };
+};
 
 /**
  * Result of applying a plan edit
@@ -28,14 +44,11 @@ export type ApplyPlanEditResult = {
     mealSlot?: string;
   };
   summary: string;
+  /** Guard Rails vNext diagnostics (shadow mode, optional) */
+  diagnostics?: {
+    guardrailsVnext?: GuardrailsVNextDiagnostics;
+  };
 };
-
-/**
- * Get model name for observability
- */
-function getModelName(): string {
-  return process.env.GEMINI_MODEL ?? "gemini-2.0-flash-exp";
-}
 
 /**
  * Log a meal plan run
@@ -85,7 +98,7 @@ export async function applyPlanEdit(args: {
   const request = plan.requestSnapshot;
   const planSnapshot = plan.planSnapshot;
   const supabase = await createClient();
-  const model = getModelName();
+  const model = getGeminiClient().getModelName("plan");
   const editabilityService = new MealPlanEditabilityService();
 
   let updatedPlan: MealPlanResponse;

@@ -31,6 +31,15 @@ import {
   type CandidatePool,
 } from "./mealPlannerAgent.tools";
 import { zodToJsonSchema } from "zod-to-json-schema";
+// vNext guard rails (shadow mode + enforcement) + Diet Logic (Dieetregels)
+import { loadRulesetWithDietLogic, evaluateGuardrails } from "@/src/lib/guardrails-vnext";
+import {
+  mapMealPlanToGuardrailsTargets,
+  getMealPlanIngredientsPerDay,
+} from "@/src/lib/guardrails-vnext/adapters/meal-planner";
+import type { EvaluationContext, GuardDecision, GuardrailsRuleset } from "@/src/lib/guardrails-vnext/types";
+import { evaluateDietLogic } from "@/src/lib/diet-logic";
+import { AppError } from "@/src/lib/errors/app-error";
 
 /**
  * Simple in-memory cache for candidate pools
@@ -161,9 +170,55 @@ export class MealPlannerAgentService {
       rules
     );
 
-    // Step 8: If successful, return
+    // Step 8: If successful, enforce vNext guard rails (if enabled). Bij FORCE-deficit: max 1 retry met deficit-hint in prompt.
     if (firstAttemptResult.success) {
-      return firstAttemptResult.response;
+      const enforceVNext = process.env.ENFORCE_VNEXT_GUARDRAILS_MEAL_PLANNER === "true";
+      if (enforceVNext) {
+        try {
+          await this.enforceVNextMealPlannerGuardrails(
+            firstAttemptResult.response!,
+            request.profile.dietKey,
+            language
+          );
+        } catch (guardError) {
+          const forceDeficits =
+            guardError instanceof AppError &&
+            guardError.code === "GUARDRAILS_VIOLATION" &&
+            guardError.guardrailsDetails?.forceDeficits;
+          if (forceDeficits && forceDeficits.length > 0) {
+            const retryPrompt = buildMealPlanPrompt({
+              request,
+              rules,
+              candidates,
+              language,
+              forceDeficitHint: { categoryNames: forceDeficits.map((d) => d.categoryNameNl) },
+            });
+            let retryRawJson: string;
+            try {
+              retryRawJson = await gemini.generateJson({
+                prompt: retryPrompt,
+                jsonSchema,
+                temperature: 0.3,
+                purpose: "plan",
+              });
+            } catch {
+              throw guardError;
+            }
+            const retryResult = await this.parseAndValidate(retryRawJson, request, rules);
+            if (!retryResult.success) {
+              throw guardError;
+            }
+            await this.enforceVNextMealPlannerGuardrails(
+              retryResult.response!,
+              request.profile.dietKey,
+              language
+            );
+            return retryResult.response!;
+          }
+          throw guardError;
+        }
+      }
+      return firstAttemptResult.response!;
     }
 
     // Step 9: Repair attempt (max 1 attempt)
@@ -197,9 +252,17 @@ export class MealPlannerAgentService {
       rules
     );
 
-    // Step 11: If repair successful, return
+    // Step 11: If repair successful, enforce vNext guard rails (if enabled). Geen extra deficit-retry hier (max 1 deficit-retry per aanroep, die gebeurt na eerste poging).
     if (repairResult.success) {
-      return repairResult.response;
+      const enforceVNext = process.env.ENFORCE_VNEXT_GUARDRAILS_MEAL_PLANNER === "true";
+      if (enforceVNext) {
+        await this.enforceVNextMealPlannerGuardrails(
+          repairResult.response!,
+          request.profile.dietKey,
+          language
+        );
+      }
+      return repairResult.response!;
     }
 
     // Step 12: Repair failed - throw error
@@ -261,6 +324,17 @@ export class MealPlannerAgentService {
         issues.push(`${issue.code}: ${issue.message} (path: ${issue.path})`);
       }
       return { success: false, issues };
+    }
+
+    // Shadow mode: vNext guard rails evaluation (feature flag)
+    const useVNextGuardrails = process.env.USE_VNEXT_GUARDRAILS === "true";
+    if (useVNextGuardrails) {
+      try {
+        await this.evaluateVNextGuardrails(response, request, rules, constraintIssues);
+      } catch (error) {
+        // Don't fail the request if vNext evaluation fails
+        console.error("[MealPlanner] vNext guard rails evaluation failed:", error);
+      }
     }
 
     return { success: true, response, issues: [] };
@@ -668,5 +742,119 @@ export class MealPlannerAgentService {
 
     // Step 10: Success - return meal
     return { meal };
+  }
+
+  /**
+   * Enforce vNext guard rails + Diet Logic on meal plan
+   *
+   * Evaluates the generated meal plan with guardrails (allow/block) and Diet Logic
+   * (DROP/FORCE/LIMIT/PASS). Blocks if HARD violations or diet logic violations are detected.
+   *
+   * @param plan - Generated meal plan
+   * @param dietKey - Diet key for ruleset loading
+   * @param locale - Locale for evaluation
+   * @param userId - Optional; when set, diet logic uses is_inflamed from user_diet_profiles
+   * @throws AppError with GUARDRAILS_VIOLATION if violations detected
+   */
+  private async enforceVNextMealPlannerGuardrails(
+    plan: MealPlanResponse,
+    dietKey: string,
+    locale: 'nl' | 'en' = 'nl',
+    userId?: string
+  ): Promise<void> {
+    try {
+      const targets = mapMealPlanToGuardrailsTargets(plan, locale);
+
+      const { guardrails, dietLogic } = await loadRulesetWithDietLogic({
+        dietId: dietKey,
+        mode: 'meal_planner',
+        locale,
+        userId,
+      });
+
+      const context: EvaluationContext = {
+        dietKey,
+        mode: 'meal_planner',
+        locale,
+        timestamp: new Date().toISOString(),
+      };
+
+      const decision = evaluateGuardrails({
+        ruleset: guardrails,
+        context,
+        targets,
+      });
+
+      // Diet Logic: DROP/LIMIT per plan; FORCE-quotum per dag (dag-aggregatie)
+      let dietResult: { ok: boolean; summary: string; warnings?: string[] } | null = null;
+      let forceDeficits: Array<{ categoryCode: string; categoryNameNl: string; minPerDay?: number; minPerWeek?: number }> | undefined;
+      if (dietLogic) {
+        const ingredientsPerDay = getMealPlanIngredientsPerDay(plan);
+        const dayResults = ingredientsPerDay.map((dayIngredients) =>
+          evaluateDietLogic(dietLogic, { ingredients: dayIngredients })
+        );
+        const firstFail = dayResults.findIndex((r) => !r.ok);
+        if (firstFail >= 0) {
+          const failed = dayResults[firstFail];
+          dietResult = {
+            ok: false,
+            summary: failed.summary,
+            warnings: failed.warnings,
+          };
+          const dayLabel = plan.days[firstFail]?.date ?? `dag ${firstFail + 1}`;
+          dietResult.summary = `${dietResult.summary} (${dayLabel})`;
+          const phase2 = failed.phaseResults.find((p) => p.phase === 2);
+          if (phase2?.forceDeficits?.length) {
+            forceDeficits = phase2.forceDeficits;
+          }
+        } else {
+          const allWarnings = dayResults.flatMap((r) => r.warnings ?? []);
+          dietResult = {
+            ok: true,
+            summary: "Dieetregels: alle fases geslaagd.",
+            warnings: allWarnings.length ? allWarnings : undefined,
+          };
+        }
+      }
+
+      const blockedByGuardrails = !decision.ok;
+      const blockedByDietLogic = dietResult !== null && !dietResult.ok;
+
+      if (blockedByGuardrails || blockedByDietLogic) {
+        const reasonCodes = blockedByGuardrails
+          ? decision.reasonCodes
+          : [...decision.reasonCodes, "DIET_LOGIC_VIOLATION"];
+        const message =
+          blockedByDietLogic && dietResult
+            ? dietResult.summary
+            : "Het gegenereerde meal plan voldoet niet aan de dieetregels";
+
+        console.log(
+          `[MealPlanner] vNext guard rails blocked plan: dietKey=${dietKey}, outcome=${decision.outcome}, reasonCodes=${reasonCodes.slice(0, 5).join(',')}, hash=${guardrails.contentHash}`
+        );
+
+        throw new AppError("GUARDRAILS_VIOLATION", message, {
+          outcome: "blocked",
+          reasonCodes,
+          contentHash: guardrails.contentHash,
+          rulesetVersion: guardrails.version,
+          ...(forceDeficits && forceDeficits.length > 0 && { forceDeficits }),
+        });
+      }
+    } catch (error) {
+      if (error instanceof AppError && error.code === 'GUARDRAILS_VIOLATION') {
+        throw error;
+      }
+
+      console.error(
+        `[MealPlanner] vNext guard rails evaluation error: dietKey=${dietKey}, error=${error instanceof Error ? error.message : String(error)}`
+      );
+
+      throw new AppError('GUARDRAILS_VIOLATION', 'Fout bij evalueren dieetregels', {
+        outcome: 'blocked',
+        reasonCodes: ['EVALUATOR_ERROR'],
+        contentHash: '',
+      });
+    }
   }
 }

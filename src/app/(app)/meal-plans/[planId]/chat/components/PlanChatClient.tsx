@@ -10,16 +10,28 @@ import { Text } from "@/components/catalyst/text";
 import { submitPlanChatMessageAction } from "../actions/planChat.actions";
 import { Loader2, Send, CheckCircle2 } from "lucide-react";
 import type { PlanChatMessage } from "@/src/lib/agents/meal-planner/planEdit.schemas";
+import { GuardrailsViolationMessage } from "./GuardrailsViolationMessage";
 
 type PlanChatClientProps = {
   planId: string;
   initialDraft?: string;
   onDraftChange?: (draft: string) => void;
+  dietTypeId?: string; // Optional diet type ID for linking to guardrails settings
 };
 
-export function PlanChatClient({ planId, initialDraft, onDraftChange }: PlanChatClientProps) {
+// Extended message type for UI (includes system/error messages)
+type ExtendedChatMessage = PlanChatMessage | {
+  role: "system";
+  type: "guardrails_violation";
+  reasonCodes: string[];
+  contentHash: string;
+  rulesetVersion?: number;
+  dietTypeId?: string;
+};
+
+export function PlanChatClient({ planId, initialDraft, onDraftChange, dietTypeId }: PlanChatClientProps) {
   const router = useRouter();
-  const [messages, setMessages] = useState<PlanChatMessage[]>([]);
+  const [messages, setMessages] = useState<ExtendedChatMessage[]>([]);
   const [input, setInput] = useState(initialDraft || "");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +69,10 @@ export function PlanChatClient({ planId, initialDraft, onDraftChange }: PlanChat
     startTransition(async () => {
       try {
         // Send last 12 messages (to keep context manageable)
-        const messagesToSend = newMessages.slice(-12);
+        // Filter out system messages when sending to backend
+        const messagesToSend = newMessages
+          .filter((msg): msg is PlanChatMessage => msg.role !== "system")
+          .slice(-12);
 
         const result = await submitPlanChatMessageAction({
           planId,
@@ -80,7 +95,22 @@ export function PlanChatClient({ planId, initialDraft, onDraftChange }: PlanChat
           // Refresh page to show updated plan
           router.refresh();
         } else {
-          setError(result.error.message);
+          // Check for GUARDRAILS_VIOLATION
+          if (result.error.code === "GUARDRAILS_VIOLATION" && result.error.details) {
+            // Add guardrails violation message to chat
+            const violationMessage: ExtendedChatMessage = {
+              role: "system",
+              type: "guardrails_violation",
+              reasonCodes: result.error.details.reasonCodes,
+              contentHash: result.error.details.contentHash,
+              rulesetVersion: result.error.details.rulesetVersion,
+              dietTypeId: dietTypeId,
+            };
+            setMessages([...newMessages, violationMessage]);
+            // Don't set generic error for GUARDRAILS_VIOLATION
+          } else {
+            setError(result.error.message);
+          }
         }
       } catch (err) {
         setError(
@@ -106,24 +136,43 @@ export function PlanChatClient({ planId, initialDraft, onDraftChange }: PlanChat
               </div>
             )}
 
-            {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex ${
-                  msg.role === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
+            {messages.map((msg, idx) => {
+              // Handle system messages (guardrails violation)
+              if (msg.role === "system" && msg.type === "guardrails_violation") {
+                return (
+                  <div key={idx} className="flex justify-start">
+                    <div className="max-w-[80%] w-full">
+                      <GuardrailsViolationMessage
+                        reasonCodes={msg.reasonCodes}
+                        contentHash={msg.contentHash}
+                        rulesetVersion={msg.rulesetVersion}
+                        dietTypeId={msg.dietTypeId}
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
+              // Handle regular user/assistant messages
+              return (
                 <div
-                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                    msg.role === "user"
-                      ? "bg-blue-500 text-white"
-                      : "bg-zinc-100 dark:bg-zinc-800"
+                  key={idx}
+                  className={`flex ${
+                    msg.role === "user" ? "justify-end" : "justify-start"
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  <div
+                    className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                      msg.role === "user"
+                        ? "bg-blue-500 text-white"
+                        : "bg-zinc-100 dark:bg-zinc-800"
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {isPending && (
               <div className="flex justify-start">

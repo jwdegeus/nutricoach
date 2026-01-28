@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { MealPlanActions } from "./MealPlanActions";
 import type { MealPlanResponse } from "@/src/lib/diets";
 
+type GuardrailsViolationState = {
+  reasonCodes: string[];
+  contentHash: string;
+  rulesetVersion?: number;
+};
+
 /**
  * Client-only wrapper for MealPlanActions to prevent hydration mismatches
  * Headless UI generates random IDs that differ between server and client.
@@ -12,9 +18,11 @@ import type { MealPlanResponse } from "@/src/lib/diets";
 export function MealPlanActionsClient({
   planId,
   plan,
+  onGuardrailsViolation,
 }: {
   planId: string;
   plan: MealPlanResponse;
+  onGuardrailsViolation?: (violation: GuardrailsViolationState | null) => void;
 }) {
   const [mounted, setMounted] = useState(false);
 
@@ -41,5 +49,5 @@ export function MealPlanActionsClient({
     );
   }
 
-  return <MealPlanActions planId={planId} plan={plan} />;
+  return <MealPlanActions planId={planId} plan={plan} onGuardrailsViolation={onGuardrailsViolation} />;
 }

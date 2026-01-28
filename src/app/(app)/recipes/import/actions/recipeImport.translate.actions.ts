@@ -5,6 +5,27 @@ import { z } from "zod";
 import { getGeminiClient } from "@/src/lib/ai/gemini/gemini.client";
 import type { GeminiExtractedRecipe } from "../recipeImport.gemini.schemas";
 
+/** Woorden die typisch Engels zijn in recepten; als deze in de "vertaalde" tekst staan bij target nl, opnieuw per item vertalen */
+const ENGLISH_RECIPE_MARKERS = /\b(tomatoes|cucumbers|scallions|peppers|place|add|stir|mix|slice|chop|cup|tablespoon|teaspoon|ounces|recipe|salad)\b/i;
+
+/** Extract only numbered list lines from Gemini response (skip preamble like "Here are the translated...") */
+function extractNumberedLines(response: string): string[] {
+  return response
+    .trim()
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => /^\d+\.?\s*/.test(line))
+    .map((line) => line.replace(/^\d+\.?\s*/, "").trim());
+}
+
+function looksLikeEnglish(text: string | undefined, original: string | undefined): boolean {
+  if (!text || !original) return false;
+  const t = text.trim().toLowerCase();
+  const o = original.trim().toLowerCase();
+  if (t === o) return true;
+  return ENGLISH_RECIPE_MARKERS.test(t);
+}
+
 /**
  * Convert English units to Dutch/metric units
  */
@@ -187,33 +208,63 @@ export async function translateRecipeImportAction(
 
     // Translate using Gemini
     const gemini = getGeminiClient();
+    const modelName = gemini.getModelName("translate");
+    console.log(`[translateRecipeImportAction] Using model: ${modelName}`);
     const translated: GeminiExtractedRecipe = { ...extracted };
 
     // Translate title
     if (extracted.title) {
       const titlePrompt = targetLocale === "nl"
-        ? `Translate the following recipe title to Dutch (Nederlands). Keep it natural. Only return the translated title, nothing else.
+        ? `Vertaal deze recepttitel naar het Nederlands. Geef ALLEEN de Nederlandse titel, geen uitleg of Engels.
 
-Title: "${extracted.title}"
+"${extracted.title}"
 
-Translated title:`
-        : `Translate the following recipe title to English. Keep it natural. Only return the translated title, nothing else.
+Nederlandse titel:`
+        : `Translate this recipe title to English. Return ONLY the English title, nothing else.
 
-Title: "${extracted.title}"
+"${extracted.title}"
 
-Translated title:`;
+English title:`;
 
       try {
         const titleResponse = await gemini.generateText({
           prompt: titlePrompt,
-          temperature: 0.3,
+          temperature: 0.2,
           purpose: "translate",
         });
-        translated.title = titleResponse.trim().replace(/^["']|["']$/g, '') || extracted.title;
+        translated.title = titleResponse.trim().replace(/^["']|["']$/g, "").trim() || extracted.title;
+        if (targetLocale === "nl" && looksLikeEnglish(translated.title, extracted.title)) {
+          const retryResponse = await gemini.generateText({
+            prompt: `Vertaal naar Nederlands, alleen het antwoord: "${extracted.title}"`,
+            temperature: 0.1,
+            purpose: "translate",
+          });
+          translated.title = retryResponse.trim().replace(/^["']|["']$/g, "").trim() || extracted.title;
+        }
         console.log(`[translateRecipeImportAction] Title translated: "${extracted.title}" → "${translated.title}"`);
       } catch (error) {
         console.error(`[translateRecipeImportAction] Failed to translate title:`, error);
-        translated.title = extracted.title; // Fallback
+        translated.title = extracted.title;
+      }
+    }
+
+    // Translate description (omschrijving) if present
+    const desc = (extracted as { description?: string }).description;
+    if (desc && typeof desc === "string" && desc.trim()) {
+      const descPrompt = targetLocale === "nl"
+        ? `Vertaal de volgende receptomschrijving naar het Nederlands. Geef ALLEEN de Nederlandse tekst, geen uitleg.\n\n"${desc.trim()}"\n\nNederlandse omschrijving:`
+        : `Translate the following recipe description to English. Return ONLY the English text, nothing else.\n\n"${desc.trim()}"\n\nEnglish description:`;
+      try {
+        const descResponse = await gemini.generateText({
+          prompt: descPrompt,
+          temperature: 0.2,
+          purpose: "translate",
+        });
+        const translatedDesc = descResponse.trim().replace(/^["']|["']$/g, "").trim() || desc;
+        (translated as { description?: string }).description = translatedDesc;
+      } catch (error) {
+        console.error(`[translateRecipeImportAction] Failed to translate description:`, error);
+        (translated as { description?: string }).description = desc;
       }
     }
 
@@ -234,18 +285,18 @@ Translated title:`;
       }).join("\n");
 
       const ingredientsPrompt = targetLocale === "nl"
-        ? `Translate the following recipe ingredients to Dutch (Nederlands). Keep ingredient names natural and appropriate for cooking. Convert units to metric if needed (cups → ml, oz → g, etc.). Return ONLY a numbered list of translated ingredients, one per line, in the same format. Do not include any other text.
+        ? `Vertaal de volgende recept-ingrediënten naar het Nederlands. Je antwoord moet ALLEEN in het Nederlands zijn (geen Engels). Gebruik natuurlijke Nederlandse namen (tomaten, komkommers, uien, etc.). Converteer eenheden naar metrisch waar nodig (cups → ml, oz → g). Geef ALLEEN een genummerde lijst: regel 1 begint met "1. ", regel 2 met "2. ", enz. Geen introductie, geen uitleg, geen andere tekst.
 
 Ingredients:
 ${ingredientsList}
 
-Translated ingredients:`
-        : `Translate the following recipe ingredients to English. Keep ingredient names natural and appropriate for cooking. Return ONLY a numbered list of translated ingredients, one per line, in the same format. Do not include any other text.
+Antwoord (alleen genummerde lijst, Nederlands):`
+        : `Translate the following recipe ingredients to English. Reply with ONLY a numbered list: line 1 must start with "1. ", line 2 with "2. ", etc. No introduction, no explanation, no other text.
 
 Ingredients:
 ${ingredientsList}
 
-Translated ingredients:`;
+Reply (numbered list only):`;
 
       try {
         const ingredientsResponse = await gemini.generateText({
@@ -254,21 +305,16 @@ Translated ingredients:`;
           purpose: "translate",
         });
 
-        // Parse translated ingredients
-        const translatedLines = ingredientsResponse.trim().split('\n').filter(line => line.trim());
+        // Parse translated ingredients (only numbered lines to skip preamble)
+        const translatedLines = extractNumberedLines(ingredientsResponse);
         const translatedIngredients = await Promise.all(
           extracted.ingredients.map(async (ing, idx) => {
             const translatedIng = { ...ing };
             
-            // Try to extract translated line
-            let translatedLine = translatedLines[idx] || translatedLines.find(line => 
-              line.trim().startsWith(`${idx + 1}.`) || line.trim().startsWith(`${idx + 1}`)
-            );
+            // Try to extract translated line (extractNumberedLines already stripped numbering)
+            const translatedLine = translatedLines[idx];
             
             if (translatedLine) {
-              // Remove numbering
-              translatedLine = translatedLine.replace(/^\d+\.?\s*/, '').trim();
-              
               // Try to parse quantity, unit, name, and note
               // Pattern: "quantity unit name (note)" or "unit name (note)" or "name (note)" or "name"
               const noteMatch = translatedLine.match(/^(.+?)\s*\(([^)]+)\)$/);
@@ -300,22 +346,36 @@ Translated ingredients:`;
               if (note) {
                 translatedIng.note = note;
               }
-            } else {
+            }
+
+            // Als batch nog Engels teruggeeft bij target nl, per item vertalen
+            if (targetLocale === "nl" && looksLikeEnglish(translatedIng.name, ing.name) && ing.name) {
+              try {
+                const nameResponse = await gemini.generateText({
+                  prompt: `Vertaal dit recept-ingrediënt naar het Nederlands. Alleen het Nederlandse woord/zin, geen uitleg.\n"${ing.name}"`,
+                  temperature: 0.2,
+                  purpose: "translate",
+                });
+                translatedIng.name = nameResponse.trim().replace(/^["']|["']$/g, "").trim() || ing.name;
+              } catch {
+                translatedIng.name = ing.name;
+              }
+            }
+
+            if (!translatedLine && ing.name) {
               // Fallback: translate name only
-              if (ing.name) {
-                const namePrompt = targetLocale === "nl"
-                  ? `Translate this ingredient name to Dutch: "${ing.name}"`
-                  : `Translate this ingredient name to English: "${ing.name}"`;
-                try {
-                  const nameResponse = await gemini.generateText({
-                    prompt: namePrompt,
-                    temperature: 0.3,
-                    purpose: "translate",
-                  });
-                  translatedIng.name = nameResponse.trim().replace(/^["']|["']$/g, '') || ing.name;
-                } catch {
-                  translatedIng.name = ing.name;
-                }
+              const namePrompt = targetLocale === "nl"
+                ? `Translate this ingredient name to Dutch: "${ing.name}"`
+                : `Translate this ingredient name to English: "${ing.name}"`;
+              try {
+                const nameResponse = await gemini.generateText({
+                  prompt: namePrompt,
+                  temperature: 0.3,
+                  purpose: "translate",
+                });
+                translatedIng.name = nameResponse.trim().replace(/^["']|["']$/g, "") || ing.name;
+              } catch {
+                translatedIng.name = ing.name;
               }
             }
 
@@ -408,18 +468,18 @@ Translated ingredients:`;
       }).map((text, idx) => `${idx + 1}. ${text}`).join("\n\n");
 
       const instructionsPrompt = targetLocale === "nl"
-        ? `Translate the following cooking instructions to Dutch (Nederlands). Keep them natural and appropriate for cooking instructions. Temperatures are already converted to Celsius. Return ONLY a numbered list of translated instructions, one per line, maintaining the same structure. Do not include any other text.
+        ? `Vertaal de volgende bereidingsinstructies naar het Nederlands. Je antwoord moet ALLEEN in het Nederlands zijn (geen Engels). Gebruik natuurlijke Nederlandse zinnen. Geef ALLEEN een genummerde lijst: regel 1 begint met "1. ", regel 2 met "2. ", enz. Geen introductie, geen uitleg, geen andere tekst.
 
 Instructions:
 ${instructionsText}
 
-Translated instructions:`
-        : `Translate the following cooking instructions to English. Keep them natural and appropriate for cooking instructions. Return ONLY a numbered list of translated instructions, one per line, maintaining the same structure. Do not include any other text.
+Antwoord (alleen genummerde lijst, Nederlands):`
+        : `Translate the following cooking instructions to English. Reply with ONLY a numbered list: line 1 must start with "1. ", line 2 with "2. ", etc. No introduction, no explanation, no other text.
 
 Instructions:
 ${instructionsText}
 
-Translated instructions:`;
+Reply (numbered list only):`;
 
       try {
         const instructionsResponse = await gemini.generateText({
@@ -428,19 +488,29 @@ Translated instructions:`;
           purpose: "translate",
         });
 
-        // Parse translated instructions
-        const translatedLines = instructionsResponse
-          .trim()
-          .split(/\n+/)
-          .filter(line => line.trim())
-          .map(line => line.replace(/^\d+\.?\s*/, '').trim());
+        // Parse translated instructions (only numbered lines to skip preamble)
+        const translatedLines = extractNumberedLines(instructionsResponse);
 
-        translated.instructions = extracted.instructions.map((inst, idx) => {
-          const translatedInst = { ...inst };
-          const translatedText = translatedLines[idx] || inst.text;
-          translatedInst.text = translatedText;
-          return translatedInst;
-        });
+        translated.instructions = await Promise.all(
+          extracted.instructions.map(async (inst, idx) => {
+            const translatedInst = { ...inst };
+            let translatedText = translatedLines[idx] || inst.text;
+            translatedInst.text = translatedText;
+            if (targetLocale === "nl" && looksLikeEnglish(translatedText, inst.text) && inst.text) {
+              try {
+                const textResponse = await gemini.generateText({
+                  prompt: `Vertaal deze bereidingsinstructie naar het Nederlands. Alleen de Nederlandse zin, geen uitleg.\n"${inst.text}"`,
+                  temperature: 0.2,
+                  purpose: "translate",
+                });
+                translatedInst.text = textResponse.trim().replace(/^["']|["']$/g, "").trim() || inst.text;
+              } catch {
+                translatedInst.text = inst.text;
+              }
+            }
+            return translatedInst;
+          })
+        );
 
         console.log(`[translateRecipeImportAction] Translated ${translated.instructions.length} instructions in batch`);
       } catch (error) {
@@ -490,15 +560,19 @@ Translated instructions:`;
       }
     }
 
-    // Update translated_to field - ALWAYS set this, even if translation partially failed
-    translated.translated_to = targetLocale;
+    // Only set translated_to when we actually have translated content (avoid "Vertaald naar: nl" with English text)
+    if (targetLocale === "nl" && looksLikeEnglish(translated.title, extracted.title)) {
+      translated.translated_to = null;
+      console.log(`[translateRecipeImportAction] Title still looks English, not setting translated_to`);
+    } else {
+      translated.translated_to = targetLocale;
+    }
 
     // Save both original and translated versions
     // If original_recipe_json doesn't exist yet, save the current extracted as original
     const originalToSave = job.original_recipe_json || extracted;
     
-    console.log(`[translateRecipeImportAction] Saving translation. Original title: "${extracted.title}", Translated title: "${translated.title}"`);
-    console.log(`[translateRecipeImportAction] translated_to will be set to: "${targetLocale}"`);
+    console.log(`[translateRecipeImportAction] Saving translation. Original title: "${extracted.title}", Translated title: "${translated.title}", translated_to: ${translated.translated_to ?? "null"}`);
     
     const { error: updateError } = await supabase
       .from("recipe_imports")

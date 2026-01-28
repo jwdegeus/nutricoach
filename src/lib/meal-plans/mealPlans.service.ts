@@ -6,6 +6,7 @@
 
 import "server-only";
 import { createClient } from "@/src/lib/supabase/server";
+import { getGeminiClient } from "@/src/lib/ai/gemini/gemini.client";
 import { ProfileService } from "@/src/lib/profile/profile.service";
 import { MealPlannerAgentService } from "@/src/lib/agents/meal-planner";
 import { MealPlannerEnrichmentService } from "@/src/lib/agents/meal-planner";
@@ -29,32 +30,25 @@ import {
 } from "./mealPlans.schemas";
 
 /**
- * Get model name for observability
- */
-function getModelName(): string {
-  return process.env.GEMINI_MODEL ?? "gemini-2.0-flash-exp";
-}
-
-/**
- * Log a meal plan run
+ * Log a meal plan run. Model is resolved from runType via GEMINI_MODEL_* env (see gemini.client.ts).
  */
 async function logMealPlanRun(args: {
   userId: string;
   mealPlanId: string | null;
   runType: "generate" | "regenerate" | "enrich";
-  model: string;
   status: "running" | "success" | "error";
   durationMs: number;
   errorCode?: string;
   errorMessage?: string;
 }): Promise<void> {
   const supabase = await createClient();
+  const model = getGeminiClient().getModelName(args.runType === "enrich" ? "enrich" : "plan");
 
   await supabase.from("meal_plan_runs").insert({
     user_id: args.userId,
     meal_plan_id: args.mealPlanId,
     run_type: args.runType,
-    model: args.model,
+    model,
     status: args.status,
     duration_ms: args.durationMs,
     error_code: args.errorCode ?? null,
@@ -194,9 +188,9 @@ export class MealPlansService {
     input: CreateMealPlanInput
   ): Promise<{ planId: string }> {
     const startTime = Date.now();
-    const model = getModelName();
     let runId: string | null = null;
     const supabase = await createClient();
+    const planModel = getGeminiClient().getModelName("plan");
 
     try {
       // Validate input
@@ -250,7 +244,6 @@ export class MealPlansService {
           userId,
           mealPlanId: existingPlan.id,
           runType: "generate",
-          model,
           status: "success",
           durationMs: 0, // Indicates idempotent reuse
         });
@@ -270,7 +263,7 @@ export class MealPlansService {
           user_id: userId,
           meal_plan_id: null,
           run_type: "generate",
-          model,
+          model: planModel,
           status: "running",
           duration_ms: 0,
         })
@@ -340,7 +333,6 @@ export class MealPlansService {
           userId,
           mealPlanId: null, // Will be set after insert
           runType: "enrich",
-          model,
           status: "success",
           durationMs: enrichmentDurationMs,
         });
@@ -356,7 +348,6 @@ export class MealPlansService {
           userId,
           mealPlanId: null,
           runType: "enrich",
-          model,
           status: "error",
           durationMs: enrichmentDurationMs,
           errorCode: "AGENT_ERROR",
@@ -423,7 +414,6 @@ export class MealPlansService {
           userId,
           mealPlanId: data.id,
           runType: "generate",
-          model,
           status: "success",
           durationMs,
         });
@@ -467,7 +457,6 @@ export class MealPlansService {
           userId,
           mealPlanId: null,
           runType: "generate",
-          model,
           status: "error",
           durationMs,
           errorCode,
@@ -672,9 +661,9 @@ export class MealPlansService {
     input: RegenerateMealPlanInput
   ): Promise<{ planId: string }> {
     const startTime = Date.now();
-    const model = getModelName();
     let runId: string | null = null;
     const supabase = await createClient();
+    const planModel = getGeminiClient().getModelName("plan");
 
     try {
       // Validate input
@@ -693,7 +682,7 @@ export class MealPlansService {
           user_id: userId,
           meal_plan_id: validated.planId,
           run_type: "regenerate",
-          model,
+          model: planModel,
           status: "running",
           duration_ms: 0,
         })
@@ -767,7 +756,6 @@ export class MealPlansService {
             userId,
             mealPlanId: validated.planId,
             runType: "enrich",
-            model,
             status: "success",
             durationMs: enrichmentDurationMs,
           });
@@ -782,7 +770,6 @@ export class MealPlansService {
             userId,
             mealPlanId: validated.planId,
             runType: "enrich",
-            model,
             status: "error",
             durationMs: enrichmentDurationMs,
             errorCode: "AGENT_ERROR",
@@ -826,7 +813,6 @@ export class MealPlansService {
             userId,
             mealPlanId: validated.planId,
             runType: "regenerate",
-            model,
             status: "success",
             durationMs,
           });
@@ -856,7 +842,6 @@ export class MealPlansService {
             userId,
             mealPlanId: validated.planId,
             runType: "enrich",
-            model,
             status: "success",
             durationMs: enrichmentDurationMs,
           });
@@ -871,7 +856,6 @@ export class MealPlansService {
             userId,
             mealPlanId: validated.planId,
             runType: "enrich",
-            model,
             status: "error",
             durationMs: enrichmentDurationMs,
             errorCode: "AGENT_ERROR",
@@ -915,7 +899,6 @@ export class MealPlansService {
             userId,
             mealPlanId: validated.planId,
             runType: "regenerate",
-            model,
             status: "success",
             durationMs,
           });
@@ -959,9 +942,8 @@ export class MealPlansService {
         await logMealPlanRun({
           userId,
           mealPlanId: planId,
-          runType: "regenerate",
-          model,
-          status: "error",
+            runType: "regenerate",
+            status: "error",
           durationMs,
           errorCode,
           errorMessage: errorMessage.substring(0, 500),

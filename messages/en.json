@@ -110,6 +110,7 @@
     "errorFileTooLargeForProcessing": "File is too large for processing. Maximum size is 4MB.",
     "errorJobNotFound": "Recipe import not found or no access",
     "errorUnknown": "Unknown error occurred",
+    "errorNetworkOrTimeout": "Network error or timeout. Check your connection and try again.",
     "errorNoFileForProcessing": "No file available for processing. Please select a recipe photo first.",
     "errorStage": "Stage",
     "errorStagegemini_call": "Gemini API call",
@@ -142,7 +143,10 @@
     "totalTime": "Total time",
     "minutes": "minutes",
     "original": "Original",
-    "noExtractedData": "No extracted data available. Please try again."
+    "noExtractedData": "No extracted data available. Please try again.",
+    "translateToDutch": "Translate to Dutch",
+    "translating": "Translating...",
+    "translateFailed": "Translation failed. Please try again."
   },
   "recipes": {
     "pageTitle": "Recipes Database",

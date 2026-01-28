@@ -7,6 +7,8 @@ import { getTranslations } from "next-intl/server";
 import { Button } from "@/components/catalyst/button";
 import { Link } from "@/components/catalyst/link";
 import { PlusIcon } from "@heroicons/react/16/solid";
+import { getTermsForCategoryCodes, filterMealsByIngredientTerms } from "@/src/lib/ingredient-categories/get-terms-for-codes";
+import { getRecipeComplianceScoresAction } from "./actions/recipe-compliance.actions";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('recipes');
@@ -21,7 +23,11 @@ export const dynamic = 'force-dynamic';
 export const revalidate = false;
 export const fetchCache = 'force-no-store';
 
-export default async function RecipesPage() {
+type RecipesPageProps = {
+  searchParams: Promise<{ categories?: string; categoryNames?: string }>;
+};
+
+export default async function RecipesPage({ searchParams }: RecipesPageProps) {
   // Check authentication
   const supabase = await createClient();
   const {
@@ -35,7 +41,20 @@ export default async function RecipesPage() {
   // Load meals directly (not using server action to avoid POST request loops)
   try {
     const service = new CustomMealsService();
-    const customMeals = await service.getUserMeals(user.id);
+    let customMeals = await service.getUserMeals(user.id);
+
+    const params = await searchParams;
+    const categoryCodes = (params.categories ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    const categoryNames = (params.categoryNames ?? "")
+      .split(",")
+      .map((s) => decodeURIComponent(s.trim()))
+      .filter(Boolean);
+    let categoryFilter: { categoryNames: string[] } | undefined;
+    if (categoryCodes.length > 0) {
+      const terms = await getTermsForCategoryCodes(categoryCodes);
+      customMeals = filterMealsByIngredientTerms(customMeals, terms);
+      categoryFilter = { categoryNames: categoryNames.length > 0 ? categoryNames : categoryCodes };
+    }
 
     // Also get meal history
     const { data: mealHistory } = await supabase
@@ -62,6 +81,29 @@ export default async function RecipesPage() {
       userRating: ratingMap.get(meal.id) || null,
     }));
 
+    const complianceItems = [
+      ...customMealsWithRatings.map((m) => {
+        const base = m.mealData ?? {};
+        const instructions = m.aiAnalysis?.instructions;
+        const mealData =
+          Array.isArray(instructions) && instructions.length > 0
+            ? { ...base, instructions }
+            : base;
+        return { id: m.id, source: "custom" as const, mealData };
+      }),
+      ...(mealHistory || []).map((m: { id: string; meal_data?: unknown; ai_analysis?: { instructions?: unknown } }) => {
+        const base = m.meal_data ?? {};
+        const instructions = m.ai_analysis?.instructions;
+        const meal_data =
+          Array.isArray(instructions) && instructions.length > 0
+            ? { ...(typeof base === "object" && base !== null ? base : {}), instructions }
+            : base;
+        return { id: m.id, source: "gemini" as const, meal_data };
+      }),
+    ];
+    const complianceResult = await getRecipeComplianceScoresAction(complianceItems);
+    const complianceScores = complianceResult.ok ? complianceResult.data : {};
+
     const t = await getTranslations('recipes');
 
     return (
@@ -79,7 +121,9 @@ export default async function RecipesPage() {
           initialMeals={{
             customMeals: customMealsWithRatings,
             mealHistory: mealHistory || [],
-          }} 
+          }}
+          initialComplianceScores={complianceScores}
+          categoryFilter={categoryFilter}
         />
       </div>
     );

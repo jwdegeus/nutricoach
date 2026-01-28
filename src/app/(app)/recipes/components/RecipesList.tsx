@@ -70,6 +70,7 @@ import { StarIcon } from "@heroicons/react/20/solid";
 import type { CustomMealRecord } from "@/src/lib/custom-meals/customMeals.service";
 import type { MealSlot } from "@/src/lib/diets";
 import { getRecipeRatingAction } from "../actions/meals.actions";
+import type { RecipeComplianceResult } from "../actions/recipe-compliance.actions";
 
 type MealItem = (CustomMealRecord & { source: "custom" }) | (any & { source: "gemini" });
 
@@ -79,6 +80,8 @@ type RecipesListProps = {
   currentPage?: number;
   totalPages?: number;
   itemsPerPage?: number;
+  /** Compliance scores per meal id (0–100% volgens dieetregels) */
+  complianceScores?: Record<string, RecipeComplianceResult>;
   onPageChange?: (page: number) => void;
   onConsumptionLogged?: (mealId: string, source: "custom" | "gemini") => void;
   onDietTypeUpdated?: (mealId: string, source: "custom" | "gemini", dietTypeName: string | null) => void;
@@ -127,12 +130,31 @@ function generatePaginationPages(currentPage: number, totalPages: number): (numb
   return pages;
 }
 
+function ComplianceScoreBadge({ score }: { score: RecipeComplianceResult }) {
+  if (score.noRulesConfigured) {
+    return (
+      <Badge color="zinc" className="text-xs" title="Geen dieetregels geconfigureerd voor dit dieet">
+        N.v.t.
+      </Badge>
+    );
+  }
+  const p = score.scorePercent;
+  const color =
+    p >= 80 ? "green" : p >= 50 ? "amber" : p >= 20 ? "red" : "red";
+  return (
+    <Badge color={color} className="font-mono text-xs" title={score.ok ? "Voldoet aan dieetregels" : "Schendt één of meer dieetregels"}>
+      {p}%
+    </Badge>
+  );
+}
+
 export function RecipesList({ 
   meals, 
   totalItems,
   currentPage = 1,
   totalPages = 1,
   itemsPerPage = 15,
+  complianceScores = {},
   onPageChange,
   onConsumptionLogged, 
   onDietTypeUpdated, 
@@ -319,12 +341,12 @@ export function RecipesList({
               <TableRow>
                 <TableHeader className="w-0"></TableHeader>
                 <TableHeader>Naam</TableHeader>
-                <TableHeader className="whitespace-nowrap">Type</TableHeader>
                 <TableHeader className="whitespace-nowrap">Slot</TableHeader>
                 <TableHeader className="whitespace-nowrap">Bereidingstijd</TableHeader>
                 <TableHeader className="whitespace-nowrap">Porties</TableHeader>
                 <TableHeader className="whitespace-nowrap">Gebruikt</TableHeader>
                 <TableHeader className="whitespace-nowrap">Beoordeling</TableHeader>
+                <TableHeader className="whitespace-nowrap">Compliance</TableHeader>
                 <TableHeader className="relative w-0">
                   <span className="sr-only">Acties</span>
                 </TableHeader>
@@ -338,7 +360,7 @@ export function RecipesList({
               <TableCell>
                 <RecipeThumbnail imageUrl={imageUrl} alt={meal.name || meal.meal_name || "Recept"} />
               </TableCell>
-              <TableCell className="font-medium">
+              <TableCell className="font-medium min-w-[180px]">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span>{meal.name || meal.meal_name}</span>
                   {formatDietTypeName(meal.dietKey || meal.diet_key) && (
@@ -347,11 +369,6 @@ export function RecipesList({
                     </Badge>
                   )}
                 </div>
-              </TableCell>
-              <TableCell>
-                <Badge color={meal.source === "custom" ? "blue" : "zinc"}>
-                  {meal.source === "custom" ? "Custom" : "Gemini"}
-                </Badge>
               </TableCell>
               <TableCell className="capitalize whitespace-nowrap text-sm">
                 {formatMealSlot(meal.mealSlot || meal.meal_slot)}
@@ -408,6 +425,13 @@ export function RecipesList({
                       {meal.userRating || meal.user_rating}/5
                     </span>
                   </div>
+                ) : (
+                  <span className="text-zinc-400 text-sm">-</span>
+                )}
+              </TableCell>
+              <TableCell className="whitespace-nowrap">
+                {complianceScores[meal.id] ? (
+                  <ComplianceScoreBadge score={complianceScores[meal.id]} />
                 ) : (
                   <span className="text-zinc-400 text-sm">-</span>
                 )}

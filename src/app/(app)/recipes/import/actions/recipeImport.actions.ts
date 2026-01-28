@@ -504,10 +504,60 @@ export async function importRecipeFromUrlAction(
         if (jsonLdResult.ok && jsonLdResult.draft) {
           // Validate that we have actual recipe data
           if (jsonLdResult.draft.ingredients.length > 0 && jsonLdResult.draft.steps.length > 0) {
-            // JSON-LD extraction succeeded - create job and save recipe
+            // JSON-LD extraction succeeded - create job and save recipe (no auto-translate; user translates via button)
             console.log("[importRecipeFromUrlAction] Recipe extracted via JSON-LD:", jsonLdResult.draft);
-            
-            // Create job
+            const jsonLdExtractedRecipe = {
+              title: jsonLdResult.draft.title,
+              language_detected: jsonLdResult.draft.sourceLanguage || "en",
+              translated_to: null,
+              description: jsonLdResult.draft.description,
+              servings: jsonLdResult.draft.servings ? (() => {
+                const servingsNum = parseFloat(jsonLdResult.draft.servings);
+                return isNaN(servingsNum) || servingsNum <= 0 ? null : Math.round(servingsNum);
+              })() : null,
+              ingredients: jsonLdResult.draft.ingredients.map(ing => {
+                const text = ing.text.trim();
+                let quantity: number | null = null;
+                let unit: string | null = null;
+                let name: string = text;
+                let note: string | null = null;
+                const noteMatch = text.match(/^(.+?)\s*\(([^)]+)\)$/);
+                const mainPart = noteMatch ? noteMatch[1].trim() : text;
+                if (noteMatch) note = noteMatch[2].trim();
+                const qtyUnitMatch = mainPart.match(/^([\d\s½¼¾⅓⅔⅛⅜⅝⅞]+)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/);
+                if (qtyUnitMatch) {
+                  const qtyStr = qtyUnitMatch[1].trim();
+                  const fractionMap: Record<string, number> = {
+                    '½': 0.5, '¼': 0.25, '¾': 0.75,
+                    '⅓': 0.333, '⅔': 0.667,
+                    '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875
+                  };
+                  let qty = 0;
+                  for (const part of qtyStr.split(/\s+/)) {
+                    if (fractionMap[part]) qty += fractionMap[part];
+                    else { const num = parseFloat(part); if (!isNaN(num)) qty += num; }
+                  }
+                  if (qty > 0) {
+                    quantity = qty;
+                    unit = qtyUnitMatch[2].trim();
+                    name = qtyUnitMatch[3].trim();
+                  }
+                } else {
+                  const unitMatch = mainPart.match(/^([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/);
+                  if (unitMatch) { unit = unitMatch[1].trim(); name = unitMatch[2].trim(); }
+                  else name = mainPart;
+                }
+                return { original_line: ing.text, name, quantity, unit, note };
+              }),
+              instructions: jsonLdResult.draft.steps.map((step, idx) => ({ step: idx + 1, text: step.text })),
+              times: {
+                prep_minutes: jsonLdResult.draft.prepTimeMinutes || null,
+                cook_minutes: jsonLdResult.draft.cookTimeMinutes || null,
+                total_minutes: jsonLdResult.draft.totalTimeMinutes || null,
+              },
+              confidence: { overall: 95, fields: {} },
+              warnings: [],
+            };
             const { data: jobData, error: jobError } = await supabase
               .from("recipe_imports")
               .insert({
@@ -517,100 +567,12 @@ export async function importRecipeFromUrlAction(
                   url: input.url,
                   domain: domain,
                   source: "url_import",
-                  ...(jsonLdResult.draft.imageUrl ? { imageUrl: jsonLdResult.draft.imageUrl } : {}), // Store image URL for later use
+                  ...(jsonLdResult.draft.imageUrl ? { imageUrl: jsonLdResult.draft.imageUrl } : {}),
                 },
                 source_locale: jsonLdResult.draft.sourceLanguage || undefined,
-                extracted_recipe_json: {
-                  title: jsonLdResult.draft.title,
-                  language_detected: jsonLdResult.draft.sourceLanguage || "en",
-                  translated_to: null,
-                  description: jsonLdResult.draft.description,
-                  servings: jsonLdResult.draft.servings ? (() => {
-                    // Convert servings string to number if possible
-                    const servingsNum = parseFloat(jsonLdResult.draft.servings);
-                    return isNaN(servingsNum) || servingsNum <= 0 ? null : Math.round(servingsNum);
-                  })() : null,
-                  ingredients: jsonLdResult.draft.ingredients.map(ing => {
-                    // Parse ingredient text to extract quantity, unit, name, and note
-                    const text = ing.text.trim();
-                    let quantity: number | null = null;
-                    let unit: string | null = null;
-                    let name: string = text;
-                    let note: string | null = null;
-
-                    // Try to extract note (text in parentheses)
-                    const noteMatch = text.match(/^(.+?)\s*\(([^)]+)\)$/);
-                    const mainPart = noteMatch ? noteMatch[1].trim() : text;
-                    if (noteMatch) {
-                      note = noteMatch[2].trim();
-                    }
-
-                    // Try to parse quantity and unit
-                    // Pattern: "1 ½ cup flour" or "1 lb ground chicken" or "2 cloves garlic"
-                    const qtyUnitMatch = mainPart.match(/^([\d\s½¼¾⅓⅔⅛⅜⅝⅞]+)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/);
-                    if (qtyUnitMatch) {
-                      // Parse fraction or decimal quantity
-                      const qtyStr = qtyUnitMatch[1].trim();
-                      const fractionMap: Record<string, number> = {
-                        '½': 0.5, '¼': 0.25, '¾': 0.75,
-                        '⅓': 0.333, '⅔': 0.667,
-                        '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875
-                      };
-                      
-                      let qty = 0;
-                      const parts = qtyStr.split(/\s+/);
-                      for (const part of parts) {
-                        if (fractionMap[part]) {
-                          qty += fractionMap[part];
-                        } else {
-                          const num = parseFloat(part);
-                          if (!isNaN(num)) {
-                            qty += num;
-                          }
-                        }
-                      }
-                      
-                      if (qty > 0) {
-                        quantity = qty;
-                        unit = qtyUnitMatch[2].trim();
-                        name = qtyUnitMatch[3].trim();
-                      }
-                    } else {
-                      // Try without quantity: "cup flour" or "cloves garlic"
-                      const unitMatch = mainPart.match(/^([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/);
-                      if (unitMatch) {
-                        unit = unitMatch[1].trim();
-                        name = unitMatch[2].trim();
-                      } else {
-                        // Just name
-                        name = mainPart;
-                      }
-                    }
-
-                    return {
-                      original_line: ing.text,
-                      name,
-                      quantity,
-                      unit,
-                      note,
-                    };
-                  }),
-                  instructions: jsonLdResult.draft.steps.map((step, idx) => ({
-                    step: idx + 1,
-                    text: step.text,
-                  })),
-                  times: {
-                    prep_minutes: jsonLdResult.draft.prepTimeMinutes || null,
-                    cook_minutes: jsonLdResult.draft.cookTimeMinutes || null,
-                    total_minutes: jsonLdResult.draft.totalTimeMinutes || null,
-                  },
-                  confidence: {
-                    overall: 95,
-                    fields: {},
-                  },
-                  warnings: [],
-                },
-                confidence_overall: 95, // JSON-LD is highly reliable
+                extracted_recipe_json: jsonLdExtractedRecipe,
+                original_recipe_json: jsonLdExtractedRecipe,
+                confidence_overall: 95,
               })
               .select("id")
               .single();
@@ -666,31 +628,53 @@ export async function importRecipeFromUrlAction(
               }
             }
 
-            // Automatically translate recipe if needed
-            console.log("[importRecipeFromUrlAction] Auto-translating JSON-LD recipe...");
+            // Step 2: Translate to user language (ingredients, description, instructions)
+            console.log("[importRecipeFromUrlAction] Translating JSON-LD recipe to user language...");
             try {
               const { translateRecipeImportAction } = await import("./recipeImport.translate.actions");
-              const translateResult = await translateRecipeImportAction({
-                jobId: jobData.id,
-                // targetLocale will be determined from user preferences in the action
-              });
-
+              const translateResult = await translateRecipeImportAction({ jobId: jobData.id });
               if (translateResult.ok) {
-                console.log("[importRecipeFromUrlAction] Translation completed successfully");
+                console.log("[importRecipeFromUrlAction] Translation completed");
               } else {
-                // Log but don't fail - recipe is already extracted
                 console.error("[importRecipeFromUrlAction] Translation failed (non-fatal):", translateResult.error);
               }
             } catch (translateError) {
-              // Log but don't fail - recipe is already extracted
               console.error("[importRecipeFromUrlAction] Translation error (non-fatal):", translateError);
             }
-            
-            // JSON-LD extraction succeeded - recipe is ready
-            
+
+            // Return fresh job (with translated extracted_recipe_json) so client shows it without refetch
+            const { data: freshData } = await supabase
+              .from("recipe_imports")
+              .select("*, original_recipe_json")
+              .eq("id", jobData.id)
+              .eq("user_id", user.id)
+              .maybeSingle();
+            const job = freshData
+              ? ({
+                  id: freshData.id,
+                  userId: freshData.user_id,
+                  status: freshData.status as RecipeImportStatus,
+                  sourceImagePath: freshData.source_image_path,
+                  sourceImageMeta: freshData.source_image_meta,
+                  sourceLocale: freshData.source_locale,
+                  targetLocale: freshData.target_locale,
+                  rawOcrText: freshData.raw_ocr_text,
+                  geminiRawJson: freshData.gemini_raw_json,
+                  extractedRecipeJson: freshData.extracted_recipe_json,
+                  originalRecipeJson: freshData.original_recipe_json,
+                  validationErrorsJson: freshData.validation_errors_json,
+                  confidenceOverall: freshData.confidence_overall ? parseFloat(freshData.confidence_overall.toString()) : null,
+                  createdAt: freshData.created_at,
+                  updatedAt: freshData.updated_at,
+                  finalizedAt: freshData.finalized_at,
+                  recipeId: freshData.recipe_id || null,
+                } as RecipeImportJob)
+              : undefined;
+
             return {
               ok: true,
               jobId: jobData.id,
+              job,
             };
           } else {
             console.log("[importRecipeFromUrlAction] JSON-LD draft incomplete, trying Gemini");
@@ -861,6 +845,7 @@ export async function importRecipeFromUrlAction(
           source_locale: geminiResult.extracted.language_detected || undefined,
           gemini_raw_json: geminiResult.rawResponse,
           extracted_recipe_json: geminiResult.extracted,
+          original_recipe_json: geminiResult.extracted,
           confidence_overall: geminiResult.extracted.confidence?.overall || null,
         })
         .select("id")
@@ -877,29 +862,53 @@ export async function importRecipeFromUrlAction(
 
       console.log(`[importRecipeFromUrlAction] Recipe extracted successfully`);
 
-      // Automatically translate recipe if needed
-      console.log("[importRecipeFromUrlAction] Auto-translating recipe...");
+      // Step 2: Translate to user language (ingredients, description, instructions)
+      console.log("[importRecipeFromUrlAction] Translating recipe to user language...");
       try {
         const { translateRecipeImportAction } = await import("./recipeImport.translate.actions");
-        const translateResult = await translateRecipeImportAction({
-          jobId: jobData.id,
-          // targetLocale will be determined from user preferences in the action
-        });
-
+        const translateResult = await translateRecipeImportAction({ jobId: jobData.id });
         if (translateResult.ok) {
-          console.log("[importRecipeFromUrlAction] Translation completed successfully");
+          console.log("[importRecipeFromUrlAction] Translation completed");
         } else {
-          // Log but don't fail - recipe is already extracted
           console.error("[importRecipeFromUrlAction] Translation failed (non-fatal):", translateResult.error);
         }
       } catch (translateError) {
-        // Log but don't fail - recipe is already extracted
         console.error("[importRecipeFromUrlAction] Translation error (non-fatal):", translateError);
       }
+
+      // Return fresh job (with translated extracted_recipe_json) so client shows it without refetch
+      const { data: freshData } = await supabase
+        .from("recipe_imports")
+        .select("*, original_recipe_json")
+        .eq("id", jobData.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const job = freshData
+        ? ({
+            id: freshData.id,
+            userId: freshData.user_id,
+            status: freshData.status as RecipeImportStatus,
+            sourceImagePath: freshData.source_image_path,
+            sourceImageMeta: freshData.source_image_meta,
+            sourceLocale: freshData.source_locale,
+            targetLocale: freshData.target_locale,
+            rawOcrText: freshData.raw_ocr_text,
+            geminiRawJson: freshData.gemini_raw_json,
+            extractedRecipeJson: freshData.extracted_recipe_json,
+            originalRecipeJson: freshData.original_recipe_json,
+            validationErrorsJson: freshData.validation_errors_json,
+            confidenceOverall: freshData.confidence_overall ? parseFloat(freshData.confidence_overall.toString()) : null,
+            createdAt: freshData.created_at,
+            updatedAt: freshData.updated_at,
+            finalizedAt: freshData.finalized_at,
+            recipeId: freshData.recipe_id || null,
+          } as RecipeImportJob)
+        : undefined;
 
       return {
         ok: true,
         jobId: jobData.id,
+        job,
       };
     } catch (error) {
       console.error("Error processing recipe URL with Gemini:", error);

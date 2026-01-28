@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/src/lib/supabase/server";
-import { RecipeDetailPageClient } from "./components/MealDetailPageClient";
+import { RecipeDetailPageClientLoader } from "./components/RecipeDetailPageClientLoader";
 
 export const metadata: Metadata = {
   title: "Recept Details | NutriCoach",
@@ -44,5 +44,5 @@ export default async function RecipeDetailPage({
     redirect("/recipes");
   }
 
-  return <RecipeDetailPageClient mealId={recipeId} mealSource={mealSource} />;
+  return <RecipeDetailPageClientLoader mealId={recipeId} mealSource={mealSource} />;
 }

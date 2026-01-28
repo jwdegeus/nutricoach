@@ -16,6 +16,11 @@ import { planEditSchema, planChatRequestSchema } from "./planEdit.schemas";
 import { buildPlanChatPrompt } from "./planChat.prompts";
 import { applyPlanEdit, type ApplyPlanEditResult } from "./planEdit.apply";
 import { zodToJsonSchema } from "zod-to-json-schema";
+// vNext guard rails (shadow mode) + Diet Logic (Dieetregels)
+import { loadRulesetWithDietLogic, evaluateGuardrails } from "@/src/lib/guardrails-vnext";
+import { mapPlanEditToGuardrailsTargets } from "@/src/lib/guardrails-vnext/adapters/plan-chat";
+import type { EvaluationContext } from "@/src/lib/guardrails-vnext/types";
+import { evaluateDietLogic } from "@/src/lib/diet-logic";
 
 /**
  * Plan Chat Service
@@ -161,6 +166,106 @@ export class PlanChatService {
       );
     }
 
+    // Shadow mode: vNext guard rails evaluation (feature flag)
+    const useVNextGuardrails = process.env.USE_VNEXT_GUARDRAILS === "true";
+    if (useVNextGuardrails) {
+      try {
+        await this.evaluateVNextGuardrails(edit, planSnapshot, plan.dietKey, chatRequest.planId, userId);
+      } catch (error) {
+        // Don't fail the request if vNext evaluation fails (shadow mode only)
+        console.error("[PlanChat] vNext guard rails evaluation failed:", error);
+      }
+    }
+
+    // Enforcement gate: vNext guard rails enforcement (feature flag)
+    // TODO [GUARD-RAILS-vNext]: RISK #3 - No Post-Validation in Plan Chat
+    // This gate closes the bypass by blocking applyPlanEdit when HARD violations are detected.
+    // See: docs/guard-rails-rebuild-plan.md section 6.2
+    const enforceVNext = process.env.ENFORCE_VNEXT_GUARDRAILS_PLAN_CHAT === "true";
+    if (enforceVNext) {
+      try {
+        // Map edit and plan snapshot to vNext targets
+        const targets = mapPlanEditToGuardrailsTargets(edit, planSnapshot, 'nl');
+
+        // Load guardrails + Diet Logic (Dieetregels); use userId for is_inflamed from profile
+        const { guardrails, dietLogic } = await loadRulesetWithDietLogic({
+          dietId: plan.dietKey,
+          mode: 'plan_chat',
+          locale: 'nl',
+          userId,
+        });
+
+        // Build evaluation context
+        const context: EvaluationContext = {
+          dietKey: plan.dietKey,
+          locale: 'nl',
+          mode: 'plan_chat',
+          timestamp: new Date().toISOString(),
+        };
+
+        // Evaluate guardrails (allow/block)
+        const decision = evaluateGuardrails({
+          ruleset: guardrails,
+          context,
+          targets,
+        });
+
+        // Evaluate Diet Logic (DROP/FORCE/LIMIT/PASS) when available
+        let dietResult: { ok: boolean; summary: string } | null = null;
+        if (dietLogic) {
+          const dietTargets = {
+            ingredients: targets.ingredient.map((a) => ({ name: a.text })),
+          };
+          dietResult = evaluateDietLogic(dietLogic, dietTargets);
+        }
+
+        const blockedByGuardrails = !decision.ok;
+        const blockedByDietLogic = dietResult !== null && !dietResult.ok;
+
+        if (blockedByGuardrails || blockedByDietLogic) {
+          const reasonCodes = blockedByGuardrails
+            ? decision.reasonCodes
+            : [...decision.reasonCodes, 'DIET_LOGIC_VIOLATION'];
+          const message =
+            blockedByDietLogic && dietResult
+              ? dietResult.summary
+              : 'Deze wijziging voldoet niet aan de dieetregels';
+
+          console.log(
+            `[PlanChat] vNext guard rails blocked apply: planId=${chatRequest.planId}, dietKey=${plan.dietKey}, outcome=${decision.outcome}, reasonCodes=${reasonCodes.slice(0, 5).join(',')}, hash=${guardrails.contentHash}`
+          );
+
+          throw new AppError('GUARDRAILS_VIOLATION', message, {
+            outcome: 'blocked',
+            reasonCodes,
+            contentHash: guardrails.contentHash,
+            rulesetVersion: guardrails.version,
+          });
+        }
+      } catch (error) {
+        // Fail-closed on evaluator/loader errors (policy A: safest)
+        if (error instanceof AppError && error.code === "GUARDRAILS_VIOLATION") {
+          // Re-throw guardrails violations as-is
+          throw error;
+        }
+
+        // Evaluator/loader error: block apply
+        console.error(
+          `[PlanChat] vNext guard rails evaluation error: planId=${chatRequest.planId}, error=${error instanceof Error ? error.message : String(error)}`
+        );
+
+        throw new AppError(
+          "GUARDRAILS_VIOLATION",
+          "Fout bij evalueren dieetregels",
+          {
+            outcome: "blocked",
+            reasonCodes: ["EVALUATOR_ERROR"],
+            contentHash: "",
+          }
+        );
+      }
+    }
+
     // Step 9: Apply edit
     let applied: ApplyPlanEditResult | undefined;
     try {
@@ -188,5 +293,74 @@ export class PlanChatService {
       reply,
       applied,
     };
+  }
+
+  /**
+   * Evaluate vNext guard rails in shadow mode
+   *
+   * Runs guardrails + Diet Logic evaluation on PlanEdit and plan snapshot.
+   * Results are logged (no diagnostics field in response).
+   *
+   * @param edit - Plan edit
+   * @param planSnapshot - Current plan snapshot
+   * @param dietKey - Diet key
+   * @param planId - Plan ID (for logging)
+   * @param userId - Optional; when set, diet logic uses is_inflamed from user_diet_profiles
+   */
+  private async evaluateVNextGuardrails(
+    edit: PlanEdit,
+    planSnapshot: MealPlanResponse,
+    dietKey: string,
+    planId: string,
+    userId?: string
+  ): Promise<void> {
+    try {
+      const targets = mapPlanEditToGuardrailsTargets(edit, planSnapshot, 'nl');
+
+      const { guardrails, dietLogic } = await loadRulesetWithDietLogic({
+        dietId: dietKey,
+        mode: 'plan_chat',
+        locale: 'nl',
+        userId,
+      });
+
+      const context: EvaluationContext = {
+        dietKey,
+        locale: 'nl',
+        mode: 'plan_chat',
+        timestamp: new Date().toISOString(),
+      };
+
+      const decision = evaluateGuardrails({
+        ruleset: guardrails,
+        context,
+        targets,
+      });
+
+      let dietOk: boolean | null = null;
+      let dietSummary: string | null = null;
+      if (dietLogic) {
+        const dietResult = evaluateDietLogic(dietLogic, {
+          ingredients: targets.ingredient.map((a) => ({ name: a.text })),
+        });
+        dietOk = dietResult.ok;
+        dietSummary = dietResult.summary;
+      }
+
+      if (decision.outcome === 'blocked' || (dietOk === false && dietSummary)) {
+        console.warn('[PlanChat] vNext guard rails blocked plan edit', {
+          planId,
+          dietKey,
+          vNextOutcome: decision.outcome,
+          vNextHash: guardrails.contentHash.substring(0, 8),
+          reasonCodes: decision.reasonCodes.slice(0, 3),
+          matches: decision.matches.length,
+          dietLogicOk: dietOk,
+          dietLogicSummary: dietSummary ?? undefined,
+        });
+      }
+    } catch (error) {
+      console.error('[PlanChat] vNext guard rails evaluation error:', error);
+    }
   }
 }

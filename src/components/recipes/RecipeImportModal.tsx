@@ -95,13 +95,18 @@ export function RecipeImportModal({ open, onClose }: RecipeImportModalProps) {
         }
 
         if (result.ok) {
-          // Success - navigate to import page with jobId if available
+          // Success - pass job (with translated recipe) so import page shows it without refetch
           console.log('[RecipeImportModal] Import successful, jobId:', result.jobId)
           setUrl('')
           setError(null)
           setInternalOpen(false)
-          
-          // Navigate to import page with jobId if available
+          if (result.jobId && result.job && typeof window !== 'undefined') {
+            try {
+              sessionStorage.setItem(`recipe-import-job-${result.jobId}`, JSON.stringify(result.job))
+            } catch {
+              // ignore quota / parse errors
+            }
+          }
           if (result.jobId) {
             router.push(`/recipes/import?jobId=${result.jobId}`)
             onClose()
@@ -120,11 +125,11 @@ export function RecipeImportModal({ open, onClose }: RecipeImportModalProps) {
         }
       } catch (err) {
         console.error('[RecipeImportModal] Unexpected error:', err)
-        const errorMessage = err instanceof Error 
-          ? err.message 
-          : 'Er is een onverwachte fout opgetreden bij het importeren'
+        const isNetworkError = err instanceof Error && err.message === 'Failed to fetch'
+        const errorMessage = isNetworkError
+          ? tImport('errorNetworkOrTimeout')
+          : (err instanceof Error ? err.message : 'Er is een onverwachte fout opgetreden bij het importeren')
         setError(errorMessage)
-        // Don't close modal on error - let user see the error
       }
     })
   }

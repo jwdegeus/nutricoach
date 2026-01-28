@@ -23,6 +23,11 @@ import type { DietRuleset, ValidationReport } from "./diet-validator";
 import { validateDraft, findForbiddenMatches } from "./diet-validator";
 import type { DietRuleSet, IngredientConstraint } from "@/src/lib/diets";
 import { generateRecipeAdaptationWithGemini } from "./gemini-recipe-adaptation.service";
+// vNext guard rails (shadow mode)
+import { loadGuardrailsRuleset, evaluateGuardrails } from "@/src/lib/guardrails-vnext";
+import { mapRecipeDraftToGuardrailsTargets } from "@/src/lib/guardrails-vnext/adapters/recipe-adaptation";
+import type { GuardrailsVNextDiagnostics } from "../recipe-ai.types";
+import type { EvaluationContext, Locale } from "@/src/lib/guardrails-vnext/types";
 
 /**
  * Recipe Adaptation Service
@@ -86,12 +91,14 @@ export class RecipeAdaptationService {
       console.log("[RecipeAdaptationService] Ruleset loaded successfully, forbidden count:", ruleset.forbidden.length);
 
       // Generate draft with engine (first attempt)
+      // Bij twee-fase flow: bestaande violations uit eerdere analyse meegiven
+      const existingViolations = input.existingAnalysis?.violations;
       let draft: RecipeAdaptationDraft;
       let validation: ValidationReport;
       let needsRetry = false;
 
       try {
-        draft = await this.generateDraftWithEngine(recipeId, dietId, false);
+        draft = await this.generateDraftWithEngine(recipeId, dietId, false, existingViolations);
         validation = validateDraft(draft, ruleset);
 
         if (!validation.ok) {
@@ -112,7 +119,7 @@ export class RecipeAdaptationService {
       // Retry with strict mode if validation failed
       if (needsRetry) {
         try {
-          draft = await this.generateDraftWithEngine(recipeId, dietId, true);
+          draft = await this.generateDraftWithEngine(recipeId, dietId, true, existingViolations);
           validation = validateDraft(draft, ruleset);
 
           if (!validation.ok) {
@@ -123,6 +130,14 @@ export class RecipeAdaptationService {
             // The user will see the violations in the UI
             console.warn("Strict mode rewrite still has violations:", validation.matches);
             
+            // TODO [GUARD-RAILS-vNext]: RISK #2 - Fail-Open Behavior
+            // Current behavior: Draft is returned even with violations (fail-open).
+            // Risk: Users can receive recipes that violate guard rails.
+            // vNext solution: Implement fail-closed for hard constraints via src/lib/guardrails-vnext/validator.ts
+            // - Hard constraint violations → block draft, return error
+            // - Soft constraint violations → show warning, require explicit user consent
+            // - Decision trace will be generated for audit trail
+            // See: docs/guard-rails-rebuild-plan.md section 6.1
             // Return the draft anyway - it's better than nothing
             // The violations will be shown to the user
             // In a future version, we could implement iterative replacement
@@ -149,6 +164,18 @@ export class RecipeAdaptationService {
 
       console.log("[RecipeAdaptationService] Draft validation passed");
       console.log("[RecipeAdaptationService] Violations in draft:", draft.analysis.violations.length);
+      
+      // Shadow mode: vNext guard rails evaluation (feature flag)
+      const useVNextGuardrails = process.env.USE_VNEXT_GUARDRAILS === "true";
+      if (useVNextGuardrails) {
+        try {
+          await this.evaluateVNextGuardrails(draft, dietId, input.locale, recipeId, validation);
+        } catch (error) {
+          // Don't fail the request if vNext evaluation fails
+          console.error("[RecipeAdaptationService] vNext guard rails evaluation failed:", error);
+        }
+      }
+      
       console.log("[RecipeAdaptationService] Returning success result");
       console.log("[RecipeAdaptationService] ========================================");
 
@@ -177,8 +204,57 @@ export class RecipeAdaptationService {
   }
 
   /**
+   * Alleen analyse: violations uit dieetregels, geen AI-rewrite.
+   * Gebruikt in twee-fase flow (eerst "Analyseer recept", daarna "Genereer aangepaste versie").
+   */
+  async getAnalysisOnly(recipeId: string, dietId: string): Promise<{
+    violations: ViolationDetail[];
+    summary: string;
+    recipeName: string;
+  }> {
+    const recipe = await this.loadRecipeForAnalysis(recipeId);
+    if (!recipe) {
+      throw new Error("Recipe not found");
+    }
+    const ruleset = await this.loadDietRuleset(dietId);
+    if (!ruleset) {
+      throw new Error("Diet ruleset not found");
+    }
+    // Geen echte dieetregels: geen fallback gebruiken, geen nep-afwijkingen tonen
+    if (ruleset.forbidden.length === 0) {
+      return {
+        violations: [],
+        summary: "Geen dieetregels geconfigureerd voor dit dieet.",
+        recipeName: recipe.mealName,
+        noRulesConfigured: true,
+      };
+    }
+    const violations = this.analyzeRecipeForViolations(recipe, ruleset);
+
+    const summary =
+      violations.length === 0
+        ? "Geen afwijkingen gevonden! Dit recept past perfect bij jouw dieet."
+        : `${violations.length} ingrediënt${violations.length !== 1 ? "en" : ""} wijk${violations.length !== 1 ? "en" : "t"} af van je dieetvoorkeuren.`;
+    return {
+      violations,
+      summary,
+      recipeName: recipe.mealName,
+    };
+  }
+
+  /**
+   * Load recipe for analysis-only (geen user-id in pad; gebruikt huidige user uit auth).
+   */
+  private async loadRecipeForAnalysis(recipeId: string): Promise<{ mealData: any; mealName: string; steps: string[] } | null> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    return this.loadRecipe(recipeId, user.id);
+  }
+
+  /**
    * Load diet ruleset from database
-   * 
+   *
    * First tries to load recipe adaptation rules from database.
    * Falls back to deriving from user's diet profile if no rules found.
    * 
@@ -203,7 +279,7 @@ export class RecipeAdaptationService {
             code,
             name_nl,
             category_type,
-            items:ingredient_category_items(term, term_nl, synonyms)
+            items:ingredient_category_items(term, term_nl, synonyms, is_active)
           )
         `
         )
@@ -222,7 +298,26 @@ export class RecipeAdaptationService {
       // Firewall evaluatie: regels zijn al gesorteerd op rule_priority (hoog naar laag)
       // Eerste match wint - block regels hebben voorrang over allow regels op dezelfde prioriteit
       if (!constraintsError && constraints && constraints.length > 0) {
+        // Load recipe_adaptation_rules early so we can use substitution_suggestions for guard-rail terms
+        const { data: rules, error: rulesError } = await supabase
+          .from("recipe_adaptation_rules")
+          .select("*")
+          .eq("diet_type_id", dietId)
+          .eq("is_active", true)
+          .order("priority", { ascending: false });
+
+        const adaptationRules = !rulesError && rules ? rules : [];
         const forbidden: DietRuleset["forbidden"] = [];
+        // TODO [GUARD-RAILS-vNext]: RISK #6 - Allow Rules Not Used
+        // Current behavior: allowedTerms Set is populated but never used for evaluation.
+        // Only block rules are added to forbidden[] array, so allow rules have no effect.
+        // Risk: Allow rules are collected but ignored, breaking firewall logic.
+        // vNext solution: Implement full firewall evaluation in src/lib/guardrails-vnext/ruleset-loader.ts
+        // - Evaluate allow rules first (tracking)
+        // - Evaluate block rules second (block overrides allow on same priority)
+        // - Return unified GuardRailsRuleset with both allowed[] and blocked[] arrays
+        // - Validator will use both arrays for deterministic evaluation
+        // See: docs/guard-rails-rebuild-plan.md section 6.3
         const allowedTerms = new Set<string>(); // Track allowed terms (voor firewall logica)
 
         // Eerst: verzamel alle allow regels (voor firewall evaluatie)
@@ -234,7 +329,7 @@ export class RecipeAdaptationService {
             const items = category.items || [];
 
             for (const item of items) {
-              if (!item.is_active) continue;
+              if (item.is_active === false) continue;
               const term = item.term?.toLowerCase() || "";
               if (term) {
                 allowedTerms.add(term);
@@ -258,10 +353,23 @@ export class RecipeAdaptationService {
 
             // Add each item from the category with its synonyms
             for (const item of items) {
-              if (!item.is_active) continue;
+              if (item.is_active === false) continue;
 
               const synonyms = Array.isArray(item.synonyms) ? item.synonyms : [];
               const term = item.term?.toLowerCase() || "";
+              const categoryCode = (category as { code?: string }).code ?? "";
+
+              // SubstitutionSuggestions: uit recipe_adaptation_rules (zelfde term/synonym) of fallback per categorie
+              const adaptationRule = adaptationRules.find(
+                (r: { term?: string; synonyms?: string[] }) => {
+                  const rTerm = (r.term ?? "").toLowerCase();
+                  const rSynonyms = (Array.isArray(r.synonyms) ? r.synonyms : []).map((s: string) => s.toLowerCase());
+                  return rTerm === term || rSynonyms.includes(term) || synonyms.some((s: string) => rTerm === s.toLowerCase() || rSynonyms.includes(s.toLowerCase()));
+                }
+              );
+              const substitutionSuggestions: string[] = adaptationRule?.substitution_suggestions
+                ? (Array.isArray(adaptationRule.substitution_suggestions) ? adaptationRule.substitution_suggestions : [])
+                : this.getSubstitutionSuggestionsByCategoryCode(categoryCode);
 
               // Firewall logica: als term al in allowed set staat, skip (allow heeft al voorrang gehad)
               // Maar block regels met hogere prioriteit kunnen allow overrulen
@@ -271,12 +379,14 @@ export class RecipeAdaptationService {
               // Check if we already have this term
               const existing = forbidden.find((f) => f.term === term);
               if (!existing && term) {
+                // strictness: hard = blokkeren/vervangen, soft = beperkt/waarschuwing (limit)
+                const hard = constraint.strictness === "hard";
                 forbidden.push({
                   term,
                   synonyms: synonyms.map((s: string) => s.toLowerCase()),
-                  ruleCode: constraint.strictness === "hard" ? "GUARD_RAIL_HARD" : "GUARD_RAIL_SOFT",
-                  ruleLabel: `${category.name_nl} (${constraint.strictness === "hard" ? "Strikt verboden" : "Niet gewenst"})`,
-                  substitutionSuggestions: [],
+                  ruleCode: hard ? "GUARD_RAIL_HARD" : "GUARD_RAIL_SOFT",
+                  ruleLabel: `${category.name_nl} (${hard ? "Strikt verboden" : "Niet gewenst"})`,
+                  substitutionSuggestions,
                 });
               }
             }
@@ -285,30 +395,22 @@ export class RecipeAdaptationService {
 
         console.log(`[RecipeAdaptation] Guard rails loaded: ${forbidden.length} forbidden terms from ${constraints.length} constraints`);
 
-        // PRIORITY 2: Also load recipe adaptation rules (for additional rules/substitutions)
-        const { data: rules, error: rulesError } = await supabase
-          .from("recipe_adaptation_rules")
-          .select("*")
-          .eq("diet_type_id", dietId)
-          .eq("is_active", true)
-          .order("priority", { ascending: false });
-
-        if (!rulesError && rules && rules.length > 0) {
-          // Merge recipe adaptation rules (avoid duplicates)
-          for (const rule of rules) {
-            const term = rule.term?.toLowerCase() || "";
+        // PRIORITY 2: Merge recipe adaptation rules (avoid duplicates; we already loaded them as adaptationRules)
+        if (adaptationRules.length > 0) {
+          for (const rule of adaptationRules) {
+            const term = (rule as { term?: string }).term?.toLowerCase() || "";
             const existing = forbidden.find((f) => f.term === term);
             if (!existing && term) {
               forbidden.push({
                 term,
                 synonyms: (rule.synonyms as string[]) || [],
-                ruleCode: rule.rule_code,
-                ruleLabel: rule.rule_label,
+                ruleCode: (rule as { rule_code?: string }).rule_code ?? "RECIPE_ADAPTATION",
+                ruleLabel: (rule as { rule_label?: string }).rule_label ?? "Aanpassing",
                 substitutionSuggestions: (rule.substitution_suggestions as string[]) || [],
               });
             }
           }
-          console.log(`[RecipeAdaptation] Added ${rules.length} recipe adaptation rules`);
+          console.log(`[RecipeAdaptation] Added ${adaptationRules.length} recipe adaptation rules`);
         }
 
         // Get added sugar terms from heuristics
@@ -600,6 +702,32 @@ export class RecipeAdaptationService {
   }
 
   /**
+   * Get substitution suggestions by ingredient_category.code (fallback voor guard-rail termen).
+   * Gebruikt wanneer recipe_adaptation_rules geen match heeft voor de term.
+   */
+  private getSubstitutionSuggestionsByCategoryCode(categoryCode: string): string[] {
+    const code = categoryCode.toLowerCase();
+    const byCode: Record<string, string[]> = {
+      // Gluten / granen
+      wahls_forbidden_gluten: ["rijstnoedels", "zucchininoedels", "glutenvrije pasta", "quinoa", "rijst"],
+      gluten_containing_grains: ["rijstnoedels", "zucchininoedels", "quinoa", "amandelmeel", "rijstmeel"],
+      grains: ["rijst", "quinoa", "amandelmeel", "rijstmeel"],
+      // Zuivel
+      wahls_forbidden_dairy: ["amandelmelk", "havermelk", "kokosmelk", "rijstmelk"],
+      dairy: ["amandelmelk", "havermelk", "kokosmelk", "rijstmelk"],
+      // Suiker
+      wahls_forbidden_added_sugar: ["stevia", "monniksfruit", "erythritol", "verminder of weglaten"],
+      processed_sugar: ["stevia", "honing", "agavesiroop", "erythritol"],
+      // Overig Wahls/Paleo
+      wahls_forbidden_soy: ["tempeh (niet soja)", "linzen", "kikkererwten"],
+      wahls_forbidden_ultra_processed: ["verse variant", "zonder toevoegingen"],
+      wahls_limited_legumes: ["meer groente", "extra eiwit (ei, vis)"],
+      wahls_limited_non_gluten_grains: ["groente", "zoete aardappel", "pompoen"],
+    };
+    return byCode[code] ?? [];
+  }
+
+  /**
    * Get substitution suggestions for an ingredient
    */
   private getSubstitutionSuggestions(
@@ -856,9 +984,10 @@ export class RecipeAdaptationService {
     const violations: ViolationDetail[] = [];
     const foundIngredients = new Set<string>(); // Track to avoid duplicates
 
-    // Analyze ingredients (ingredientRefs or legacy ingredients)
-    const ingredients =
-      recipe.mealData?.ingredientRefs || recipe.mealData?.ingredients || [];
+    // Analyze ingredients: gebruik ingredientRefs als die items heeft, anders legacy ingredients
+    const refs = recipe.mealData?.ingredientRefs ?? [];
+    const legacy = recipe.mealData?.ingredients ?? [];
+    const ingredients = refs.length > 0 ? refs : legacy;
 
     console.log(`[RecipeAdaptation] ========================================`);
     console.log(`[RecipeAdaptation] Analyzing recipe: ${recipe.mealName}`);
@@ -880,8 +1009,7 @@ export class RecipeAdaptationService {
     console.log(`[RecipeAdaptation] ========================================`);
 
     for (const ing of ingredients) {
-      // Try multiple fields to get ingredient name
-      // Priority: displayName > name > original_line > nevoCode fallback
+      // Displaynaam voor in de UI (eerste niet-lege veld)
       const ingredientName =
         ing.displayName ||
         ing.name ||
@@ -889,66 +1017,29 @@ export class RecipeAdaptationService {
         (ing.nevoCode ? `NEVO ${ing.nevoCode}` : null) ||
         String(ing);
 
-      if (!ingredientName || ingredientName.trim() === "") {
+      if (!ingredientName || String(ingredientName).trim() === "") {
         console.log(`[RecipeAdaptation] Skipping empty ingredient:`, ing);
         continue;
       }
 
-      const lowerName = ingredientName.toLowerCase().trim();
-      
-      // Skip if we already found a violation for this exact ingredient
-      if (foundIngredients.has(lowerName)) {
-        continue;
-      }
+      const lowerName = String(ingredientName).toLowerCase().trim();
+      if (foundIngredients.has(lowerName)) continue;
 
-      // Log ingredient being analyzed with full context
-      console.log(`[RecipeAdaptation] Checking ingredient:`, {
-        displayName: ing.displayName,
-        name: ing.name,
-        original_line: ing.original_line,
-        nevoCode: ing.nevoCode,
-        resolved: ingredientName,
-        lower: lowerName,
-      });
+      // Gecombineerde zoektekst: alle relevante velden in één string zodat
+      // "verse mozzarella (in blokjes, of geitenkaas)" en "honing" in note ook matchen
+      const searchParts = [
+        ing.displayName,
+        ing.name,
+        ing.original_line,
+        ing.note,
+      ].filter((v) => v != null && String(v).trim() !== "");
+      const searchText = searchParts.join(" ");
 
-      // Try matching with the ingredient name first
-      let matches = findForbiddenMatches(
-        ingredientName,
-        ruleset,
-        "ingredients"
-      );
+      console.log(`[RecipeAdaptation] Checking ingredient: searchText="${searchText.substring(0, 80)}..."`);
 
-      // If no match found and we have original_line, also check that
-      // (original_line might contain more context like "orzo pasta")
-      if (matches.length === 0 && ing.original_line && ing.original_line !== ingredientName) {
-        console.log(`[RecipeAdaptation] No match with name, trying original_line: "${ing.original_line}"`);
-        const originalMatches = findForbiddenMatches(
-          ing.original_line,
-          ruleset,
-          "ingredients"
-        );
-        if (originalMatches.length > 0) {
-          matches = originalMatches;
-          console.log(`[RecipeAdaptation] ✓ Found match in original_line!`);
-        }
-      }
-
-      // Also check the note field if present (might contain additional info)
-      if (matches.length === 0 && ing.note) {
-        console.log(`[RecipeAdaptation] No match yet, checking note: "${ing.note}"`);
-        const noteMatches = findForbiddenMatches(
-          ing.note,
-          ruleset,
-          "ingredients"
-        );
-        if (noteMatches.length > 0) {
-          matches = noteMatches;
-          console.log(`[RecipeAdaptation] ✓ Found match in note!`);
-        }
-      }
+      const matches = findForbiddenMatches(searchText, ruleset, "ingredients");
 
       if (matches.length > 0) {
-        // Use the first match (most specific)
         const match = matches[0];
         violations.push({
           ingredientName,
@@ -1103,9 +1194,10 @@ export class RecipeAdaptationService {
       }
     }
 
-    // Rewrite ingredients
-    const originalIngredients =
-      recipe.mealData?.ingredientRefs || recipe.mealData?.ingredients || [];
+    // Rewrite ingredients: gebruik ingredientRefs als die items heeft, anders legacy ingredients
+    const origRefs = recipe.mealData?.ingredientRefs ?? [];
+    const origLegacy = recipe.mealData?.ingredients ?? [];
+    const originalIngredients = origRefs.length > 0 ? origRefs : origLegacy;
 
     for (const ing of originalIngredients) {
       const ingredientName =
@@ -1184,23 +1276,21 @@ export class RecipeAdaptationService {
    * Generate draft with rewrite engine
    * 
    * Analyzes the actual recipe and generates a draft based on real violations.
-   * In production, this will call the AI service for more sophisticated rewrites.
+   * Bij twee-fase flow kan existingViolations worden meegegeven (dan wordt analyse overgeslagen).
    * 
    * @param recipeId - Recipe ID
    * @param dietId - Diet ID
    * @param strict - Whether to use strict mode (for retry)
+   * @param existingViolations - Optional; bij twee-fase flow uit eerdere getAnalysisOnly
    * @returns Recipe adaptation draft
    */
   private async generateDraftWithEngine(
     recipeId: string,
     dietId: string,
-    strict: boolean
+    strict: boolean,
+    existingViolations?: ViolationDetail[]
   ): Promise<RecipeAdaptationDraft> {
-    // Simulate network latency (400-800ms)
-    const delay = Math.floor(Math.random() * 400) + 400;
-    await new Promise((resolve) => setTimeout(resolve, delay));
-
-    // Load recipe
+    // Load recipe, ruleset and diet name in parallel where possible
     const supabase = await createClient();
     const {
       data: { user },
@@ -1210,9 +1300,17 @@ export class RecipeAdaptationService {
       throw new Error("User not authenticated");
     }
 
-    const recipe = await this.loadRecipe(recipeId, user.id);
+    const [recipe, ruleset, dietName] = await Promise.all([
+      this.loadRecipe(recipeId, user.id),
+      this.loadDietRuleset(dietId),
+      this.getDietName(dietId),
+    ]);
+
     if (!recipe) {
       throw new Error("Recipe not found");
+    }
+    if (!ruleset) {
+      throw new Error("Ruleset not found");
     }
 
     console.log(`[RecipeAdaptation] Loaded recipe:`, {
@@ -1240,44 +1338,45 @@ export class RecipeAdaptationService {
       })));
     }
 
-      // Load ruleset
-      const ruleset = await this.loadDietRuleset(dietId);
-      if (!ruleset) {
-        throw new Error("Diet ruleset not found");
+    if (ruleset.forbidden.length === 0) {
+      console.error(`[RecipeAdaptation] ⚠ ERROR: Ruleset has no forbidden rules! This will result in no violations being found.`);
+      console.error(`[RecipeAdaptation]   dietId: ${dietId}`);
+      console.error(`[RecipeAdaptation]   Falling back to default ruleset...`);
+      const fallbackRuleset = this.getFallbackRuleset(dietId);
+      if (fallbackRuleset.forbidden.length > 0) {
+        console.log(`[RecipeAdaptation]   Using fallback with ${fallbackRuleset.forbidden.length} rules`);
+        ruleset.forbidden = fallbackRuleset.forbidden;
       }
+    }
 
-      if (ruleset.forbidden.length === 0) {
-        console.error(`[RecipeAdaptation] ⚠ ERROR: Ruleset has no forbidden rules! This will result in no violations being found.`);
-        console.error(`[RecipeAdaptation]   dietId: ${dietId}`);
-        console.error(`[RecipeAdaptation]   Falling back to default ruleset...`);
-        
-        // Use fallback ruleset if empty
-        const fallbackRuleset = this.getFallbackRuleset(dietId);
-        if (fallbackRuleset.forbidden.length > 0) {
-          console.log(`[RecipeAdaptation]   Using fallback with ${fallbackRuleset.forbidden.length} rules`);
-          // Merge fallback with empty ruleset (keep dietId and heuristics)
-          ruleset.forbidden = fallbackRuleset.forbidden;
-        }
-      }
-
-    // Analyze for violations
-    const violations = this.analyzeRecipeForViolations(recipe, ruleset);
-
-    // Get diet name for Gemini prompt
-    const dietName = await this.getDietName(dietId);
+    // Analyze for violations (of gebruik bestaande bij twee-fase flow)
+    const violations =
+      existingViolations !== undefined
+        ? existingViolations
+        : this.analyzeRecipeForViolations(recipe, ruleset);
 
     // Use Gemini for intelligent adaptation if violations found, otherwise use simple rewrite
     let draft: RecipeAdaptationDraft;
     
     if (violations.length > 0) {
       console.log(`[RecipeAdaptation] Using Gemini AI for intelligent adaptation (${violations.length} violations found)`);
+      const GEMINI_ADAPTATION_TIMEOUT_MS = 45_000;
+      let geminiTimeoutId: ReturnType<typeof setTimeout>;
       try {
-        draft = await generateRecipeAdaptationWithGemini(
-          recipe,
-          violations,
-          ruleset,
-          dietName
-        );
+        draft = await Promise.race([
+          generateRecipeAdaptationWithGemini(
+            recipe,
+            violations,
+            ruleset,
+            dietName
+          ).finally(() => clearTimeout(geminiTimeoutId)),
+          new Promise<RecipeAdaptationDraft>((_, reject) => {
+            geminiTimeoutId = setTimeout(
+              () => reject(new Error("Gemini-aanpassing duurde te lang; gebruik simpele vervangingen.")),
+              GEMINI_ADAPTATION_TIMEOUT_MS
+            );
+          }),
+        ]);
         console.log(`[RecipeAdaptation] Gemini adaptation completed successfully`);
       } catch (error) {
         console.error(`[RecipeAdaptation] Gemini adaptation failed, falling back to simple rewrite:`, error);
@@ -1329,5 +1428,110 @@ export class RecipeAdaptationService {
     console.log(`[RecipeAdaptation] ========================================`);
     
     return draft;
+  }
+
+  /**
+   * Evaluate vNext guard rails in shadow mode
+   * 
+   * Runs vNext evaluation in parallel to legacy validation for comparison.
+   * Results are added to diagnostics field (non-breaking).
+   * 
+   * @param draft - Recipe adaptation draft
+   * @param dietId - Diet ID
+   * @param locale - Locale
+   * @param recipeId - Recipe ID (for logging)
+   * @param legacyValidation - Legacy validation result (for discrepancy detection)
+   */
+  private async evaluateVNextGuardrails(
+    draft: RecipeAdaptationDraft,
+    dietId: string,
+    locale: string | undefined,
+    recipeId: string,
+    legacyValidation: ValidationReport
+  ): Promise<void> {
+    try {
+      // Map draft to vNext targets
+      const targets = mapRecipeDraftToGuardrailsTargets(
+        draft,
+        locale === 'en' ? 'en' : 'nl'
+      );
+
+      // Determine locale (default to 'nl')
+      const vNextLocale = (locale === 'en' ? 'en' : 'nl') as Locale;
+      
+      // Load vNext ruleset
+      const ruleset = await loadGuardrailsRuleset({
+        dietId,
+        mode: 'recipe_adaptation',
+        locale: vNextLocale,
+      });
+
+      // Build evaluation context
+      const context: EvaluationContext = {
+        dietId,
+        locale: vNextLocale,
+        mode: 'recipe_adaptation',
+        timestamp: new Date().toISOString(),
+      };
+
+      // Evaluate with vNext
+      const decision = evaluateGuardrails({
+        ruleset,
+        context,
+        targets,
+      });
+
+      // Build diagnostics
+      const diagnostics: GuardrailsVNextDiagnostics = {
+        rulesetVersion: ruleset.version,
+        contentHash: ruleset.contentHash,
+        outcome: decision.outcome,
+        ok: decision.ok,
+        reasonCodes: decision.reasonCodes,
+        counts: {
+          matches: decision.matches.length,
+          applied: decision.appliedRuleIds.length,
+        },
+      };
+
+      // Add to draft (non-breaking: optional field)
+      if (!draft.diagnostics) {
+        draft.diagnostics = {};
+      }
+      draft.diagnostics.guardrailsVnext = diagnostics;
+
+      // Log discrepancy if legacy and vNext outcomes differ
+      const legacyOutcome = legacyValidation.ok ? 'allowed' : 'blocked';
+      const vNextOutcome = decision.outcome;
+      
+      if (legacyOutcome !== vNextOutcome && legacyOutcome === 'allowed' && vNextOutcome === 'blocked') {
+        // Legacy allowed but vNext blocked - potential safety issue
+        console.warn(
+          `[RecipeAdaptation] Guard rails discrepancy: legacy=${legacyOutcome}, vNext=${vNextOutcome}`,
+          {
+            recipeId,
+            dietId,
+            legacyViolations: legacyValidation.matches.length,
+            vNextMatches: decision.matches.length,
+            vNextHash: ruleset.contentHash.substring(0, 8),
+          }
+        );
+      } else if (legacyOutcome !== vNextOutcome && legacyOutcome === 'blocked' && vNextOutcome === 'allowed') {
+        // Legacy blocked but vNext allowed - potential false positive in legacy
+        console.warn(
+          `[RecipeAdaptation] Guard rails discrepancy: legacy=${legacyOutcome}, vNext=${vNextOutcome}`,
+          {
+            recipeId,
+            dietId,
+            legacyViolations: legacyValidation.matches.length,
+            vNextMatches: decision.matches.length,
+            vNextHash: ruleset.contentHash.substring(0, 8),
+          }
+        );
+      }
+    } catch (error) {
+      // Don't throw - shadow mode should not break the request
+      console.error('[RecipeAdaptation] vNext guard rails evaluation error:', error);
+    }
   }
 }

@@ -90,11 +90,13 @@ export type ImportRecipeFromUrlInput = {
 
 /**
  * Import recipe from URL result (success)
+ * job: full job with translated extracted_recipe_json, so client can show it without refetch
  */
 export type ImportRecipeFromUrlSuccess = {
   ok: true;
   jobId?: string;
   recipeId?: string;
+  job?: RecipeImportJob;
 };
 
 /**

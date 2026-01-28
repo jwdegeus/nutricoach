@@ -9,6 +9,8 @@ import Link from "next/link";
 import { MealDetail } from "./MealDetail";
 import { getMealByIdAction } from "../../actions/meals.actions";
 import { getNevoFoodByCode } from "@/src/lib/nevo/nutrition-calculator";
+import { getRecipeComplianceScoresAction } from "../../actions/recipe-compliance.actions";
+import type { RecipeComplianceResult } from "../../actions/recipe-compliance.actions";
 
 type RecipeDetailPageClientProps = {
   mealId: string;
@@ -19,6 +21,7 @@ export function RecipeDetailPageClient({ mealId, mealSource }: RecipeDetailPageC
   const router = useRouter();
   const [meal, setMeal] = useState<any>(null);
   const [nevoFoodNamesByCode, setNevoFoodNamesByCode] = useState<Record<string, string>>({});
+  const [complianceScore, setComplianceScore] = useState<RecipeComplianceResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +56,24 @@ export function RecipeDetailPageClient({ mealId, mealSource }: RecipeDetailPageC
         fullMeal: JSON.stringify(loadedMeal, null, 2).substring(0, 500),
       });
       setMeal(loadedMeal);
+
+      // Compliance score voor dieetregels (ingrediënten + bereidingsinstructies)
+      const base = loadedMeal.mealData ?? loadedMeal.meal_data ?? {};
+      const instructions =
+        loadedMeal.aiAnalysis?.instructions ??
+        (loadedMeal as { ai_analysis?: { instructions?: unknown } }).ai_analysis?.instructions;
+      const mealPayload =
+        Array.isArray(instructions) && instructions.length > 0
+          ? { ...(typeof base === "object" && base !== null ? base : {}), instructions }
+          : base;
+      const complianceResult = await getRecipeComplianceScoresAction([
+        { id: loadedMeal.id, source: mealSource, mealData: mealPayload },
+      ]);
+      if (complianceResult.ok && complianceResult.data[loadedMeal.id]) {
+        setComplianceScore(complianceResult.data[loadedMeal.id]);
+      } else {
+        setComplianceScore(null);
+      }
 
       // Build NEVO food names map
       const nevoCodes = new Set<string>();
@@ -209,6 +230,8 @@ export function RecipeDetailPageClient({ mealId, mealSource }: RecipeDetailPageC
         meal={meal} 
         mealSource={mealSource}
         nevoFoodNamesByCode={nevoFoodNamesByCode}
+        complianceScore={complianceScore}
+        onRecipeApplied={loadMeal}
       />
     </div>
   );

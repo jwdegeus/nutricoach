@@ -15,30 +15,87 @@ import {
 import type { RecipeDraft } from "../recipeDraft.types";
 
 /**
+ * Check if a URL is a tracking pixel or non-image URL
+ */
+function isTrackingPixelOrNonImage(url: string): boolean {
+  const lowerUrl = url.toLowerCase();
+  
+  // Check for tracking pixels and analytics
+  const trackingPatterns = [
+    'facebook.com/tr',
+    'google-analytics.com',
+    'googletagmanager.com',
+    'doubleclick.net',
+    '/analytics',
+    '/tracking',
+    '/pixel',
+    '/beacon',
+    'noscript',
+    'amp;', // HTML entities
+  ];
+  
+  if (trackingPatterns.some(pattern => lowerUrl.includes(pattern))) {
+    return true;
+  }
+  
+  // Check if URL has query params but no image extension
+  if (url.includes('?') && !url.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?|$)/i)) {
+    // Might be a tracking pixel, but allow if it's from a known image CDN
+    const imageCdnPatterns = ['imgur.com', 'cloudinary.com', 'unsplash.com', 'pexels.com'];
+    if (!imageCdnPatterns.some(cdn => lowerUrl.includes(cdn))) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
  * Extract image URL from HTML
  * Looks for og:image, recipe image, or main image
+ * Filters out tracking pixels and non-image URLs
  */
 function extractImageUrlFromHtml(html: string): string | undefined {
   // Try og:image meta tag first
   const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
   if (ogImageMatch && ogImageMatch[1]) {
-    return ogImageMatch[1];
+    const url = ogImageMatch[1];
+    // Decode HTML entities
+    const decodedUrl = url.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    if (!isTrackingPixelOrNonImage(decodedUrl)) {
+      return decodedUrl;
+    }
   }
 
   // Try recipe image in JSON-LD (we'll extract this separately, but also check HTML)
   // Look for common image patterns
   const imgTagMatch = html.match(/<img[^>]*class=["'][^"]*recipe[^"]*["'][^>]*src=["']([^"']+)["']/i);
   if (imgTagMatch && imgTagMatch[1]) {
-    return imgTagMatch[1];
+    const url = imgTagMatch[1];
+    const decodedUrl = url.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    if (!isTrackingPixelOrNonImage(decodedUrl)) {
+      return decodedUrl;
+    }
   }
 
   // Try first large image in main content
-  const mainImageMatch = html.match(/<img[^>]*src=["']([^"']+)["'][^>]*>/i);
-  if (mainImageMatch && mainImageMatch[1]) {
-    const url = mainImageMatch[1];
-    // Filter out small icons, logos, etc.
-    if (!url.includes('icon') && !url.includes('logo') && !url.includes('avatar')) {
-      return url;
+  // Match all img tags and filter them
+  const imgTagMatches = html.matchAll(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi);
+  for (const match of imgTagMatches) {
+    if (match[1]) {
+      const url = match[1];
+      const decodedUrl = url.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+      
+      // Filter out small icons, logos, tracking pixels, etc.
+      const lowerUrl = decodedUrl.toLowerCase();
+      if (
+        !lowerUrl.includes('icon') &&
+        !lowerUrl.includes('logo') &&
+        !lowerUrl.includes('avatar') &&
+        !isTrackingPixelOrNonImage(decodedUrl)
+      ) {
+        return decodedUrl;
+      }
     }
   }
 
@@ -112,7 +169,43 @@ function buildRecipeExtractionFromHtmlPrompt(
 HTML:
 ${cleanedHtml}
 
-Extract the recipe and return it as JSON. Keep all text in the original language. Do NOT translate anything.
+REQUIRED OUTPUT FORMAT (strict JSON):
+{
+  "title": "Recipe name in original language",
+  "language_detected": "Source language code (e.g., 'en', 'nl', 'de') or null if unclear",
+  "translated_to": null,
+  "servings": number or null,
+  "times": {
+    "prep_minutes": number or null,
+    "cook_minutes": number or null,
+    "total_minutes": number or null
+  },
+  "ingredients": [
+    {
+      "original_line": "Exact text as it appears in HTML (REQUIRED)",
+      "quantity": number or null,
+      "unit": "string or null (e.g., 'g', 'ml', 'el', 'tl')",
+      "name": "Normalized ingredient name in original language (REQUIRED)",
+      "note": "string or null"
+    }
+  ],
+  "instructions": [
+    {
+      "step": 1,
+      "text": "Instruction text in original language (REQUIRED)"
+    }
+  ],
+  "confidence": { "overall": number 0-100 or null, "fields": {} } (optional),
+  "warnings": ["string"] (optional)
+}
+
+CRITICAL RULES:
+1. Language Detection: Identify the source language and set "language_detected" (e.g., 'en', 'nl', 'de') or null if unclear
+2. Keep ALL text in original language - do NOT translate anything
+3. Ingredients MUST be objects with "original_line" and "name" fields (NOT strings)
+4. Instructions MUST be objects with "step" (number) and "text" fields (NOT strings)
+5. Always include "language_detected", "translated_to", "servings", and "times" fields (use null if not available)
+6. Number instruction steps starting from 1
 
 UNIT CONVERSION (convert English units to metric):
 - "cups" or "cup" → "ml" (1 cup = 240 ml, so "1 cup" becomes "240 ml", "2 cups" becomes "480 ml")
@@ -121,7 +214,7 @@ UNIT CONVERSION (convert English units to metric):
 - "oz" or "ounces" → "g" (1 oz = 28 g, so "15 oz" becomes "420 g")
 - "lb" or "pounds" → "g" (1 lb = 450 g, so "1 lb" becomes "450 g")
 
-OUTPUT: JSON with extracted recipe data. Return JSON only.`;
+Return ONLY valid JSON conforming to the schema above. Do NOT include markdown code blocks.`;
 }
 
 /**
@@ -369,7 +462,7 @@ export async function processRecipeUrlWithGemini(args: {
         items: { type: "string" },
       },
     },
-    required: ["title", "ingredients", "instructions", "times"],
+    required: ["title", "language_detected", "translated_to", "servings", "times", "ingredients", "instructions"],
   };
 
   try {

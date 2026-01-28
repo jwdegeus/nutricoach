@@ -108,6 +108,13 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+/** Detect native "Failed to fetch" / network errors from server actions */
+function isNetworkOrFetchError(err: unknown): boolean {
+  if (err instanceof TypeError && err.message === "Failed to fetch") return true;
+  if (err instanceof Error && (err.message === "Failed to fetch" || err.name === "AbortError")) return true;
+  return false;
+}
+
 export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) {
   const t = useTranslations("recipeImport");
   const locale = useLocale();
@@ -132,7 +139,6 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
   const [loadingJob, setLoadingJob] = useState(false);
   const [processingJob, setProcessingJob] = useState(false);
   const [finalizingJob, setFinalizingJob] = useState(false);
-  // Translation happens automatically - no state needed
   const [error, setError] = useState<string | null>(null);
   const [selectedMealSlot, setSelectedMealSlot] = useState<"breakfast" | "lunch" | "dinner" | "snack" | "">("");
 
@@ -168,7 +174,8 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
           }
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : t("errorUnknown"));
+        const msg = isNetworkOrFetchError(err) ? t("errorNetworkOrTimeout") : (err instanceof Error ? err.message : t("errorUnknown"));
+        setError(msg);
       } finally {
         setLoadingJob(false);
       }
@@ -176,12 +183,27 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
     [t]
   );
 
-  // Load job on mount if jobId is present
+  // Load job whenever jobId in URL is present; use job from sessionStorage if just returned from URL import
   useEffect(() => {
-    if (jobId && !remoteJob && !loadingJob) {
-      console.log("[RecipeImportClient] useEffect: Loading job on mount, jobId:", jobId);
-      loadJob(jobId);
+    if (!jobId || loadingJob) return;
+    if (typeof window !== "undefined") {
+      try {
+        const stored = sessionStorage.getItem(`recipe-import-job-${jobId}`);
+        if (stored) {
+          const job = JSON.parse(stored) as RecipeImportJob;
+          if (job.id === jobId) {
+            sessionStorage.removeItem(`recipe-import-job-${jobId}`);
+            setRemoteJob(job);
+            setError(null);
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
+    console.log("[RecipeImportClient] useEffect: Loading job, jobId:", jobId);
+    loadJob(jobId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
@@ -404,8 +426,8 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
             }
           } catch (err) {
             console.error("[RecipeImportClient] Auto-processing error:", err);
-            setError(err instanceof Error ? err.message : t("errorUnknown"));
-            // Load job to see current status
+            const msg = isNetworkOrFetchError(err) ? t("errorNetworkOrTimeout") : (err instanceof Error ? err.message : t("errorUnknown"));
+            setError(msg);
             await loadJob(newJobId);
             setProcessingJob(false);
           }
@@ -422,7 +444,8 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
         }
       } catch (err) {
         console.error("[RecipeImportClient] File upload error:", err);
-        setError(err instanceof Error ? err.message : t("errorUnknown"));
+        const msg = isNetworkOrFetchError(err) ? t("errorNetworkOrTimeout") : (err instanceof Error ? err.message : t("errorUnknown"));
+        setError(msg);
         setProcessingJob(false);
       }
     },
@@ -602,11 +625,9 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
         await loadJob(remoteJob.id);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("errorUnknown"));
-      // Try to reload job to see current status
-      if (remoteJob) {
-        await loadJob(remoteJob.id);
-      }
+      const msg = isNetworkOrFetchError(err) ? t("errorNetworkOrTimeout") : (err instanceof Error ? err.message : t("errorUnknown"));
+      setError(msg);
+      if (remoteJob) await loadJob(remoteJob.id);
     } finally {
       setProcessingJob(false);
     }
@@ -698,7 +719,8 @@ export function RecipeImportClient({ initialJobId }: { initialJobId?: string }) 
         setError(errorMessage);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("errorUnknown"));
+      const msg = isNetworkOrFetchError(err) ? t("errorNetworkOrTimeout") : (err instanceof Error ? err.message : t("errorUnknown"));
+      setError(msg);
     } finally {
       setFinalizingJob(false);
     }

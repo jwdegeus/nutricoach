@@ -11,7 +11,28 @@ export type AppErrorCode =
   | "DB_ERROR"
   | "AGENT_ERROR"
   | "RATE_LIMIT"
-  | "CONFLICT";
+  | "CONFLICT"
+  | "GUARDRAILS_VIOLATION";
+
+/** Ontbrekende FORCE-categorie bij quotum-falen (voor substitutie/“voeg toe”-feedback) */
+export type ForceDeficitItem = {
+  categoryCode: string;
+  categoryNameNl: string;
+  minPerDay?: number;
+  minPerWeek?: number;
+};
+
+/**
+ * Guardrails violation details
+ */
+export type GuardrailsViolationDetails = {
+  outcome: "blocked";
+  reasonCodes: string[];
+  contentHash: string;
+  rulesetVersion?: number;
+  /** Bij DIET_LOGIC_VIOLATION wegens FORCE-quotum: ontbrekende categorieën voor “voeg toe”-feedback */
+  forceDeficits?: ForceDeficitItem[];
+};
 
 /**
  * Application Error
@@ -22,32 +43,44 @@ export type AppErrorCode =
 export class AppError extends Error {
   public readonly code: AppErrorCode;
   public readonly safeMessage: string;
+  public readonly guardrailsDetails?: GuardrailsViolationDetails;
 
   constructor(
     code: AppErrorCode,
     safeMessage: string,
-    cause?: unknown
+    causeOrDetails?: unknown
   ) {
     super(safeMessage);
     this.name = "AppError";
     this.code = code;
     this.safeMessage = safeMessage;
 
-    // Preserve original error as cause (for debugging)
-    if (cause instanceof Error) {
-      this.cause = cause;
-    } else if (cause) {
-      this.cause = new Error(String(cause));
+    // Check if causeOrDetails is guardrails details
+    if (
+      code === "GUARDRAILS_VIOLATION" &&
+      causeOrDetails &&
+      typeof causeOrDetails === "object" &&
+      "outcome" in causeOrDetails &&
+      "reasonCodes" in causeOrDetails &&
+      "contentHash" in causeOrDetails
+    ) {
+      this.guardrailsDetails = causeOrDetails as GuardrailsViolationDetails;
+    } else if (causeOrDetails instanceof Error) {
+      // Preserve original error as cause (for debugging)
+      this.cause = causeOrDetails;
+    } else if (causeOrDetails) {
+      this.cause = new Error(String(causeOrDetails));
     }
   }
 
   /**
    * Convert to a plain object for serialization
    */
-  toJSON(): { code: AppErrorCode; message: string } {
+  toJSON(): { code: AppErrorCode; message: string; details?: GuardrailsViolationDetails } {
     return {
       code: this.code,
       message: this.safeMessage,
+      ...(this.guardrailsDetails && { details: this.guardrailsDetails }),
     };
   }
 }

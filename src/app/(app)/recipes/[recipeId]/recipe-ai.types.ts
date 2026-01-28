@@ -40,12 +40,14 @@ export type RecipeAIData = {
   rewrite: RecipeRewrite | null;
 };
 
-export type RecipeAIState = 
-  | { type: 'idle' }
-  | { type: 'loading' }
-  | { type: 'error'; message: string }
-  | { type: 'empty'; reason: string }
-  | { type: 'success'; data: RecipeAIData };
+export type RecipeAIState =
+  | { type: "idle" }
+  | { type: "loading" }
+  | { type: "analysis_only"; data: { violations: ViolationDetail[]; summary: string; recipeName: string; noRulesConfigured?: boolean } }
+  | { type: "loading_rewrite"; data: { violations: ViolationDetail[]; summary: string; recipeName: string; noRulesConfigured?: boolean } }
+  | { type: "error"; message: string }
+  | { type: "empty"; reason: string }
+  | { type: "success"; data: RecipeAIData };
 
 // ============================================================================
 // Server Contract Types (for API/Server Action)
@@ -58,7 +60,28 @@ export type RequestRecipeAdaptationInput = {
   recipeId: string;
   dietId?: string;
   locale?: string;
+  /** Bij twee-fase flow: violations uit eerdere analyse-only; dan wordt analyse overgeslagen. */
+  existingAnalysis?: {
+    violations: ViolationDetail[];
+    recipeName: string;
+  };
 };
+
+/**
+ * Input voor analyse-only (fase 1 van twee-fase flow)
+ */
+export type GetRecipeAnalysisInput = {
+  recipeId: string;
+  dietId: string;
+};
+
+/**
+ * Resultaat van analyse-only; geen rewrite.
+ * noRulesConfigured: true wanneer het dieet geen dieetregels heeft → UI toont "N.v.t." i.p.v. afwijkingen.
+ */
+export type GetRecipeAnalysisResult =
+  | { ok: true; data: { violations: ViolationDetail[]; summary: string; recipeName: string; noRulesConfigured?: boolean } }
+  | { ok: false; error: { code: string; message: string } };
 
 /**
  * Violation with rule code/label for server response
@@ -89,6 +112,21 @@ export type StepLine = {
 };
 
 /**
+ * Guard Rails vNext diagnostics (shadow mode)
+ */
+export type GuardrailsVNextDiagnostics = {
+  rulesetVersion: number;
+  contentHash: string;
+  outcome: 'allowed' | 'blocked' | 'warned';
+  ok: boolean;
+  reasonCodes: string[];
+  counts: {
+    matches: number;
+    applied: number;
+  };
+};
+
+/**
  * Recipe adaptation draft from server
  */
 export type RecipeAdaptationDraft = {
@@ -103,6 +141,10 @@ export type RecipeAdaptationDraft = {
   };
   confidence?: number;
   openQuestions?: string[];
+  /** Guard Rails vNext diagnostics (shadow mode, optional) */
+  diagnostics?: {
+    guardrailsVnext?: GuardrailsVNextDiagnostics;
+  };
 };
 
 /**

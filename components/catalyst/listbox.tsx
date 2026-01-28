@@ -19,7 +19,7 @@ export function Listbox<T>({
   children?: React.ReactNode
 } & Omit<Headless.ListboxProps<typeof Fragment, T>, 'as' | 'multiple'>) {
   return (
-    <Headless.Listbox {...props} multiple={false}>
+    <Headless.Listbox as="div" {...props} multiple={false}>
       <Headless.ListboxButton
         autoFocus={autoFocus}
         data-slot="control"

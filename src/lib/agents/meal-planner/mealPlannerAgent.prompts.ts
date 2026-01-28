@@ -162,13 +162,20 @@ function formatCandidatePool(candidates: CandidatePool): string {
  * @param input - Request, rules, and candidate pool for meal planning
  * @returns Formatted prompt string
  */
+/** Hint bij retry: ontbrekende FORCE-categorieën (dag-quotum niet gehaald) */
+export type ForceDeficitHint = {
+  categoryNames: string[];
+};
+
 export function buildMealPlanPrompt(input: {
   request: MealPlanRequest;
   rules: DietRuleSet;
   candidates?: CandidatePool;
   language?: 'nl' | 'en';
+  /** Bij retry na FORCE-quotum-fout: zorg dat elke dag voldoende uit deze groepen bevat */
+  forceDeficitHint?: ForceDeficitHint;
 }): string {
-  const { request, rules, candidates, language = 'nl' } = input;
+  const { request, rules, candidates, language = 'nl', forceDeficitHint } = input;
 
   const dateRange = formatDateRange(
     request.dateRange.start,
@@ -238,6 +245,9 @@ ${prepTimeInfo ? `- ${prepTimeInfo}` : ""}
 
 DIET RULES & CONSTRAINTS:
 ${constraintSummary}
+${forceDeficitHint && forceDeficitHint.categoryNames.length > 0
+    ? `\nCRITICAL - DAG-QUOTUM (vorige poging afgekeurd): Zorg dat ELKE dag voldoende ingrediënten bevat uit deze groepen: ${forceDeficitHint.categoryNames.join(", ")}. Het dag-quotum voor deze groepen moet op elke afzonderlijke dag gehaald worden.\n`
+    : ""}
 
 ${additionalExclusions ? `\n${additionalExclusions}` : ""}
 ${preferredIngredients ? `\n${preferredIngredients}` : ""}

@@ -1,17 +1,32 @@
 /**
  * Gemini Client - Server-only wrapper for Google Gemini API
- * 
- * Provides a type-safe interface for generating structured JSON output
- * using Google's Gemini API with schema validation.
- * 
- * This module is server-only and cannot be imported in client components.
+ *
+ * All models are configured via .env.local. No model names are hardcoded in call sites.
+ *
+ * Environment variables (all optional except GEMINI_API_KEY):
+ *   GEMINI_API_KEY           - Required. API key from https://aistudio.google.com/app/apikey
+ *   GEMINI_MODEL             - Default model for all purposes (fallback when purpose-specific is unset)
+ *   GEMINI_MODEL_PLAN        - Meal plan generation (create/regenerate)
+ *   GEMINI_MODEL_ENRICH      - Meal plan enrichment (nutrients, etc.)
+ *   GEMINI_MODEL_HIGH_ACCURACY - Repair / high-accuracy tasks (e.g. recipe adaptation)
+ *   GEMINI_MODEL_TRANSLATE   - Recipe import translation (EN → user language)
+ *   GEMINI_MODEL_VISION      - Vision/OCR (recipe photo import, image analysis)
+ *   GEMINI_MAX_OUTPUT_TOKENS - Max tokens per response (default 2048)
+ *
+ * Example .env.local:
+ *   GEMINI_API_KEY=your-key
+ *   GEMINI_MODEL=gemini-1.5-flash
+ *   GEMINI_MODEL_PLAN=gemini-1.5-flash
+ *   GEMINI_MODEL_ENRICH=gemini-1.5-flash
+ *   GEMINI_MODEL_TRANSLATE=gemini-1.5-flash
+ *   GEMINI_MODEL_VISION=gemini-1.5-flash
  */
 
 import "server-only";
 import { GoogleGenAI } from "@google/genai";
 
 /**
- * Model selection policy
+ * Model selection policy (each maps to an env var)
  */
 type ModelPurpose = "plan" | "enrich" | "repair" | "translate" | "vision";
 
@@ -33,7 +48,7 @@ class GeminiClient {
     }
 
     this.ai = new GoogleGenAI({ apiKey });
-    this.model = process.env.GEMINI_MODEL ?? "gemini-2.0-flash-exp";
+    this.model = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
     this.maxOutputTokens = parseInt(
       process.env.GEMINI_MAX_OUTPUT_TOKENS ?? "2048",
       10
@@ -41,27 +56,19 @@ class GeminiClient {
   }
 
   /**
-   * Get model name based on purpose
-   * 
-   * @param purpose - Purpose of the API call
-   * @returns Model name
+   * Get model name for a purpose. Uses env: GEMINI_MODEL_<PURPOSE> or GEMINI_MODEL.
    */
   getModelName(purpose: ModelPurpose = "plan"): string {
     switch (purpose) {
       case "plan":
-        // Use GEMINI_MODEL_PLAN if set, otherwise fallback to GEMINI_MODEL, otherwise default
         return process.env.GEMINI_MODEL_PLAN ?? this.model;
       case "enrich":
-        // Use GEMINI_MODEL_ENRICH if set, otherwise fallback to GEMINI_MODEL, otherwise default
         return process.env.GEMINI_MODEL_ENRICH ?? this.model;
       case "repair":
-        // Use GEMINI_MODEL_HIGH_ACCURACY if set, otherwise fallback to GEMINI_MODEL, otherwise default
         return process.env.GEMINI_MODEL_HIGH_ACCURACY ?? this.model;
       case "translate":
-        // Use GEMINI_MODEL_TRANSLATE if set, otherwise fallback to GEMINI_MODEL, otherwise default
         return process.env.GEMINI_MODEL_TRANSLATE ?? this.model;
       case "vision":
-        // Use vision-capable model (gemini-2.0-flash-exp supports vision)
         return process.env.GEMINI_MODEL_VISION ?? this.model;
       default:
         return this.model;
@@ -105,10 +112,10 @@ class GeminiClient {
         model: modelName,
         contents: prompt,
         config: {
-          response_mime_type: "application/json",
-          response_json_schema: jsonSchema,
+          responseMimeType: "application/json",
+          responseJsonSchema: jsonSchema,
           temperature,
-          max_output_tokens: this.maxOutputTokens,
+          maxOutputTokens: this.maxOutputTokens,
         },
       });
 
@@ -141,7 +148,11 @@ class GeminiClient {
             "For more info: https://ai.google.dev/gemini-api/docs/rate-limits"
           );
         }
-        
+
+        // Log raw error voor debugging
+        console.error("[GeminiClient] generateJson error:", errorMessage);
+        if (error.stack) console.error("[GeminiClient] Stack:", error.stack);
+
         // Re-throw with more context (but don't expose API key or full prompt)
         throw new Error(
           `Gemini API error: ${errorMessage}. ` +
@@ -177,7 +188,7 @@ class GeminiClient {
         contents: prompt,
         config: {
           temperature,
-          max_output_tokens: this.maxOutputTokens,
+          maxOutputTokens: this.maxOutputTokens,
         },
       });
 
@@ -192,17 +203,17 @@ class GeminiClient {
       // Handle quota/rate limit errors (429) with better messaging
       if (error instanceof Error) {
         const errorMessage = error.message;
-        
+
         // Check for quota exceeded errors
         if (errorMessage.includes("429") || errorMessage.includes("RESOURCE_EXHAUSTED") || errorMessage.includes("quota")) {
           // Try to extract retry delay from error message
           const retryMatch = errorMessage.match(/retry.*?(\d+)\s*s/i) || errorMessage.match(/(\d+)\s*second/i);
           const retrySeconds = retryMatch ? parseInt(retryMatch[1], 10) : null;
-          
-          const retryInfo = retrySeconds 
+
+          const retryInfo = retrySeconds
             ? ` Please retry in ${retrySeconds} seconds.`
             : " Please wait a moment and try again.";
-          
+
           throw new Error(
             `Gemini API quota exceeded (rate limit).${retryInfo} ` +
             "This usually means you've hit the free tier limits. " +
@@ -210,7 +221,11 @@ class GeminiClient {
             "For more info: https://ai.google.dev/gemini-api/docs/rate-limits"
           );
         }
-        
+
+        // Log raw error voor debugging
+        console.error("[GeminiClient] generateText error:", errorMessage);
+        if (error.stack) console.error("[GeminiClient] Stack:", error.stack);
+
         // Re-throw with more context (but don't expose API key or full prompt)
         throw new Error(
           `Gemini API error: ${errorMessage}. ` +
@@ -276,13 +291,13 @@ class GeminiClient {
     try {
       const config: any = {
         temperature,
-        max_output_tokens: this.maxOutputTokens,
+        maxOutputTokens: this.maxOutputTokens,
       };
 
       // Add JSON schema if provided
       if (jsonSchema) {
-        config.response_mime_type = "application/json";
-        config.response_json_schema = jsonSchema;
+        config.responseMimeType = "application/json";
+        config.responseJsonSchema = jsonSchema;
       }
 
       // Retry logic for rate limits with exponential backoff
@@ -348,7 +363,7 @@ class GeminiClient {
           throw new Error(
             `Gemini Vision API rate limit exceeded after ${maxRetries + 1} attempts.${retryInfo} ` +
             `Model: ${modelName}. ` +
-            "Consider using gemini-2.0-flash-exp for better rate limits or waiting for the quota to reset."
+            "Check GEMINI_MODEL / GEMINI_MODEL_VISION env or try gemini-1.5-flash."
           );
         }
       }

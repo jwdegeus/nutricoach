@@ -3,18 +3,26 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { RecipesList } from "./RecipesList";
 import type { CustomMealRecord } from "@/src/lib/custom-meals/customMeals.service";
+import { Link } from "@/components/catalyst/link";
+import { Text } from "@/components/catalyst/text";
+import type { RecipeComplianceResult } from "../actions/recipe-compliance.actions";
 
 type RecipesPageClientProps = {
   initialMeals: {
     customMeals: CustomMealRecord[];
     mealHistory: any[];
   };
+  /** Compliance scores per meal id (0–100% volgens dieetregels) */
+  initialComplianceScores?: Record<string, RecipeComplianceResult>;
+  /** Bij "recepten voor ontbrekende categorieën": toon banner en gefilterde lijst */
+  categoryFilter?: { categoryNames: string[] };
 };
 
 const ITEMS_PER_PAGE = 15;
 
-export function RecipesPageClient({ initialMeals }: RecipesPageClientProps) {
+export function RecipesPageClient({ initialMeals, initialComplianceScores = {}, categoryFilter }: RecipesPageClientProps) {
   const [meals, setMeals] = useState(initialMeals);
+  const [complianceScores] = useState(initialComplianceScores);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Handle consumption logged - update local state optimistically
@@ -159,17 +167,33 @@ export function RecipesPageClient({ initialMeals }: RecipesPageClientProps) {
   }, []);
 
   return (
-    <RecipesList 
+    <>
+      {categoryFilter && categoryFilter.categoryNames.length > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/50 dark:bg-amber-950/30">
+          <Text className="text-sm font-medium text-amber-900 dark:text-amber-100">
+            Recepten die passen bij: {categoryFilter.categoryNames.join(", ")}
+          </Text>
+          <Text className="mt-1 text-sm text-amber-800 dark:text-amber-200">
+            Hieronder alleen recepten die ingrediënten uit deze groepen bevatten.{" "}
+            <Link href="/recipes" className="text-amber-700 underline hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100">
+              Toon alle recepten
+            </Link>
+          </Text>
+        </div>
+      )}
+      <RecipesList 
       meals={paginatedMeals}
       totalItems={totalItems}
       currentPage={safeCurrentPage}
       totalPages={totalPages}
       itemsPerPage={ITEMS_PER_PAGE}
+      complianceScores={complianceScores}
       onPageChange={handlePageChange}
       onConsumptionLogged={handleConsumptionLogged}
       onDietTypeUpdated={handleDietTypeUpdated}
       onMealDeleted={handleMealDeleted}
       onRatingUpdated={handleRatingUpdated}
     />
+    </>
   );
 }

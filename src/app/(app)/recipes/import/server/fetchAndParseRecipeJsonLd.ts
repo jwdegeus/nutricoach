@@ -32,7 +32,10 @@ export type FetchAndParseResult =
 /**
  * Configuration constants
  */
-const FETCH_TIMEOUT_MS = 15000; // 15 seconds (increased for slower sites)
+const FETCH_TIMEOUT_MS =
+  typeof process !== "undefined" && process.env.RECIPE_FETCH_TIMEOUT_MS
+    ? parseInt(process.env.RECIPE_FETCH_TIMEOUT_MS, 10)
+    : 30_000; // 30 seconden standaard; sommige sites (bv. foolproofliving.com) zijn traag
 const MAX_RESPONSE_SIZE = 3 * 1024 * 1024; // 3MB
 const MAX_REDIRECTS = 5; // Increased for sites with multiple redirects
 const ALLOWED_CONTENT_TYPES = [
@@ -559,37 +562,78 @@ function convertUnitToDutch(unit: string | undefined | null, quantity: number | 
 }
 
 /**
+ * Check if a URL is a tracking pixel or non-image URL
+ */
+function isTrackingPixelOrNonImage(url: string): boolean {
+  const lowerUrl = url.toLowerCase();
+  
+  // Check for tracking pixels and analytics
+  const trackingPatterns = [
+    'facebook.com/tr',
+    'google-analytics.com',
+    'googletagmanager.com',
+    'doubleclick.net',
+    '/analytics',
+    '/tracking',
+    '/pixel',
+    '/beacon',
+    'noscript',
+    'amp;', // HTML entities
+  ];
+  
+  if (trackingPatterns.some(pattern => lowerUrl.includes(pattern))) {
+    return true;
+  }
+  
+  // Check if URL has query params but no image extension
+  if (url.includes('?') && !url.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?|$)/i)) {
+    // Might be a tracking pixel, but allow if it's from a known image CDN
+    const imageCdnPatterns = ['imgur.com', 'cloudinary.com', 'unsplash.com', 'pexels.com'];
+    if (!imageCdnPatterns.some(cdn => lowerUrl.includes(cdn))) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
  * Extract image URL from recipe JSON-LD
  * Handles both string URLs and ImageObject with url property
+ * Filters out tracking pixels and non-image URLs
  */
 function extractImageUrl(recipe: any): string | undefined {
   if (!recipe.image) {
     return undefined;
   }
 
+  let imageUrl: string | undefined;
+
   // If image is a string, return it
   if (typeof recipe.image === "string") {
-    return recipe.image;
+    imageUrl = recipe.image;
   }
-
   // If image is an array, take the first item
-  if (Array.isArray(recipe.image)) {
+  else if (Array.isArray(recipe.image)) {
     const firstImage = recipe.image[0];
     if (typeof firstImage === "string") {
-      return firstImage;
+      imageUrl = firstImage;
+    } else if (firstImage && typeof firstImage === "object" && firstImage.url) {
+      imageUrl = typeof firstImage.url === "string" ? firstImage.url : undefined;
     }
-    if (firstImage && typeof firstImage === "object" && firstImage.url) {
-      return typeof firstImage.url === "string" ? firstImage.url : undefined;
-    }
+  }
+  // If image is an object with url property
+  else if (recipe.image && typeof recipe.image === "object" && recipe.image.url) {
+    imageUrl = typeof recipe.image.url === "string" ? recipe.image.url : undefined;
+  }
+
+  // Filter out tracking pixels
+  if (imageUrl && isTrackingPixelOrNonImage(imageUrl)) {
+    console.warn(`[fetchAndParseRecipeJsonLd] Filtered out tracking pixel or non-image URL: ${imageUrl}`);
     return undefined;
   }
 
-  // If image is an object with url property
-  if (recipe.image && typeof recipe.image === "object" && recipe.image.url) {
-    return typeof recipe.image.url === "string" ? recipe.image.url : undefined;
-  }
-
-  return undefined;
+  return imageUrl;
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "@/src/components/theme-provider";
-import { getLocale, getMessages } from 'next-intl/server';
+import { getLocale, getMessages, getTimeZone } from 'next-intl/server';
 import { I18nProvider } from "@/src/components/i18n-provider";
 import "./globals.css";
 
@@ -19,6 +19,7 @@ export default async function RootLayout({
 }>) {
   const locale = await getLocale();
   const messages = await getMessages();
+  const timeZone = await getTimeZone();
 
   return (
     <html
@@ -45,7 +46,7 @@ export default async function RootLayout({
         />
       </head>
       <body>
-        <I18nProvider locale={locale} messages={messages}>
+        <I18nProvider locale={locale} messages={messages} timeZone={timeZone}>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"

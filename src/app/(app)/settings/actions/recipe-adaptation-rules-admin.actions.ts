@@ -13,6 +13,8 @@ export type RecipeAdaptationRuleInput = {
   substitutionSuggestions: string[];
   priority?: number;
   isActive?: boolean;
+  target?: "ingredient" | "step" | "metadata";
+  matchMode?: "exact" | "word_boundary" | "substring" | "canonical_id";
 };
 
 export type RecipeAdaptationRuleOutput = {
@@ -25,6 +27,8 @@ export type RecipeAdaptationRuleOutput = {
   substitutionSuggestions: string[];
   priority: number;
   isActive: boolean;
+  target: "ingredient" | "step" | "metadata";
+  matchMode: "exact" | "word_boundary" | "substring" | "canonical_id";
   createdAt: string;
   updatedAt: string;
 };
@@ -83,6 +87,8 @@ export async function getRecipeAdaptationRulesForAdmin(
         substitutionSuggestions: rule.substitution_suggestions || [],
         priority: rule.priority,
         isActive: rule.is_active,
+        target: (rule.target as "ingredient" | "step" | "metadata") || "ingredient",
+        matchMode: (rule.match_mode as "exact" | "word_boundary" | "substring" | "canonical_id") || "word_boundary",
         createdAt: rule.created_at,
         updatedAt: rule.updated_at,
       })) ?? [],
@@ -128,6 +134,8 @@ export async function createRecipeAdaptationRule(
       substitution_suggestions: input.substitutionSuggestions || [],
       priority: input.priority ?? 50,
       is_active: input.isActive ?? true,
+      target: input.target ?? "ingredient",
+      match_mode: input.matchMode ?? "word_boundary",
     })
     .select("*")
     .single();
@@ -195,6 +203,12 @@ export async function updateRecipeAdaptationRule(
   if (input.isActive !== undefined) {
     updateData.is_active = input.isActive;
   }
+  if (input.target !== undefined) {
+    updateData.target = input.target;
+  }
+  if (input.matchMode !== undefined) {
+    updateData.match_mode = input.matchMode;
+  }
 
   if (Object.keys(updateData).length === 0) {
     return { error: "Geen wijzigingen opgegeven" };
@@ -228,6 +242,8 @@ export async function updateRecipeAdaptationRule(
       substitutionSuggestions: data.substitution_suggestions || [],
       priority: data.priority,
       isActive: data.is_active,
+      target: (data.target as "ingredient" | "step" | "metadata") || "ingredient",
+      matchMode: (data.match_mode as "exact" | "word_boundary" | "substring" | "canonical_id") || "word_boundary",
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     },

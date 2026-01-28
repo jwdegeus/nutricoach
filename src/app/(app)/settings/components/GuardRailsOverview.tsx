@@ -492,10 +492,10 @@ export function GuardRailsOverview({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-zinc-950 dark:text-white">
-            Firewall Rules Overzicht
+            Dieetregels Overzicht
           </h2>
           <Text className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Alle firewall rules voor {dietTypeName} ({sortedConstraints.length} regels, gesorteerd op prioriteit)
+            Alle dieetregels voor {dietTypeName} ({sortedConstraints.length} regels, gesorteerd op prioriteit)
           </Text>
         </div>
         <div className="flex gap-2">
@@ -691,7 +691,7 @@ export function GuardRailsOverview({
                         <option value="block">Block (Blokkeren)</option>
                       </select>
                       <Description>
-                        Firewall rule actie. Block heeft voorrang over allow bij gelijke prioriteit.
+                        Regel actie. Block heeft voorrang over allow bij gelijke prioriteit.
                       </Description>
                     </Field>
                     <Field>
@@ -791,7 +791,7 @@ export function GuardRailsOverview({
                       }
                     />
                     <Description>
-                      Firewall evaluatie prioriteit (0-100, hoger = belangrijker). Regels worden geëvalueerd in volgorde van prioriteit.
+                      Evaluatie prioriteit (0-100, hoger = belangrijker). Regels worden geëvalueerd in volgorde van prioriteit.
                     </Description>
                   </Field>
                 </div>

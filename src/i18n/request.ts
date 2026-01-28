@@ -46,8 +46,12 @@ export default getRequestConfig(async ({ requestLocale }) => {
     locale = 'nl'; // Default to Dutch
   }
 
+  // Default timeZone to avoid ENVIRONMENT_FALLBACK and server/client markup mismatches
+  const timeZone = process.env.NEXT_PUBLIC_TIMEZONE ?? "Europe/Amsterdam";
+
   return {
     locale,
-    messages: (await import(`../../messages/${locale}.json`)).default
+    messages: (await import(`../../messages/${locale}.json`)).default,
+    timeZone,
   };
 });

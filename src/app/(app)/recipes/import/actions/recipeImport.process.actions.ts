@@ -322,6 +322,7 @@ export async function processRecipeImportWithGeminiAction(
         raw_ocr_text: geminiResult.ocrText || null,
         gemini_raw_json: geminiRawJson,
         extracted_recipe_json: geminiResult.extracted,
+        original_recipe_json: geminiResult.extracted,
         confidence_overall: geminiResult.extracted.confidence?.overall || null,
         validation_errors_json: validationErrors,
         updated_at: new Date().toISOString(),
@@ -337,23 +338,17 @@ export async function processRecipeImportWithGeminiAction(
         throw new Error(`Database update failed: ${updateError.message}`);
       }
 
-      // Step 4: Automatically translate recipe if needed
-      console.log("[processRecipeImportWithGeminiAction] Step 4: Auto-translating recipe...");
+      // Step 4: Translate to user language (ingredients, description, instructions)
+      console.log("[processRecipeImportWithGeminiAction] Step 4: Translating recipe to user language...");
       try {
         const { translateRecipeImportAction } = await import("./recipeImport.translate.actions");
-        const translateResult = await translateRecipeImportAction({
-          jobId: input.jobId,
-          // targetLocale will be determined from user preferences in the action
-        });
-
+        const translateResult = await translateRecipeImportAction({ jobId: input.jobId });
         if (translateResult.ok) {
-          console.log("[processRecipeImportWithGeminiAction] Translation completed successfully");
+          console.log("[processRecipeImportWithGeminiAction] Translation completed");
         } else {
-          // Log but don't fail - recipe is already extracted
           console.error("[processRecipeImportWithGeminiAction] Translation failed (non-fatal):", translateResult.error);
         }
       } catch (translateError) {
-        // Log but don't fail - recipe is already extracted
         console.error("[processRecipeImportWithGeminiAction] Translation error (non-fatal):", translateError);
       }
 

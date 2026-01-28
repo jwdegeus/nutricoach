@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   updateDietType,
   type DietTypeOutput,
@@ -15,6 +15,8 @@ import { Textarea } from "@/components/catalyst/textarea";
 import { Checkbox, CheckboxField } from "@/components/catalyst/checkbox";
 import { RecipeAdaptationRulesManager } from "../../../components/RecipeAdaptationRulesManager";
 import { FirewallRulesCombined } from "../../../components/FirewallRulesCombined";
+import { GuardrailsPreviewPanel } from "../../../components/GuardrailsPreviewPanel";
+import { IngredientGroupsTab } from "../../../components/IngredientGroupsTab";
 
 type DietEditPageProps = {
   dietType: DietTypeOutput;
@@ -22,11 +24,37 @@ type DietEditPageProps = {
 
 export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [dietType, setDietType] = useState<DietTypeOutput>(initialDietType);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [activeTab, setActiveTab] = useState<"diet" | "guardrails">("diet");
+  
+  // Initialize active tab from URL query parameter or default
+  const tabParam = searchParams.get("tab");
+  const initialTab: "diet" | "guardrails" | "test-rules" | "ingredient-groups" =
+    tabParam === "ingredient-groups"
+      ? "ingredient-groups"
+      : tabParam === "test-rules"
+      ? "test-rules"
+      : tabParam === "guardrails"
+      ? "guardrails"
+      : "diet";
+  const [activeTab, setActiveTab] = useState<"diet" | "guardrails" | "test-rules" | "ingredient-groups">(initialTab);
+  
+  // Update tab when URL changes
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "ingredient-groups") {
+      setActiveTab("ingredient-groups");
+    } else if (tabParam === "test-rules") {
+      setActiveTab("test-rules");
+    } else if (tabParam === "guardrails") {
+      setActiveTab("guardrails");
+    } else if (tabParam === null || tabParam === "diet") {
+      setActiveTab("diet");
+    }
+  }, [searchParams]);
 
   // Diet form state
   const [dietFormData, setDietFormData] = useState<DietTypeInput>({
@@ -94,7 +122,10 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
       <div className="border-b border-zinc-200 dark:border-zinc-800">
         <nav className="-mb-px flex space-x-8">
           <button
-            onClick={() => setActiveTab("diet")}
+            onClick={() => {
+              setActiveTab("diet");
+              router.replace(`/settings/diets/${dietType.id}/edit?tab=diet`);
+            }}
             className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium ${
               activeTab === "diet"
                 ? "border-blue-500 text-blue-600 dark:text-blue-400"
@@ -104,14 +135,43 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
             Dieettype
           </button>
           <button
-            onClick={() => setActiveTab("guardrails")}
+            onClick={() => {
+              setActiveTab("guardrails");
+              router.replace(`/settings/diets/${dietType.id}/edit?tab=guardrails`);
+            }}
             className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium ${
               activeTab === "guardrails"
                 ? "border-blue-500 text-blue-600 dark:text-blue-400"
                 : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"
             }`}
           >
-            Firewall Rules
+            Dieetregels
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("test-rules");
+              router.replace(`/settings/diets/${dietType.id}/edit?tab=test-rules`);
+            }}
+            className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium ${
+              activeTab === "test-rules"
+                ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"
+            }`}
+          >
+            Regels testen
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("ingredient-groups");
+              router.replace(`/settings/diets/${dietType.id}/edit?tab=ingredient-groups`);
+            }}
+            className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium ${
+              activeTab === "ingredient-groups"
+                ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"
+            }`}
+          >
+            Ingrediëntgroepen
           </button>
         </nav>
       </div>
@@ -192,9 +252,22 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
         </div>
       )}
 
-      {/* Firewall Rules Tab - Combined Overview and Management */}
+      {/* Dieetregels Tab - Overview and Management (zonder Regels testen) */}
       {activeTab === "guardrails" && (
         <FirewallRulesCombined
+          dietTypeId={dietType.id}
+          dietTypeName={dietType.name}
+        />
+      )}
+
+      {/* Regels testen Tab */}
+      {activeTab === "test-rules" && (
+        <GuardrailsPreviewPanel dietTypeId={dietType.id} />
+      )}
+
+      {/* Ingrediëntgroepen Tab - Read-only overview */}
+      {activeTab === "ingredient-groups" && (
+        <IngredientGroupsTab
           dietTypeId={dietType.id}
           dietTypeName={dietType.name}
         />

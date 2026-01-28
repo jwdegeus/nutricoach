@@ -354,7 +354,7 @@ export function GuardRailsManager({
         if (!result.ok) {
           setError(result.error.message);
         } else {
-          setSuccess("Firewall rules succesvol opgeslagen");
+          setSuccess("Dieetregels succesvol opgeslagen");
           await loadData();
           // Callback to notify parent (e.g., to switch back to overview)
           if (onSaved) {
@@ -491,7 +491,7 @@ export function GuardRailsManager({
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-zinc-950 dark:text-white">
-              Firewall Rules voor {dietTypeName}
+              Dieetregels voor {dietTypeName}
             </h2>
             <Text className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
               Beheer categorieën, configureer allow/block regels met prioriteit. Regels worden geëvalueerd in volgorde van prioriteit (eerste match wint).
@@ -695,7 +695,7 @@ export function GuardRailsManager({
                 className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
               >
                 <div className="flex items-start gap-3">
-                  {/* Firewall Rule Actions: Allow/Block */}
+                  {/* Regel Acties: Allow/Block */}
                   <div className="flex flex-col gap-2">
                     <CheckboxField>
                       <Checkbox
@@ -792,7 +792,7 @@ export function GuardRailsManager({
                             <option value="block">Block (Blokkeren)</option>
                           </select>
                           <Description>
-                            Firewall rule actie. Block heeft voorrang over allow bij gelijke prioriteit.
+                            Regel actie. Block heeft voorrang over allow bij gelijke prioriteit.
                           </Description>
                         </Field>
                         <Field>
@@ -890,7 +890,7 @@ export function GuardRailsManager({
                               }
                             />
                             <Description>
-                              Firewall evaluatie prioriteit (0-100, hoger = belangrijker). Regels worden geëvalueerd in volgorde van prioriteit.
+                              Evaluatie prioriteit (0-100, hoger = belangrijker). Regels worden geëvalueerd in volgorde van prioriteit.
                             </Description>
                           </Field>
                         </div>
@@ -1152,7 +1152,7 @@ export function GuardRailsManager({
 
         <div className="mt-6 flex justify-end">
           <Button onClick={handleSave} disabled={isPending || isSaving}>
-            {isPending || isSaving ? "Opslaan..." : "Firewall Rules Opslaan"}
+            {isPending || isSaving ? "Opslaan..." : "Dieetregels Opslaan"}
           </Button>
         </div>
       </div>

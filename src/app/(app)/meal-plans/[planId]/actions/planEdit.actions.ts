@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/src/lib/supabase/server";
+import { getGeminiClient } from "@/src/lib/ai/gemini/gemini.client";
 import { applyPlanEdit } from "@/src/lib/agents/meal-planner/planEdit.apply";
 import { AppError } from "@/src/lib/errors/app-error";
 import type { PlanEdit } from "@/src/lib/agents/meal-planner/planEdit.types";
@@ -17,13 +18,6 @@ type ActionResult<T> =
         message: string;
       };
     };
-
-/**
- * Get model name for observability
- */
-function getModelName(): string {
-  return process.env.GEMINI_MODEL ?? "gemini-2.0-flash-exp";
-}
 
 /**
  * Map plan edit action to run type
@@ -64,8 +58,8 @@ export async function applyDirectPlanEditAction(
       };
     }
 
-    // Log "running" status at start
-    const model = getModelName();
+    // Log "running" status at start (model from GEMINI_MODEL_PLAN / GEMINI_MODEL in .env.local)
+    const model = getGeminiClient().getModelName("plan");
     const runType = getRunType(edit.action);
     const { data: runData, error: runError } = await supabase
       .from("meal_plan_runs")
