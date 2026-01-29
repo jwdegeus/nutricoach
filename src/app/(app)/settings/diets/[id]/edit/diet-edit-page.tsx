@@ -49,18 +49,18 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
     'diet' | 'guardrails' | 'test-rules' | 'ingredient-groups'
   >(initialTab);
 
-  // Update tab when URL changes
+  // Update tab when URL changes (defer to avoid set-state-in-effect)
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam === 'ingredient-groups') {
-      setActiveTab('ingredient-groups');
-    } else if (tabParam === 'test-rules') {
-      setActiveTab('test-rules');
-    } else if (tabParam === 'guardrails') {
-      setActiveTab('guardrails');
-    } else if (tabParam === null || tabParam === 'diet') {
-      setActiveTab('diet');
-    }
+    const nextTab =
+      tabParam === 'ingredient-groups'
+        ? 'ingredient-groups'
+        : tabParam === 'test-rules'
+          ? 'test-rules'
+          : tabParam === 'guardrails'
+            ? 'guardrails'
+            : 'diet';
+    queueMicrotask(() => setActiveTab(nextTab));
   }, [searchParams]);
 
   // Diet form state

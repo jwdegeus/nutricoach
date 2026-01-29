@@ -7,7 +7,6 @@ import {
   CheckIcon,
 } from '@heroicons/react/20/solid';
 import { useTheme } from 'next-themes';
-import { useEffect, useState } from 'react';
 import {
   Dropdown,
   DropdownButton,
@@ -15,6 +14,7 @@ import {
   DropdownLabel,
   DropdownMenu,
 } from '@/components/catalyst/dropdown';
+import { useIsMounted } from '@/src/lib/hooks/use-is-mounted';
 import { NavbarItem } from '@/components/catalyst/navbar';
 import { Button } from '@/components/catalyst/button';
 import type { ComponentPropsWithoutRef } from 'react';
@@ -36,11 +36,7 @@ export function ThemeSwitcher({
   ...props
 }: ThemeSwitcherProps) {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useIsMounted();
 
   const getIcon = () => {
     if (!mounted) return <SunIcon data-slot="icon" />;

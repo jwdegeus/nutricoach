@@ -32,6 +32,7 @@ import { useTranslatedNavItems } from '@/src/lib/nav-hooks';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/src/lib/supabase/client';
 import { useEffect, useState } from 'react';
+import { useIsMounted } from '@/src/lib/hooks/use-is-mounted';
 import {
   ArrowRightStartOnRectangleIcon,
   ChevronDownIcon,
@@ -111,13 +112,9 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
   const [initials, setInitials] = useState('U');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
-  const [mounted, setMounted] = useState(false);
+  const mounted = useIsMounted();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     const supabase = createClient();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useIsMounted } from '@/src/lib/hooks/use-is-mounted';
 import { ApplicationLayout } from './ApplicationLayout';
 
 /**
@@ -13,11 +13,7 @@ export function ClientOnlyApplicationLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useIsMounted();
 
   // During SSR and initial render, return a simple structure without Headless UI
   // This prevents hydration mismatches while maintaining the layout structure

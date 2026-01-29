@@ -82,9 +82,11 @@ export function MealDetail({
   // Check of er een aangepaste versie is en laad advies (intro + whyThisWorks)
   useEffect(() => {
     if (!meal?.id) {
-      setHasAppliedAdaptation(false);
-      setAdvisoryIntro(undefined);
-      setAdvisoryWhyThisWorks(undefined);
+      queueMicrotask(() => {
+        setHasAppliedAdaptation(false);
+        setAdvisoryIntro(undefined);
+        setAdvisoryWhyThisWorks(undefined);
+      });
       return;
     }
     getHasAppliedAdaptationAction({ recipeId: meal.id }).then((result) => {

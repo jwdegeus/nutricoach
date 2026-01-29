@@ -57,6 +57,9 @@
     "tsx": "^4.7.0",
     "typescript": "^5"
   },
+  "overrides": {
+    "@swc/helpers": "0.5.18"
+  },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
       "prettier --write",
