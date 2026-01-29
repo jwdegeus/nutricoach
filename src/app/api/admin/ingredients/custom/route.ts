@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/src/lib/supabase/server';
 import { isAdmin } from '@/src/lib/auth/roles';
+import { NUMERIC_CUSTOM_FOOD_KEYS } from '@/src/app/(app)/admin/ingredients/custom/custom-foods-fields';
+import {
+  correctNutritionValues,
+  validateNutritionValues,
+} from '@/src/app/(app)/admin/ingredients/custom/nutrition-validation';
 
 /**
  * POST /api/admin/ingredients/custom
@@ -120,6 +125,26 @@ export async function POST(request: NextRequest) {
       folic_acid_ug: body.folic_acid_ug ?? null,
       vit_c_mg: body.vit_c_mg ?? null,
     };
+
+    // Corrigeer en valideer voedingswaarden per 100g (bijv. 38758 → 38.758 voor sodium_mg)
+    const corrected = correctNutritionValues(row, NUMERIC_CUSTOM_FOOD_KEYS);
+    const validation = validateNutritionValues(
+      corrected,
+      NUMERIC_CUSTOM_FOOD_KEYS,
+    );
+    if (!validation.valid) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: validation.error,
+          },
+        },
+        { status: 400 },
+      );
+    }
+    Object.assign(row, corrected);
 
     const { data: newFood, error } = await supabase
       .from('custom_foods')

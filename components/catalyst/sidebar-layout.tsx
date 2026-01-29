@@ -64,7 +64,7 @@ export function SidebarLayout({
       {/* Sidebar on desktop */}
       <motion.div
         layoutScroll
-        className="fixed inset-y-0 left-0 w-64 max-lg:hidden"
+        className="fixed inset-y-0 left-0 w-64 max-lg:hidden border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
       >
         {sidebar}
       </motion.div>
@@ -75,7 +75,7 @@ export function SidebarLayout({
       </MobileSidebar>
 
       {/* Navbar on mobile - fixed, same background as sidebar */}
-      <header className="sticky top-0 z-10 flex flex-col bg-zinc-100 px-4 dark:bg-zinc-950 lg:hidden">
+      <header className="sticky top-0 z-10 flex flex-col border-b border-zinc-200 bg-zinc-100 px-4 dark:border-zinc-800 dark:bg-zinc-950 lg:hidden">
         <div className="flex items-center">
           <div className="py-2.5">
             <NavbarItem
@@ -89,14 +89,14 @@ export function SidebarLayout({
         </div>
       </header>
 
-      {/* Content */}
+      {/* Content – geen aparte kaart; vult de breedte enzelfde achtergrond als pagina */}
       <main className="flex flex-1 flex-col pb-2 lg:min-w-0 lg:pt-2 lg:pr-2 lg:pl-64">
         {/* Navbar on desktop - fixed, same background as sidebar */}
-        <header className="sticky top-0 z-10 hidden bg-zinc-100 px-4 pt-2.5 dark:bg-zinc-950 lg:block">
+        <header className="sticky top-0 z-10 hidden border-b border-zinc-200 bg-zinc-100 px-4 pt-2.5 dark:border-zinc-800 dark:bg-zinc-950 lg:block">
           {navbar}
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-6 lg:rounded-lg lg:bg-white lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-zinc-950/5 dark:lg:bg-zinc-900 dark:lg:ring-white/10">
-          <div className="mx-auto w-full max-w-6xl flex-1">{children}</div>
+        <div className="flex flex-1 flex-col gap-4 p-6 lg:p-8">
+          <div className="mx-auto w-full max-w-7xl flex-1">{children}</div>
         </div>
       </main>
     </div>

@@ -1764,7 +1764,7 @@ export function GuardRailsVNextOverview({
               </FieldGroup>
               <div className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
                 <Link
-                  href={`/settings/diets/${dietTypeId}/edit?tab=ingredient-groups&categoryId=${editingPolicy.categoryId}`}
+                  href="/admin/ingredients?tab=groups"
                   className="underline"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -2422,7 +2422,7 @@ export function GuardRailsVNextOverview({
                       Alleen ingrediëntgroepen zonder bestaande dieetregel.
                       Termen beheer je in{' '}
                       <Link
-                        href={`/settings/diets/${dietTypeId}/edit?tab=ingredient-groups`}
+                        href="/admin/ingredients?tab=groups"
                         className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline"
                       >
                         Ingrediëntgroepen

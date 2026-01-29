@@ -142,7 +142,72 @@ const SUBSTRING_FALSE_POSITIVE_IF_CONTAINS: Record<string, string | string[]> =
     ei: ['romeinse', 'romaine'],
     ijs: 'radijs',
     oca: 'avocado',
+    // "pasta" als in paste/spread (notenpasta, amandelpasta, tomatenpasta) ≠ glutenpasta
+    pasta: [
+      'notenpasta',
+      'amandelpasta',
+      'gember-knoflookpasta',
+      'gemberpasta',
+      'knoflookpasta',
+      'tomatenpasta',
+      'sesampasta',
+      'pindapasta',
+      'olijvenpasta',
+      'chilipasta',
+      'currypasta',
+      'kruidenpasta',
+      'pastasaus',
+      'tahin',
+      'tahini',
+    ],
   };
+
+/**
+ * Ingrediëntnamen die "pasta" als paste/spread betekenen (geen gluten).
+ * Wordt gebruikt om false positives te voorkomen: notenpasta, amandelpasta,
+ * gember-knoflookpasta, tomatenpasta enz. zijn geen tarwepasta.
+ */
+const PASTA_AS_PASTE_INDICATORS = [
+  'notenpasta',
+  'amandelpasta',
+  'gember-knoflookpasta',
+  'gemberpasta',
+  'knoflookpasta',
+  'tomatenpasta',
+  'sesampasta',
+  'pindapasta',
+  'olijvenpasta',
+  'chilipasta',
+  'currypasta',
+  'kruidenpasta',
+  'pastasaus',
+  'tahin',
+  'tahini',
+];
+
+function isPastaAsPaste(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  if (PASTA_AS_PASTE_INDICATORS.some((p) => lower.includes(p))) return true;
+  // "noten pasta", "amandel pasta" (twee woorden)
+  const pastaAsPastePrefixes = [
+    'noten',
+    'amandel',
+    'gember',
+    'knoflook',
+    'tomaten',
+    'sesam',
+    'pinda',
+    'olijven',
+    'chili',
+    'curry',
+    'kruiden',
+  ];
+  const twoWordMatch = new RegExp(
+    `^(${pastaAsPastePrefixes.join('|')})\\s+pasta$`,
+    'i',
+  );
+  return twoWordMatch.test(lower);
+}
 
 /**
  * Normaliseer tekst voor matching: lowercase, trim, meerdere spaties → één.
@@ -291,6 +356,7 @@ export function findForbiddenMatches(
         for (const synonym of forbidden.synonyms) {
           const lowerSynonym = synonym.toLowerCase();
           if (lowerText === lowerSynonym) {
+            if (lowerTerm === 'pasta' && isPastaAsPaste(lowerText)) continue;
             console.log(
               `[DietValidator] ✓ Exact synonym match: "${synonym}" (synonym of "${forbidden.term}") == "${text}"`,
             );
@@ -310,6 +376,12 @@ export function findForbiddenMatches(
 
     // Check main term - try word boundary first, then substring for ingredients
     if (matchesWordBoundary(text, forbidden.term)) {
+      if (
+        context === 'ingredients' &&
+        lowerTerm === 'pasta' &&
+        isPastaAsPaste(lowerText)
+      )
+        continue;
       if (context === 'ingredients') {
         console.log(
           `[DietValidator] ✓ Word boundary match: "${forbidden.term}" in "${text}"`,
@@ -348,9 +420,10 @@ export function findForbiddenMatches(
             ? excludeIfContains
             : [excludeIfContains];
           if (patterns.some((p) => lowerText.includes(p))) {
-            continue; // bv. "ei" in "romeinse sla", "ijs" in "radijsjes", "oca" in "avocado"
+            continue; // bv. "ei" in "romeinse sla", "pasta" in "notenpasta"
           }
         }
+        if (found === 'pasta' && isPastaAsPaste(lowerText)) continue;
         const matchedLabel = found === lowerTerm ? forbidden.term : found;
         console.log(
           `[DietValidator] ✓ Substring match: "${matchedLabel}" (term: ${forbidden.term}) in "${text}"`,
@@ -375,6 +448,7 @@ export function findForbiddenMatches(
 
         // For ingredients, check exact match first (most important for cases like "orzo")
         if (context === 'ingredients' && lowerText === lowerSynonym) {
+          if (lowerTerm === 'pasta' && isPastaAsPaste(lowerText)) continue;
           console.log(
             `[DietValidator] ✓ Exact synonym match: "${synonym}" (synonym of "${forbidden.term}") == "${text}"`,
           );
@@ -391,6 +465,12 @@ export function findForbiddenMatches(
 
         // Then check word boundary
         if (matchesWordBoundary(text, synonym)) {
+          if (
+            context === 'ingredients' &&
+            lowerTerm === 'pasta' &&
+            isPastaAsPaste(lowerText)
+          )
+            continue;
           if (context === 'ingredients') {
             console.log(
               `[DietValidator] ✓ Word boundary synonym match: "${synonym}" (synonym of "${forbidden.term}") in "${text}"`,
@@ -427,6 +507,7 @@ export function findForbiddenMatches(
               : [excludeIfContains];
             if (patterns.some((p) => lowerText.includes(p))) continue;
           }
+          if (lowerTerm === 'pasta' && isPastaAsPaste(lowerText)) continue;
           console.log(
             `[DietValidator] ✓ Substring synonym match: "${synonym}" (synonym of "${forbidden.term}") in "${text}"`,
           );

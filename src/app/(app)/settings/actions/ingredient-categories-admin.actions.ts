@@ -136,6 +136,170 @@ function validateTerm(term: string): { valid: boolean; error?: string } {
 }
 
 /**
+ * Get distinct NEVO food groups (for linking ingredient categories to NEVO)
+ * Admin-only.
+ */
+export async function getNevoFoodGroupsAction(): Promise<
+  ActionResultWithOk<Array<{ food_group_nl: string; food_group_en: string }>>
+> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return {
+        ok: false,
+        error: { code: 'AUTH_ERROR', message: 'Je moet ingelogd zijn' },
+      };
+    }
+
+    const { data: role } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (!role) {
+      return {
+        ok: false,
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen NEVO groepen opvragen',
+        },
+      };
+    }
+
+    const { data, error } = await supabase.rpc('get_nevo_food_groups');
+
+    if (error) {
+      return {
+        ok: false,
+        error: { code: 'DB_ERROR', message: error.message },
+      };
+    }
+
+    const groups = (data || []).map(
+      (row: { food_group_nl: string; food_group_en: string }) => ({
+        food_group_nl: row.food_group_nl ?? '',
+        food_group_en: row.food_group_en ?? '',
+      }),
+    );
+
+    return { ok: true, data: groups };
+  } catch (error) {
+    console.error('Error in getNevoFoodGroupsAction:', error);
+    return {
+      ok: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
+      },
+    };
+  }
+}
+
+/**
+ * Get a single ingredient category by id (admin)
+ */
+export async function getIngredientCategoryAction(categoryId: string): Promise<
+  ActionResultWithOk<{
+    id: string;
+    code: string;
+    name_nl: string;
+    name_en: string | null;
+    description: string | null;
+    category_type: 'forbidden' | 'required';
+    display_order: number;
+    is_active: boolean;
+    items_count?: number;
+    nevo_food_groups_nl?: string[];
+    nevo_food_groups_en?: string[];
+  } | null>
+> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return {
+        ok: false,
+        error: { code: 'AUTH_ERROR', message: 'Je moet ingelogd zijn' },
+      };
+    }
+
+    const { data: role } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (!role) {
+      return {
+        ok: false,
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen categorieën bekijken',
+        },
+      };
+    }
+
+    const { data: cat, error } = await supabase
+      .from('ingredient_categories')
+      .select(
+        `
+        *,
+        items:ingredient_category_items(count)
+      `,
+      )
+      .eq('id', categoryId)
+      .maybeSingle();
+
+    if (error) {
+      return { ok: false, error: { code: 'DB_ERROR', message: error.message } };
+    }
+
+    if (!cat) {
+      return { ok: true, data: null };
+    }
+
+    const out = {
+      id: cat.id,
+      code: cat.code,
+      name_nl: cat.name_nl,
+      name_en: cat.name_en ?? null,
+      description: cat.description ?? null,
+      category_type: cat.category_type,
+      display_order: cat.display_order ?? 0,
+      is_active: cat.is_active ?? true,
+      items_count: (cat as any).items?.[0]?.count ?? 0,
+      nevo_food_groups_nl: Array.isArray(cat.nevo_food_groups_nl)
+        ? cat.nevo_food_groups_nl
+        : [],
+      nevo_food_groups_en: Array.isArray(cat.nevo_food_groups_en)
+        ? cat.nevo_food_groups_en
+        : [],
+    };
+
+    return { ok: true, data: out };
+  } catch (error) {
+    console.error('Error in getIngredientCategoryAction:', error);
+    return {
+      ok: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
+      },
+    };
+  }
+}
+
+/**
  * Get all ingredient categories (forbidden and required)
  */
 export async function getIngredientCategoriesAction(): Promise<
@@ -150,6 +314,8 @@ export async function getIngredientCategoriesAction(): Promise<
       display_order: number;
       is_active: boolean;
       items_count?: number;
+      nevo_food_groups_nl?: string[];
+      nevo_food_groups_en?: string[];
     }>
   >
 > {
@@ -225,6 +391,12 @@ export async function getIngredientCategoriesAction(): Promise<
       display_order: cat.display_order,
       is_active: cat.is_active,
       items_count: cat.items?.[0]?.count || 0,
+      nevo_food_groups_nl: Array.isArray(cat.nevo_food_groups_nl)
+        ? cat.nevo_food_groups_nl
+        : [],
+      nevo_food_groups_en: Array.isArray(cat.nevo_food_groups_en)
+        ? cat.nevo_food_groups_en
+        : [],
     }));
 
     return {
@@ -700,6 +872,8 @@ export async function createIngredientCategoryAction(input: {
   category_type: 'forbidden' | 'required';
   parent_category_id?: string | null;
   display_order?: number;
+  nevo_food_groups_nl?: string[];
+  nevo_food_groups_en?: string[];
 }): Promise<ActionResultWithOk<{ id: string }>> {
   try {
     const supabase = await createClient();
@@ -746,6 +920,13 @@ export async function createIngredientCategoryAction(input: {
       };
     }
 
+    const groupsNl = (input.nevo_food_groups_nl ?? [])
+      .filter((s) => s?.trim())
+      .map((s) => s.trim());
+    const groupsEn = (input.nevo_food_groups_en ?? [])
+      .filter((s) => s?.trim())
+      .map((s) => s.trim());
+
     const { data, error } = await supabase
       .from('ingredient_categories')
       .insert({
@@ -757,6 +938,8 @@ export async function createIngredientCategoryAction(input: {
         parent_category_id: input.parent_category_id || null,
         display_order: input.display_order || 0,
         is_active: true,
+        nevo_food_groups_nl: groupsNl,
+        nevo_food_groups_en: groupsEn,
       })
       .select('id')
       .single();
@@ -809,6 +992,8 @@ export async function updateIngredientCategoryAction(
     description?: string | null;
     display_order?: number;
     is_active?: boolean;
+    nevo_food_groups_nl?: string[];
+    nevo_food_groups_en?: string[];
   },
 ): Promise<ActionResultWithOk<{ id: string }>> {
   try {
@@ -856,6 +1041,14 @@ export async function updateIngredientCategoryAction(
     if (input.display_order !== undefined)
       updateData.display_order = input.display_order;
     if (input.is_active !== undefined) updateData.is_active = input.is_active;
+    if (input.nevo_food_groups_nl !== undefined)
+      updateData.nevo_food_groups_nl = (input.nevo_food_groups_nl ?? [])
+        .filter((s) => s?.trim())
+        .map((s) => s.trim());
+    if (input.nevo_food_groups_en !== undefined)
+      updateData.nevo_food_groups_en = (input.nevo_food_groups_en ?? [])
+        .filter((s) => s?.trim())
+        .map((s) => s.trim());
 
     const { data, error } = await supabase
       .from('ingredient_categories')
@@ -1102,21 +1295,50 @@ export async function deleteIngredientCategoryAction(
     }
 
     // Blokkeer verwijderen als deze categorie nog in een actieve dieetregel (diet_category_constraint) zit
-    const { data: inUse } = await supabase
+    const { data: constraintsInUse } = await supabase
       .from('diet_category_constraints')
-      .select('id')
+      .select(
+        `
+        id,
+        constraint_type,
+        rule_action,
+        diet_type_id,
+        diet_type:diet_types(id, name)
+      `,
+      )
       .eq('category_id', categoryId)
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle();
+      .eq('is_active', true);
 
-    if (inUse) {
+    if (constraintsInUse && constraintsInUse.length > 0) {
+      const usageLines = constraintsInUse.map((c: any) => {
+        const nested = c.diet_type ?? c.diet_types;
+        const name =
+          nested &&
+          typeof nested === 'object' &&
+          typeof (nested as { name?: string }).name === 'string'
+            ? (nested as { name: string }).name
+            : null;
+        const dietName =
+          name ??
+          (c.diet_type_id
+            ? `Dieet (id: ${String(c.diet_type_id).slice(0, 8)}…)`
+            : 'Onbekend dieet');
+        const ruleLabel =
+          c.constraint_type === 'forbidden'
+            ? 'Verboden'
+            : c.constraint_type === 'required'
+              ? 'Vereist'
+              : c.rule_action === 'block'
+                ? 'Verboden'
+                : 'Vereist';
+        return `• ${dietName} (regel: ${ruleLabel})`;
+      });
+      const message = `Deze ingredientgroep wordt nog gebruikt en kan niet worden verwijderd.\n\nGebruikt in:\n${usageLines.join('\n')}\n\nVerwijder de groep eerst uit deze dieetregels via Instellingen → Dieettype bewerken → tab Dieetregels.`;
       return {
         ok: false,
         error: {
           code: 'IN_USE',
-          message:
-            'Deze ingrediëntgroep wordt nog gebruikt door één of meer dieetregels. Verwijder eerst die dieetregels (tab Dieetregels).',
+          message,
         },
       };
     }
@@ -1549,6 +1771,7 @@ export async function readIngredientCategoryItemsAction(
       display_order: number;
       is_active: boolean;
       subgroup_id: string | null;
+      nevo_food_id: number | null;
     }>;
     total_count: number;
     has_more: boolean;
@@ -1606,11 +1829,11 @@ export async function readIngredientCategoryItemsAction(
       };
     }
 
-    // Get first N items (active only), including subgroup_id
+    // Get first N items (active only), including subgroup_id and nevo_food_id
     const { data: items, error } = await supabase
       .from('ingredient_category_items')
       .select(
-        'id, term, term_nl, synonyms, display_order, is_active, subgroup_id',
+        'id, term, term_nl, synonyms, display_order, is_active, subgroup_id, nevo_food_id',
       )
       .eq('category_id', categoryId)
       .eq('is_active', true)
@@ -1636,6 +1859,7 @@ export async function readIngredientCategoryItemsAction(
       display_order: item.display_order,
       is_active: item.is_active,
       subgroup_id: item.subgroup_id || null,
+      nevo_food_id: item.nevo_food_id ?? null,
     }));
 
     return {
@@ -1648,6 +1872,387 @@ export async function readIngredientCategoryItemsAction(
     };
   } catch (error) {
     console.error('Error in readIngredientCategoryItemsAction:', error);
+    return {
+      ok: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
+      },
+    };
+  }
+}
+
+/**
+ * Search NEVO ingredients that can be added to this category.
+ * Only returns NEVO foods in the category's linked NEVO groups that are not yet in any ingredient group.
+ * Optional searchQuery filters by name_nl (ilike).
+ */
+export async function searchNevoIngredientsForCategoryAction(
+  categoryId: string,
+  searchQuery?: string,
+): Promise<
+  ActionResultWithOk<
+    Array<{
+      id: number;
+      nevo_code: number;
+      name_nl: string;
+      name_en: string;
+      food_group_nl: string;
+    }>
+  >
+> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return {
+        ok: false,
+        error: { code: 'AUTH_ERROR', message: 'Je moet ingelogd zijn' },
+      };
+    }
+
+    const { data: role } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (!role) {
+      return {
+        ok: false,
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen NEVO ingrediënten zoeken',
+        },
+      };
+    }
+
+    const { data: category, error: catError } = await supabase
+      .from('ingredient_categories')
+      .select('nevo_food_groups_nl')
+      .eq('id', categoryId)
+      .single();
+
+    if (catError || !category) {
+      return {
+        ok: false,
+        error: {
+          code: 'DB_ERROR',
+          message: catError?.message ?? 'Categorie niet gevonden',
+        },
+      };
+    }
+
+    const groupsNl = (category as { nevo_food_groups_nl?: string[] })
+      .nevo_food_groups_nl;
+    if (!groupsNl || groupsNl.length === 0) {
+      return {
+        ok: true,
+        data: [],
+      };
+    }
+
+    // Only treat active items as "using" a NEVO food; soft-deleted items free the NEVO for re-use
+    const { data: usedNevoIds } = await supabase
+      .from('ingredient_category_items')
+      .select('nevo_food_id')
+      .eq('is_active', true)
+      .not('nevo_food_id', 'is', null);
+
+    const usedSet = new Set(
+      (usedNevoIds || []).map((r: { nevo_food_id: number }) => r.nevo_food_id),
+    );
+
+    let query = supabase
+      .from('nevo_foods')
+      .select('id, nevo_code, name_nl, name_en, food_group_nl')
+      .in('food_group_nl', groupsNl)
+      .limit(100);
+
+    if (searchQuery?.trim()) {
+      query = query.ilike('name_nl', `%${searchQuery.trim()}%`);
+    }
+
+    const { data: foods, error } = await query;
+
+    if (error) {
+      return { ok: false, error: { code: 'DB_ERROR', message: error.message } };
+    }
+
+    const filtered = (foods || []).filter(
+      (f: { id: number }) => !usedSet.has(f.id),
+    );
+
+    const out = filtered.map((f: any) => ({
+      id: f.id,
+      nevo_code: f.nevo_code,
+      name_nl: f.name_nl ?? '',
+      name_en: f.name_en ?? '',
+      food_group_nl: f.food_group_nl ?? '',
+    }));
+
+    return { ok: true, data: out };
+  } catch (error) {
+    console.error('Error in searchNevoIngredientsForCategoryAction:', error);
+    return {
+      ok: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
+      },
+    };
+  }
+}
+
+/**
+ * Add a NEVO ingredient to this ingredient category.
+ * Fails if the NEVO food is already in another category (unique constraint).
+ */
+export async function addNevoIngredientToCategoryAction(
+  categoryId: string,
+  nevoFoodId: number,
+): Promise<ActionResultWithOk<{ id: string }>> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return {
+        ok: false,
+        error: { code: 'AUTH_ERROR', message: 'Je moet ingelogd zijn' },
+      };
+    }
+
+    const { data: role } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (!role) {
+      return {
+        ok: false,
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen NEVO ingrediënten toevoegen',
+        },
+      };
+    }
+
+    const { data: category, error: catError } = await supabase
+      .from('ingredient_categories')
+      .select('nevo_food_groups_nl')
+      .eq('id', categoryId)
+      .single();
+
+    if (catError || !category) {
+      return {
+        ok: false,
+        error: {
+          code: 'DB_ERROR',
+          message: catError?.message ?? 'Categorie niet gevonden',
+        },
+      };
+    }
+
+    const { data: nevoFood, error: nevoError } = await supabase
+      .from('nevo_foods')
+      .select('id, name_nl, food_group_nl')
+      .eq('id', nevoFoodId)
+      .single();
+
+    if (nevoError || !nevoFood) {
+      return {
+        ok: false,
+        error: {
+          code: 'DB_ERROR',
+          message: nevoError?.message ?? 'NEVO voedingsmiddel niet gevonden',
+        },
+      };
+    }
+
+    const groupsNl =
+      (category as { nevo_food_groups_nl?: string[] }).nevo_food_groups_nl ??
+      [];
+    if (
+      !groupsNl.includes((nevoFood as { food_group_nl: string }).food_group_nl)
+    ) {
+      return {
+        ok: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message:
+            'Dit NEVO-ingrediënt hoort niet bij de gekoppelde NEVO-groepen van deze categorie',
+        },
+      };
+    }
+
+    const nameNl = (nevoFood as { name_nl: string }).name_nl ?? '';
+    const term = nameNl.trim().toLowerCase();
+    if (!term) {
+      return {
+        ok: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'NEVO-ingrediënt heeft geen naam',
+        },
+      };
+    }
+
+    const { data, error } = await supabase
+      .from('ingredient_category_items')
+      .insert({
+        category_id: categoryId,
+        subgroup_id: null,
+        term,
+        term_nl: nameNl.trim(),
+        synonyms: [],
+        display_order: 0,
+        is_active: true,
+        nevo_food_id: nevoFoodId,
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        return {
+          ok: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message:
+              'Dit NEVO-ingrediënt staat al in een andere ingredientgroep. Verwijder het daar eerst.',
+          },
+        };
+      }
+      return { ok: false, error: { code: 'DB_ERROR', message: error.message } };
+    }
+
+    return { ok: true, data: { id: data.id } };
+  } catch (error) {
+    console.error('Error in addNevoIngredientToCategoryAction:', error);
+    return {
+      ok: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
+      },
+    };
+  }
+}
+
+/**
+ * Ontdubbelen: remove custom (hand/AI) items that duplicate a NEVO item in this category.
+ * NEVO items always win; custom items with matching term or synonyms are removed.
+ */
+export async function deduplicateCategoryItemsAction(
+  categoryId: string,
+): Promise<ActionResultWithOk<{ removed: number }>> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return {
+        ok: false,
+        error: { code: 'AUTH_ERROR', message: 'Je moet ingelogd zijn' },
+      };
+    }
+
+    const { data: role } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (!role) {
+      return {
+        ok: false,
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen ontdubbelen',
+        },
+      };
+    }
+
+    const { data: items, error } = await supabase
+      .from('ingredient_category_items')
+      .select('id, term, term_nl, synonyms, nevo_food_id')
+      .eq('category_id', categoryId)
+      .eq('is_active', true);
+
+    if (error) {
+      return { ok: false, error: { code: 'DB_ERROR', message: error.message } };
+    }
+
+    const nevoTerms = new Set<string>();
+    const customItems: Array<{
+      id: string;
+      term: string;
+      term_nl: string | null;
+      synonyms: string[];
+    }> = [];
+
+    for (const item of items || []) {
+      const term = (item.term ?? '').toLowerCase().trim();
+      const termNl = (item.term_nl ?? '').toLowerCase().trim();
+      const synonyms = Array.isArray(item.synonyms)
+        ? (item.synonyms as string[]).map((s) => String(s).toLowerCase().trim())
+        : [];
+      if (item.nevo_food_id != null) {
+        if (term) nevoTerms.add(term);
+        if (termNl) nevoTerms.add(termNl);
+        synonyms.forEach((s) => s && nevoTerms.add(s));
+      } else {
+        customItems.push({
+          id: item.id,
+          term,
+          term_nl: item.term_nl ?? null,
+          synonyms,
+        });
+      }
+    }
+
+    const toRemove: string[] = [];
+    for (const custom of customItems) {
+      const norm = custom.term;
+      const normNl = (custom.term_nl ?? '').toLowerCase().trim();
+      const matches =
+        nevoTerms.has(norm) ||
+        (normNl && nevoTerms.has(normNl)) ||
+        custom.synonyms.some((s) => s && nevoTerms.has(s));
+      if (matches) toRemove.push(custom.id);
+    }
+
+    if (toRemove.length === 0) {
+      return { ok: true, data: { removed: 0 } };
+    }
+
+    const { error: deleteError } = await supabase
+      .from('ingredient_category_items')
+      .update({ is_active: false })
+      .in('id', toRemove);
+
+    if (deleteError) {
+      return {
+        ok: false,
+        error: { code: 'DB_ERROR', message: deleteError.message },
+      };
+    }
+
+    return { ok: true, data: { removed: toRemove.length } };
+  } catch (error) {
+    console.error('Error in deduplicateCategoryItemsAction:', error);
     return {
       ok: false,
       error: {
@@ -1949,6 +2554,78 @@ export async function updateIngredientCategoryItemAction(
 }
 
 /**
+ * Reorder ingredient category items by setting display_order to the index in orderedIds.
+ * No page reload needed; call after local reorder.
+ */
+export async function reorderIngredientCategoryItemsAction(
+  categoryId: string,
+  orderedIds: string[],
+): Promise<ActionResultWithOk<void>> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return {
+        ok: false,
+        error: {
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
+        },
+      };
+    }
+
+    const { data: role } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (!role) {
+      return {
+        ok: false,
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Alleen admins kunnen volgorde wijzigen',
+        },
+      };
+    }
+
+    for (let i = 0; i < orderedIds.length; i++) {
+      const { error } = await supabase
+        .from('ingredient_category_items')
+        .update({ display_order: i, updated_at: new Date().toISOString() })
+        .eq('id', orderedIds[i])
+        .eq('category_id', categoryId);
+
+      if (error) {
+        return {
+          ok: false,
+          error: {
+            code: 'DB_ERROR',
+            message: error.message,
+          },
+        };
+      }
+    }
+
+    return { ok: true, data: undefined };
+  } catch (error) {
+    console.error('Error in reorderIngredientCategoryItemsAction:', error);
+    return {
+      ok: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
+      },
+    };
+  }
+}
+
+/**
  * Delete an ingredient category item (soft delete: sets is_active=false)
  */
 export async function deleteIngredientCategoryItemAction(
@@ -1988,10 +2665,14 @@ export async function deleteIngredientCategoryItemAction(
       };
     }
 
-    // Soft delete: set is_active=false
+    // Soft delete: set is_active=false and clear nevo_food_id so the NEVO can be re-linked elsewhere
     const { error } = await supabase
       .from('ingredient_category_items')
-      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .update({
+        is_active: false,
+        nevo_food_id: null,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', itemId);
 
     if (error) {

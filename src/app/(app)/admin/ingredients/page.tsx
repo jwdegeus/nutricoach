@@ -1,11 +1,12 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/src/lib/supabase/server';
 import { isAdmin } from '@/src/lib/auth/roles';
-import { IngredientsAdminClient } from './components/IngredientsAdminClient';
+import { AdminIngredientsPageClient } from './components/AdminIngredientsPageClient';
 
 export const metadata = {
-  title: 'Ingrediënten (NEVO) | NutriCoach Admin',
-  description: 'Bekijk NEVO-ingrediënten en beheer eigen ingredienten',
+  title: 'Ingrediënten en groepen | NutriCoach Admin',
+  description:
+    'Beheer NEVO- en eigen ingrediënten en ingredientgroepen (categorieën)',
 };
 
 export default async function AdminIngredientsPage() {
@@ -23,5 +24,5 @@ export default async function AdminIngredientsPage() {
     redirect('/dashboard');
   }
 
-  return <IngredientsAdminClient />;
+  return <AdminIngredientsPageClient />;
 }

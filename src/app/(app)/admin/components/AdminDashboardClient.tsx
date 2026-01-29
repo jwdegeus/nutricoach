@@ -18,6 +18,8 @@ type StatItem = {
   value: number | string;
   icon?: ComponentType<SVGProps<SVGSVGElement>>;
   iconColor?: string;
+  /** Als gezet: deze stat is een link (bijv. naar gefilterd overzicht) */
+  href?: string;
 };
 
 type AdminStats = {
@@ -35,6 +37,7 @@ type AdminStats = {
   ingredients: {
     nevo: number;
     custom: number;
+    withoutCategory: number;
   };
 };
 
@@ -119,6 +122,11 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
           label: 'Eigen ingredienten',
           value: stats.ingredients.custom,
         },
+        {
+          label: 'Zonder categorie',
+          value: stats.ingredients.withoutCategory,
+          href: '/admin/ingredients?filter=noCategory',
+        },
       ],
     },
   ];
@@ -136,50 +144,65 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-2">
         {adminSections.map((section) => (
-          <Link
+          <div
             key={section.name}
-            href={section.href}
             className="group relative overflow-hidden rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 transition hover:ring-zinc-950/10 dark:bg-zinc-900 dark:ring-white/10 dark:hover:ring-white/20"
           >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-lg ${section.iconBackground} text-white`}
-                  >
-                    <section.icon className="h-6 w-6" />
+            <Link href={section.href} className="block">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-lg ${section.iconBackground} text-white`}
+                    >
+                      <section.icon className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
+                        {section.name}
+                      </h3>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
-                      {section.name}
-                    </h3>
-                  </div>
+                  <Text className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+                    {section.description}
+                  </Text>
                 </div>
-                <Text className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-                  {section.description}
-                </Text>
+                <ArrowRightIcon className="h-5 w-5 text-zinc-400 transition group-hover:text-zinc-600 group-hover:translate-x-1 dark:text-zinc-500 dark:group-hover:text-zinc-300" />
               </div>
-              <ArrowRightIcon className="h-5 w-5 text-zinc-400 transition group-hover:text-zinc-600 group-hover:translate-x-1 dark:text-zinc-500 dark:group-hover:text-zinc-300" />
-            </div>
+            </Link>
 
             <dl className="mt-6 grid grid-cols-2 gap-4 border-t border-zinc-950/5 pt-4 dark:border-white/10">
-              {section.stats.map((stat, index) => (
-                <div key={index}>
-                  <dt className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                    {stat.icon && (
-                      <stat.icon
-                        className={`h-4 w-4 ${stat.iconColor ?? 'text-zinc-400'}`}
-                      />
-                    )}
-                    {stat.label}
-                  </dt>
-                  <dd className="mt-1 text-lg font-semibold text-zinc-950 dark:text-white">
-                    {stat.value}
-                  </dd>
-                </div>
-              ))}
+              {section.stats.map((stat, index) => {
+                const content = (
+                  <>
+                    <dt className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                      {stat.icon && (
+                        <stat.icon
+                          className={`h-4 w-4 ${stat.iconColor ?? 'text-zinc-400'}`}
+                        />
+                      )}
+                      {stat.label}
+                    </dt>
+                    <dd className="mt-1 text-lg font-semibold text-zinc-950 dark:text-white">
+                      {stat.value}
+                    </dd>
+                  </>
+                );
+                if (stat.href) {
+                  return (
+                    <Link
+                      key={index}
+                      href={stat.href}
+                      className="rounded-md transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50 -m-1 p-1"
+                    >
+                      {content}
+                    </Link>
+                  );
+                }
+                return <div key={index}>{content}</div>;
+              })}
             </dl>
-          </Link>
+          </div>
         ))}
       </div>
 

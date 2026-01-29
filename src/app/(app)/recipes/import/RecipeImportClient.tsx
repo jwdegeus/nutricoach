@@ -641,9 +641,19 @@ export function RecipeImportClient({
   // Handle camera capture
   const handleOpenCamera = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }, // Prefer back camera
-      });
+      // Prefer back camera on mobile; fallback to default camera (desktop / no environment)
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' },
+          audio: false,
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      }
       setCameraStream(stream);
       setCameraOpen(true);
     } catch (err) {
@@ -729,9 +739,31 @@ export function RecipeImportClient({
 
   // Set up video stream when camera opens
   useEffect(() => {
-    if (cameraOpen && cameraStream && videoRef.current) {
-      videoRef.current.srcObject = cameraStream;
+    if (!cameraOpen || !cameraStream) return;
+
+    const attachAndPlay = (video: HTMLVideoElement): void => {
+      video.srcObject = cameraStream;
+      video.muted = true;
+      video.playsInline = true;
+      requestAnimationFrame(() => {
+        video.play().catch((err) => {
+          console.warn('Camera video play failed:', err);
+        });
+      });
+    };
+
+    const video = videoRef.current;
+    if (video) {
+      attachAndPlay(video);
+      return;
     }
+
+    // Dialog may mount the video element after this effect (portal/transition)
+    const retryId = window.setTimeout(() => {
+      const v = videoRef.current;
+      if (v && cameraStream) attachAndPlay(v);
+    }, 100);
+    return () => clearTimeout(retryId);
   }, [cameraOpen, cameraStream]);
 
   // Handle start processing with Gemini
@@ -1492,6 +1524,7 @@ export function RecipeImportClient({
                 ref={videoRef}
                 autoPlay
                 playsInline
+                muted
                 className="w-full h-full object-cover"
               />
               <canvas ref={canvasRef} className="hidden" />

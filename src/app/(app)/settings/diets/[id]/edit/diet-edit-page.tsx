@@ -21,7 +21,6 @@ import { Checkbox, CheckboxField } from '@/components/catalyst/checkbox';
 import { RecipeAdaptationRulesManager } from '../../../components/RecipeAdaptationRulesManager';
 import { FirewallRulesCombined } from '../../../components/FirewallRulesCombined';
 import { GuardrailsPreviewPanel } from '../../../components/GuardrailsPreviewPanel';
-import { IngredientGroupsTab } from '../../../components/IngredientGroupsTab';
 
 type DietEditPageProps = {
   dietType: DietTypeOutput;
@@ -37,29 +36,25 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
 
   // Initialize active tab from URL query parameter or default
   const tabParam = searchParams.get('tab');
-  const initialTab: 'diet' | 'guardrails' | 'test-rules' | 'ingredient-groups' =
-    tabParam === 'ingredient-groups'
-      ? 'ingredient-groups'
-      : tabParam === 'test-rules'
-        ? 'test-rules'
-        : tabParam === 'guardrails'
-          ? 'guardrails'
-          : 'diet';
+  const initialTab: 'diet' | 'guardrails' | 'test-rules' =
+    tabParam === 'test-rules'
+      ? 'test-rules'
+      : tabParam === 'guardrails'
+        ? 'guardrails'
+        : 'diet';
   const [activeTab, setActiveTab] = useState<
-    'diet' | 'guardrails' | 'test-rules' | 'ingredient-groups'
+    'diet' | 'guardrails' | 'test-rules'
   >(initialTab);
 
   // Update tab when URL changes (defer to avoid set-state-in-effect)
   useEffect(() => {
     const tabParam = searchParams.get('tab');
     const nextTab =
-      tabParam === 'ingredient-groups'
-        ? 'ingredient-groups'
-        : tabParam === 'test-rules'
-          ? 'test-rules'
-          : tabParam === 'guardrails'
-            ? 'guardrails'
-            : 'diet';
+      tabParam === 'test-rules'
+        ? 'test-rules'
+        : tabParam === 'guardrails'
+          ? 'guardrails'
+          : 'diet';
     queueMicrotask(() => setActiveTab(nextTab));
   }, [searchParams]);
 
@@ -170,21 +165,6 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
           >
             Regels testen
           </button>
-          <button
-            onClick={() => {
-              setActiveTab('ingredient-groups');
-              router.replace(
-                `/settings/diets/${dietType.id}/edit?tab=ingredient-groups`,
-              );
-            }}
-            className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium ${
-              activeTab === 'ingredient-groups'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
-            }`}
-          >
-            Ingrediëntgroepen
-          </button>
         </nav>
       </div>
 
@@ -282,14 +262,6 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
       {/* Regels testen Tab */}
       {activeTab === 'test-rules' && (
         <GuardrailsPreviewPanel dietTypeId={dietType.id} />
-      )}
-
-      {/* Ingrediëntgroepen Tab - Read-only overview */}
-      {activeTab === 'ingredient-groups' && (
-        <IngredientGroupsTab
-          dietTypeId={dietType.id}
-          dietTypeName={dietType.name}
-        />
       )}
     </div>
   );

@@ -15,6 +15,8 @@ type ConfirmDialogProps = {
   onConfirm: () => void;
   title: string;
   description: string;
+  /** Error message to show inside the dialog (e.g. when confirm failed) */
+  error?: string | null;
   confirmLabel?: string;
   cancelLabel?: string;
   confirmColor?: 'red' | 'zinc' | 'blue';
@@ -27,6 +29,7 @@ export function ConfirmDialog({
   onConfirm,
   title,
   description,
+  error,
   confirmLabel = 'Bevestigen',
   cancelLabel = 'Annuleren',
   confirmColor = 'red',
@@ -40,7 +43,13 @@ export function ConfirmDialog({
     <Dialog open={open} onClose={onClose}>
       <DialogTitle>{title}</DialogTitle>
       <DialogDescription>{description}</DialogDescription>
-      <DialogBody>{/* Empty body - description is already shown */}</DialogBody>
+      <DialogBody>
+        {error && (
+          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400 whitespace-pre-line">
+            {error}
+          </div>
+        )}
+      </DialogBody>
       <DialogActions>
         <Button outline onClick={onClose} disabled={isLoading}>
           {cancelLabel}

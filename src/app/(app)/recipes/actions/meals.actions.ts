@@ -818,9 +818,29 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
   }
 }
 
+/** Normaliseer ingrediënttekst voor lookup in recipe_ingredient_matches */
+function normalizeIngredientText(text: string): string {
+  return text.toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+/** Schat quantityG uit quantity + unit (bijv. 200 + "g" → 200; anders 100). */
+function quantityGFromIngredient(ing: {
+  quantity?: string | number | null;
+  unit?: string | null;
+}): number {
+  const q = ing.quantity;
+  const u = (ing.unit ?? 'g').toString().toLowerCase();
+  if (u === 'g' && q != null) {
+    const n = typeof q === 'number' ? q : parseFloat(String(q));
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 100;
+}
+
 /**
  * Update recipe content (ingredients and preparation instructions).
  * Updates only the active version; meal_data_original / ai_analysis_original stay unchanged.
+ * Na opslaan worden ingrediënten automatisch gematcht waar mogelijk via recipe_ingredient_matches.
  */
 export async function updateRecipeContentAction(args: {
   mealId: string;
@@ -874,16 +894,55 @@ export async function updateRecipeContentAction(args: {
     const currentAiAnalysis =
       (current.ai_analysis as Record<string, unknown>) || {};
 
+    const ingredientRows = args.ingredients.map((ing) => ({
+      name: String(ing.name ?? '').trim(),
+      quantity: ing.quantity != null ? String(ing.quantity) : '',
+      unit: ing.unit != null && ing.unit !== '' ? String(ing.unit) : null,
+      note: ing.note != null && ing.note !== '' ? String(ing.note) : null,
+      original_line: String(ing.name ?? '').trim(),
+    }));
+
+    const ingredientRefs: Array<{
+      displayName: string;
+      quantityG: number;
+      nevoCode?: string;
+      customFoodId?: string;
+    }> = [];
+    const ingredientsUnmatched: typeof ingredientRows = [];
+
+    for (const ing of ingredientRows) {
+      const norm = normalizeIngredientText(ing.name || ing.original_line);
+      if (!norm) {
+        ingredientsUnmatched.push(ing);
+        continue;
+      }
+      const { data: match } = await supabase
+        .from('recipe_ingredient_matches')
+        .select('source, nevo_code, custom_food_id')
+        .eq('normalized_text', norm)
+        .maybeSingle();
+
+      if (match && (match.nevo_code != null || match.custom_food_id != null)) {
+        const quantityG = quantityGFromIngredient(ing);
+        ingredientRefs.push({
+          displayName: ing.name || ing.original_line,
+          quantityG,
+          ...(match.source === 'nevo' && match.nevo_code != null
+            ? { nevoCode: String(match.nevo_code) }
+            : {}),
+          ...(match.source === 'custom' && match.custom_food_id != null
+            ? { customFoodId: match.custom_food_id }
+            : {}),
+        });
+      } else {
+        ingredientsUnmatched.push(ing);
+      }
+    }
+
     const updatedMealData = {
       ...currentMealData,
-      ingredients: args.ingredients.map((ing) => ({
-        name: String(ing.name ?? '').trim(),
-        quantity: ing.quantity != null ? String(ing.quantity) : '',
-        unit: ing.unit != null && ing.unit !== '' ? String(ing.unit) : null,
-        note: ing.note != null && ing.note !== '' ? String(ing.note) : null,
-        original_line: String(ing.name ?? '').trim(),
-      })),
-      ingredientRefs: [],
+      ingredients: ingredientsUnmatched,
+      ingredientRefs,
     };
 
     const updatedAiAnalysis = {

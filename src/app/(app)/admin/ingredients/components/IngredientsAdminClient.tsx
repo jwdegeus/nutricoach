@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, Fragment } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { Link } from '@/components/catalyst/link';
 import {
   Table,
   TableHead,
@@ -19,11 +21,14 @@ import {
   DialogActions,
 } from '@/components/catalyst/dialog';
 import { Field, Label } from '@/components/catalyst/fieldset';
+import { Select } from '@/components/catalyst/select';
 import {
-  DescriptionList,
-  DescriptionTerm,
-  DescriptionDetails,
-} from '@/components/catalyst/description-list';
+  Dropdown,
+  DropdownButton,
+  DropdownMenu,
+  DropdownItem,
+} from '@/components/catalyst/dropdown';
+import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
 import {
   Pagination,
   PaginationPrevious,
@@ -36,6 +41,9 @@ import {
   MagnifyingGlassIcon,
   PlusIcon,
   ArrowPathIcon,
+  EllipsisVerticalIcon,
+  PencilSquareIcon,
+  TrashIcon,
 } from '@heroicons/react/20/solid';
 
 type SourceType = 'nevo' | 'custom';
@@ -69,6 +77,7 @@ type ListItemCustom = {
   carbs_g: number | null;
   fiber_g: number | null;
   quantity: string | null;
+  created_by: string | null;
 };
 
 type ListItem = ListItemNevo | ListItemCustom;
@@ -80,17 +89,20 @@ type ListResult = {
   limit: number;
 };
 
-type AllResult = {
-  nevo: ListResult;
-  custom: ListResult;
-};
+/** Label voor weergave: NEVO, AI generated (custom met created_by), NutriCoach (custom zonder created_by) */
+function getSourceLabel(row: ListItem): 'NEVO' | 'AI generated' | 'NutriCoach' {
+  if (row.source === 'nevo') return 'NEVO';
+  const custom = row as ListItemCustom;
+  return custom.created_by ? 'AI generated' : 'NutriCoach';
+}
 
-type DetailFood = Record<string, unknown> & { source: SourceType };
+type SourceFilter = 'nevo' | 'custom' | 'ai_generated' | 'eigen' | 'all';
 
-const SOURCE_OPTIONS: { value: 'nevo' | 'custom' | 'all'; label: string }[] = [
+const SOURCE_OPTIONS: { value: SourceFilter; label: string }[] = [
   { value: 'all', label: 'Alles' },
   { value: 'nevo', label: 'NEVO' },
-  { value: 'custom', label: 'Eigen' },
+  { value: 'ai_generated', label: 'AI generated' },
+  { value: 'eigen', label: 'Eigen' },
 ];
 
 const PAGE_SIZE = 25;
@@ -101,36 +113,52 @@ function formatNum(value: number | null | undefined): string {
   return String(value);
 }
 
-export function IngredientsAdminClient() {
-  const [sourceFilter, setSourceFilter] = useState<'nevo' | 'custom' | 'all'>(
-    'nevo',
+type IngredientsAdminClientProps = {
+  /** Wanneer true (bij gebruik in tab), geen eigen paginatitel tonen */
+  embedded?: boolean;
+  /** Toon alleen NEVO-ingrediënten zonder categorie (vanaf dashboard-link) */
+  initialFilterNoCategory?: boolean;
+};
+
+export function IngredientsAdminClient({
+  embedded = false,
+  initialFilterNoCategory = false,
+}: IngredientsAdminClientProps = {}) {
+  const router = useRouter();
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(
+    initialFilterNoCategory ? 'nevo' : 'nevo',
+  );
+  const [noCategoryFilter, setNoCategoryFilter] = useState(
+    initialFilterNoCategory,
   );
   const [search, setSearch] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
   const [page, setPage] = useState(1);
-  const [pageCustom, setPageCustom] = useState(1);
-  const [data, setData] = useState<ListResult | AllResult | null>(null);
+  const [data, setData] = useState<ListResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [detailItem, setDetailItem] = useState<DetailFood | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  useEffect(() => {
+    setNoCategoryFilter(initialFilterNoCategory);
+  }, [initialFilterNoCategory]);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteItem, setDeleteItem] = useState<ListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
     name_nl: '',
-    name_en: '',
-    food_group_nl: 'Overig',
-    food_group_en: 'Other',
-    energy_kcal: '',
-    protein_g: '',
-    fat_g: '',
-    carbs_g: '',
-    fiber_g: '',
+    food_group_nl: '',
+    food_group_en: '',
   });
   const [createSaving, setCreateSaving] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [foodGroups, setFoodGroups] = useState<{ nl: string; en: string }[]>(
+    [],
+  );
+  const [foodGroupsLoading, setFoodGroupsLoading] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounced(search), 300);
@@ -144,9 +172,10 @@ export function IngredientsAdminClient() {
       const params = new URLSearchParams();
       params.set('source', sourceFilter);
       params.set('page', String(page));
-      if (sourceFilter === 'all') params.set('pageCustom', String(pageCustom));
       params.set('limit', String(PAGE_SIZE));
       if (searchDebounced) params.set('search', searchDebounced);
+      if (noCategoryFilter && sourceFilter === 'nevo')
+        params.set('noCategory', '1');
       const res = await fetch(`/api/admin/ingredients?${params}`);
       const json = await res.json();
       if (!json.ok) {
@@ -159,80 +188,102 @@ export function IngredientsAdminClient() {
     } finally {
       setLoading(false);
     }
-  }, [sourceFilter, page, pageCustom, searchDebounced]);
+  }, [sourceFilter, page, searchDebounced, noCategoryFilter]);
 
   useEffect(() => {
     loadList();
   }, [loadList]);
 
-  const openDetail = async (item: ListItem) => {
-    setDetailOpen(true);
-    setDetailItem(null);
-    setDetailLoading(true);
+  useEffect(() => {
+    if (!createOpen) return;
+    let cancelled = false;
+    setFoodGroupsLoading(true);
+    fetch('/api/admin/ingredients/food-groups')
+      .then((res) => res.json())
+      .then((json) => {
+        if (!cancelled && json.ok && json.data?.groups) {
+          setFoodGroups(json.data.groups);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setFoodGroupsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [createOpen]);
+
+  const openDetail = (item: ListItem) => {
+    if (item.source === 'custom') {
+      router.push(`/admin/ingredients/custom/${item.id}`);
+      return;
+    }
+    router.push(`/admin/ingredients/nevo/${item.id}`);
+  };
+
+  const handleDeleteClick = (item: ListItem) => {
+    setDeleteItem(item);
+    setDeleteError(null);
+    setDeleteOpen(true);
+  };
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteItem) return;
+    setDeleting(true);
+    setDeleteError(null);
     try {
       const url =
-        item.source === 'nevo'
-          ? `/api/admin/ingredients/nevo/${item.id}`
-          : `/api/admin/ingredients/custom/${item.id}`;
-      const res = await fetch(url);
+        deleteItem.source === 'nevo'
+          ? `/api/admin/ingredients/nevo/${deleteItem.id}`
+          : `/api/admin/ingredients/custom/${deleteItem.id}`;
+      const res = await fetch(url, { method: 'DELETE' });
       const json = await res.json();
-      if (!json.ok) throw new Error(json.error?.message ?? 'Niet gevonden');
-      setDetailItem(json.data);
+      if (!json.ok) {
+        throw new Error(json.error?.message ?? 'Verwijderen mislukt');
+      }
+      setDeleteOpen(false);
+      setDeleteItem(null);
+      loadList();
     } catch (err) {
-      setDetailItem(null);
-      setError(err instanceof Error ? err.message : 'Detail laden mislukt');
+      setDeleteError(
+        err instanceof Error ? err.message : 'Verwijderen mislukt',
+      );
     } finally {
-      setDetailLoading(false);
+      setDeleting(false);
     }
-  };
+  }, [deleteItem, loadList]);
 
   const createCustom = async () => {
     const name_nl = createForm.name_nl.trim();
     if (!name_nl) {
-      setCreateError('Naam (NL) is verplicht');
+      setCreateError('Naam is verplicht');
       return;
     }
+    const food_group_nl = createForm.food_group_nl.trim() || 'Overig';
+    const food_group_en = createForm.food_group_en.trim() || 'Other';
     setCreateSaving(true);
     setCreateError(null);
     try {
-      const body: Record<string, unknown> = {
-        name_nl,
-        name_en: createForm.name_en.trim() || null,
-        food_group_nl: createForm.food_group_nl || 'Overig',
-        food_group_en: createForm.food_group_en || 'Other',
-      };
-      if (createForm.energy_kcal !== '')
-        body.energy_kcal = parseFloat(createForm.energy_kcal);
-      if (createForm.protein_g !== '')
-        body.protein_g = parseFloat(createForm.protein_g);
-      if (createForm.fat_g !== '') body.fat_g = parseFloat(createForm.fat_g);
-      if (createForm.carbs_g !== '')
-        body.carbs_g = parseFloat(createForm.carbs_g);
-      if (createForm.fiber_g !== '')
-        body.fiber_g = parseFloat(createForm.fiber_g);
-
       const res = await fetch('/api/admin/ingredients/custom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          name_nl,
+          food_group_nl,
+          food_group_en,
+        }),
       });
       const json = await res.json();
       if (!json.ok) {
         throw new Error(json.error?.message ?? 'Aanmaken mislukt');
       }
+      const newId = json.data?.id;
       setCreateOpen(false);
-      setCreateForm({
-        name_nl: '',
-        name_en: '',
-        food_group_nl: 'Overig',
-        food_group_en: 'Other',
-        energy_kcal: '',
-        protein_g: '',
-        fat_g: '',
-        carbs_g: '',
-        fiber_g: '',
-      });
-      setSourceFilter('custom');
+      setCreateForm({ name_nl: '', food_group_nl: '', food_group_en: '' });
+      if (newId) {
+        router.push(`/admin/ingredients/custom/${newId}`);
+      }
+      setSourceFilter('eigen');
       setPage(1);
       loadList();
     } catch (err) {
@@ -246,18 +297,23 @@ export function IngredientsAdminClient() {
     }
   };
 
-  const nevoResult =
-    data && 'items' in data
+  /** Bij source=all: één gecombineerde lijst (items, total, page). Anders gesplitst. */
+  const unifiedResult =
+    data && 'items' in data && sourceFilter === 'all'
       ? (data as ListResult)
-      : data && 'nevo' in data
-        ? (data as AllResult).nevo
-        : null;
+      : null;
+  const nevoResult =
+    data && 'items' in data && sourceFilter === 'nevo'
+      ? (data as ListResult)
+      : null;
   const customResult =
-    data && 'custom' in data
-      ? (data as AllResult).custom
-      : data && sourceFilter === 'custom' && 'items' in data
-        ? (data as ListResult)
-        : null;
+    data &&
+    'items' in data &&
+    (sourceFilter === 'custom' ||
+      sourceFilter === 'ai_generated' ||
+      sourceFilter === 'eigen')
+      ? (data as ListResult)
+      : null;
 
   const totalPages = (total: number) =>
     Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -268,28 +324,37 @@ export function IngredientsAdminClient() {
     currentPage: number,
     onPageChange: (p: number) => void,
   ) => (
-    <div className="space-y-2">
-      <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+    <div className="space-y-3">
+      <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
         <Table striped>
           <TableHead>
             <TableRow>
-              <TableHeader>Bron</TableHeader>
-              <TableHeader>Code</TableHeader>
-              <TableHeader>Naam (NL)</TableHeader>
-              <TableHeader>Groep</TableHeader>
-              <TableHeader className="text-right">kcal</TableHeader>
-              <TableHeader className="text-right">Eiwit (g)</TableHeader>
-              <TableHeader className="text-right">Vet (g)</TableHeader>
-              <TableHeader className="text-right">Koolh. (g)</TableHeader>
-              <TableHeader className="text-right">Vezel (g)</TableHeader>
+              <TableHeader className="py-3 px-4">Bron</TableHeader>
+              <TableHeader className="py-3 px-4">Code</TableHeader>
+              <TableHeader className="py-3 px-4">Naam (NL)</TableHeader>
+              <TableHeader className="py-3 px-4">Groep</TableHeader>
+              <TableHeader className="py-3 px-4 text-right">kcal</TableHeader>
+              <TableHeader className="py-3 px-4 text-right">
+                Eiwit (g)
+              </TableHeader>
+              <TableHeader className="py-3 px-4 text-right">
+                Vet (g)
+              </TableHeader>
+              <TableHeader className="py-3 px-4 text-right">
+                Koolh. (g)
+              </TableHeader>
+              <TableHeader className="py-3 px-4 text-right">
+                Vezel (g)
+              </TableHeader>
+              <TableHeader className="w-12 py-3 px-2" aria-label="Acties" />
             </TableRow>
           </TableHead>
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={9}
-                  className="text-center text-zinc-500 dark:text-zinc-400 py-8"
+                  colSpan={10}
+                  className="text-center text-zinc-500 dark:text-zinc-400 py-10 px-4"
                 >
                   Geen ingrediënten gevonden
                 </TableCell>
@@ -301,36 +366,81 @@ export function IngredientsAdminClient() {
                   className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                   onClick={() => openDetail(row)}
                 >
-                  <TableCell>
-                    <Badge color={row.source === 'nevo' ? 'blue' : 'zinc'}>
-                      {row.source === 'nevo' ? 'NEVO' : 'Eigen'}
+                  <TableCell className="py-3 px-4">
+                    <Badge
+                      color={
+                        getSourceLabel(row) === 'NEVO'
+                          ? 'blue'
+                          : getSourceLabel(row) === 'AI generated'
+                            ? 'amber'
+                            : 'zinc'
+                      }
+                    >
+                      {getSourceLabel(row)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="font-mono text-zinc-600 dark:text-zinc-400">
+                  <TableCell className="py-3 px-4 font-mono text-zinc-600 dark:text-zinc-400">
                     {row.source === 'nevo'
                       ? (row as ListItemNevo).nevo_code
                       : String((row as ListItemCustom).id).slice(0, 8)}
                   </TableCell>
-                  <TableCell className="font-medium text-zinc-900 dark:text-white">
+                  <TableCell className="py-3 px-4 font-medium text-zinc-900 dark:text-white max-w-[200px] truncate">
                     {row.name_nl}
                   </TableCell>
-                  <TableCell className="text-zinc-600 dark:text-zinc-400">
+                  <TableCell className="py-3 px-4 text-zinc-600 dark:text-zinc-400 max-w-[160px] truncate">
                     {row.food_group_nl}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="py-3 px-4 text-right tabular-nums">
                     {formatNum(row.energy_kcal)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="py-3 px-4 text-right tabular-nums">
                     {formatNum(row.protein_g)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="py-3 px-4 text-right tabular-nums">
                     {formatNum(row.fat_g)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="py-3 px-4 text-right tabular-nums">
                     {formatNum(row.carbs_g)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="py-3 px-4 text-right tabular-nums">
                     {formatNum(row.fiber_g)}
+                  </TableCell>
+                  <TableCell
+                    className="py-3 px-2 w-12"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Dropdown>
+                      <DropdownButton
+                        as={Button}
+                        plain
+                        className="rounded-lg p-2"
+                        aria-label="Acties"
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                      >
+                        <EllipsisVerticalIcon className="h-5 w-5 text-zinc-500 dark:text-zinc-400" />
+                      </DropdownButton>
+                      <DropdownMenu anchor="bottom end">
+                        <DropdownItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDetail(row);
+                          }}
+                        >
+                          <PencilSquareIcon className="h-4 w-4" />
+                          Bewerken
+                        </DropdownItem>
+                        <DropdownItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(row);
+                          }}
+                          className="text-red-600 dark:text-red-400 data-focus:bg-red-50 data-focus:text-red-700 dark:data-focus:bg-red-900/20 dark:data-focus:text-red-300"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                          Verwijderen
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </Dropdown>
                   </TableCell>
                 </TableRow>
               ))
@@ -371,22 +481,35 @@ export function IngredientsAdminClient() {
   );
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-950 dark:text-white">
-            Ingrediënten (NEVO)
-          </h1>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Bekijk NEVO-voedingsmiddelen en voedingswaarden. Voeg eigen
-            ingredienten toe als ze niet in NEVO staan.
-          </p>
+    <div className={embedded ? 'space-y-6' : 'space-y-6 p-6'}>
+      {!embedded && (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-zinc-950 dark:text-white">
+              Ingrediënten (NEVO)
+            </h1>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              Bekijk NEVO-voedingsmiddelen en voedingswaarden. Voeg eigen
+              ingredienten toe als ze niet in NEVO staan.
+            </p>
+          </div>
+          <Button onClick={() => setCreateOpen(true)}>
+            <PlusIcon className="h-4 w-4 mr-1" />
+            Nieuw eigen ingredient
+          </Button>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <PlusIcon className="h-4 w-4 mr-1" />
-          Nieuw eigen ingredient
-        </Button>
-      </div>
+      )}
+      {embedded && (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
+            Ingrediënten
+          </h2>
+          <Button onClick={() => setCreateOpen(true)}>
+            <PlusIcon className="h-4 w-4 mr-1" />
+            Nieuw eigen ingredient
+          </Button>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg bg-red-50 p-4 text-red-600 dark:bg-red-900/20 dark:text-red-400">
@@ -402,7 +525,9 @@ export function IngredientsAdminClient() {
           <select
             value={sourceFilter}
             onChange={(e) => {
-              setSourceFilter(e.target.value as 'nevo' | 'custom' | 'all');
+              const next = e.target.value as SourceFilter;
+              setSourceFilter(next);
+              if (next !== 'nevo') setNoCategoryFilter(false);
               setPage(1);
             }}
             className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
@@ -432,35 +557,34 @@ export function IngredientsAdminClient() {
         </Button>
       </div>
 
+      {noCategoryFilter && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+          <span>Filter: alleen NEVO-ingrediënten zonder categorie.</span>
+          <Link
+            href="/admin/ingredients"
+            onClick={(e) => {
+              e.preventDefault();
+              setNoCategoryFilter(false);
+              router.replace('/admin/ingredients');
+            }}
+            className="font-medium underline hover:no-underline"
+          >
+            Toon alle NEVO-ingrediënten
+          </Link>
+        </div>
+      )}
+
       {loading ? (
         <div className="py-8 text-center text-zinc-500 dark:text-zinc-400">
           Laden...
         </div>
-      ) : sourceFilter === 'all' && data && 'nevo' in data ? (
-        <div className="space-y-8">
-          <section>
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
-              NEVO ({(data as AllResult).nevo.total})
-            </h2>
-            {renderTable(
-              (data as AllResult).nevo.items,
-              (data as AllResult).nevo.total,
-              (data as AllResult).nevo.page,
-              setPage,
-            )}
-          </section>
-          <section>
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
-              Eigen ({(data as AllResult).custom.total})
-            </h2>
-            {renderTable(
-              (data as AllResult).custom.items,
-              (data as AllResult).custom.total,
-              (data as AllResult).custom.page,
-              setPageCustom,
-            )}
-          </section>
-        </div>
+      ) : unifiedResult ? (
+        renderTable(
+          unifiedResult.items,
+          unifiedResult.total,
+          unifiedResult.page,
+          setPage,
+        )
       ) : nevoResult ? (
         renderTable(
           nevoResult.items,
@@ -477,37 +601,14 @@ export function IngredientsAdminClient() {
         )
       ) : null}
 
-      {/* Detail dialog */}
-      <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} size="4xl">
-        <DialogTitle>
-          {detailItem
-            ? String(detailItem.name_nl ?? detailItem.name_en ?? 'Ingrediënt')
-            : 'Detail'}
-        </DialogTitle>
-        <DialogBody>
-          {detailLoading ? (
-            <div className="py-8 text-center text-zinc-500">Laden...</div>
-          ) : detailItem ? (
-            <IngredientDetailView item={detailItem} />
-          ) : (
-            <p className="text-zinc-500">Geen gegevens.</p>
-          )}
-        </DialogBody>
-        <DialogActions>
-          <Button plain onClick={() => setDetailOpen(false)}>
-            Sluiten
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Create custom dialog */}
+      {/* Create custom dialog – alleen Naam en NEVO groep */}
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} size="lg">
         <DialogTitle>Nieuw eigen ingredient</DialogTitle>
         <DialogBody>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-            Voeg een ingredient toe dat niet in het NEVO-bestand staat. Vul
-            minimaal de Nederlandse naam in; voedingswaarden zijn optioneel (per
-            100 g).
+            Voeg een ingredient toe dat niet in het NEVO-bestand staat. Vul naam
+            en kies een NEVO-groep; daarna kun je op de editpagina de overige
+            velden invullen.
           </p>
           {createError && (
             <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
@@ -516,103 +617,40 @@ export function IngredientsAdminClient() {
           )}
           <div className="space-y-4">
             <Field>
-              <Label>Naam (NL) *</Label>
+              <Label>Naam *</Label>
               <Input
                 value={createForm.name_nl}
                 onChange={(e) =>
                   setCreateForm((f) => ({ ...f, name_nl: e.target.value }))
                 }
-                placeholder="bijv. Zelfgemaakte hummus"
+                placeholder="bijv. Zout"
               />
             </Field>
             <Field>
-              <Label>Naam (EN)</Label>
-              <Input
-                value={createForm.name_en}
-                onChange={(e) =>
-                  setCreateForm((f) => ({ ...f, name_en: e.target.value }))
-                }
-                placeholder="optional"
-              />
-            </Field>
-            <Field>
-              <Label>Voedingsmiddelgroep (NL)</Label>
-              <Input
+              <Label>NEVO groep</Label>
+              <Select
                 value={createForm.food_group_nl}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const nl = e.target.value;
+                  const opt = foodGroups.find((g) => g.nl === nl);
                   setCreateForm((f) => ({
                     ...f,
-                    food_group_nl: e.target.value,
-                  }))
-                }
-                placeholder="bijv. Samengestelde gerechten"
-              />
+                    food_group_nl: nl,
+                    food_group_en: opt?.en ?? nl,
+                  }));
+                }}
+                disabled={foodGroupsLoading}
+              >
+                <option value="">
+                  {foodGroupsLoading ? 'Laden...' : '— Kies een groep'}
+                </option>
+                {foodGroups.map((g) => (
+                  <option key={g.nl} value={g.nl}>
+                    {g.nl}
+                  </option>
+                ))}
+              </Select>
             </Field>
-            <div className="grid grid-cols-2 gap-4">
-              <Field>
-                <Label>Energie (kcal/100g)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={createForm.energy_kcal}
-                  onChange={(e) =>
-                    setCreateForm((f) => ({
-                      ...f,
-                      energy_kcal: e.target.value,
-                    }))
-                  }
-                  placeholder="–"
-                />
-              </Field>
-              <Field>
-                <Label>Eiwit (g)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={createForm.protein_g}
-                  onChange={(e) =>
-                    setCreateForm((f) => ({ ...f, protein_g: e.target.value }))
-                  }
-                  placeholder="–"
-                />
-              </Field>
-              <Field>
-                <Label>Vet (g)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={createForm.fat_g}
-                  onChange={(e) =>
-                    setCreateForm((f) => ({ ...f, fat_g: e.target.value }))
-                  }
-                  placeholder="–"
-                />
-              </Field>
-              <Field>
-                <Label>Koolhydraten (g)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={createForm.carbs_g}
-                  onChange={(e) =>
-                    setCreateForm((f) => ({ ...f, carbs_g: e.target.value }))
-                  }
-                  placeholder="–"
-                />
-              </Field>
-              <Field>
-                <Label>Vezel (g)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={createForm.fiber_g}
-                  onChange={(e) =>
-                    setCreateForm((f) => ({ ...f, fiber_g: e.target.value }))
-                  }
-                  placeholder="–"
-                />
-              </Field>
-            </div>
           </div>
         </DialogBody>
         <DialogActions>
@@ -620,184 +658,30 @@ export function IngredientsAdminClient() {
             Annuleren
           </Button>
           <Button onClick={createCustom} disabled={createSaving}>
-            {createSaving ? 'Opslaan...' : 'Aanmaken'}
+            {createSaving ? 'Aanmaken...' : 'Aanmaken'}
           </Button>
         </DialogActions>
       </Dialog>
-    </div>
-  );
-}
 
-function IngredientDetailView({ item }: { item: DetailFood }) {
-  const skipKeys = new Set([
-    'id',
-    'created_at',
-    'updated_at',
-    'source',
-    'nevo_code',
-    'nevo_version',
-  ]);
-
-  const groups: { title: string; keys: string[] }[] = [
-    {
-      title: 'Algemeen',
-      keys: [
-        'name_nl',
-        'name_en',
-        'synonym',
-        'food_group_nl',
-        'food_group_en',
-        'quantity',
-        'note',
-        'contains_traces_of',
-        'is_fortified_with',
-      ],
-    },
-    {
-      title: 'Energie en macronutriënten',
-      keys: [
-        'energy_kj',
-        'energy_kcal',
-        'water_g',
-        'protein_g',
-        'fat_g',
-        'carbs_g',
-        'sugar_g',
-        'fiber_g',
-        'starch_g',
-        'alcohol_g',
-      ],
-    },
-    {
-      title: 'Vetten',
-      keys: [
-        'saturated_fat_g',
-        'monounsaturated_fat_g',
-        'polyunsaturated_fat_g',
-        'omega3_fat_g',
-        'omega6_fat_g',
-        'trans_fat_g',
-        'cholesterol_mg',
-      ],
-    },
-    {
-      title: 'Mineralen',
-      keys: [
-        'sodium_mg',
-        'potassium_mg',
-        'calcium_mg',
-        'phosphorus_mg',
-        'magnesium_mg',
-        'iron_mg',
-        'zinc_mg',
-        'copper_mg',
-        'selenium_ug',
-        'iodine_ug',
-      ],
-    },
-    {
-      title: 'Vitamines',
-      keys: [
-        'vit_a_rae_ug',
-        'vit_d_ug',
-        'vit_e_mg',
-        'vit_k_ug',
-        'vit_b1_mg',
-        'vit_b2_mg',
-        'vit_b6_mg',
-        'vit_b12_ug',
-        'niacin_equiv_mg',
-        'folate_equiv_ug',
-        'vit_c_mg',
-      ],
-    },
-  ];
-
-  const labelMap: Record<string, string> = {
-    name_nl: 'Naam (NL)',
-    name_en: 'Naam (EN)',
-    synonym: 'Synoniem',
-    food_group_nl: 'Groep (NL)',
-    food_group_en: 'Groep (EN)',
-    quantity: 'Hoeveelheid',
-    note: 'Opmerking',
-    contains_traces_of: 'Bevat sporen van',
-    is_fortified_with: 'Verrijkt met',
-    energy_kj: 'Energie (kJ)',
-    energy_kcal: 'Energie (kcal)',
-    water_g: 'Water (g)',
-    protein_g: 'Eiwit (g)',
-    fat_g: 'Vet (g)',
-    carbs_g: 'Koolhydraten (g)',
-    sugar_g: 'Suiker (g)',
-    fiber_g: 'Vezel (g)',
-    starch_g: 'Zetmeel (g)',
-    alcohol_g: 'Alcohol (g)',
-    saturated_fat_g: 'Verzadigd vet (g)',
-    monounsaturated_fat_g: 'Enkelv. onverz. vet (g)',
-    polyunsaturated_fat_g: 'Meerv. onverz. vet (g)',
-    omega3_fat_g: 'Omega-3 (g)',
-    omega6_fat_g: 'Omega-6 (g)',
-    trans_fat_g: 'Transvet (g)',
-    cholesterol_mg: 'Cholesterol (mg)',
-    sodium_mg: 'Natrium (mg)',
-    potassium_mg: 'Kalium (mg)',
-    calcium_mg: 'Calcium (mg)',
-    phosphorus_mg: 'Fosfor (mg)',
-    magnesium_mg: 'Magnesium (mg)',
-    iron_mg: 'IJzer (mg)',
-    zinc_mg: 'Zink (mg)',
-    copper_mg: 'Koper (mg)',
-    selenium_ug: 'Selenium (µg)',
-    iodine_ug: 'Jodium (µg)',
-    vit_a_rae_ug: 'Vit. A RAE (µg)',
-    vit_d_ug: 'Vit. D (µg)',
-    vit_e_mg: 'Vit. E (mg)',
-    vit_k_ug: 'Vit. K (µg)',
-    vit_b1_mg: 'Vit. B1 (mg)',
-    vit_b2_mg: 'Vit. B2 (mg)',
-    vit_b6_mg: 'Vit. B6 (mg)',
-    vit_b12_ug: 'Vit. B12 (µg)',
-    niacin_equiv_mg: 'Niacine equiv. (mg)',
-    folate_equiv_ug: 'Folaat equiv. (µg)',
-    vit_c_mg: 'Vit. C (mg)',
-  };
-
-  return (
-    <div className="space-y-6 max-h-[70vh] overflow-y-auto">
-      {groups.map((group) => {
-        const entries = group.keys
-          .filter((k) => k in item && !skipKeys.has(k))
-          .map((k) => {
-            const v = item[k];
-            const display =
-              v == null
-                ? '–'
-                : typeof v === 'number'
-                  ? Number.isNaN(v)
-                    ? '–'
-                    : String(v)
-                  : String(v);
-            return { key: k, label: labelMap[k] ?? k, value: display };
-          })
-          .filter((e) => e.value !== '–' || e.key.includes('name'));
-        if (entries.length === 0) return null;
-        return (
-          <div key={group.title}>
-            <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
-              {group.title}
-            </h3>
-            <DescriptionList>
-              {entries.map(({ key, label, value }) => (
-                <Fragment key={key}>
-                  <DescriptionTerm>{label}</DescriptionTerm>
-                  <DescriptionDetails>{value}</DescriptionDetails>
-                </Fragment>
-              ))}
-            </DescriptionList>
-          </div>
-        );
-      })}
+      <ConfirmDialog
+        open={deleteOpen}
+        onClose={() => {
+          setDeleteOpen(false);
+          setDeleteItem(null);
+          setDeleteError(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Ingrediënt verwijderen"
+        description={
+          deleteItem
+            ? `Weet je zeker dat je "${deleteItem.name_nl}" wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.`
+            : 'Weet je zeker dat je dit ingrediënt wilt verwijderen?'
+        }
+        confirmLabel="Verwijderen"
+        confirmColor="red"
+        isLoading={deleting}
+        error={deleteError}
+      />
     </div>
   );
 }

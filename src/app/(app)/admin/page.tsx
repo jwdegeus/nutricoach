@@ -34,11 +34,21 @@ async function getAdminStats() {
   const totalUsage =
     sources?.reduce((sum, s) => sum + (s.usage_count || 0), 0) || 0;
 
-  // Get NEVO and custom ingredients count
-  const [{ count: nevoCount }, { count: customCount }] = await Promise.all([
+  // Get NEVO, custom, and NEVO without category count
+  const [
+    { count: nevoCount },
+    { count: customCount },
+    { data: withoutCategoryData },
+  ] = await Promise.all([
     supabase.from('nevo_foods').select('*', { count: 'exact', head: true }),
     supabase.from('custom_foods').select('*', { count: 'exact', head: true }),
+    supabase.rpc('get_nevo_without_category_count'),
   ]);
+
+  const withoutCategoryCount =
+    typeof withoutCategoryData === 'number'
+      ? withoutCategoryData
+      : Number(withoutCategoryData) || 0;
 
   return {
     dietTypes: {
@@ -55,6 +65,7 @@ async function getAdminStats() {
     ingredients: {
       nevo: nevoCount ?? 0,
       custom: customCount ?? 0,
+      withoutCategory: withoutCategoryCount,
     },
   };
 }
