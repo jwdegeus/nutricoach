@@ -22,10 +22,16 @@ export type CustomMealRecord = {
   sourceImageUrl: string | null;
   sourceImagePath: string | null;
   source: string | null;
+  /** Originele receptpagina-URL (bij URL-import) */
+  sourceUrl: string | null;
   aiAnalysis: any | null;
   originalLanguage: string | null;
   translatedContent: any | null;
   mealData: Meal;
+  /** Vaste kopie van meal_data vóór eerste aanpassing (origineel recept) */
+  mealDataOriginal: Meal | null;
+  /** Vaste kopie van ai_analysis vóór eerste aanpassing (originele bereidingsinstructies) */
+  aiAnalysisOriginal: any | null;
   consumptionCount: number;
   firstConsumedAt: string | null;
   lastConsumedAt: string | null;
@@ -229,10 +235,13 @@ export class CustomMealsService {
       sourceImageUrl: row.source_image_url,
       sourceImagePath: row.source_image_path,
       source: row.source || null,
+      sourceUrl: row.source_url || null,
       aiAnalysis: row.ai_analysis,
       originalLanguage: row.original_language,
       translatedContent: row.translated_content,
       mealData: row.meal_data as Meal,
+      mealDataOriginal: row.meal_data_original ?? null,
+      aiAnalysisOriginal: row.ai_analysis_original ?? null,
       consumptionCount: row.consumption_count,
       firstConsumedAt: row.first_consumed_at,
       lastConsumedAt: row.last_consumed_at,

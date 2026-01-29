@@ -518,13 +518,24 @@ export function RecipeImportClient({
                 await loadJob(newJobId);
                 setProcessingJob(false);
               } else {
+                // Server action error may serialize to {} over the wire; use message with fallback
+                const err =
+                  processResult && 'error' in processResult
+                    ? processResult.error
+                    : undefined;
+                const errMessage =
+                  err &&
+                  typeof err === 'object' &&
+                  'message' in err &&
+                  typeof (err as { message: unknown }).message === 'string'
+                    ? (err as { message: string }).message
+                    : undefined;
                 console.error(
                   '[RecipeImportClient] Processing failed:',
-                  processResult.error,
+                  err ?? processResult,
                 );
-                // Error will be shown via status panel
-                setError(processResult.error.message);
-                // Load job to see failed status
+                setError(errMessage ?? t('errorUnknown'));
+                // Load job to see failed status (job may have error_message set)
                 await loadJob(newJobId);
                 setProcessingJob(false);
               }

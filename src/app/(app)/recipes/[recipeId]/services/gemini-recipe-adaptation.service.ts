@@ -1,8 +1,9 @@
 /**
  * Gemini Recipe Adaptation Service
  *
- * Uses Gemini AI to intelligently adapt recipes based on diet restrictions.
- * Provides ingredient substitutions and cooking method adjustments.
+ * Uses Gemini AI as the "chef" that adapts recipes using the diet rules ("wetboeken").
+ * Returns structured output: intro, adapted ingredients with notes, full adapted steps,
+ * and "why this works" bullets for the UI.
  */
 
 import 'server-only';
@@ -20,12 +21,10 @@ const AI_SUGGESTION_MIN_CONFIDENCE = 0.7;
  */
 function extractJsonFromResponse(raw: string): string {
   const s = raw.trim();
-  // Markdown code block
   const jsonBlock = s.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonBlock) {
     return jsonBlock[1].trim();
   }
-  // Eerste { tot bijbehorende }
   const start = s.indexOf('{');
   if (start === -1) return s;
   let depth = 0;
@@ -57,85 +56,102 @@ function extractJsonFromResponse(raw: string): string {
   return s.slice(start);
 }
 
-type RecipeData = {
+export type RecipeData = {
   mealData: any;
   mealName: string;
   steps: string[];
 };
 
+/** Optioneel: ingrediënten die de gebruiker wil schrappen (niet opnemen in het recept). */
+export type GeminiAdaptationOptions = {
+  ingredientsToRemove?: string[];
+};
+
 /**
- * Generate recipe adaptation using Gemini AI
+ * JSON-schema voor structured output (responseMimeType: application/json).
+ * Komt overeen met GeminiRecipeAdaptationResponse in recipe-ai.types.ts.
+ */
+const ADAPTATION_JSON_SCHEMA = {
+  type: 'object',
+  properties: {
+    intro: {
+      type: 'string',
+      description:
+        'Korte introductie in het Nederlands (bv. "Om dit recept Wahls Paleo proof te maken...")',
+    },
+    adapted_ingredients: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Ingrediëntnaam' },
+          amount: {
+            type: 'string',
+            description: 'Hoeveelheid (bv. "4", "1/2", "250")',
+          },
+          unit: {
+            type: 'string',
+            description: 'Eenheid (bv. "stuks", "ml", "gram")',
+          },
+          note: {
+            type: 'string',
+            description:
+              'Optionele toelichting (bv. "Vervanging voor rijst", "Telt mee voor bladgroen")',
+          },
+        },
+        required: ['name', 'amount', 'unit', 'note'],
+      },
+    },
+    adapted_steps: {
+      type: 'array',
+      items: { type: 'string' },
+      description:
+        'Bereidingsstappen volledig herschreven voor de nieuwe ingrediënten',
+    },
+    why_this_works: {
+      type: 'array',
+      items: { type: 'string' },
+      description:
+        'Bullets met gezondheidsvoordelen binnen dit dieet (bv. "Geen granen", "Extra bladgroen")',
+    },
+  },
+  required: ['intro', 'adapted_ingredients', 'adapted_steps', 'why_this_works'],
+};
+
+/**
+ * Generate recipe adaptation using Gemini AI (structured output).
  *
- * Analyzes the recipe, identifies violations, and generates intelligent
- * substitutions and cooking method adjustments.
+ * Gemini fungeert als chef met de dieetregels als wetboek: volledige herschrijving
+ * van ingrediënten en stappen, plus intro en "waarom dit werkt".
  */
 export async function generateRecipeAdaptationWithGemini(
   recipe: RecipeData,
   violations: ViolationDetail[],
   ruleset: DietRuleset,
   dietName: string,
+  options?: GeminiAdaptationOptions,
 ): Promise<RecipeAdaptationDraft> {
   const gemini = getGeminiClient();
-
-  // Build prompt for Gemini
-  const prompt = buildAdaptationPrompt(recipe, violations, ruleset, dietName);
-
-  // Define JSON schema for structured output
-  const jsonSchema = {
-    type: 'object',
-    properties: {
-      adapted_ingredients: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            original: { type: 'string' },
-            substituted: { type: 'string' },
-            quantity: { type: ['string', 'null'] },
-            unit: { type: ['string', 'null'] },
-            note: { type: ['string', 'null'] },
-            reason: { type: 'string' },
-          },
-          required: ['original', 'substituted', 'reason'],
-        },
-      },
-      adapted_steps: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            step_number: { type: 'number' },
-            original_text: { type: 'string' },
-            adapted_text: { type: 'string' },
-            changes: { type: 'array', items: { type: 'string' } },
-          },
-          required: ['step_number', 'original_text', 'adapted_text'],
-        },
-      },
-      additional_suggestions: {
-        type: 'array',
-        items: { type: 'string' },
-      },
-      confidence: {
-        type: 'number',
-        minimum: 0,
-        maximum: 1,
-      },
-    },
-    required: ['adapted_ingredients', 'adapted_steps', 'confidence'],
-  };
+  const prompt = buildAdaptationPrompt(
+    recipe,
+    violations,
+    ruleset,
+    dietName,
+    options?.ingredientsToRemove ?? [],
+  );
 
   try {
     console.log(
-      '[GeminiRecipeAdaptation] Calling Gemini for recipe adaptation...',
+      '[GeminiRecipeAdaptation] Calling Gemini for recipe adaptation (structured output)...',
     );
     const startTime = Date.now();
 
     const rawResponse = await gemini.generateJson({
       prompt,
-      jsonSchema,
+      jsonSchema: ADAPTATION_JSON_SCHEMA,
       temperature: 0.4,
       purpose: 'repair',
+      maxOutputTokens: 8192,
     });
 
     const duration = Date.now() - startTime;
@@ -143,7 +159,6 @@ export async function generateRecipeAdaptationWithGemini(
       `[GeminiRecipeAdaptation] Gemini API call completed in ${duration}ms`,
     );
 
-    // Parse response; als Gemini tekst voor de JSON zet (bijv. "Hier is het..."), haal JSON eruit
     let parsed: any;
     try {
       const jsonStr = extractJsonFromResponse(rawResponse);
@@ -154,13 +169,12 @@ export async function generateRecipeAdaptationWithGemini(
         parseError,
       );
       console.error(
-        '[GeminiRecipeAdaptation] Raw response (first 300 chars):',
-        rawResponse.slice(0, 300),
+        '[GeminiRecipeAdaptation] Raw response (first 400 chars):',
+        rawResponse.slice(0, 400),
       );
       throw new Error('Invalid JSON response from Gemini');
     }
 
-    // Convert to RecipeAdaptationDraft format
     return convertGeminiResponseToDraft(parsed, recipe, violations);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -172,13 +186,28 @@ export async function generateRecipeAdaptationWithGemini(
 }
 
 /**
- * Build prompt for Gemini recipe adaptation
+ * System instruction: chef met wetboeken.
+ * [DIEETREGELS] wordt vervangen door de geformatteerde regels uit ruleset + violations.
+ */
+const SYSTEM_INSTRUCTION = `Je bent een culinaire expert gespecialiseerd in therapeutische diëten zoals Wahls Paleo, Keto en Auto-immuun Paleo.
+
+**Jouw taak:** Transformeer het aangeboden recept op basis van de meegeleverde [DIEETREGELS].
+
+**Strikte richtlijnen:**
+1. Gebruik ALTIJD de verplichte substituties uit de [DIEETREGELS] voor verboden ingrediënten.
+2. Herschrijf de bereidingsstappen VOLLEDIG zodat ze logisch zijn voor de nieuwe ingrediënten (bijv. kortere kooktijd voor bloemkoolrijst vs. gewone rijst).
+3. Voeg een 'why_this_works' sectie toe die specifiek de gezondheidsvoordelen binnen dit dieet benoemt.
+4. De output MOET in het Nederlands zijn en strikt voldoen aan het gevraagde JSON schema.`;
+
+/**
+ * Build prompt: system instruction + [DIEETREGELS] + recept + eventueel schraplijst.
  */
 function buildAdaptationPrompt(
   recipe: RecipeData,
   violations: ViolationDetail[],
   ruleset: DietRuleset,
   dietName: string,
+  ingredientsToRemove: string[],
 ): string {
   const ingredients =
     recipe.mealData?.ingredientRefs || recipe.mealData?.ingredients || [];
@@ -199,30 +228,27 @@ function buildAdaptationPrompt(
     )
     .join('\n');
 
-  const violationsList = violations
-    .map(
-      (v) =>
-        `- ${v.ingredientName} | Regel: ${v.ruleLabel} | Voorgestelde vervangingen uit dieetregels: ${v.suggestion}`,
-    )
-    .join('\n');
-
-  const mustReplaceNames = violations.map((v) => v.ingredientName).join(', ');
-  const violationRuleCodes = new Set(violations.map((v) => v.ruleCode));
-  const relevantForbidden = ruleset.forbidden.filter(
-    (r) =>
-      violationRuleCodes.has(r.ruleCode) ||
-      violations.some((v) => v.ruleLabel?.includes(r.term)),
-  );
-  const forbiddenTerms = (
-    relevantForbidden.length > 0 ? relevantForbidden : ruleset.forbidden
-  )
-    .map(
+  // [DIEETREGELS]: verboden termen + per violation de regel en voorgestelde vervanging
+  const dieetregelsLines = [
+    `Dieet: ${dietName}`,
+    '',
+    'Verboden / beperkt (uit dieetregels):',
+    ...ruleset.forbidden.map(
       (r) =>
-        `${r.term}${r.synonyms?.length ? ` (${r.synonyms.slice(0, 3).join(', ')})` : ''}`,
-    )
-    .join(', ');
+        `- ${r.term}${r.synonyms?.length ? ` (${r.synonyms.slice(0, 3).join(', ')})` : ''}: ${r.ruleLabel}. Vervanging: ${(r.substitutionSuggestions ?? []).slice(0, 3).join(', ') || 'geen opgegeven'}`,
+    ),
+    '',
+    'Gedetecteerde afwijkingen in dit recept (deze MOETEN worden aangepast):',
+    ...violations.map(
+      (v) =>
+        `- "${v.ingredientName}" | Regel: ${v.ruleLabel} | Voorgestelde vervanging: ${v.suggestion}`,
+    ),
+  ];
+  const dieetregelsBlock = dieetregelsLines.join('\n');
 
-  return `Je bent een expert voedingsdeskundige en chef-kok. Je taak is om een recept aan te passen zodat het voldoet aan een specifiek dieet.
+  let promptText = `${SYSTEM_INSTRUCTION.replace('[DIEETREGELS]', dieetregelsBlock)}
+
+---
 
 RECEPT:
 Naam: ${recipe.mealName}
@@ -231,136 +257,55 @@ Ingrediënten:
 ${ingredientList}
 
 Bereidingswijze:
-${stepsList}
+${stepsList}`;
 
-DIET INFORMATIE:
-Dieet: ${dietName}
-Verboden ingrediënten: ${forbiddenTerms}
+  if (ingredientsToRemove.length > 0) {
+    promptText += `
 
-GEDETECTEERDE AFWIJKINGEN (deze ingrediënten zijn NIET toegestaan – ze MOETEN worden vervangen):
-${violationsList}
+SCHRAPPEN: De gebruiker wil de volgende ingrediënten niet in het recept. Neem ze NIET op in adapted_ingredients en noem ze niet in de stappen:
+${ingredientsToRemove.map((n) => `- ${n}`).join('\n')}`;
+  }
 
-KRITIEK – VERPLICHT VERVANGEN:
-Deze ingrediënten staan in de afwijkingen en zijn verboden: ${mustReplaceNames}.
-Voor elk van deze ingrediënten MOET je bij "substituted" een ANDER, dieet-compatibel ingrediënt invullen. Nooit hetzelfde woord behouden (bijv. "tomaten" → vervang door "paprika" of een ander toegestaan alternatief uit de voorgestelde vervangingen, nooit "tomaten" als substituted).
+  promptText += `
 
-BELANGRIJK – Gebruik bij voorkeur de voorgestelde vervangingen:
-Bij elke afwijking staat "Voorgestelde vervangingen uit dieetregels". Kies bij voorkeur één van die vermelde alternatieven. Alleen een eigen alternatief als geen van de voorgestelde opties past.
+Geef je antwoord ALLEEN als een geldig JSON-object met de velden: intro, adapted_ingredients, adapted_steps, why_this_works. Geen tekst voor of na de JSON.`;
 
-OPDRACHT:
-1. Vervang alle verboden ingrediënten; voor elk ingrediënt uit de afwijkingen: substituted ≠ original, gebruik een voorgesteld alternatief
-2. Pas de bereidingswijze aan zodat alle verwijzingen naar de oude ingrediënten naar de nieuwe verwijzen
-3. Behoud smaak en textuur zo goed mogelijk met de gekozen substituten
-4. Geef bij elke aanpassing een korte reason
-5. Optioneel: extra suggesties
-
-REGELS:
-- Voor GEDETECTEERDE AFWIJKINGEN: substituted moet altijd een ander ingrediënt zijn dan original (nooit ongewijzigd laten)
-- De aangepaste versie moet volledig dieet-compatibel zijn
-- Behoud structuur en volgorde van het recept
-- Realistische hoeveelheden en kooktijden
-
-Geef je antwoord ALLEEN als een geldig JSON-object (adapted_ingredients, adapted_steps, confidence), zonder introductietekst of uitleg ervoor of erna.`;
-}
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/** Haal het eerste voorgestelde alternatief uit een suggestion-tekst (bijv. "Vervang door paprika, courgette of biet" → "paprika"). */
-function firstSuggestedAlternative(suggestion: string): string | null {
-  const m = suggestion.match(/vervang\s+door\s+(.+)/i);
-  const rest = (m ? m[1] : suggestion).trim();
-  const first = rest
-    .split(/\s+of\s+|\s*,\s*/)
-    .map((s) => s.trim())
-    .filter(Boolean)[0];
-  return first || null;
+  return promptText;
 }
 
 /**
- * Convert Gemini response to RecipeAdaptationDraft format
+ * Map Gemini structured response to RecipeAdaptationDraft.
+ * - intro en why_this_works komen direct in rewrite
+ * - adapted_ingredients: amount → quantity, rest 1:1
+ * - adapted_steps: string[] → steps: { step: index+1, text }
  */
 function convertGeminiResponseToDraft(
-  geminiResponse: any,
+  geminiResponse: {
+    intro?: string;
+    adapted_ingredients?: Array<{
+      name: string;
+      amount: string;
+      unit: string;
+      note: string;
+    }>;
+    adapted_steps?: string[];
+    why_this_works?: string[];
+  },
   recipe: RecipeData,
   violations: ViolationDetail[],
 ): RecipeAdaptationDraft {
-  // Build adapted ingredients
-  const adaptedIngredients = geminiResponse.adapted_ingredients || [];
-  const ingredients = adaptedIngredients.map((ing: any) => {
-    let name = ing.substituted || ing.original;
-    const orig = (ing.original || '').toString().toLowerCase().trim();
-    const sub = (name || '').toString().toLowerCase().trim();
+  const ingredients = (geminiResponse.adapted_ingredients ?? []).map((ing) => ({
+    name: ing.name ?? '',
+    quantity: String(ing.amount ?? '').trim(),
+    unit: (ing.unit ?? '').trim() || undefined,
+    note: (ing.note ?? '').trim() || undefined,
+  }));
 
-    const violation = violations.find((v) => {
-      const vn = v.ingredientName.toLowerCase();
-      return (
-        orig.includes(vn) ||
-        vn.includes(orig) ||
-        sub === vn ||
-        vn.includes(sub) ||
-        sub.includes(vn)
-      );
-    });
-    if (violation) {
-      const vn = violation.ingredientName.toLowerCase();
-      const stillViolation =
-        sub === orig ||
-        sub.includes(orig) ||
-        orig.includes(sub) ||
-        sub === vn ||
-        sub.includes(vn);
-      if (stillViolation) {
-        const fallback = firstSuggestedAlternative(violation.suggestion);
-        if (fallback) {
-          name = fallback;
-          console.log(
-            `[GeminiRecipeAdaptation] Fallback: "${ing.original}" → "${fallback}" (violation: ${violation.ingredientName})`,
-          );
-        }
-      }
-    }
+  const steps = (geminiResponse.adapted_steps ?? []).map((text, index) => ({
+    step: index + 1,
+    text: String(text ?? '').trim(),
+  }));
 
-    return {
-      name: name || ing.original,
-      quantity: ing.quantity || '',
-      unit: ing.unit || '',
-      note: ing.note || ing.reason || undefined,
-    };
-  });
-
-  // Build map: violated ingredient name → substitute (from suggestion), for use in steps
-  const replacementMap = new Map<string, string>();
-  for (const v of violations) {
-    const fallback = firstSuggestedAlternative(v.suggestion);
-    if (fallback) {
-      replacementMap.set(v.ingredientName.toLowerCase().trim(), fallback);
-    }
-  }
-
-  // Build adapted steps; replace any remaining violation-ingredient names in text (lange namen eerst)
-  const adaptedSteps = geminiResponse.adapted_steps || [];
-  const replacementsByLength = [...replacementMap.entries()].sort(
-    (a, b) => b[0].length - a[0].length,
-  );
-  const steps = adaptedSteps
-    .sort((a: any, b: any) => a.step_number - b.step_number)
-    .map((step: any) => {
-      let text = step.adapted_text || step.original_text || '';
-      const lower = text.toLowerCase();
-      for (const [violatedName, substitute] of replacementsByLength) {
-        if (lower.includes(violatedName)) {
-          text = text.replace(
-            new RegExp(escapeRegex(violatedName), 'gi'),
-            substitute,
-          );
-        }
-      }
-      return { text };
-    });
-
-  // Build summary
   const summary =
     violations.length === 0
       ? 'Geen afwijkingen gevonden! Dit recept past perfect bij jouw dieet.'
@@ -375,14 +320,21 @@ function convertGeminiResponseToDraft(
       title: `Aangepast: ${recipe.mealName}`,
       ingredients,
       steps,
+      intro: (geminiResponse.intro ?? '').trim() || undefined,
+      whyThisWorks:
+        Array.isArray(geminiResponse.why_this_works) &&
+        geminiResponse.why_this_works.length > 0
+          ? geminiResponse.why_this_works
+              .map((s) => String(s).trim())
+              .filter(Boolean)
+          : undefined,
     },
-    confidence: geminiResponse.confidence || 0.8,
-    openQuestions: geminiResponse.additional_suggestions || [],
+    confidence: 0.85,
   };
 }
 
 /**
- * AI-augmentatie: laat de model redeneren over dieetregels en ingrediënten.
+ * AI-augmentatie: laat het model redeneren over dieetregels en ingrediënten.
  * Vult code-based violations aan met suggesties waar het model bv. "mozzarella = zuivel" afleidt.
  */
 export async function suggestViolationsWithAI(

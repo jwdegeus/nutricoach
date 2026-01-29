@@ -566,12 +566,12 @@ export function RecipesList({
         </div>
       </div>
 
-      {/* Pagination */}
+      {/* Pagination - Tailwind UI Plus style */}
       {totalItems !== undefined && totalPages > 1 && (
-        <div className="mt-6 flex justify-center">
-          <Pagination aria-label="Recepten paginering">
+        <div className="mt-6 w-full">
+          <Pagination aria-label="Recepten paginering" className="w-full">
             <PaginationPrevious
-              href={currentPage > 1 ? undefined : null}
+              disabled={currentPage <= 1}
               onClick={(e) => {
                 e.preventDefault();
                 if (currentPage > 1 && onPageChange) {
@@ -605,7 +605,7 @@ export function RecipesList({
               )}
             </PaginationList>
             <PaginationNext
-              href={currentPage < totalPages ? undefined : null}
+              disabled={currentPage >= totalPages}
               onClick={(e) => {
                 e.preventDefault();
                 if (currentPage < totalPages && onPageChange) {

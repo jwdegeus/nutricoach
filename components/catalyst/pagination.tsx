@@ -11,83 +11,133 @@ export function Pagination({
     <nav
       aria-label={ariaLabel}
       {...props}
-      className={clsx(className, 'flex gap-x-2')}
+      className={clsx(
+        className,
+        'flex items-center justify-between border-t border-zinc-200 px-4 dark:border-white/10 sm:px-0',
+      )}
     />
   );
 }
 
+// Native button styles for prev/next (avoids Headless Button so clicks always work)
+const plainNavButtonClass = clsx(
+  'relative inline-flex items-center justify-center gap-x-2 rounded-lg border border-transparent text-base/6 font-semibold',
+  'text-zinc-950 dark:text-white',
+  'px-[calc(theme(spacing.3.5)-1px)] py-[calc(theme(spacing.2.5)-1px)] sm:px-[calc(theme(spacing.3)-1px)] sm:py-[calc(theme(spacing.1.5)-1px)] sm:text-sm/6',
+  'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-950',
+  'hover:bg-zinc-950/5 active:bg-zinc-950/5 dark:hover:bg-white/10 dark:active:bg-white/10',
+  'disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed',
+  'cursor-pointer',
+);
+
+const ChevronLeftIcon = () => (
+  <svg
+    className="size-5 shrink-0 stroke-current sm:size-4"
+    data-slot="icon"
+    viewBox="0 0 16 16"
+    fill="none"
+    aria-hidden="true"
+  >
+    <path
+      d="M2.75 8H13.25M2.75 8L5.25 5.5M2.75 8L5.25 10.5"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const ChevronRightIcon = () => (
+  <svg
+    className="size-5 shrink-0 stroke-current sm:size-4"
+    data-slot="icon"
+    viewBox="0 0 16 16"
+    fill="none"
+    aria-hidden="true"
+  >
+    <path
+      d="M13.25 8L2.75 8M13.25 8L10.75 10.5M13.25 8L10.75 5.5"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 export function PaginationPrevious({
   href = null,
+  disabled: disabledProp,
   className,
   children = 'Previous',
   onClick,
 }: React.PropsWithChildren<{
   href?: string | null;
+  /** When using onClick-based pagination, set to true on first page so Previous is disabled. */
+  disabled?: boolean;
   className?: string;
   onClick?: (e: React.MouseEvent) => void;
 }>) {
+  const isLink = typeof href === 'string' && href.length > 0;
+  const disabled = disabledProp ?? href === null;
+
   return (
-    <span className={clsx(className, 'grow basis-0')}>
-      <Button
-        {...(href === null ? { disabled: true } : href ? { href } : {})}
-        {...(onClick ? { onClick } : {})}
-        plain
-        aria-label="Previous page"
-      >
-        <svg
-          className="stroke-current"
-          data-slot="icon"
-          viewBox="0 0 16 16"
-          fill="none"
-          aria-hidden="true"
+    <span className={clsx(className, '-mt-px flex w-0 flex-1')}>
+      {isLink ? (
+        <Button href={href} plain aria-label="Previous page">
+          <ChevronLeftIcon />
+          {children}
+        </Button>
+      ) : (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onClick}
+          aria-label="Previous page"
+          className={plainNavButtonClass}
         >
-          <path
-            d="M2.75 8H13.25M2.75 8L5.25 5.5M2.75 8L5.25 10.5"
-            strokeWidth={1.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        {children}
-      </Button>
+          <ChevronLeftIcon />
+          {children}
+        </button>
+      )}
     </span>
   );
 }
 
 export function PaginationNext({
   href = null,
+  disabled: disabledProp,
   className,
   children = 'Next',
   onClick,
 }: React.PropsWithChildren<{
   href?: string | null;
+  /** When using onClick-based pagination, set to true on last page so Next is disabled. */
+  disabled?: boolean;
   className?: string;
   onClick?: (e: React.MouseEvent) => void;
 }>) {
+  const isLink = typeof href === 'string' && href.length > 0;
+  const disabled = disabledProp ?? href === null;
+
   return (
-    <span className={clsx(className, 'flex grow basis-0 justify-end')}>
-      <Button
-        {...(href === null ? { disabled: true } : href ? { href } : {})}
-        {...(onClick ? { onClick } : {})}
-        plain
-        aria-label="Next page"
-      >
-        {children}
-        <svg
-          className="stroke-current"
-          data-slot="icon"
-          viewBox="0 0 16 16"
-          fill="none"
-          aria-hidden="true"
+    <span className={clsx(className, '-mt-px flex w-0 flex-1 justify-end')}>
+      {isLink ? (
+        <Button href={href} plain aria-label="Next page">
+          {children}
+          <ChevronRightIcon />
+        </Button>
+      ) : (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onClick}
+          aria-label="Next page"
+          className={plainNavButtonClass}
         >
-          <path
-            d="M13.25 8L2.75 8M13.25 8L10.75 10.5M13.25 8L10.75 5.5"
-            strokeWidth={1.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </Button>
+          {children}
+          <ChevronRightIcon />
+        </button>
+      )}
     </span>
   );
 }
@@ -99,7 +149,10 @@ export function PaginationList({
   return (
     <span
       {...props}
-      className={clsx(className, 'hidden items-baseline gap-x-2 sm:flex')}
+      className={clsx(
+        className,
+        '-mt-px hidden items-baseline gap-x-2 md:flex',
+      )}
     />
   );
 }
@@ -116,9 +169,10 @@ export function PaginationPage({
   current?: boolean;
   onClick?: (e: React.MouseEvent) => void;
 }>) {
+  const isLink = typeof href === 'string' && href.length > 0;
   return (
     <Button
-      {...(href ? { href } : {})}
+      {...(isLink ? { href } : { type: 'button' })}
       {...(onClick ? { onClick } : {})}
       plain
       aria-label={`Page ${children}`}

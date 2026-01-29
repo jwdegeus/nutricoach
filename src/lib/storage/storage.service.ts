@@ -38,17 +38,20 @@ export function isVercelBlobUrl(pathOrUrl: string | null | undefined): boolean {
 }
 
 export class StorageService {
-  private config: StorageConfig;
+  private config: Omit<StorageConfig, 'provider'> & {
+    provider?: StorageProvider;
+  };
 
   constructor(config?: Partial<StorageConfig>) {
     this.config = {
-      provider: this.resolveProvider(),
       baseUrl: process.env.STORAGE_BASE_URL || undefined,
       localPath:
         process.env.STORAGE_LOCAL_PATH ||
         join(process.cwd(), 'public', 'uploads', 'recipe-images'),
       ...config,
     };
+    // Provider is resolved lazily via getter so build (e.g. on Vercel) never
+    // runs resolveProvider() when BLOB_READ_WRITE_TOKEN may be unavailable.
   }
 
   /** Resolve provider from env at runtime so BLOB_READ_WRITE_TOKEN is always respected. */

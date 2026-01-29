@@ -254,6 +254,8 @@ function recordToDraft(record: {
   analysisViolations: any[];
   rewriteIngredients: any[];
   rewriteSteps: any[];
+  rewriteIntro?: string | null;
+  rewriteWhyThisWorks?: string[];
   confidence: number | null;
   openQuestions: string[];
 }): RecipeAdaptationDraft {
@@ -266,6 +268,10 @@ function recordToDraft(record: {
       title: record.title,
       ingredients: record.rewriteIngredients || [],
       steps: record.rewriteSteps || [],
+      intro: record.rewriteIntro ?? undefined,
+      whyThisWorks: Array.isArray(record.rewriteWhyThisWorks)
+        ? record.rewriteWhyThisWorks
+        : undefined,
     },
     confidence: record.confidence ?? undefined,
     openQuestions: record.openQuestions || [],
@@ -320,43 +326,37 @@ export async function applyRecipeAdaptationAction(
 
     const { adaptationId } = raw as { adaptationId: string };
 
+    const dbService = new RecipeAdaptationDbService();
+
+    // Always load adaptation to get recipe_id and rewrite data
+    const adaptation = await dbService.getAdaptationById(adaptationId, user.id);
+
+    if (!adaptation) {
+      return {
+        ok: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Aanpassing niet gevonden',
+        },
+      };
+    }
+
     // Check enforcement feature flag
     const enforceVNext =
       process.env.ENFORCE_VNEXT_GUARDRAILS_RECIPE_ADAPTATION === 'true';
 
     if (enforceVNext) {
-      // Load adaptation from DB
-      const dbService = new RecipeAdaptationDbService();
-      const adaptation = await dbService.getAdaptationById(
-        adaptationId,
-        user.id,
-      );
-
-      if (!adaptation) {
-        return {
-          ok: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Aanpassing niet gevonden',
-          },
-        };
-      }
-
-      // Convert record to draft
       const draft = recordToDraft(adaptation);
 
       try {
-        // Load vNext ruleset
         const ruleset = await loadGuardrailsRuleset({
           dietId: adaptation.dietId,
           mode: 'recipe_adaptation',
-          locale: 'nl', // Default to nl, could be made configurable
+          locale: 'nl',
         });
 
-        // Map draft to vNext targets
         const targets = mapRecipeDraftToGuardrailsTargets(draft, 'nl');
 
-        // Build evaluation context
         const context: EvaluationContext = {
           dietKey: adaptation.dietId,
           mode: 'recipe_adaptation',
@@ -364,16 +364,13 @@ export async function applyRecipeAdaptationAction(
           timestamp: new Date().toISOString(),
         };
 
-        // Evaluate guard rails
         const decision = evaluateGuardrails({
           ruleset,
           context,
           targets,
         });
 
-        // Check if apply should be blocked (HARD violations only)
         if (shouldBlockApply(decision)) {
-          // Log for monitoring
           console.log(
             `[RecipeAdaptation] vNext guard rails blocked apply: adaptationId=${adaptationId}, dietId=${adaptation.dietId}, outcome=${decision.outcome}, reasonCodes=${decision.reasonCodes.join(',')}, hash=${ruleset.contentHash}`,
           );
@@ -392,11 +389,7 @@ export async function applyRecipeAdaptationAction(
             },
           };
         }
-
-        // SOFT warnings are allowed (decision.ok === true), continue with apply
-        // Diagnostics are already in draft (from shadow mode), no need to add here
       } catch (error) {
-        // Fail-closed on evaluator/loader errors (policy A: safest)
         console.error(
           `[RecipeAdaptation] vNext guard rails evaluation error: adaptationId=${adaptationId}, error=${error instanceof Error ? error.message : String(error)}`,
         );
@@ -417,8 +410,125 @@ export async function applyRecipeAdaptationAction(
       }
     }
 
-    // Update status (either enforcement is off, or vNext evaluation passed)
-    const dbService = new RecipeAdaptationDbService();
+    // Apply adapted ingredients and steps to the meal (recipe_id = meal id)
+    const recipeId = adaptation.recipeId;
+    const ingredients = adaptation.rewriteIngredients || [];
+    const steps = adaptation.rewriteSteps || [];
+
+    if (ingredients.length === 0 && steps.length === 0) {
+      return {
+        ok: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Geen ingrediënten of bereidingsstappen in deze aanpassing',
+        },
+      };
+    }
+
+    // Find meal in custom_meals or meal_history
+    const { data: customMeal } = await supabase
+      .from('custom_meals')
+      .select(
+        'id, meal_data, ai_analysis, meal_data_original, ai_analysis_original',
+      )
+      .eq('id', recipeId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    const { data: historyMeal } = await supabase
+      .from('meal_history')
+      .select('id, meal_data, ai_analysis')
+      .eq('id', recipeId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    const mealRow = customMeal ?? historyMeal;
+    const tableName = customMeal ? 'custom_meals' : 'meal_history';
+
+    if (!mealRow) {
+      return {
+        ok: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Recept niet gevonden om aanpassing op toe te passen',
+        },
+      };
+    }
+
+    const currentMealData =
+      (mealRow.meal_data as Record<string, unknown>) || {};
+    const currentAiAnalysis =
+      (mealRow.ai_analysis as Record<string, unknown>) || {};
+
+    const updatedMealData = {
+      ...currentMealData,
+      ingredients: ingredients.map(
+        (ing: {
+          name: string;
+          quantity: string;
+          unit?: string;
+          note?: string;
+        }) => ({
+          name: ing.name,
+          quantity: ing.quantity,
+          unit: ing.unit ?? null,
+          note: ing.note ?? null,
+          original_line: ing.name,
+        }),
+      ),
+      ingredientRefs: [],
+    };
+
+    const updatedAiAnalysis = {
+      ...currentAiAnalysis,
+      instructions: steps.map(
+        (s: { step?: number; text?: string }, i: number) => ({
+          step: s?.step ?? i + 1,
+          text:
+            (s && typeof s === 'object' && 'text' in s ? s.text : String(s)) ??
+            '',
+        }),
+      ),
+    };
+
+    // Voor custom_meals: bewaar origineel vóór eerste aanpassing (versies)
+    const updatePayload: Record<string, unknown> = {
+      meal_data: updatedMealData,
+      ai_analysis: updatedAiAnalysis,
+      updated_at: new Date().toISOString(),
+    };
+    const mealRowWithOriginal = mealRow as {
+      meal_data_original?: unknown;
+      ai_analysis_original?: unknown;
+    };
+    if (
+      tableName === 'custom_meals' &&
+      mealRowWithOriginal.meal_data_original == null
+    ) {
+      updatePayload.meal_data_original = currentMealData;
+      updatePayload.ai_analysis_original = currentAiAnalysis;
+    }
+
+    const { error: updateMealError } = await supabase
+      .from(tableName)
+      .update(updatePayload)
+      .eq('id', recipeId)
+      .eq('user_id', user.id);
+
+    if (updateMealError) {
+      console.error(
+        '[RecipeAdaptation] Failed to update meal:',
+        updateMealError,
+      );
+      return {
+        ok: false,
+        error: {
+          code: 'DB_ERROR',
+          message: `Kon recept niet bijwerken: ${updateMealError.message}`,
+        },
+      };
+    }
+
     await dbService.updateStatus(adaptationId, user.id, 'applied');
 
     return {
@@ -435,6 +545,206 @@ export async function applyRecipeAdaptationAction(
           error instanceof Error
             ? error.message
             : 'Fout bij toepassen aanpassing',
+      },
+    };
+  }
+}
+
+/**
+ * Check whether the current user has an applied adaptation for this recipe,
+ * and return advisory content (intro + whyThisWorks) for the recipe page.
+ *
+ * @param raw - Raw input: { recipeId: string }
+ * @returns ActionResult with hasAppliedAdaptation and optional intro/whyThisWorks
+ */
+export async function getHasAppliedAdaptationAction(raw: unknown): Promise<
+  ActionResult<{
+    hasAppliedAdaptation: boolean;
+    intro?: string;
+    whyThisWorks?: string[];
+  }>
+> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: {
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
+        },
+      };
+    }
+
+    if (
+      !raw ||
+      typeof raw !== 'object' ||
+      !('recipeId' in raw) ||
+      typeof (raw as { recipeId: string }).recipeId !== 'string'
+    ) {
+      return {
+        ok: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'recipeId is vereist',
+        },
+      };
+    }
+
+    const { recipeId } = raw as { recipeId: string };
+    const dbService = new RecipeAdaptationDbService();
+    const adaptation = await dbService.getAppliedAdaptationForRecipe(
+      recipeId,
+      user.id,
+    );
+
+    if (!adaptation) {
+      return {
+        ok: true,
+        data: { hasAppliedAdaptation: false },
+      };
+    }
+
+    return {
+      ok: true,
+      data: {
+        hasAppliedAdaptation: true,
+        intro: adaptation.rewriteIntro ?? undefined,
+        whyThisWorks:
+          Array.isArray(adaptation.rewriteWhyThisWorks) &&
+          adaptation.rewriteWhyThisWorks.length > 0
+            ? adaptation.rewriteWhyThisWorks
+            : undefined,
+      },
+    };
+  } catch (error) {
+    console.error('Error in getHasAppliedAdaptationAction:', error);
+    return {
+      ok: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
+      },
+    };
+  }
+}
+
+/**
+ * Remove applied recipe adaptation
+ *
+ * Reverts the recipe (custom_meal) to the original version (meal_data_original /
+ * ai_analysis_original) and deletes the adaptation record.
+ *
+ * @param raw - Raw input: { recipeId: string }
+ * @returns ActionResult
+ */
+export async function removeRecipeAdaptationAction(
+  raw: unknown,
+): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: {
+          code: 'AUTH_ERROR',
+          message:
+            'Je moet ingelogd zijn om de aangepaste versie te verwijderen',
+        },
+      };
+    }
+
+    if (
+      !raw ||
+      typeof raw !== 'object' ||
+      !('recipeId' in raw) ||
+      typeof (raw as { recipeId: string }).recipeId !== 'string'
+    ) {
+      return {
+        ok: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'recipeId is vereist',
+        },
+      };
+    }
+
+    const { recipeId } = raw as { recipeId: string };
+    const dbService = new RecipeAdaptationDbService();
+
+    const adaptation = await dbService.getAppliedAdaptationForRecipe(
+      recipeId,
+      user.id,
+    );
+
+    if (!adaptation) {
+      return {
+        ok: true,
+        data: undefined,
+      };
+    }
+
+    const { data: customMeal } = await supabase
+      .from('custom_meals')
+      .select('id, meal_data_original, ai_analysis_original')
+      .eq('id', recipeId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (
+      customMeal?.meal_data_original != null ||
+      customMeal?.ai_analysis_original != null
+    ) {
+      const updatePayload: Record<string, unknown> = {
+        meal_data: customMeal.meal_data_original ?? {},
+        ai_analysis: customMeal.ai_analysis_original ?? {},
+        meal_data_original: null,
+        ai_analysis_original: null,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error: updateError } = await supabase
+        .from('custom_meals')
+        .update(updatePayload)
+        .eq('id', recipeId)
+        .eq('user_id', user.id);
+
+      if (updateError) {
+        console.error('[RecipeAdaptation] Failed to revert meal:', updateError);
+        return {
+          ok: false,
+          error: {
+            code: 'DB_ERROR',
+            message: `Kon recept niet terugzetten: ${updateError.message}`,
+          },
+        };
+      }
+    }
+
+    await dbService.deleteAdaptation(adaptation.id, user.id);
+
+    return {
+      ok: true,
+      data: undefined,
+    };
+  } catch (error) {
+    console.error('Error in removeRecipeAdaptationAction:', error);
+    return {
+      ok: false,
+      error: {
+        code: 'DB_ERROR',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Fout bij verwijderen aangepaste versie',
       },
     };
   }

@@ -4,14 +4,38 @@ import { useState, useEffect } from 'react';
 import { Badge } from '@/components/catalyst/badge';
 import { Text } from '@/components/catalyst/text';
 import { Button } from '@/components/catalyst/button';
-import { StarIcon, SparklesIcon } from '@heroicons/react/20/solid';
+import {
+  StarIcon,
+  SparklesIcon,
+  LinkIcon,
+  TrashIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  LightBulbIcon,
+} from '@heroicons/react/20/solid';
 import { RecipeNotesEditor } from './RecipeNotesEditor';
 import { ImageLightbox } from './ImageLightbox';
 import { RecipeImageUpload } from './RecipeImageUpload';
 import { RecipeSourceEditor } from './RecipeSourceEditor';
 import { RecipeAIMagician } from './RecipeAIMagician';
 import { RecipePrepTimeAndServingsEditor } from './RecipePrepTimeAndServingsEditor';
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/catalyst/dialog';
+import {
+  RecipeContentEditor,
+  getIngredientsForEditor,
+  getInstructionsForEditor,
+} from './RecipeContentEditor';
 import { updateRecipeNotesAction } from '../../actions/meals.actions';
+import {
+  getHasAppliedAdaptationAction,
+  removeRecipeAdaptationAction,
+} from '../actions/recipe-ai.persist.actions';
 import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
 import type { RecipeComplianceResult } from '../../actions/recipe-compliance.actions';
 
@@ -34,6 +58,52 @@ export function MealDetail({
 }: MealDetailProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [aiMagicianOpen, setAiMagicianOpen] = useState(false);
+  /** Toon originele versie (ingrediënten + bereiding) i.p.v. aangepaste */
+  const [viewingOriginal, setViewingOriginal] = useState(false);
+  const [isRemovingAdaptation, setIsRemovingAdaptation] = useState(false);
+  const [removeAdaptationError, setRemoveAdaptationError] = useState<
+    string | null
+  >(null);
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
+  /** Of er een toegepaste aanpassing bestaat (server-check); null = nog niet geladen */
+  const [hasAppliedAdaptation, setHasAppliedAdaptation] = useState<
+    boolean | null
+  >(null);
+  /** Maaltijdadvies van toegepaste aanpassing (intro + waarom dit werkt) */
+  const [advisoryIntro, setAdvisoryIntro] = useState<string | undefined>(
+    undefined,
+  );
+  const [advisoryWhyThisWorks, setAdvisoryWhyThisWorks] = useState<
+    string[] | undefined
+  >(undefined);
+  /** Toggle: ontvouwen/inklappen van het "Waarom dit werkt"-paneel */
+  const [advisoryPanelOpen, setAdvisoryPanelOpen] = useState(false);
+
+  // Check of er een aangepaste versie is en laad advies (intro + whyThisWorks)
+  useEffect(() => {
+    if (!meal?.id) {
+      setHasAppliedAdaptation(false);
+      setAdvisoryIntro(undefined);
+      setAdvisoryWhyThisWorks(undefined);
+      return;
+    }
+    getHasAppliedAdaptationAction({ recipeId: meal.id }).then((result) => {
+      if (result.ok) {
+        setHasAppliedAdaptation(result.data.hasAppliedAdaptation);
+        setAdvisoryIntro(result.data.intro);
+        setAdvisoryWhyThisWorks(result.data.whyThisWorks);
+      } else {
+        setHasAppliedAdaptation(false);
+        setAdvisoryIntro(undefined);
+        setAdvisoryWhyThisWorks(undefined);
+      }
+    });
+  }, [meal?.id, meal?.updated_at ?? meal?.updatedAt]);
+
+  const hasAdvisoryContent =
+    hasAppliedAdaptation &&
+    (Boolean(advisoryIntro?.trim()) ||
+      (Array.isArray(advisoryWhyThisWorks) && advisoryWhyThisWorks.length > 0));
 
   // Get initial image URL from meal data
   const initialImageUrl = meal.sourceImageUrl || meal.source_image_url || null;
@@ -97,6 +167,20 @@ export function MealDetail({
   const mealSlot = meal.mealSlot || meal.meal_slot;
   const dietKey = meal.dietKey || meal.diet_key;
   const aiAnalysis = meal.aiAnalysis || meal.ai_analysis;
+  const sourceUrl = meal.sourceUrl ?? meal.source_url ?? null;
+  const mealDataOriginal =
+    meal.mealDataOriginal ?? meal.meal_data_original ?? null;
+  const aiAnalysisOriginal =
+    meal.aiAnalysisOriginal ?? meal.ai_analysis_original ?? null;
+  const hasOriginal =
+    (mealDataOriginal &&
+      (mealDataOriginal.ingredients?.length > 0 ||
+        mealDataOriginal.ingredientRefs?.length > 0)) ||
+    aiAnalysisOriginal?.instructions?.length > 0;
+  const displayMealData =
+    viewingOriginal && mealDataOriginal ? mealDataOriginal : mealData;
+  const displayAiAnalysis =
+    viewingOriginal && aiAnalysisOriginal ? aiAnalysisOriginal : aiAnalysis;
   const consumptionCount =
     meal.consumptionCount ||
     meal.consumption_count ||
@@ -199,13 +283,64 @@ export function MealDetail({
               />
             </div>
 
-            {/* AI Magician Button */}
-            <div className="mt-4">
+            {/* AI Magician + Waarom dit werkt toggle */}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
               <Button onClick={() => setAiMagicianOpen(true)}>
                 <SparklesIcon data-slot="icon" />
                 AI Magician
               </Button>
+              {hasAdvisoryContent && (
+                <Button
+                  outline
+                  onClick={() => setAdvisoryPanelOpen((open) => !open)}
+                  aria-expanded={advisoryPanelOpen}
+                  aria-controls="advisory-panel"
+                >
+                  <LightBulbIcon data-slot="icon" />
+                  Waarom dit werkt voor jouw dieet
+                  {advisoryPanelOpen ? (
+                    <ChevronUpIcon className="ml-1 h-4 w-4" />
+                  ) : (
+                    <ChevronDownIcon className="ml-1 h-4 w-4" />
+                  )}
+                </Button>
+              )}
             </div>
+
+            {/* Uitklapmenu: maaltijdadvies direct onder de toggle */}
+            {hasAdvisoryContent && advisoryPanelOpen && (
+              <div
+                id="advisory-panel"
+                role="region"
+                aria-label="Waarom dit werkt voor jouw dieet"
+                className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/80 dark:bg-emerald-950/30 p-4"
+              >
+                <Text className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mb-3">
+                  Waarom dit werkt voor jouw dieet
+                </Text>
+                {advisoryIntro?.trim() && (
+                  <Text className="text-sm text-emerald-800 dark:text-emerald-200 mb-3 whitespace-pre-wrap">
+                    {advisoryIntro}
+                  </Text>
+                )}
+                {Array.isArray(advisoryWhyThisWorks) &&
+                  advisoryWhyThisWorks.length > 0 && (
+                    <ul className="space-y-1.5">
+                      {advisoryWhyThisWorks.map((bullet, idx) => (
+                        <li
+                          key={idx}
+                          className="text-sm text-emerald-800 dark:text-emerald-200 flex items-start gap-2"
+                        >
+                          <span className="text-emerald-500 dark:text-emerald-400 mt-0.5">
+                            •
+                          </span>
+                          <span>{bullet}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+              </div>
+            )}
           </div>
 
           {/* Source Image Upload/Display - Right aligned */}
@@ -304,32 +439,68 @@ export function MealDetail({
             </div>
           )}
         </div>
+
+        {/* Bron-URL (originele receptpagina) */}
+        {sourceUrl && (
+          <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 text-sm">
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              <LinkIcon className="h-4 w-4 flex-shrink-0" />
+              Bron: originele receptpagina
+            </a>
+          </div>
+        )}
       </div>
 
+      {/* Bekijk origineel / aangepaste versie toggle – alleen als er een aangepaste versie is (server-check) */}
+      {hasAppliedAdaptation === true && hasOriginal && (
+        <div className="mb-4 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-3 flex items-center justify-between gap-4">
+          <Text className="text-sm text-zinc-700 dark:text-zinc-300">
+            {viewingOriginal
+              ? 'Je bekijkt de originele versie.'
+              : 'Je bekijkt de aangepaste versie.'}
+          </Text>
+          <Button
+            outline
+            onClick={() => setViewingOriginal((v) => !v)}
+            className="flex-shrink-0"
+          >
+            {viewingOriginal ? 'Bekijk aangepaste versie' : 'Bekijk origineel'}
+          </Button>
+        </div>
+      )}
+
       {/* AI Analysis / Instructions */}
-      {aiAnalysis && (
+      {(displayAiAnalysis || aiAnalysis) && (
         <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
           <h3 className="text-lg font-semibold text-zinc-950 dark:text-white mb-4">
             Bereidingsinstructies
           </h3>
-          {aiAnalysis.instructions && Array.isArray(aiAnalysis.instructions) ? (
+          {displayAiAnalysis?.instructions &&
+          Array.isArray(displayAiAnalysis.instructions) ? (
             <ol className="space-y-2 list-decimal list-inside text-sm text-zinc-600 dark:text-zinc-400">
-              {aiAnalysis.instructions.map((instruction: any, idx: number) => {
-                // Handle both string format and object format {step, text}
-                const instructionText =
-                  typeof instruction === 'string'
-                    ? instruction
-                    : instruction?.text ||
-                      instruction?.step ||
-                      String(instruction);
-                return <li key={idx}>{instructionText}</li>;
-              })}
+              {displayAiAnalysis.instructions.map(
+                (instruction: any, idx: number) => {
+                  // Handle both string format and object format {step, text}
+                  const instructionText =
+                    typeof instruction === 'string'
+                      ? instruction
+                      : instruction?.text ||
+                        instruction?.step ||
+                        String(instruction);
+                  return <li key={idx}>{instructionText}</li>;
+                },
+              )}
             </ol>
-          ) : aiAnalysis.instructions ? (
+          ) : displayAiAnalysis?.instructions ? (
             <Text className="text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-line">
-              {typeof aiAnalysis.instructions === 'string'
-                ? aiAnalysis.instructions
-                : String(aiAnalysis.instructions)}
+              {typeof displayAiAnalysis.instructions === 'string'
+                ? displayAiAnalysis.instructions
+                : String(displayAiAnalysis.instructions)}
             </Text>
           ) : (
             <Text className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -340,17 +511,19 @@ export function MealDetail({
       )}
 
       {/* Ingredients */}
-      {((mealData?.ingredientRefs && mealData.ingredientRefs.length > 0) ||
-        (mealData?.ingredients && mealData.ingredients.length > 0)) && (
+      {((displayMealData?.ingredientRefs &&
+        displayMealData.ingredientRefs.length > 0) ||
+        (displayMealData?.ingredients &&
+          displayMealData.ingredients.length > 0)) && (
         <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
           <h3 className="text-lg font-semibold text-zinc-950 dark:text-white mb-4">
             Ingrediënten
           </h3>
           <ul className="space-y-2 text-sm">
             {/* Show ingredientRefs if available (new format) */}
-            {mealData?.ingredientRefs &&
-              mealData.ingredientRefs.length > 0 &&
-              mealData.ingredientRefs.map((ref: any, idx: number) => {
+            {displayMealData?.ingredientRefs &&
+              displayMealData.ingredientRefs.length > 0 &&
+              displayMealData.ingredientRefs.map((ref: any, idx: number) => {
                 const name =
                   ref.displayName ||
                   nevoFoodNamesByCode[ref.nevoCode] ||
@@ -365,11 +538,11 @@ export function MealDetail({
                 );
               })}
             {/* Show ingredients if available (legacy format from recipe import) */}
-            {(!mealData?.ingredientRefs ||
-              mealData.ingredientRefs.length === 0) &&
-              mealData?.ingredients &&
-              mealData.ingredients.length > 0 &&
-              mealData.ingredients.map((ing: any, idx: number) => {
+            {(!displayMealData?.ingredientRefs ||
+              displayMealData.ingredientRefs.length === 0) &&
+              displayMealData?.ingredients &&
+              displayMealData.ingredients.length > 0 &&
+              displayMealData.ingredients.map((ing: any, idx: number) => {
                 const name =
                   ing.name || ing.original_line || `Ingrediënt ${idx + 1}`;
                 const quantity = ing.quantity || ing.amount;
@@ -398,6 +571,17 @@ export function MealDetail({
               })}
           </ul>
         </div>
+      )}
+
+      {/* Bewerk ingrediënten en bereiding (alleen actieve versie) */}
+      {!viewingOriginal && (
+        <RecipeContentEditor
+          mealId={meal.id}
+          mealSource={mealSource}
+          ingredients={getIngredientsForEditor(mealData)}
+          instructions={getInstructionsForEditor(aiAnalysis)}
+          onUpdated={() => onRecipeApplied?.()}
+        />
       )}
 
       {/* Notes Editor */}
@@ -504,6 +688,89 @@ export function MealDetail({
           </div>
         </div>
       )}
+
+      {/* Aangepaste versie verwijderen – alleen tonen als er een aangepaste versie is (server-check) */}
+      {hasAppliedAdaptation === true && (
+        <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10 border-t border-zinc-200 dark:border-zinc-800">
+          <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">
+            Je bekijkt dit recept met een door de AI Magician aangepaste versie.
+            Je kunt de aanpassing ongedaan maken en teruggaan naar de originele
+            versie.
+          </Text>
+          <Button
+            outline
+            disabled={isRemovingAdaptation}
+            onClick={() => setConfirmRemoveOpen(true)}
+            className="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/30"
+          >
+            <TrashIcon className="h-4 w-4" />
+            Aangepaste versie verwijderen
+          </Button>
+          {removeAdaptationError && (
+            <Text className="text-sm text-red-600 dark:text-red-400 mt-2">
+              {removeAdaptationError}
+            </Text>
+          )}
+        </div>
+      )}
+
+      {/* Bevestigingspopup: aangepaste versie verwijderen */}
+      <Dialog
+        open={confirmRemoveOpen}
+        onClose={() => {
+          if (!isRemovingAdaptation) {
+            setConfirmRemoveOpen(false);
+            setRemoveAdaptationError(null);
+          }
+        }}
+        size="sm"
+      >
+        <DialogTitle>Aangepaste versie verwijderen?</DialogTitle>
+        <DialogDescription>
+          Het recept wordt teruggezet naar de originele versie. Deze actie kun
+          je niet ongedaan maken.
+        </DialogDescription>
+        <DialogBody>
+          {removeAdaptationError && (
+            <Text className="text-sm text-red-600 dark:text-red-400 mb-4">
+              {removeAdaptationError}
+            </Text>
+          )}
+        </DialogBody>
+        <DialogActions>
+          <Button
+            outline
+            onClick={() => {
+              setConfirmRemoveOpen(false);
+              setRemoveAdaptationError(null);
+            }}
+            disabled={isRemovingAdaptation}
+          >
+            Annuleren
+          </Button>
+          <Button
+            color="red"
+            disabled={isRemovingAdaptation}
+            onClick={async () => {
+              setIsRemovingAdaptation(true);
+              setRemoveAdaptationError(null);
+              const result = await removeRecipeAdaptationAction({
+                recipeId: meal.id,
+              });
+              setIsRemovingAdaptation(false);
+              if (result.ok) {
+                setConfirmRemoveOpen(false);
+                setHasAppliedAdaptation(false);
+                onRecipeApplied?.();
+              } else {
+                setRemoveAdaptationError(result.error.message);
+              }
+            }}
+          >
+            {isRemovingAdaptation ? 'Bezig…' : 'Verwijderen'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* AI Magician Dialog */}
       <RecipeAIMagician

@@ -10,6 +10,7 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ChartBarIcon,
+  BeakerIcon,
 } from '@heroicons/react/20/solid';
 
 type StatItem = {
@@ -30,6 +31,10 @@ type AdminStats = {
     system: number;
     user: number;
     totalUsage: number;
+  };
+  ingredients: {
+    nevo: number;
+    custom: number;
   };
 };
 
@@ -95,6 +100,24 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
           value: stats.dietTypes.inactive,
           icon: XCircleIcon,
           iconColor: 'text-zinc-400',
+        },
+      ],
+    },
+    {
+      name: 'Ingrediënten (NEVO)',
+      description:
+        'Bekijk NEVO-voedingsmiddelen en voedingswaarden. Voeg eigen ingredienten toe als ze niet in NEVO staan.',
+      href: '/admin/ingredients',
+      icon: BeakerIcon,
+      iconBackground: 'bg-amber-500',
+      stats: [
+        {
+          label: 'NEVO-ingrediënten',
+          value: stats.ingredients.nevo.toLocaleString(),
+        },
+        {
+          label: 'Eigen ingredienten',
+          value: stats.ingredients.custom,
         },
       ],
     },

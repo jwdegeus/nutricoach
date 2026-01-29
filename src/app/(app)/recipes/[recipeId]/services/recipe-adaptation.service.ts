@@ -16,13 +16,13 @@ import type {
   RequestRecipeAdaptationResult,
   RecipeAdaptationDraft,
   ViolationDetail,
+  ViolationChoice,
   IngredientLine,
   StepLine,
 } from '../recipe-ai.types';
 import type { DietRuleset, ValidationReport } from './diet-validator';
 import { validateDraft, findForbiddenMatches } from './diet-validator';
 import type { DietRuleSet } from '@/src/lib/diets';
-import { generateRecipeAdaptationWithGemini } from './gemini-recipe-adaptation.service';
 // vNext guard rails (shadow mode)
 import {
   loadGuardrailsRuleset,
@@ -34,6 +34,20 @@ import type {
   EvaluationContext,
   Locale,
 } from '@/src/lib/guardrails-vnext/types';
+import { generateRecipeAdaptationWithGemini } from './gemini-recipe-adaptation.service';
+
+/** Haal eerste voorgestelde alternatief uit suggestion-tekst (bijv. "Vervang door X of Y" → "X"). */
+function firstSuggestedAlternativeFromSuggestion(
+  suggestion: string,
+): string | null {
+  const m = (suggestion || '').match(/vervang\s+door\s+(.+)/i);
+  const rest = (m ? m[1] : suggestion).trim();
+  const first = rest
+    .split(/\s+of\s+|\s*,\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean)[0];
+  return first || null;
+}
 
 /**
  * Recipe Adaptation Service
@@ -111,8 +125,9 @@ export class RecipeAdaptationService {
       );
 
       // Generate draft with engine (first attempt)
-      // Bij twee-fase flow: bestaande violations uit eerdere analyse meegiven
+      // Bij twee-fase flow: bestaande violations + keuzes (Kies X / Vervang / Schrappen) meegiven
       const existingViolations = input.existingAnalysis?.violations;
+      const violationChoices = input.existingAnalysis?.violationChoices;
       let draft: RecipeAdaptationDraft;
       let validation: ValidationReport;
       let needsRetry = false;
@@ -123,6 +138,7 @@ export class RecipeAdaptationService {
           dietId,
           false,
           existingViolations,
+          violationChoices,
         );
         validation = validateDraft(draft, ruleset);
 
@@ -149,6 +165,7 @@ export class RecipeAdaptationService {
             dietId,
             true,
             existingViolations,
+            violationChoices,
           );
           validation = validateDraft(draft, ruleset);
 
@@ -515,6 +532,12 @@ export class RecipeAdaptationService {
         );
         const addedSugarTerms = (addedSugarHeuristic?.terms as string[]) || [];
 
+        this.filterSubstitutionSuggestionsAgainstForbidden(forbidden);
+
+        console.log(
+          `[RecipeAdaptation] ✓ Loaded ${forbidden.length} total rules (from guard rails + recipe adaptation) for diet ${dietId}`,
+        );
+
         const ruleset: DietRuleset = {
           dietId,
           version: 1,
@@ -522,10 +545,6 @@ export class RecipeAdaptationService {
           heuristics:
             addedSugarTerms.length > 0 ? { addedSugarTerms } : undefined,
         };
-
-        console.log(
-          `[RecipeAdaptation] ✓ Loaded ${forbidden.length} total rules (from guard rails + recipe adaptation) for diet ${dietId}`,
-        );
 
         return ruleset;
       }
@@ -572,6 +591,8 @@ export class RecipeAdaptationService {
           substitutionSuggestions:
             (rule.substitution_suggestions as string[]) || [],
         }));
+
+        this.filterSubstitutionSuggestionsAgainstForbidden(forbidden);
 
         console.log(
           `[RecipeAdaptation] Rules loaded:`,
@@ -626,6 +647,8 @@ export class RecipeAdaptationService {
         dietId,
       );
 
+      this.filterSubstitutionSuggestionsAgainstForbidden(ruleset.forbidden);
+
       console.log(
         `[RecipeAdaptation] ✓ Loaded diet ruleset for ${dietProfile.dietKey} with ${ruleset.forbidden.length} forbidden rules (derived from profile)`,
       );
@@ -644,6 +667,37 @@ export class RecipeAdaptationService {
       console.error('[RecipeAdaptation] Error loading diet ruleset:', error);
       // Fallback to basic ruleset if everything fails
       return this.getFallbackRuleset(dietId);
+    }
+  }
+
+  /**
+   * Filter substitution suggestions so we never suggest an ingredient that is
+   * itself forbidden (e.g. gerookte paprikapoeder for chilipoeder when paprika
+   * is also a nightshade). Excludes exact matches and suggestions that contain
+   * any forbidden term (e.g. "gerookte paprikapoeder" contains "paprikapoeder").
+   */
+  private filterSubstitutionSuggestionsAgainstForbidden(
+    forbidden: DietRuleset['forbidden'],
+  ): void {
+    const forbiddenSet = new Set<string>();
+    for (const r of forbidden) {
+      const t = r.term?.toLowerCase().trim();
+      if (t) forbiddenSet.add(t);
+      for (const s of r.synonyms || []) {
+        const v = s?.toLowerCase().trim();
+        if (v) forbiddenSet.add(v);
+      }
+    }
+    const forbiddenList = Array.from(forbiddenSet);
+    for (const r of forbidden) {
+      if (!r.substitutionSuggestions?.length) continue;
+      r.substitutionSuggestions = r.substitutionSuggestions.filter((s) => {
+        if (!s?.trim()) return false;
+        const low = s.toLowerCase().trim();
+        if (forbiddenSet.has(low)) return false;
+        if (forbiddenList.some((f) => low.includes(f))) return false;
+        return true;
+      });
     }
   }
 
@@ -1193,16 +1247,56 @@ export class RecipeAdaptationService {
     const customMeal = await customMealsService.getMealById(recipeId, userId);
 
     if (customMeal) {
-      const mealData = customMeal.mealData || {};
+      let mealData = { ...(customMeal.mealData || {}) };
       // Instructions are stored in aiAnalysis, not in mealData (Meal type doesn't have instructions)
       const steps = customMeal.aiAnalysis?.instructions || [];
 
+      // Fallback: als meal_data geen ingredienten heeft, probeer ai_analysis.ingredients (sommige imports)
+      const hasRefs =
+        Array.isArray(mealData.ingredientRefs) &&
+        mealData.ingredientRefs.length > 0;
+      const hasLegacy =
+        Array.isArray(mealData.ingredients) && mealData.ingredients.length > 0;
+      if (!hasRefs && !hasLegacy) {
+        const aiIng = customMeal.aiAnalysis?.ingredients;
+        if (Array.isArray(aiIng) && aiIng.length > 0) {
+          mealData = {
+            ...mealData,
+            ingredients: aiIng.map((item: any) => {
+              const qty = item.quantity ?? item.quantityG ?? item.amount ?? '';
+              const amountNum = parseFloat(String(qty));
+              return {
+                name:
+                  item.name ??
+                  item.original_line ??
+                  (typeof item === 'string' ? item : ''),
+                quantity: String(qty),
+                amount: Number.isNaN(amountNum) ? 0 : amountNum,
+                unit: item.unit ?? '',
+                note: item.note ?? item.notes ?? null,
+                original_line:
+                  item.original_line ??
+                  item.name ??
+                  (typeof item === 'string' ? item : ''),
+              };
+            }),
+          };
+          console.log(
+            `[RecipeAdaptation] Used ai_analysis.ingredients fallback (${aiIng.length} items)`,
+          );
+        }
+      }
+
+      const mealDataForLog = mealData as {
+        ingredientRefs?: unknown[];
+        ingredients?: unknown[];
+      };
       console.log(`[RecipeAdaptation] Loaded custom meal:`, {
         name: customMeal.name,
-        hasIngredientRefs: !!mealData.ingredientRefs,
-        ingredientRefsCount: mealData.ingredientRefs?.length || 0,
-        hasIngredients: !!mealData.ingredients,
-        ingredientsCount: mealData.ingredients?.length || 0,
+        hasIngredientRefs: !!mealDataForLog.ingredientRefs?.length,
+        ingredientRefsCount: mealDataForLog.ingredientRefs?.length || 0,
+        hasIngredients: !!mealDataForLog.ingredients?.length,
+        ingredientsCount: mealDataForLog.ingredients?.length || 0,
         hasAiAnalysis: !!customMeal.aiAnalysis,
         aiAnalysisInstructions:
           customMeal.aiAnalysis?.instructions?.length || 0,
@@ -1228,20 +1322,62 @@ export class RecipeAdaptationService {
       .maybeSingle();
 
     if (mealHistory) {
-      const mealData = mealHistory.meal_data || {};
-      // meal_data is of type Meal which doesn't have instructions
-      // Instructions might be in ai_analysis if available, otherwise empty array
-      const steps = (mealHistory as any).ai_analysis?.instructions || [];
+      let mealData = {
+        ...((mealHistory.meal_data as Record<string, unknown>) || {}),
+      };
+      const aiAnalysis = (mealHistory as any).ai_analysis;
+      const steps = aiAnalysis?.instructions || [];
 
+      const hasRefs =
+        Array.isArray(mealData.ingredientRefs) &&
+        mealData.ingredientRefs.length > 0;
+      const hasLegacy =
+        Array.isArray(mealData.ingredients) && mealData.ingredients.length > 0;
+      if (
+        !hasRefs &&
+        !hasLegacy &&
+        Array.isArray(aiAnalysis?.ingredients) &&
+        aiAnalysis.ingredients.length > 0
+      ) {
+        const aiIng = aiAnalysis.ingredients;
+        mealData = {
+          ...mealData,
+          ingredients: aiIng.map((item: any) => {
+            const qty = item.quantity ?? item.quantityG ?? item.amount ?? '';
+            const amountNum = parseFloat(String(qty));
+            return {
+              name:
+                item.name ??
+                item.original_line ??
+                (typeof item === 'string' ? item : ''),
+              quantity: String(qty),
+              amount: Number.isNaN(amountNum) ? 0 : amountNum,
+              unit: item.unit ?? '',
+              note: item.note ?? item.notes ?? null,
+              original_line:
+                item.original_line ??
+                item.name ??
+                (typeof item === 'string' ? item : ''),
+            };
+          }),
+        };
+        console.log(
+          `[RecipeAdaptation] Used meal_history ai_analysis.ingredients fallback (${aiIng.length} items)`,
+        );
+      }
+
+      const mealDataTyped = mealData as {
+        ingredientRefs?: unknown[];
+        ingredients?: unknown[];
+      };
       console.log(`[RecipeAdaptation] Loaded meal_history:`, {
         mealName: mealHistory.meal_name,
-        hasIngredientRefs: !!mealData.ingredientRefs,
-        ingredientRefsCount: mealData.ingredientRefs?.length || 0,
-        hasIngredients: !!mealData.ingredients,
-        ingredientsCount: mealData.ingredients?.length || 0,
-        hasAiAnalysis: !!(mealHistory as any).ai_analysis,
-        aiAnalysisInstructions:
-          (mealHistory as any).ai_analysis?.instructions?.length || 0,
+        hasIngredientRefs: !!mealDataTyped.ingredientRefs?.length,
+        ingredientRefsCount: mealDataTyped.ingredientRefs?.length || 0,
+        hasIngredients: !!mealDataTyped.ingredients?.length,
+        ingredientsCount: mealDataTyped.ingredients?.length || 0,
+        hasAiAnalysis: !!aiAnalysis,
+        aiAnalysisInstructions: aiAnalysis?.instructions?.length || 0,
       });
 
       return {
@@ -1341,15 +1477,29 @@ export class RecipeAdaptationService {
 
       if (matches.length > 0) {
         const match = matches[0];
+        const substitution =
+          match.substitutionSuggestions &&
+          match.substitutionSuggestions.length > 0
+            ? match.substitutionSuggestions[0] +
+              (match.substitutionSuggestions.length > 1
+                ? ` of ${match.substitutionSuggestions.slice(1, 3).join(', ')}`
+                : '')
+            : null;
+        const suggestion =
+          match.allowedAlternativeInText && substitution
+            ? `Kies ${match.allowedAlternativeInText}, of vervang ${match.matched} door ${substitution}`
+            : match.allowedAlternativeInText
+              ? `Kies ${match.allowedAlternativeInText} (toegestaan)`
+              : substitution
+                ? `Vervang door ${substitution}`
+                : `Vervang dit ingrediënt voor een dieet-compatibele variant`;
         violations.push({
           ingredientName,
           ruleCode: match.ruleCode,
           ruleLabel: match.ruleLabel,
-          suggestion:
-            match.substitutionSuggestions &&
-            match.substitutionSuggestions.length > 0
-              ? `Vervang door ${match.substitutionSuggestions[0]}${match.substitutionSuggestions.length > 1 ? ` of ${match.substitutionSuggestions.slice(1, 3).join(', ')}` : ''}`
-              : `Vervang dit ingrediënt voor een dieet-compatibele variant`,
+          suggestion,
+          allowedAlternativeInText: match.allowedAlternativeInText ?? undefined,
+          matchedForbiddenTerm: match.matched,
         });
         foundIngredients.add(lowerName);
 
@@ -1487,12 +1637,56 @@ export class RecipeAdaptationService {
   }
 
   /**
+   * Normaliseer voor vergelijking: deel vóór eerste ":", lowercase, trim.
+   */
+  private static normalizedIngredientKey(s: string): string {
+    const part = s.split(':')[0];
+    return (part ?? s).toLowerCase().trim();
+  }
+
+  /**
+   * Vind violation-index voor een ingredientregel.
+   * Match: exact → genormaliseerd (deel vóór :) → bevat matchedForbiddenTerm (langste eerst).
+   */
+  private getViolationIndexForIngredient(
+    ingredientName: string,
+    violations: ViolationDetail[],
+  ): number {
+    const lower = ingredientName.toLowerCase().trim();
+    const keyNorm =
+      RecipeAdaptationService.normalizedIngredientKey(ingredientName);
+
+    const exact = violations.findIndex(
+      (v) => v.ingredientName.toLowerCase().trim() === lower,
+    );
+    if (exact >= 0) return exact;
+
+    const byNorm = violations.findIndex(
+      (v) =>
+        RecipeAdaptationService.normalizedIngredientKey(v.ingredientName) ===
+        keyNorm,
+    );
+    if (byNorm >= 0) return byNorm;
+
+    const withTerm = violations
+      .map((v, i) => ({
+        i,
+        term: v.matchedForbiddenTerm?.toLowerCase().trim(),
+        len: (v.matchedForbiddenTerm ?? '').length,
+      }))
+      .filter((x) => x.term && lower.includes(x.term))
+      .sort((a, b) => b.len - a.len);
+    return withTerm[0]?.i ?? -1;
+  }
+
+  /**
    * Generate rewrite with substitutions
    *
    * @param recipe - Original recipe
    * @param violations - Found violations
    * @param ruleset - Diet ruleset
    * @param strict - Whether to use strict mode (no forbidden ingredients)
+   * @param violationChoices - Per violation: use_allowed | substitute | remove
    * @returns Rewritten recipe
    */
   private generateRewrite(
@@ -1500,9 +1694,22 @@ export class RecipeAdaptationService {
     violations: ViolationDetail[],
     ruleset: DietRuleset,
     strict: boolean,
+    violationChoices?: Array<{ choice: ViolationChoice; substitute?: string }>,
   ): { ingredients: IngredientLine[]; steps: StepLine[] } {
     const ingredients: IngredientLine[] = [];
     const steps: StepLine[] = [];
+
+    if (violationChoices?.length !== undefined) {
+      console.log(
+        `[RecipeAdaptation] generateRewrite: violationChoices length=${violationChoices.length}, violations length=${violations.length}`,
+      );
+      violationChoices.slice(0, 5).forEach((c, i) => {
+        console.log(`[RecipeAdaptation]   choice[${i}]=${c?.choice}`);
+      });
+    }
+
+    // Termen die we in stappen als "(weglaten)" tonen (keuze "Schrappen")
+    const removeTerms = new Set<string>();
 
     // Build substitution map
     // In strict mode, use ALL forbidden terms from ruleset, not just found violations
@@ -1532,27 +1739,124 @@ export class RecipeAdaptationService {
         }
       }
     } else {
-      // In non-strict mode, only use found violations
-      for (const violation of violations) {
+      // In non-strict: violations + keuzes (use_allowed / substitute / remove)
+      for (let j = 0; j < violations.length; j++) {
+        const violation = violations[j];
+        const choice = violationChoices?.[j]?.choice ?? 'substitute';
         const rule = ruleset.forbidden.find(
           (r) => r.ruleCode === violation.ruleCode,
         );
-        if (
-          rule?.substitutionSuggestions &&
-          rule.substitutionSuggestions.length > 0
-        ) {
-          substitutionMap.set(
-            violation.ingredientName.toLowerCase(),
-            rule.substitutionSuggestions[0],
-          );
+        const defaultSubstitute =
+          rule?.substitutionSuggestions?.[0] ??
+          firstSuggestedAlternativeFromSuggestion(violation.suggestion);
+
+        if (choice === 'remove') {
+          removeTerms.add(violation.ingredientName.toLowerCase().trim());
+          if (violation.matchedForbiddenTerm) {
+            removeTerms.add(violation.matchedForbiddenTerm.toLowerCase());
+          }
+          if (rule) {
+            removeTerms.add(rule.term.toLowerCase());
+            for (const syn of rule.synonyms || []) {
+              removeTerms.add(syn.toLowerCase());
+            }
+          }
+          continue;
+        }
+
+        const substitute =
+          choice === 'use_allowed' && violation.allowedAlternativeInText
+            ? violation.allowedAlternativeInText.trim()
+            : (violationChoices?.[j]?.substitute ?? defaultSubstitute);
+
+        if (substitute) {
+          const key = violation.ingredientName.toLowerCase().trim();
+          substitutionMap.set(key, substitute);
+          const beforeColon = key.split(':')[0].trim();
+          if (beforeColon && beforeColon !== key) {
+            substitutionMap.set(beforeColon, substitute);
+          }
+          if (choice === 'use_allowed') {
+            if (violation.matchedForbiddenTerm) {
+              substitutionMap.set(
+                violation.matchedForbiddenTerm.toLowerCase().trim(),
+                substitute,
+              );
+            }
+            if (rule) {
+              substitutionMap.set(rule.term.toLowerCase(), substitute);
+              for (const syn of rule.synonyms || []) {
+                substitutionMap.set(syn.toLowerCase(), substitute);
+              }
+            }
+          }
+          if (choice !== 'use_allowed' && rule) {
+            substitutionMap.set(rule.term.toLowerCase(), substitute);
+            for (const syn of rule.synonyms || []) {
+              substitutionMap.set(syn.toLowerCase(), substitute);
+            }
+          }
         }
       }
     }
+
+    // Lookup substitute: exact → hoofdingrediënt (deel vóór :) → langste key in hoofdingrediënt → anders ergens in regel
+    const substitutionEntries = [...substitutionMap.entries()].sort(
+      (a, b) => b[0].length - a[0].length,
+    );
+    const getSubstitution = (lowerName: string): string | undefined => {
+      const exact = substitutionMap.get(lowerName);
+      if (exact) return exact;
+      const nameBeforeColon = lowerName.split(':')[0].trim();
+      if (nameBeforeColon && substitutionMap.get(nameBeforeColon))
+        return substitutionMap.get(nameBeforeColon);
+      // Eerst: key die in het hoofdingrediënt (vóór :) past, langste eerst – zo wint "melk" boven "room" in "melk: 160 ml(of halfvolle room)"
+      for (const [key, sub] of substitutionEntries) {
+        if (
+          nameBeforeColon &&
+          (nameBeforeColon.includes(key) || key.includes(nameBeforeColon))
+        )
+          return sub;
+      }
+      // Daarna: key ergens in de hele regel (voor stappen of lange ingredientregels)
+      for (const [key, sub] of substitutionEntries) {
+        if (lowerName.includes(key) || key.includes(lowerName)) return sub;
+      }
+      return undefined;
+    };
 
     // Rewrite ingredients: gebruik ingredientRefs als die items heeft, anders legacy ingredients
     const origRefs = recipe.mealData?.ingredientRefs ?? [];
     const origLegacy = recipe.mealData?.ingredients ?? [];
     const originalIngredients = origRefs.length > 0 ? origRefs : origLegacy;
+
+    // Alleen focussen op foute ingredienten: als we geen bronlijst hebben maar wel violations,
+    // bouw een minimale lijst uit alleen de voorgestelde vervangingen (origineel → alternatief).
+    if (originalIngredients.length === 0 && violations.length > 0) {
+      for (const v of violations) {
+        const substitute =
+          firstSuggestedAlternativeFromSuggestion(v.suggestion) ??
+          ruleset.forbidden.find((r) => r.ruleCode === v.ruleCode)
+            ?.substitutionSuggestions?.[0];
+        const name = substitute
+          ? substitute.charAt(0).toUpperCase() + substitute.slice(1)
+          : v.ingredientName;
+        ingredients.push({
+          name,
+          quantity: '',
+          unit: '',
+          note: substitute
+            ? `vervanging voor ${v.ingredientName}`
+            : (v.ruleLabel ?? ''),
+        });
+      }
+      // Stappen ongewijzigd doorgeven (geen substituties in tekst als we geen bron-ingredienten hadden)
+      recipe.steps.forEach((step, index) => {
+        const stepText = typeof step === 'string' ? step : String(step);
+        steps.push({ step: index + 1, text: stepText });
+      });
+      return { ingredients, steps };
+    }
 
     for (const ing of originalIngredients) {
       const ingredientName =
@@ -1562,12 +1866,19 @@ export class RecipeAdaptationService {
       const note = ing.note || ing.notes;
 
       const lowerName = ingredientName.toLowerCase();
+      const violationIdx = this.getViolationIndexForIngredient(
+        ingredientName,
+        violations,
+      );
+      const choice = violationChoices?.[violationIdx]?.choice;
 
-      // Check if this ingredient matches any forbidden term (including synonyms)
+      if (choice === 'remove') {
+        continue;
+      }
+
       let substitution: string | undefined;
 
       if (strict) {
-        // In strict mode, use findForbiddenMatches for accurate matching
         const matches = findForbiddenMatches(
           ingredientName,
           ruleset,
@@ -1586,12 +1897,18 @@ export class RecipeAdaptationService {
           }
         }
       } else {
-        // In non-strict mode, use substitution map from violations
-        substitution = substitutionMap.get(lowerName);
+        if (
+          choice === 'use_allowed' &&
+          violations[violationIdx]?.allowedAlternativeInText
+        ) {
+          substitution =
+            violations[violationIdx].allowedAlternativeInText!.trim();
+        } else {
+          substitution = getSubstitution(lowerName);
+        }
       }
 
       if (substitution) {
-        // Use substitution
         ingredients.push({
           name: substitution.charAt(0).toUpperCase() + substitution.slice(1),
           quantity: String(quantity),
@@ -1599,7 +1916,6 @@ export class RecipeAdaptationService {
           note: note || `vervanging voor ${ingredientName}`,
         });
       } else {
-        // Keep original (no substitution found or not a violation)
         ingredients.push({
           name: ingredientName,
           quantity: String(quantity),
@@ -1609,20 +1925,37 @@ export class RecipeAdaptationService {
       }
     }
 
-    // Rewrite steps
+    // Rewrite steps: substituties toepassen; daarna "weglaten" voor keuze Schrappen
+    const stepReplacements = [...substitutionMap.entries()].sort(
+      (a, b) => b[0].length - a[0].length,
+    );
+    const removeTermsSorted = [...removeTerms].sort(
+      (a, b) => b.length - a.length,
+    );
+
     recipe.steps.forEach((step, index) => {
       const stepText = typeof step === 'string' ? step : String(step);
       let rewrittenText = stepText;
 
-      // Replace forbidden terms in steps (both strict and non-strict mode)
-      substitutionMap.forEach((substitution, original) => {
-        const escapedOriginal = original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(`\\b${escapedOriginal}\\b`, 'gi');
-        rewrittenText = rewrittenText.replace(
-          regex,
-          substitution.charAt(0).toUpperCase() + substitution.slice(1),
-        );
-      });
+      for (const [original, substitution] of stepReplacements) {
+        const escaped = original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const subDisplay =
+          substitution.charAt(0).toUpperCase() + substitution.slice(1);
+        const useWordBoundary = original.length <= 6;
+        const regex = useWordBoundary
+          ? new RegExp(`\\b${escaped}\\b`, 'gi')
+          : new RegExp(escaped, 'gi');
+        rewrittenText = rewrittenText.replace(regex, subDisplay);
+      }
+
+      for (const term of removeTermsSorted) {
+        const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex =
+          term.length <= 6
+            ? new RegExp(`\\b${escaped}\\b`, 'gi')
+            : new RegExp(escaped, 'gi');
+        rewrittenText = rewrittenText.replace(regex, '(weglaten)');
+      }
 
       steps.push({
         step: index + 1,
@@ -1643,6 +1976,7 @@ export class RecipeAdaptationService {
    * @param dietId - Diet ID
    * @param strict - Whether to use strict mode (for retry)
    * @param existingViolations - Optional; bij twee-fase flow uit eerdere getAnalysisOnly
+   * @param violationChoices - Optional; per violation: use_allowed | substitute | remove
    * @returns Recipe adaptation draft
    */
   private async generateDraftWithEngine(
@@ -1650,6 +1984,7 @@ export class RecipeAdaptationService {
     dietId: string,
     strict: boolean,
     existingViolations?: ViolationDetail[],
+    violationChoices?: Array<{ choice: ViolationChoice; substitute?: string }>,
   ): Promise<RecipeAdaptationDraft> {
     // Load recipe, ruleset and diet name in parallel where possible
     const supabase = await createClient();
@@ -1726,95 +2061,56 @@ export class RecipeAdaptationService {
         ? existingViolations
         : this.analyzeRecipeForViolations(recipe, ruleset);
 
-    // Use Gemini for intelligent adaptation if violations found, otherwise use simple rewrite
     let draft: RecipeAdaptationDraft;
 
     if (violations.length > 0) {
-      console.log(
-        `[RecipeAdaptation] Using Gemini AI for intelligent adaptation (${violations.length} violations found)`,
+      // Gemini als "chef" met dieetregels: intro, volledige herschrijving, why_this_works
+      const ingredientsToRemove =
+        violationChoices
+          ?.map((vc, i) =>
+            vc.choice === 'remove' ? violations[i]?.ingredientName : null,
+          )
+          .filter((n): n is string => Boolean(n)) ?? [];
+      draft = await generateRecipeAdaptationWithGemini(
+        recipe,
+        violations,
+        ruleset,
+        dietName,
+        ingredientsToRemove.length > 0 ? { ingredientsToRemove } : undefined,
       );
-      const GEMINI_ADAPTATION_TIMEOUT_MS = 45_000;
-      let geminiTimeoutId: ReturnType<typeof setTimeout>;
-      try {
-        draft = await Promise.race([
-          generateRecipeAdaptationWithGemini(
-            recipe,
-            violations,
-            ruleset,
-            dietName,
-          ).finally(() => clearTimeout(geminiTimeoutId)),
-          new Promise<RecipeAdaptationDraft>((_, reject) => {
-            geminiTimeoutId = setTimeout(
-              () =>
-                reject(
-                  new Error(
-                    'Gemini-aanpassing duurde te lang; gebruik simpele vervangingen.',
-                  ),
-                ),
-              GEMINI_ADAPTATION_TIMEOUT_MS,
-            );
-          }),
-        ]);
-        console.log(
-          `[RecipeAdaptation] Gemini adaptation completed successfully`,
-        );
-      } catch (error) {
-        console.error(
-          `[RecipeAdaptation] Gemini adaptation failed, falling back to simple rewrite:`,
-          error,
-        );
-        // Fallback to simple rewrite if Gemini fails
-        const rewrite = this.generateRewrite(
-          recipe,
-          violations,
-          ruleset,
-          strict,
-        );
-        const summary =
-          violations.length === 0
-            ? 'Geen afwijkingen gevonden! Dit recept past perfect bij jouw dieet.'
-            : `${violations.length} ingrediënt${violations.length !== 1 ? 'en' : ''} wijk${violations.length !== 1 ? 'en' : 't'} af van je dieetvoorkeuren. Hieronder vind je aangepaste alternatieven.`;
-
-        draft = {
-          analysis: {
-            violations,
-            summary,
-          },
-          rewrite: {
-            title: strict
-              ? `Aangepast: ${recipe.mealName}`
-              : `Aangepast: ${recipe.mealName}`,
-            ingredients: rewrite.ingredients,
-            steps: rewrite.steps,
-          },
-          confidence:
-            violations.length === 0
-              ? 1.0
-              : Math.max(0.7, 1.0 - violations.length * 0.1),
-          openQuestions: violations.length > 0 ? [] : undefined,
-        };
-      }
     } else {
-      // No violations, use simple rewrite
-      console.log(
-        `[RecipeAdaptation] No violations found, using simple rewrite`,
-      );
-      const rewrite = this.generateRewrite(recipe, violations, ruleset, strict);
+      // Geen afwijkingen: geen AI-call, alleen samenvatting
       const summary =
         'Geen afwijkingen gevonden! Dit recept past perfect bij jouw dieet.';
-
       draft = {
-        analysis: {
-          violations,
-          summary,
-        },
+        analysis: { violations, summary },
         rewrite: {
           title: `Aangepast: ${recipe.mealName}`,
-          ingredients: rewrite.ingredients,
-          steps: rewrite.steps,
+          ingredients: recipe.mealData?.ingredientRefs?.length
+            ? (recipe.mealData.ingredientRefs as any[]).map((ing: any) => ({
+                name:
+                  ing.displayName ||
+                  ing.name ||
+                  ing.original_line ||
+                  String(ing),
+                quantity: String(
+                  ing.quantityG ?? ing.quantity ?? ing.amount ?? '',
+                ).trim(),
+                unit: (ing.unit ?? '').trim() || undefined,
+                note: ing.note ?? ing.notes ?? undefined,
+              }))
+            : (recipe.mealData?.ingredients ?? []).map((ing: any) => ({
+                name: ing.name || ing.original_line || String(ing),
+                quantity: String(ing.quantity ?? ing.amount ?? '').trim(),
+                unit: (ing.unit ?? '').trim() || undefined,
+                note: ing.note ?? ing.notes ?? undefined,
+              })),
+          steps: recipe.steps.map((step, index) => ({
+            step: index + 1,
+            text: typeof step === 'string' ? step : String(step),
+          })),
         },
         confidence: 1.0,
-        openQuestions: undefined,
       };
     }
 

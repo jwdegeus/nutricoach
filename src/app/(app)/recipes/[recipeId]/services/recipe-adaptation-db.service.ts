@@ -34,6 +34,8 @@ export type RecipeAdaptationRecord = {
   analysisViolations: ViolationDetail[];
   rewriteIngredients: IngredientLine[];
   rewriteSteps: StepLine[];
+  rewriteIntro: string | null;
+  rewriteWhyThisWorks: string[];
   nutritionEstimate: any | null;
   confidence: number | null;
   openQuestions: string[];
@@ -107,7 +109,7 @@ export class RecipeAdaptationDbService {
 
     const adaptation = input.adaptation;
 
-    const insertData = {
+    const baseData = {
       user_id: input.userId,
       recipe_id: input.recipeId,
       diet_id: input.dietId,
@@ -123,6 +125,18 @@ export class RecipeAdaptationDbService {
       open_questions: adaptation.openQuestions || [],
     };
 
+    const insertDataWithIntro = {
+      ...baseData,
+      rewrite_intro: adaptation.rewrite.intro ?? null,
+      rewrite_why_this_works: (adaptation.rewrite.whyThisWorks ?? []) as any,
+    };
+
+    const isSchemaCacheError = (err: { message?: string }) =>
+      typeof err?.message === 'string' &&
+      (err.message.includes("Could not find the 'rewrite_intro' column") ||
+        err.message.includes('rewrite_intro') ||
+        err.message.includes('rewrite_why_this_works'));
+
     // Try to find existing adaptation
     const { data: existing } = await supabase
       .from('recipe_adaptations')
@@ -132,34 +146,40 @@ export class RecipeAdaptationDbService {
       .eq('diet_id', input.dietId)
       .maybeSingle();
 
-    let result;
-    if (existing) {
-      // Update existing
-      const { data: updatedData, error } = await supabase
-        .from('recipe_adaptations')
-        .update(insertData)
-        .eq('id', existing.id)
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(`Failed to update recipe adaptation: ${error.message}`);
+    let result: any;
+    const tryUpsert = (
+      data: typeof baseData & Partial<Record<string, unknown>>,
+    ) => {
+      if (existing) {
+        return supabase
+          .from('recipe_adaptations')
+          .update(data)
+          .eq('id', existing.id)
+          .select()
+          .single();
       }
+      return supabase.from('recipe_adaptations').insert(data).select().single();
+    };
 
-      result = updatedData;
+    const { data: dataWithIntro, error: errorWithIntro } =
+      await tryUpsert(insertDataWithIntro);
+
+    if (!errorWithIntro) {
+      result = dataWithIntro;
+    } else if (isSchemaCacheError(errorWithIntro)) {
+      // Kolommen bestaan nog niet (migratie 20260201000002 niet uitgevoerd): opslaan zonder intro/whyThisWorks
+      const { data: dataFallback, error: errorFallback } =
+        await tryUpsert(baseData);
+      if (errorFallback) {
+        throw new Error(
+          `Failed to update recipe adaptation: ${errorFallback.message}`,
+        );
+      }
+      result = dataFallback;
     } else {
-      // Insert new
-      const { data: insertedData, error } = await supabase
-        .from('recipe_adaptations')
-        .insert(insertData)
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(`Failed to create recipe adaptation: ${error.message}`);
-      }
-
-      result = insertedData;
+      throw new Error(
+        `Failed to update recipe adaptation: ${errorWithIntro.message}`,
+      );
     }
 
     return this.mapToRecord(result);
@@ -335,6 +355,76 @@ export class RecipeAdaptationDbService {
   }
 
   /**
+   * Get the applied adaptation for a recipe (if any)
+   *
+   * @param recipeId - Recipe ID (meal id)
+   * @param userId - User ID
+   * @returns Recipe adaptation record with status 'applied' or null
+   */
+  async getAppliedAdaptationForRecipe(
+    recipeId: string,
+    userId: string,
+  ): Promise<RecipeAdaptationRecord | null> {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from('recipe_adaptations')
+      .select('*')
+      .eq('recipe_id', recipeId)
+      .eq('user_id', userId)
+      .eq('status', 'applied')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Failed to get applied adaptation: ${error.message}`);
+    }
+
+    return data ? this.mapToRecord(data) : null;
+  }
+
+  /**
+   * Delete a recipe adaptation and its runs
+   *
+   * @param adaptationId - Adaptation ID
+   * @param userId - User ID (for authorization)
+   */
+  async deleteAdaptation(adaptationId: string, userId: string): Promise<void> {
+    const supabase = await createClient();
+
+    const { data: adaptation } = await supabase
+      .from('recipe_adaptations')
+      .select('id')
+      .eq('id', adaptationId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!adaptation) {
+      throw new Error('Adaptation not found or access denied');
+    }
+
+    const { error: runsError } = await supabase
+      .from('recipe_adaptation_runs')
+      .delete()
+      .eq('recipe_adaptation_id', adaptationId);
+
+    if (runsError) {
+      throw new Error(`Failed to delete adaptation runs: ${runsError.message}`);
+    }
+
+    const { error: adaptError } = await supabase
+      .from('recipe_adaptations')
+      .delete()
+      .eq('id', adaptationId)
+      .eq('user_id', userId);
+
+    if (adaptError) {
+      throw new Error(`Failed to delete adaptation: ${adaptError.message}`);
+    }
+  }
+
+  /**
    * Map database row to RecipeAdaptationRecord
    */
   private mapToRecord(row: any): RecipeAdaptationRecord {
@@ -350,6 +440,10 @@ export class RecipeAdaptationDbService {
       analysisViolations: (row.analysis_violations || []) as ViolationDetail[],
       rewriteIngredients: (row.rewrite_ingredients || []) as IngredientLine[],
       rewriteSteps: (row.rewrite_steps || []) as StepLine[],
+      rewriteIntro: row.rewrite_intro ?? null,
+      rewriteWhyThisWorks: Array.isArray(row.rewrite_why_this_works)
+        ? (row.rewrite_why_this_works as string[])
+        : [],
       nutritionEstimate: row.nutrition_estimate,
       confidence: row.confidence ? Number(row.confidence) : null,
       openQuestions: (row.open_questions || []) as string[],

@@ -33,6 +33,10 @@ export type RecipeAnalysis = {
 export type RecipeRewrite = {
   ingredients: AdaptedIngredient[];
   steps: AdaptedStep[];
+  /** Intro-tekst bovenaan de aangepaste versie (bv. "Om dit recept Wahls Paleo proof te maken..."). */
+  intro?: string;
+  /** Bullets met gezondheidsvoordelen binnen het dieet ("Waarom dit werkt"). */
+  whyThisWorks?: string[];
 };
 
 export type RecipeAIData = {
@@ -70,6 +74,11 @@ export type RecipeAIState =
 // ============================================================================
 
 /**
+ * Keuze per violation: toegestaan alternatief gebruiken, vervangen door substitute, of schrappen.
+ */
+export type ViolationChoice = 'use_allowed' | 'substitute' | 'remove';
+
+/**
  * Input for requesting recipe adaptation
  */
 export type RequestRecipeAdaptationInput = {
@@ -80,6 +89,8 @@ export type RequestRecipeAdaptationInput = {
   existingAnalysis?: {
     violations: ViolationDetail[];
     recipeName: string;
+    /** Per violation-index: keuze (Kies X / Vervang door Y / Schrappen). Lengte = violations.length. */
+    violationChoices?: Array<{ choice: ViolationChoice; substitute?: string }>;
   };
 };
 
@@ -115,6 +126,10 @@ export type ViolationDetail = {
   ruleCode: string;
   ruleLabel: string;
   suggestion: string;
+  /** Toegestaan alternatief in dezelfde regel (bv. "olijfolie" in "olijfolie of boter") – voor keuze "Kies X" */
+  allowedAlternativeInText?: string;
+  /** Verboden term die gematcht is (bv. "butter") – voor weergave en substitutie */
+  matchedForbiddenTerm?: string;
 };
 
 /**
@@ -162,6 +177,10 @@ export type RecipeAdaptationDraft = {
     title: string;
     ingredients: IngredientLine[];
     steps: StepLine[];
+    /** Intro-tekst bovenaan (Gemini "chef" uitleg). */
+    intro?: string;
+    /** Waarom dit werkt voor het dieet (bullets). */
+    whyThisWorks?: string[];
   };
   confidence?: number;
   openQuestions?: string[];
@@ -169,6 +188,22 @@ export type RecipeAdaptationDraft = {
   diagnostics?: {
     guardrailsVnext?: GuardrailsVNextDiagnostics;
   };
+};
+
+/**
+ * Structured output from Gemini recipe adaptation (responseMimeType: application/json).
+ * Gebruikt in gemini-recipe-adaptation.service voor type-veilige mapping.
+ */
+export type GeminiRecipeAdaptationResponse = {
+  intro: string;
+  adapted_ingredients: Array<{
+    name: string;
+    amount: string;
+    unit: string;
+    note: string;
+  }>;
+  adapted_steps: string[];
+  why_this_works: string[];
 };
 
 /**

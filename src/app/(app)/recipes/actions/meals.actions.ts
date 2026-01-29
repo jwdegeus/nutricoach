@@ -819,6 +819,114 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
 }
 
 /**
+ * Update recipe content (ingredients and preparation instructions).
+ * Updates only the active version; meal_data_original / ai_analysis_original stay unchanged.
+ */
+export async function updateRecipeContentAction(args: {
+  mealId: string;
+  source: 'custom' | 'gemini';
+  ingredients: Array<{
+    name: string;
+    quantity?: string | number | null;
+    unit?: string | null;
+    note?: string | null;
+  }>;
+  instructions: Array<{ step: number; text: string }>;
+}): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: {
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om receptgegevens bij te werken',
+        },
+      };
+    }
+
+    const tableName =
+      args.source === 'custom' ? 'custom_meals' : 'meal_history';
+
+    const { data: current, error: fetchError } = await supabase
+      .from(tableName)
+      .select('meal_data, ai_analysis')
+      .eq('id', args.mealId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (fetchError || !current) {
+      return {
+        ok: false,
+        error: {
+          code: fetchError ? 'DB_ERROR' : 'VALIDATION_ERROR',
+          message: fetchError?.message ?? 'Recept niet gevonden',
+        },
+      };
+    }
+
+    const currentMealData =
+      (current.meal_data as Record<string, unknown>) || {};
+    const currentAiAnalysis =
+      (current.ai_analysis as Record<string, unknown>) || {};
+
+    const updatedMealData = {
+      ...currentMealData,
+      ingredients: args.ingredients.map((ing) => ({
+        name: String(ing.name ?? '').trim(),
+        quantity: ing.quantity != null ? String(ing.quantity) : '',
+        unit: ing.unit != null && ing.unit !== '' ? String(ing.unit) : null,
+        note: ing.note != null && ing.note !== '' ? String(ing.note) : null,
+        original_line: String(ing.name ?? '').trim(),
+      })),
+      ingredientRefs: [],
+    };
+
+    const updatedAiAnalysis = {
+      ...currentAiAnalysis,
+      instructions: args.instructions.map((inst) => ({
+        step: inst.step,
+        text: String(inst.text ?? '').trim(),
+      })),
+    };
+
+    const { error: updateError } = await supabase
+      .from(tableName)
+      .update({
+        meal_data: updatedMealData,
+        ai_analysis: updatedAiAnalysis,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', args.mealId)
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      return {
+        ok: false,
+        error: {
+          code: 'DB_ERROR',
+          message: updateError.message,
+        },
+      };
+    }
+
+    return { ok: true, data: undefined };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+    };
+  }
+}
+
+/**
  * Get a single meal by ID (custom meal or meal history)
  */
 export async function getMealByIdAction(
@@ -933,6 +1041,7 @@ export async function getMealByIdAction(
           mealSlot: data.meal_slot,
           dietKey: data.diet_key,
           mealData: data.meal_data,
+          aiAnalysis: data.ai_analysis ?? null,
           userRating: data.user_rating,
           nutritionScore: data.nutrition_score,
           varietyScore: data.variety_score,

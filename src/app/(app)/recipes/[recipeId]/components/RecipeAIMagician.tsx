@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/catalyst/button';
 import { Text } from '@/components/catalyst/text';
 import { Badge } from '@/components/catalyst/badge';
-import { Checkbox } from '@/components/catalyst/checkbox';
+import { RadioGroup, Radio } from '@/components/catalyst/radio';
 import {
   SparklesIcon,
   ExclamationTriangleIcon,
@@ -32,6 +32,7 @@ import type {
   RecipeAIData,
   RecipeAdaptationDraft,
   ViolationDetail,
+  ViolationChoice,
 } from '../recipe-ai.types';
 import { GuardrailsViolationCallout } from './GuardrailsViolationCallout';
 import { SoftWarningsCallout } from '@/src/app/(app)/components/SoftWarningsCallout';
@@ -83,6 +84,8 @@ function draftToAIData(draft: RecipeAdaptationDraft): RecipeAIData {
     rewrite: {
       ingredients: draft.rewrite.ingredients,
       steps: draft.rewrite.steps,
+      intro: draft.rewrite.intro,
+      whyThisWorks: draft.rewrite.whyThisWorks,
     },
   };
 }
@@ -111,9 +114,9 @@ export function RecipeAIMagician({
   const [currentDraft, setCurrentDraft] =
     useState<RecipeAdaptationDraft | null>(null);
   const [rewriteError, setRewriteError] = useState<string | null>(null);
-  /** Per index: false = niet laten vervangen. Ongespecificeerd = wel vervangen. */
-  const [replaceViolationByIndex, setReplaceViolationByIndex] = useState<
-    Record<number, boolean>
+  /** Per violation-index: keuze (Kies X / Vervang door Y / Schrappen uit menu). */
+  const [violationChoices, setViolationChoices] = useState<
+    Record<number, { choice: ViolationChoice }>
   >({});
 
   // Load diet ID when dialog opens
@@ -141,7 +144,7 @@ export function RecipeAIMagician({
       setGuardrailsViolation(null);
       setCurrentDraft(null);
       setRewriteError(null);
-      setReplaceViolationByIndex({});
+      setViolationChoices({});
     }
   }, [open]);
 
@@ -207,6 +210,13 @@ export function RecipeAIMagician({
           type: 'analysis_only',
           data: result.data,
         });
+        const defaults: Record<number, { choice: ViolationChoice }> = {};
+        result.data.violations.forEach((v, i) => {
+          defaults[i] = {
+            choice: v.allowedAlternativeInText ? 'use_allowed' : 'substitute',
+          };
+        });
+        setViolationChoices(defaults);
       } else {
         if (
           result.error.code === 'NO_DIET_SELECTED' ||
@@ -252,9 +262,12 @@ export function RecipeAIMagician({
               };
             }
           ).data;
-    const violationsToReplace = analysisData.violations.filter(
-      (_, i) => replaceViolationByIndex[i] !== false,
-    );
+    const choicesArray = analysisData.violations.map((v, i) => ({
+      choice:
+        violationChoices[i]?.choice ??
+        (v.allowedAlternativeInText ? 'use_allowed' : 'substitute'),
+      substitute: undefined,
+    }));
     setRewriteError(null);
     setPersistError(null);
     setApplyError(null);
@@ -268,14 +281,16 @@ export function RecipeAIMagician({
         recipeId,
         dietId,
         existingAnalysis: {
-          violations: violationsToReplace,
+          violations: analysisData.violations,
           recipeName: analysisData.recipeName,
+          violationChoices: choicesArray,
         },
       });
 
       if (result.outcome === 'success') {
         const data = draftToAIData(result.adaptation);
         setState({ type: 'success', data });
+        setActiveTab('rewrite');
         setCurrentDraft(result.adaptation);
         setIsPersisting(true);
         try {
@@ -381,11 +396,10 @@ export function RecipeAIMagician({
       </DialogDescription>
 
       <DialogBody>
-        {/* Tabs: tonen bij analyse-only, loading-rewrite, loading of success */}
+        {/* Tabs: tonen bij analyse-only, loading of success (niet bij loading_rewrite: dan alleen loader) */}
         {(state.type === 'success' ||
           state.type === 'loading' ||
-          state.type === 'analysis_only' ||
-          state.type === 'loading_rewrite') && (
+          state.type === 'analysis_only') && (
           <div
             className="border-b border-zinc-200 dark:border-zinc-800 mb-6"
             role="tablist"
@@ -419,7 +433,6 @@ export function RecipeAIMagician({
                 disabled={
                   state.type === 'loading' ||
                   state.type === 'analysis_only' ||
-                  state.type === 'loading_rewrite' ||
                   (state.type === 'success' && !state.data.rewrite)
                 }
               >
@@ -448,7 +461,7 @@ export function RecipeAIMagician({
           </div>
         )}
 
-        {/* Loading State */}
+        {/* Loading State - analyse */}
         {state.type === 'loading' && (
           <div className="space-y-4 py-6">
             <div className="text-center">
@@ -462,6 +475,29 @@ export function RecipeAIMagician({
               <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-3/4 animate-pulse" />
               <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-1/2 animate-pulse" />
               <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-5/6 animate-pulse" />
+            </div>
+          </div>
+        )}
+
+        {/* Loading State - Gemini zoekt alternatieven voor geselecteerde producten */}
+        {state.type === 'loading_rewrite' && (
+          <div className="space-y-4 py-8">
+            <div className="text-center">
+              <ArrowPathIcon
+                className="h-14 w-14 text-blue-500 dark:text-blue-400 mx-auto mb-4 animate-spin"
+                aria-hidden
+              />
+              <Text className="text-zinc-700 dark:text-zinc-300 font-medium block mb-1">
+                Gemini zoekt alternatieven voor de geselecteerde producten
+              </Text>
+              <Text className="text-sm text-zinc-500 dark:text-zinc-400">
+                Dit kan even duren…
+              </Text>
+            </div>
+            <div className="space-y-2 mt-6 max-w-sm mx-auto" aria-hidden>
+              <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full animate-pulse" />
+              <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full animate-pulse w-4/5 mx-auto" />
+              <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full animate-pulse w-3/5 mx-auto" />
             </div>
           </div>
         )}
@@ -500,174 +536,187 @@ export function RecipeAIMagician({
           </div>
         )}
 
-        {/* Analyse-tab content: analysis_only of loading_rewrite (fase 1) */}
-        {(state.type === 'analysis_only' || state.type === 'loading_rewrite') &&
-          activeTab === 'analyse' && (
-            <div
-              className="space-y-4 py-2"
-              role="tabpanel"
-              id="analyse-panel"
-              aria-labelledby="analyse-tab"
-            >
-              {'noRulesConfigured' in state.data &&
-              state.data.noRulesConfigured ? (
-                <div className="space-y-4 py-2">
-                  <div className="text-center py-8 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
-                    <ExclamationTriangleIcon className="h-12 w-12 text-amber-500 dark:text-amber-400 mx-auto mb-4" />
-                    <Text className="text-zinc-700 dark:text-zinc-300 font-medium mb-2">
-                      Geen dieetregels geconfigureerd
-                    </Text>
-                    <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                      Er zijn geen dieetregels ingesteld voor dit dieet. Voeg
-                      regels toe via Instellingen → Dieettype bewerken →
-                      Dieetregels om afwijkingen te kunnen controleren.
-                    </Text>
-                  </div>
+        {/* Analyse-tab content: alleen bij analysis_only (loading_rewrite heeft eigen loader) */}
+        {state.type === 'analysis_only' && activeTab === 'analyse' && (
+          <div
+            className="space-y-4 py-2"
+            role="tabpanel"
+            id="analyse-panel"
+            aria-labelledby="analyse-tab"
+          >
+            {'noRulesConfigured' in state.data &&
+            state.data.noRulesConfigured ? (
+              <div className="space-y-4 py-2">
+                <div className="text-center py-8 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+                  <ExclamationTriangleIcon className="h-12 w-12 text-amber-500 dark:text-amber-400 mx-auto mb-4" />
+                  <Text className="text-zinc-700 dark:text-zinc-300 font-medium mb-2">
+                    Geen dieetregels geconfigureerd
+                  </Text>
+                  <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                    Er zijn geen dieetregels ingesteld voor dit dieet. Voeg
+                    regels toe via Instellingen → Dieettype bewerken →
+                    Dieetregels om afwijkingen te kunnen controleren.
+                  </Text>
                 </div>
-              ) : state.data.violations.length > 0 ? (
-                <>
-                  <div className="flex items-center gap-2 mb-4">
-                    <ExclamationTriangleIcon className="h-5 w-5 text-amber-500 dark:text-amber-400" />
-                    <Text className="font-semibold text-zinc-900 dark:text-white">
-                      {state.data.violations.length}{' '}
-                      {state.data.violations.length === 1
-                        ? 'afwijking gevonden'
-                        : 'afwijkingen gevonden'}
-                    </Text>
-                  </div>
-                  <div
-                    className="max-h-[min(40vh,320px)] overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-800 p-1 space-y-4 pr-2"
-                    role="region"
-                    aria-label="Afwijkingsmeldingen"
-                  >
-                    {state.data.violations.map((violation, idx) => {
-                      const severity = getViolationSeverity(violation);
-                      const replaceChecked =
-                        replaceViolationByIndex[idx] !== false;
-                      return (
-                        <div
-                          key={idx}
-                          className={`rounded-lg border p-4 ${
-                            severity.level === 'verboden'
-                              ? 'border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-950/30'
-                              : severity.level === 'beter_van_niet'
-                                ? 'border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-950/20'
-                                : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50'
-                          }`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="flex-1 space-y-2 min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Badge
-                                  color={
-                                    severity.level === 'verboden'
-                                      ? 'red'
-                                      : severity.level === 'beter_van_niet'
-                                        ? 'amber'
-                                        : 'zinc'
-                                  }
-                                  className="text-xs"
-                                >
-                                  {severity.label}
-                                </Badge>
-                                <Badge color="red" className="text-xs">
-                                  {violation.ingredientName}
-                                </Badge>
-                              </div>
-                              <div>
-                                <Text className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                  Regel
-                                </Text>
-                                <Text className="text-sm text-zinc-900 dark:text-white">
-                                  {violation.ruleLabel}
-                                </Text>
-                              </div>
-                              <div>
-                                <Text className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                                  Advies uit dieetregels
-                                </Text>
-                                <Text className="text-sm text-zinc-700 dark:text-zinc-300">
-                                  {violation.suggestion}
-                                </Text>
-                              </div>
-                              <label className="flex items-center gap-2 cursor-pointer mt-3">
-                                <Checkbox
-                                  checked={replaceChecked}
-                                  onChange={(checked) =>
-                                    setReplaceViolationByIndex((prev) => ({
-                                      ...prev,
-                                      [idx]: checked,
-                                    }))
-                                  }
-                                  color="dark/zinc"
-                                />
-                                <Text className="text-sm text-zinc-700 dark:text-zinc-300">
-                                  Vervangen in aangepaste versie
-                                </Text>
-                              </label>
+              </div>
+            ) : state.data.violations.length > 0 ? (
+              <>
+                <div className="flex items-center gap-2 mb-4">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-amber-500 dark:text-amber-400" />
+                  <Text className="font-semibold text-zinc-900 dark:text-white">
+                    {state.data.violations.length}{' '}
+                    {state.data.violations.length === 1
+                      ? 'afwijking gevonden'
+                      : 'afwijkingen gevonden'}
+                  </Text>
+                </div>
+                <div
+                  className="max-h-[min(40vh,320px)] overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-800 p-1 space-y-4 pr-2"
+                  role="region"
+                  aria-label="Afwijkingsmeldingen"
+                >
+                  {state.data.violations.map((violation, idx) => {
+                    const severity = getViolationSeverity(violation);
+                    const choice =
+                      violationChoices[idx]?.choice ??
+                      (violation.allowedAlternativeInText
+                        ? 'use_allowed'
+                        : 'substitute');
+                    const hasAllowed =
+                      !!violation.allowedAlternativeInText?.trim();
+                    return (
+                      <div
+                        key={idx}
+                        className={`rounded-lg border p-4 ${
+                          severity.level === 'verboden'
+                            ? 'border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-950/30'
+                            : severity.level === 'beter_van_niet'
+                              ? 'border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-950/20'
+                              : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1 space-y-2 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge
+                                color={
+                                  severity.level === 'verboden'
+                                    ? 'red'
+                                    : severity.level === 'beter_van_niet'
+                                      ? 'amber'
+                                      : 'zinc'
+                                }
+                                className="text-xs"
+                              >
+                                {severity.label}
+                              </Badge>
+                              <Badge color="red" className="text-xs">
+                                {violation.ingredientName}
+                              </Badge>
+                            </div>
+                            <div>
+                              <Text className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                Regel
+                              </Text>
+                              <Text className="text-sm text-zinc-900 dark:text-white">
+                                {violation.ruleLabel}
+                              </Text>
+                            </div>
+                            <div>
+                              <Text className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                Advies uit dieetregels
+                              </Text>
+                              <Text className="text-sm text-zinc-700 dark:text-zinc-300">
+                                {violation.suggestion}
+                              </Text>
+                            </div>
+                            <div className="mt-3">
+                              <Text className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-2 block">
+                                Jouw keuze
+                              </Text>
+                              <RadioGroup
+                                value={choice}
+                                onChange={(value: string) =>
+                                  setViolationChoices((prev) => ({
+                                    ...prev,
+                                    [idx]: {
+                                      choice: value as ViolationChoice,
+                                    },
+                                  }))
+                                }
+                                className="space-y-2"
+                              >
+                                {hasAllowed && (
+                                  <label className="flex items-center gap-2 cursor-pointer">
+                                    <Radio
+                                      value="use_allowed"
+                                      color="dark/zinc"
+                                    />
+                                    <Text className="text-sm text-zinc-700 dark:text-zinc-300">
+                                      Kies{' '}
+                                      <span className="font-medium text-zinc-900 dark:text-white">
+                                        {violation.allowedAlternativeInText}
+                                      </span>
+                                    </Text>
+                                  </label>
+                                )}
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <Radio value="substitute" color="dark/zinc" />
+                                  <Text className="text-sm text-zinc-700 dark:text-zinc-300">
+                                    Vervang door advies uit dieetregels
+                                  </Text>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <Radio value="remove" color="dark/zinc" />
+                                  <Text className="text-sm text-zinc-700 dark:text-zinc-300">
+                                    Schrappen uit het menu
+                                  </Text>
+                                </label>
+                              </RadioGroup>
                             </div>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                  <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
-                    {state.type === 'loading_rewrite' ? (
-                      <div className="flex items-center justify-center gap-2 py-4">
-                        <ArrowPathIcon className="h-5 w-5 text-blue-500 dark:text-blue-400 animate-spin" />
-                        <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                          Aangepaste versie wordt gegenereerd...
-                        </Text>
                       </div>
-                    ) : (
-                      <>
-                        {rewriteError && (
-                          <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-3 mb-4">
-                            <div className="flex items-start gap-2">
-                              <ExclamationTriangleIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                              <Text className="text-sm text-amber-800 dark:text-amber-200">
-                                {rewriteError}
-                              </Text>
-                            </div>
-                          </div>
-                        )}
-                        {state.data.violations.filter(
-                          (_, i) => replaceViolationByIndex[i] !== false,
-                        ).length === 0 && (
-                          <Text className="text-xs text-amber-600 dark:text-amber-400 mb-2">
-                            Vink ten minste één afwijking aan om te laten
-                            vervangen.
-                          </Text>
-                        )}
-                        <Button
-                          onClick={handleGenerateRewrite}
-                          className="w-full"
-                          disabled={
-                            state.data.violations.filter(
-                              (_, i) => replaceViolationByIndex[i] !== false,
-                            ).length === 0
-                          }
-                        >
-                          <SparklesIcon data-slot="icon" />
-                          Genereer aangepaste versie
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="space-y-4 py-2">
-                  <div className="text-center py-8">
-                    <CheckCircleIcon className="h-12 w-12 text-green-500 dark:text-green-400 mx-auto mb-4" />
-                    <Text className="text-zinc-600 dark:text-zinc-400">
-                      Geen afwijkingen gevonden! Dit recept past perfect bij
-                      jouw dieet.
-                    </Text>
-                  </div>
+                    );
+                  })}
                 </div>
-              )}
-            </div>
-          )}
+                <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                  {
+                    <>
+                      {rewriteError && (
+                        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-3 mb-4">
+                          <div className="flex items-start gap-2">
+                            <ExclamationTriangleIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                            <Text className="text-sm text-amber-800 dark:text-amber-200">
+                              {rewriteError}
+                            </Text>
+                          </div>
+                        </div>
+                      )}
+                      <Button
+                        onClick={handleGenerateRewrite}
+                        className="w-full"
+                      >
+                        <SparklesIcon data-slot="icon" />
+                        Genereer aangepaste versie
+                      </Button>
+                    </>
+                  }
+                </div>
+              </>
+            ) : (
+              <div className="space-y-4 py-2">
+                <div className="text-center py-8">
+                  <CheckCircleIcon className="h-12 w-12 text-green-500 dark:text-green-400 mx-auto mb-4" />
+                  <Text className="text-zinc-600 dark:text-zinc-400">
+                    Geen afwijkingen gevonden! Dit recept past perfect bij jouw
+                    dieet.
+                  </Text>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Success State - Analyse Tab */}
         {state.type === 'success' && activeTab === 'analyse' && (
@@ -767,111 +816,150 @@ export function RecipeAIMagician({
           activeTab === 'rewrite' &&
           state.data.rewrite && (
             <div
-              className="space-y-6 py-2"
+              className="flex flex-col min-h-0 max-h-[65vh] py-2"
               role="tabpanel"
               id="rewrite-panel"
               aria-labelledby="rewrite-tab"
             >
-              {/* Ingredients */}
-              <div>
-                <Text className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
-                  Aangepaste ingrediënten
-                </Text>
-                <ul className="space-y-2">
-                  {state.data.rewrite.ingredients.map((ingredient, idx) => (
-                    <li
-                      key={idx}
-                      className="text-sm text-zinc-600 dark:text-zinc-400 flex items-start gap-2"
-                    >
-                      <span className="text-zinc-400 dark:text-zinc-500">
-                        •
-                      </span>
-                      <span>
-                        <span className="font-medium text-zinc-900 dark:text-white">
-                          {ingredient.name}
-                        </span>
-                        {ingredient.quantity && (
-                          <>
-                            : {ingredient.quantity}
-                            {ingredient.unit && ` ${ingredient.unit}`}
-                          </>
-                        )}
-                        {ingredient.note && (
-                          <span className="text-zinc-500 dark:text-zinc-500 ml-1">
-                            ({ingredient.note})
-                          </span>
-                        )}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {/* Scrollbare inhoud: intro, ingrediënten, stappen, waarom, meldingen */}
+              <div className="overflow-y-auto flex-1 min-h-0 space-y-6 pr-1 -mr-1">
+                {/* Intro (Gemini "chef" uitleg) */}
+                {state.data.rewrite.intro && (
+                  <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4">
+                    <Text className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
+                      {state.data.rewrite.intro}
+                    </Text>
+                  </div>
+                )}
 
-              {/* Steps */}
-              {state.data.rewrite.steps.length > 0 && (
+                {/* Ingredients */}
                 <div>
                   <Text className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
-                    Aangepaste bereidingswijze
+                    Aangepaste ingrediënten
                   </Text>
-                  <ol className="space-y-3">
-                    {state.data.rewrite.steps.map((step, index) => (
+                  <ul className="space-y-2">
+                    {state.data.rewrite.ingredients.map((ingredient, idx) => (
                       <li
-                        key={`step-${index}`}
-                        className="flex gap-3 text-sm text-zinc-600 dark:text-zinc-400"
+                        key={idx}
+                        className="text-sm text-zinc-600 dark:text-zinc-400 flex items-start gap-2"
                       >
-                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-medium text-xs">
-                          {step.step}
+                        <span className="text-zinc-400 dark:text-zinc-500">
+                          •
                         </span>
-                        <span className="flex-1 pt-0.5">{step.text}</span>
+                        <span>
+                          <span className="font-medium text-zinc-900 dark:text-white">
+                            {ingredient.name}
+                          </span>
+                          {ingredient.quantity && (
+                            <>
+                              : {ingredient.quantity}
+                              {ingredient.unit && ` ${ingredient.unit}`}
+                            </>
+                          )}
+                          {ingredient.note && (
+                            <span className="text-zinc-500 dark:text-zinc-500 ml-1 italic">
+                              ({ingredient.note})
+                            </span>
+                          )}
+                        </span>
                       </li>
                     ))}
-                  </ol>
+                  </ul>
                 </div>
-              )}
 
-              {/* Persist Error Alert */}
-              {persistError && (
-                <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-3">
-                  <div className="flex items-start gap-2">
-                    <ExclamationTriangleIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <Text className="text-xs text-amber-800 dark:text-amber-200">
-                        Kon niet automatisch opslaan: {persistError}
+                {/* Steps */}
+                {state.data.rewrite.steps.length > 0 && (
+                  <div>
+                    <Text className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
+                      Aangepaste bereidingswijze
+                    </Text>
+                    <ol className="space-y-3">
+                      {state.data.rewrite.steps.map((step, index) => (
+                        <li
+                          key={`step-${index}`}
+                          className="flex gap-3 text-sm text-zinc-600 dark:text-zinc-400"
+                        >
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-medium text-xs">
+                            {step.step}
+                          </span>
+                          <span className="flex-1 pt-0.5">{step.text}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                {/* Waarom dit werkt (coach-blok) */}
+                {state.data.rewrite.whyThisWorks &&
+                  state.data.rewrite.whyThisWorks.length > 0 && (
+                    <div
+                      className="rounded-lg border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/80 dark:bg-emerald-950/30 p-4"
+                      role="region"
+                      aria-label="Waarom dit werkt voor jouw dieet"
+                    >
+                      <Text className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mb-3">
+                        Waarom dit werkt voor jouw dieet
                       </Text>
+                      <ul className="space-y-1.5">
+                        {state.data.rewrite.whyThisWorks.map((bullet, idx) => (
+                          <li
+                            key={idx}
+                            className="text-sm text-emerald-800 dark:text-emerald-200 flex items-start gap-2"
+                          >
+                            <span className="text-emerald-500 dark:text-emerald-400 mt-0.5">
+                              •
+                            </span>
+                            <span>{bullet}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                {/* Persist Error Alert */}
+                {persistError && (
+                  <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-3">
+                    <div className="flex items-start gap-2">
+                      <ExclamationTriangleIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <Text className="text-xs text-amber-800 dark:text-amber-200">
+                          Kon niet automatisch opslaan: {persistError}
+                        </Text>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Soft Warnings (non-blocking) */}
-              {currentDraft?.diagnostics?.guardrailsVnext?.outcome ===
-                'warned' && (
-                <SoftWarningsCallout
-                  reasonCodes={
-                    currentDraft.diagnostics.guardrailsVnext.reasonCodes
-                  }
-                  dietTypeId={dietId || undefined}
-                  contentHash={
-                    currentDraft.diagnostics.guardrailsVnext.contentHash
-                  }
-                />
-              )}
-
-              {/* Guardrails Violation Callout */}
-              {guardrailsViolation && (
-                <div className="mt-4">
-                  <GuardrailsViolationCallout
-                    reasonCodes={guardrailsViolation.reasonCodes}
-                    contentHash={guardrailsViolation.contentHash}
-                    rulesetVersion={guardrailsViolation.rulesetVersion}
-                    dietId={dietId || undefined}
-                    onDismiss={() => setGuardrailsViolation(null)}
+                {/* Soft Warnings (non-blocking) */}
+                {currentDraft?.diagnostics?.guardrailsVnext?.outcome ===
+                  'warned' && (
+                  <SoftWarningsCallout
+                    reasonCodes={
+                      currentDraft.diagnostics.guardrailsVnext.reasonCodes
+                    }
+                    dietTypeId={dietId || undefined}
+                    contentHash={
+                      currentDraft.diagnostics.guardrailsVnext.contentHash
+                    }
                   />
-                </div>
-              )}
+                )}
 
-              {/* Persist Success / Apply Section */}
-              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                {/* Guardrails Violation Callout */}
+                {guardrailsViolation && (
+                  <div className="mt-4">
+                    <GuardrailsViolationCallout
+                      reasonCodes={guardrailsViolation.reasonCodes}
+                      contentHash={guardrailsViolation.contentHash}
+                      rulesetVersion={guardrailsViolation.rulesetVersion}
+                      dietId={dietId || undefined}
+                      onDismiss={() => setGuardrailsViolation(null)}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Persist Success / Apply Section – vast onderaan */}
+              <div className="flex-shrink-0 pt-4 border-t border-zinc-200 dark:border-zinc-800 mt-4">
                 {isApplied ? (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 justify-center">

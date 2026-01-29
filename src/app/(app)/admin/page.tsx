@@ -34,6 +34,12 @@ async function getAdminStats() {
   const totalUsage =
     sources?.reduce((sum, s) => sum + (s.usage_count || 0), 0) || 0;
 
+  // Get NEVO and custom ingredients count
+  const [{ count: nevoCount }, { count: customCount }] = await Promise.all([
+    supabase.from('nevo_foods').select('*', { count: 'exact', head: true }),
+    supabase.from('custom_foods').select('*', { count: 'exact', head: true }),
+  ]);
+
   return {
     dietTypes: {
       total: totalDietTypes,
@@ -45,6 +51,10 @@ async function getAdminStats() {
       system: systemSources,
       user: userSources,
       totalUsage,
+    },
+    ingredients: {
+      nevo: nevoCount ?? 0,
+      custom: customCount ?? 0,
     },
   };
 }

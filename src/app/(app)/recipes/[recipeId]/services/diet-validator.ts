@@ -39,6 +39,7 @@ export type ValidationReport = {
     ruleCode?: string;
     ruleLabel?: string;
     substitutionSuggestions?: string[];
+    allowedAlternativeInText?: string;
   }>;
   summary: string;
 };
@@ -176,6 +177,59 @@ function _matchesSubstring(text: string, term: string): boolean {
 }
 
 /**
+ * Check if a short phrase (e.g. one part of "X of Y") matches any forbidden term.
+ * Used to detect allowed alternatives in combinations like "olijfolie of boter".
+ */
+function partMatchesAnyForbidden(part: string, ruleset: DietRuleset): boolean {
+  const lower = part.toLowerCase().trim();
+  if (!lower) return false;
+  for (const f of ruleset.forbidden) {
+    const term = f.term.toLowerCase();
+    if (lower === term || lower.includes(term)) return true;
+    for (const s of f.synonyms || []) {
+      const syn = s.toLowerCase();
+      if (lower === syn || lower.includes(syn)) return true;
+    }
+    const extra = (EXTRA_INGREDIENT_SYNONYMS[f.term] || []).map((x) =>
+      x.toLowerCase(),
+    );
+    if (extra.some((e) => lower === e || lower.includes(e))) return true;
+  }
+  return false;
+}
+
+/**
+ * If the ingredient text looks like "X of Y" or "X or Y" and one part is allowed,
+ * set allowedAlternativeInText on the last match so the UI can suggest "Kies X, of vervang Y door Z".
+ */
+function enrichLastMatchWithAllowedAlternative(
+  fullText: string,
+  ruleset: DietRuleset,
+  matches: Array<{
+    matched: string;
+    allowedAlternativeInText?: string;
+  }>,
+): void {
+  if (matches.length === 0) return;
+  const lower = fullText.toLowerCase();
+  if (!lower.includes(' of ') && !lower.includes(' or ')) return;
+  const parts = fullText
+    .split(/\s+of\s+|\s+or\s+/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return;
+  const last = matches[matches.length - 1];
+  const matchedLower = last.matched.toLowerCase();
+  for (const part of parts) {
+    const pl = part.toLowerCase();
+    if (pl.includes(matchedLower) || pl === matchedLower) continue;
+    if (partMatchesAnyForbidden(part, ruleset)) continue;
+    last.allowedAlternativeInText = part;
+    return;
+  }
+}
+
+/**
  * Check if text contains any forbidden terms
  *
  * Exported for use in recipe analysis (not just validation)
@@ -191,6 +245,7 @@ export function findForbiddenMatches(
   ruleCode: string;
   ruleLabel: string;
   substitutionSuggestions?: string[];
+  allowedAlternativeInText?: string;
 }> {
   const matches: Array<{
     term: string;
@@ -198,6 +253,7 @@ export function findForbiddenMatches(
     ruleCode: string;
     ruleLabel: string;
     substitutionSuggestions?: string[];
+    allowedAlternativeInText?: string;
   }> = [];
   const lowerText = normalizeForMatching(text);
 
@@ -226,6 +282,7 @@ export function findForbiddenMatches(
           ruleLabel: forbidden.ruleLabel,
           substitutionSuggestions: forbidden.substitutionSuggestions,
         });
+        enrichLastMatchWithAllowedAlternative(text, ruleset, matches);
         continue;
       }
 
@@ -244,6 +301,7 @@ export function findForbiddenMatches(
               ruleLabel: forbidden.ruleLabel,
               substitutionSuggestions: forbidden.substitutionSuggestions,
             });
+            enrichLastMatchWithAllowedAlternative(text, ruleset, matches);
             continue;
           }
         }
@@ -264,6 +322,9 @@ export function findForbiddenMatches(
         ruleLabel: forbidden.ruleLabel,
         substitutionSuggestions: forbidden.substitutionSuggestions,
       });
+      if (context === 'ingredients') {
+        enrichLastMatchWithAllowedAlternative(text, ruleset, matches);
+      }
       continue;
     }
 
@@ -301,6 +362,7 @@ export function findForbiddenMatches(
           ruleLabel: forbidden.ruleLabel,
           substitutionSuggestions: forbidden.substitutionSuggestions,
         });
+        enrichLastMatchWithAllowedAlternative(text, ruleset, matches);
         continue;
       }
     }
@@ -323,6 +385,7 @@ export function findForbiddenMatches(
             ruleLabel: forbidden.ruleLabel,
             substitutionSuggestions: forbidden.substitutionSuggestions,
           });
+          enrichLastMatchWithAllowedAlternative(text, ruleset, matches);
           break; // Only report once per forbidden term
         }
 
@@ -340,6 +403,9 @@ export function findForbiddenMatches(
             ruleLabel: forbidden.ruleLabel,
             substitutionSuggestions: forbidden.substitutionSuggestions,
           });
+          if (context === 'ingredients') {
+            enrichLastMatchWithAllowedAlternative(text, ruleset, matches);
+          }
           break; // Only report once per forbidden term
         }
       }
@@ -371,6 +437,7 @@ export function findForbiddenMatches(
             ruleLabel: forbidden.ruleLabel,
             substitutionSuggestions: forbidden.substitutionSuggestions,
           });
+          enrichLastMatchWithAllowedAlternative(text, ruleset, matches);
           break;
         }
       }
@@ -433,6 +500,7 @@ export function validateDraft(
         ruleCode: m.ruleCode,
         ruleLabel: m.ruleLabel,
         substitutionSuggestions: m.substitutionSuggestions,
+        allowedAlternativeInText: m.allowedAlternativeInText,
       })),
     );
 
@@ -451,6 +519,7 @@ export function validateDraft(
           ruleCode: m.ruleCode,
           ruleLabel: m.ruleLabel,
           substitutionSuggestions: m.substitutionSuggestions,
+          allowedAlternativeInText: m.allowedAlternativeInText,
         })),
       );
     }

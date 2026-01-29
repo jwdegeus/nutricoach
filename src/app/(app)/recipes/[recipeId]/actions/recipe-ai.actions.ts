@@ -24,9 +24,19 @@ const requestRecipeAdaptationInputSchema = z.object({
           ruleCode: z.string(),
           ruleLabel: z.string(),
           suggestion: z.string(),
+          allowedAlternativeInText: z.string().optional(),
+          matchedForbiddenTerm: z.string().optional(),
         }),
       ),
       recipeName: z.string(),
+      violationChoices: z
+        .array(
+          z.object({
+            choice: z.enum(['use_allowed', 'substitute', 'remove']),
+            substitute: z.string().optional(),
+          }),
+        )
+        .optional(),
     })
     .optional(),
 });

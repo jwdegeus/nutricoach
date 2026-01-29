@@ -27,6 +27,8 @@ export const geminiIngredientSchema = z.object({
   note: z
     .string()
     .nullable()
+    .optional()
+    .default(null)
     .describe('Optional note or additional information about the ingredient'),
 });
 
@@ -47,18 +49,24 @@ export const geminiTimesSchema = z.object({
     .int()
     .min(0)
     .nullable()
+    .optional()
+    .default(null)
     .describe('Preparation time in minutes'),
   cook_minutes: z
     .number()
     .int()
     .min(0)
     .nullable()
+    .optional()
+    .default(null)
     .describe('Cooking time in minutes'),
   total_minutes: z
     .number()
     .int()
     .min(0)
     .nullable()
+    .optional()
+    .default(null)
     .describe('Total time in minutes (prep + cook)'),
 });
 
