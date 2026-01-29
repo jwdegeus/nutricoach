@@ -74,8 +74,8 @@ export function SidebarLayout({
         {sidebar}
       </MobileSidebar>
 
-      {/* Navbar on mobile - fixed, same background as sidebar */}
-      <header className="sticky top-0 z-10 flex flex-col border-b border-zinc-200 bg-zinc-100 px-4 dark:border-zinc-800 dark:bg-zinc-950 lg:hidden">
+      {/* Navbar on mobile - same background as sidebar */}
+      <header className="sticky top-0 z-10 flex flex-col border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900 lg:hidden">
         <div className="flex items-center">
           <div className="py-2.5">
             <NavbarItem
@@ -90,9 +90,9 @@ export function SidebarLayout({
       </header>
 
       {/* Content – geen aparte kaart; vult de breedte enzelfde achtergrond als pagina */}
-      <main className="flex flex-1 flex-col pb-2 lg:min-w-0 lg:pt-2 lg:pr-2 lg:pl-64">
-        {/* Navbar on desktop - fixed, same background as sidebar */}
-        <header className="sticky top-0 z-10 hidden border-b border-zinc-200 bg-zinc-100 px-4 pt-2.5 dark:border-zinc-800 dark:bg-zinc-950 lg:block">
+      <main className="flex flex-1 flex-col pb-2 lg:min-w-0 lg:pr-2 lg:pl-64">
+        {/* Navbar on desktop - same background as sidebar */}
+        <header className="sticky top-0 z-10 hidden border-b border-zinc-200 bg-white px-4 pt-2.5 dark:border-zinc-800 dark:bg-zinc-900 lg:block">
           {navbar}
         </header>
         <div className="flex flex-1 flex-col gap-4 p-6 lg:p-8">

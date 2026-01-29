@@ -54,6 +54,7 @@ import { ThemeSwitcher } from './theme-switcher';
 import { PlanEditStatusIndicator } from './PlanEditStatusIndicator';
 import { useTranslations } from 'next-intl';
 import { RecipeImportModal } from '@/src/components/recipes/RecipeImportModal';
+import { ToastProvider } from './ToastContext';
 
 function AccountDropdownMenu({
   anchor,
@@ -192,113 +193,91 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
   const tCommon = useTranslations('common');
 
   return (
-    <SidebarLayout
-      navbar={
-        <Navbar>
-          <NavbarSpacer />
-          <NavbarSection>
-            <NavbarItem
-              href="/recipes/import"
-              aria-label={tCommon('addRecipe')}
-            >
-              <PhotoIcon />
-            </NavbarItem>
-            <NavbarItem
-              onClick={() => setIsImportModalOpen(true)}
-              aria-label="Recept importeren via URL"
-            >
-              <ArrowDownTrayIcon />
-            </NavbarItem>
-            <NavbarItem href="/search" aria-label={t('search')}>
-              <MagnifyingGlassIcon />
-            </NavbarItem>
-            <PlanEditStatusIndicator />
-            <NavbarItem href="/inbox" aria-label={t('inbox')}>
-              <InboxIcon />
-            </NavbarItem>
-            <ThemeSwitcher variant="navbar" />
-            {mounted && (
-              <Dropdown>
-                <DropdownButton as={NavbarItem}>
-                  <Avatar initials={initials} square />
-                </DropdownButton>
-                <AccountDropdownMenu
-                  anchor="bottom end"
-                  onLogout={handleLogout}
-                  isAdmin={isAdmin}
-                />
-              </Dropdown>
-            )}
-          </NavbarSection>
-        </Navbar>
-      }
-      sidebar={
-        <Sidebar>
-          <SidebarHeader>
-            <Dropdown>
-              <DropdownButton as={SidebarItem} className="lg:mb-2.5">
-                <Avatar initials="NC" />
-                <SidebarLabel>NutriCoach</SidebarLabel>
-                <ChevronDownIcon />
-              </DropdownButton>
-              <DropdownMenu
-                className="min-w-80 lg:min-w-64"
-                anchor="bottom start"
+    <ToastProvider>
+      <SidebarLayout
+        navbar={
+          <Navbar>
+            <NavbarSpacer />
+            <NavbarSection>
+              <NavbarItem
+                href="/recipes/import"
+                aria-label={tCommon('addRecipe')}
               >
-                <DropdownItem href="/settings">
-                  <Cog8ToothIcon />
-                  <DropdownLabel>{t('settings')}</DropdownLabel>
-                </DropdownItem>
-                <DropdownDivider />
-                <DropdownItem href="/dashboard">
-                  <Avatar data-slot="icon" initials="NC" />
-                  <DropdownLabel>NutriCoach</DropdownLabel>
-                </DropdownItem>
-                <DropdownDivider />
-                <DropdownItem href="/teams/create">
-                  <PlusIcon />
-                  <DropdownLabel>{tMenu('newTeam')}</DropdownLabel>
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-            <SidebarSection className="max-lg:hidden">
-              <SidebarItem href="/search">
+                <PhotoIcon />
+              </NavbarItem>
+              <NavbarItem
+                onClick={() => setIsImportModalOpen(true)}
+                aria-label="Recept importeren via URL"
+              >
+                <ArrowDownTrayIcon />
+              </NavbarItem>
+              <NavbarItem href="/search" aria-label={t('search')}>
                 <MagnifyingGlassIcon />
-                <SidebarLabel>{t('search')}</SidebarLabel>
-              </SidebarItem>
-              <SidebarItem href="/inbox">
+              </NavbarItem>
+              <PlanEditStatusIndicator />
+              <NavbarItem href="/inbox" aria-label={t('inbox')}>
                 <InboxIcon />
-                <SidebarLabel>{t('inbox')}</SidebarLabel>
-              </SidebarItem>
-            </SidebarSection>
-          </SidebarHeader>
+              </NavbarItem>
+              <ThemeSwitcher variant="navbar" />
+              {mounted && (
+                <Dropdown>
+                  <DropdownButton as={NavbarItem}>
+                    <Avatar initials={initials} square />
+                  </DropdownButton>
+                  <AccountDropdownMenu
+                    anchor="bottom end"
+                    onLogout={handleLogout}
+                    isAdmin={isAdmin}
+                  />
+                </Dropdown>
+              )}
+            </NavbarSection>
+          </Navbar>
+        }
+        sidebar={
+          <Sidebar>
+            <SidebarHeader>
+              <Dropdown>
+                <DropdownButton as={SidebarItem} className="lg:mb-2.5">
+                  <Avatar initials="NC" />
+                  <SidebarLabel>NutriCoach</SidebarLabel>
+                  <ChevronDownIcon />
+                </DropdownButton>
+                <DropdownMenu
+                  className="min-w-80 lg:min-w-64"
+                  anchor="bottom start"
+                >
+                  <DropdownItem href="/settings">
+                    <Cog8ToothIcon />
+                    <DropdownLabel>{t('settings')}</DropdownLabel>
+                  </DropdownItem>
+                  <DropdownDivider />
+                  <DropdownItem href="/dashboard">
+                    <Avatar data-slot="icon" initials="NC" />
+                    <DropdownLabel>NutriCoach</DropdownLabel>
+                  </DropdownItem>
+                  <DropdownDivider />
+                  <DropdownItem href="/teams/create">
+                    <PlusIcon />
+                    <DropdownLabel>{tMenu('newTeam')}</DropdownLabel>
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+              <SidebarSection className="max-lg:hidden">
+                <SidebarItem href="/search">
+                  <MagnifyingGlassIcon />
+                  <SidebarLabel>{t('search')}</SidebarLabel>
+                </SidebarItem>
+                <SidebarItem href="/inbox">
+                  <InboxIcon />
+                  <SidebarLabel>{t('inbox')}</SidebarLabel>
+                </SidebarItem>
+              </SidebarSection>
+            </SidebarHeader>
 
-          <SidebarBody>
-            <SidebarSection>
-              {mainItems.map((item) => {
-                const Icon = item.icon;
-                const isActive =
-                  pathname === item.href ||
-                  pathname.startsWith(item.href + '/');
-                return (
-                  <SidebarItem
-                    key={item.href}
-                    href={item.href}
-                    current={isActive}
-                  >
-                    <span data-slot="icon">
-                      <Icon className="size-6 sm:size-5" />
-                    </span>
-                    <SidebarLabel>{item.label}</SidebarLabel>
-                  </SidebarItem>
-                );
-              })}
-            </SidebarSection>
-
-            {secondaryItems.length > 0 && (
+            <SidebarBody>
               <SidebarSection>
-                <SidebarHeading>{tNav('other')}</SidebarHeading>
-                {secondaryItems.map((item) => {
+                {mainItems.map((item) => {
                   const Icon = item.icon;
                   const isActive =
                     pathname === item.href ||
@@ -317,49 +296,73 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
                   );
                 })}
               </SidebarSection>
-            )}
 
-            <SidebarSpacer />
-          </SidebarBody>
+              {secondaryItems.length > 0 && (
+                <SidebarSection>
+                  <SidebarHeading>{tNav('other')}</SidebarHeading>
+                  {secondaryItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive =
+                      pathname === item.href ||
+                      pathname.startsWith(item.href + '/');
+                    return (
+                      <SidebarItem
+                        key={item.href}
+                        href={item.href}
+                        current={isActive}
+                      >
+                        <span data-slot="icon">
+                          <Icon className="size-6 sm:size-5" />
+                        </span>
+                        <SidebarLabel>{item.label}</SidebarLabel>
+                      </SidebarItem>
+                    );
+                  })}
+                </SidebarSection>
+              )}
 
-          <SidebarFooter className="max-lg:hidden">
-            {mounted && (
-              <Dropdown>
-                <DropdownButton as={SidebarItem}>
-                  <span className="flex min-w-0 items-center gap-3">
-                    <Avatar
-                      initials={initials}
-                      className="size-10"
-                      square
-                      alt=""
-                    />
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm/5 font-medium text-zinc-950 dark:text-white">
-                        {displayName}
-                      </span>
-                      <span className="block truncate text-xs/5 font-normal text-zinc-500 dark:text-zinc-400">
-                        {email}
+              <SidebarSpacer />
+            </SidebarBody>
+
+            <SidebarFooter className="max-lg:hidden">
+              {mounted && (
+                <Dropdown>
+                  <DropdownButton as={SidebarItem}>
+                    <span className="flex min-w-0 items-center gap-3">
+                      <Avatar
+                        initials={initials}
+                        className="size-10"
+                        square
+                        alt=""
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm/5 font-medium text-zinc-950 dark:text-white">
+                          {displayName}
+                        </span>
+                        <span className="block truncate text-xs/5 font-normal text-zinc-500 dark:text-zinc-400">
+                          {email}
+                        </span>
                       </span>
                     </span>
-                  </span>
-                  <ChevronUpIcon />
-                </DropdownButton>
-                <AccountDropdownMenu
-                  anchor="top start"
-                  onLogout={handleLogout}
-                  isAdmin={isAdmin}
-                />
-              </Dropdown>
-            )}
-          </SidebarFooter>
-        </Sidebar>
-      }
-    >
-      {children}
-      <RecipeImportModal
-        open={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-      />
-    </SidebarLayout>
+                    <ChevronUpIcon />
+                  </DropdownButton>
+                  <AccountDropdownMenu
+                    anchor="top start"
+                    onLogout={handleLogout}
+                    isAdmin={isAdmin}
+                  />
+                </Dropdown>
+              )}
+            </SidebarFooter>
+          </Sidebar>
+        }
+      >
+        {children}
+        <RecipeImportModal
+          open={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+        />
+      </SidebarLayout>
+    </ToastProvider>
   );
 }

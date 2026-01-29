@@ -183,3 +183,213 @@ When implementing UI components:
 - ❌ Never use: Other UI component libraries
 
 For questions or component needs, always refer to: **https://catalyst.tailwindui.com/docs**
+
+# Agent Guidelines — NutriCoach (Cursor)
+
+These rules apply to **all UI work** in this repo (Next.js pages/layouts/components, styles, and UI-related logic). If you touch UI, you **must** follow this document.
+
+---
+
+## 1) UI system of record
+
+### Catalyst UI Kit (Tailwind CSS Plus)
+
+**STRICT RULE**: This project uses **Catalyst UI Kit** by Tailwind CSS (**TailwindCSS Plus**) as the **primary and default** UI component library.
+
+- **Docs**: https://catalyst.tailwindui.com/docs
+- **Tailwind Plus UI Kit**: https://tailwindcss.com/plus/ui-kit
+- **Local components**: `@/components/catalyst/*` (directory: `/components/catalyst/`)
+
+### Headless UI
+
+- **Allowed only as an implementation detail** via Catalyst components.
+- **Do not** import `@headlessui/react` directly in feature UI unless there is no Catalyst equivalent **and** you follow Catalyst patterns.
+
+---
+
+## 2) Non‑negotiables
+
+### 2.1 Component usage
+
+- **ALWAYS** prefer Catalyst components from `@/components/catalyst/*`.
+- **NEVER** use Shadcn UI, Radix UI primitives (directly), or any other UI component library.
+- **NEVER** create bespoke components that duplicate existing Catalyst components.
+
+### 2.2 Styling rules (TailwindCSS Plus conventions)
+
+- Layout and spacing must follow TailwindCSS Plus patterns:
+  - Consistent spacing scale: `gap-4/6`, `p-4/6`, `space-y-4/6`
+  - Mobile-first responsiveness: `sm:`, `md:`, `lg:`
+  - Container patterns: `mx-auto`, `max-w-*`, `px-4 sm:px-6 lg:px-8`
+  - Clear typography hierarchy (Headings/Text components, not ad-hoc)
+
+### 2.3 Theme tokens over hard-coded palettes
+
+To avoid theme drift across breakpoints (especially mobile), prefer **semantic tokens** over hard-coded grays/blues.
+
+- Prefer tokens (examples):
+  - `bg-background`, `text-foreground`, `text-muted-foreground`
+  - `border-border`, `bg-accent`, `text-accent-foreground`
+  - `ring-ring`, `focus-visible:ring-ring`
+- Avoid introducing hard-coded palette utilities like:
+  - `bg-white`, `text-gray-900`, `border-gray-200`, `ring-blue-500`
+
+**Exception**: If the Catalyst component source already uses specific palette utilities, match that existing pattern instead of inventing a new one.
+
+### 2.4 States and accessibility are required
+
+Any interactive UI must account for:
+
+- **States**: `loading`, `empty`, `error`, and `success` where relevant.
+- **A11y**: labels, focus styles, keyboard navigation, and `aria-*` attributes where applicable.
+
+### 2.5 No new UI libraries
+
+Do not add or introduce:
+
+- MUI, Chakra, Mantine, AntD, Bootstrap, etc.
+- New CSS frameworks/resets
+
+---
+
+## 3) Component inventory
+
+All Catalyst components live in `/components/catalyst/` (import via `@/components/catalyst/...`).
+
+- `Alert` — alert messages/notifications
+- `Avatar` — user avatars
+- `Badge` — status badges
+- `Button` — solid/outline/plain variants
+- `Checkbox` — form checkboxes
+- `Combobox` — autocomplete
+- `DescriptionList` — key/value lists
+- `Dialog` — modals and overlays
+- `Divider` — separators
+- `Dropdown` — menus
+- `Fieldset` — grouped form fields
+- `Heading` — typographic headings
+- `Input` — text inputs
+- `Link` — navigation links (Next.js integrated)
+- `Listbox` — select menus
+- `Navbar` — top navigation
+- `Pagination` — pagination controls
+- `Radio` — radio groups
+- `Select` — select dropdowns
+- `Sidebar` — sidebar navigation
+- `SidebarLayout` — sidebar-based layouts
+- `StackedLayout` — stacked layouts
+- `AuthLayout` — auth page layouts
+- `Switch` — toggle switches
+- `Table` — data tables
+- `Text` — typography
+- `Textarea` — multi-line inputs
+
+If you need something new:
+
+1. Check Catalyst docs
+2. Check `/components/catalyst/` for an existing pattern
+3. Only then create a small custom component that follows Catalyst conventions
+
+---
+
+## 4) Icons
+
+- **Primary**: Heroicons (`@heroicons/react`)
+  - 16×16: `@heroicons/react/16/solid` (buttons, dropdowns, listboxes)
+  - 20×20: `@heroicons/react/20/solid` (navbar, sidebar items)
+- **Secondary**: `lucide-react` is tolerated temporarily but should be migrated to Heroicons.
+
+---
+
+## 5) Cursor workflow rules (atomic prompts)
+
+### 5.1 Use the codebase first
+
+Before implementing UI changes, you must search and reuse existing patterns:
+
+- Use `@codebase` to find similar screens/components.
+- Match existing Catalyst usage and token patterns.
+
+### 5.2 Atomic changes only
+
+Each Cursor step must:
+
+- Have **one** clear goal (one feature or one fix)
+- Touch **1–3 files** where possible
+- Be small enough to review quickly
+- Avoid scope creep (“and also…”)
+
+### 5.3 Prompt series must be 1‑by‑1
+
+If a feature requires multiple steps:
+
+- Do **Step 1** only, then stop.
+- Incorporate feedback/corrections.
+- Only then continue with the next step.
+
+---
+
+## 6) Enforcement recommendations
+
+- Reject PRs that introduce non-Catalyst UI libs.
+- Add ESLint rules to ban imports from `@/components/ui/*` and common UI libraries.
+- Consider a CI grep check to prevent new hard-coded palette classes (e.g., `text-gray-`, `bg-white`, `ring-blue-`).
+
+---
+
+## 7) Quick examples
+
+### Correct (Catalyst)
+
+```tsx
+import { Button } from '@/components/catalyst/button';
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/catalyst/dialog';
+import { PlusIcon } from '@heroicons/react/16/solid';
+
+export function Example() {
+  return (
+    <Dialog>
+      <DialogTitle>__TODO__</DialogTitle>
+      <DialogBody>
+        <DialogDescription>__TODO__</DialogDescription>
+      </DialogBody>
+      <DialogActions>
+        <Button>
+          <PlusIcon />
+          Add
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+```
+
+### Incorrect (forbidden libraries)
+
+```tsx
+// ❌ NEVER
+import { Button } from '@/components/ui/button';
+import { Dialog } from '@radix-ui/react-dialog';
+import { Plus } from 'lucide-react';
+```
+
+---
+
+## Summary
+
+**Catalyst is the UI system of record.**
+
+- ✅ Use: Catalyst components from `/components/catalyst/`
+- ✅ Use: TailwindCSS Plus layout conventions
+- ✅ Use: theme tokens over hard-coded palette utilities
+- ❌ Never use: Shadcn UI
+- ❌ Never use: Radix primitives directly
+- ❌ Never add: other UI component libraries
+
+When in doubt: consult Catalyst docs and mirror patterns already present in the codebase.

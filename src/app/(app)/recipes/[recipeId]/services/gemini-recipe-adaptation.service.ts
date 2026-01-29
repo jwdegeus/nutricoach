@@ -371,6 +371,8 @@ ${ingredientLines.map((l: string, i: number) => `${i + 1}. ${l}`).join('\n')}
 Redeneer kort: bv. "mozzarella is zuivel", "honing is toegevoegde suiker", "sojasaus is soja".
 Geef alleen suggesties met confidence >= ${AI_SUGGESTION_MIN_CONFIDENCE}.
 
+Belangrijk: bloemkoolrijst (cauliflower rice) is een groente, GEEN zuivel; noem dit nooit als zuivel-/dairy-overtreding.
+
 Antwoord in JSON: { "suggestions": [ { "ingredient": "exacte naam zoals in de lijst", "ruleLabel": "naam van de regel die geschonden wordt", "confidence": 0.85 } ] }
 Alleen objecten met confidence >= ${AI_SUGGESTION_MIN_CONFIDENCE} opnemen.`;
 
@@ -403,8 +405,30 @@ Alleen objecten met confidence >= ${AI_SUGGESTION_MIN_CONFIDENCE} opnemen.`;
       (s: { confidence?: number }) =>
         (s.confidence ?? 0) >= AI_SUGGESTION_MIN_CONFIDENCE,
     );
+
+    // False positives: ingrediënten die de AI soms ten onrechte als zuivel/dairy classificeert
+    const isDairyRule = (label: string) => /zuivel|dairy/i.test(label ?? '');
+    const dairyFalsePositiveIngredients = [
+      'bloemkoolrijst',
+      'bloemkool',
+      'cauliflower rice',
+      'cauliflower',
+    ];
+    const isDairyFalsePositive = (ingredient: string, ruleLabel: string) => {
+      if (!isDairyRule(ruleLabel)) return false;
+      const norm = ingredient.trim().toLowerCase();
+      return dairyFalsePositiveIngredients.some(
+        (fp) => norm === fp || norm.includes(fp),
+      );
+    };
+
+    const filtered = suggestions.filter(
+      (s: { ingredient: string; ruleLabel: string }) =>
+        !isDairyFalsePositive(s.ingredient, s.ruleLabel),
+    );
+
     const ruleByLabel = new Map(ruleset.forbidden.map((r) => [r.ruleLabel, r]));
-    return suggestions.map((s: { ingredient: string; ruleLabel: string }) => {
+    return filtered.map((s: { ingredient: string; ruleLabel: string }) => {
       const rule =
         ruleByLabel.get(s.ruleLabel) ??
         ruleset.forbidden.find(

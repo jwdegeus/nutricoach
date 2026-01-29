@@ -64,6 +64,90 @@ function extractIngredientSearchTerm(fullLine: string): string {
   return kernel.length > 0 ? kernel : s.slice(0, 50);
 }
 
+/** Eenheden en stopwoorden die we niet als zoekterm gebruiken */
+const UNIT_AND_STOP = new Set([
+  'g',
+  'ml',
+  'el',
+  'tl',
+  'tl.',
+  'el.',
+  'st',
+  'st.',
+  'stuk',
+  'stuks',
+  'gram',
+  'ml',
+  'liter',
+  'l',
+  'kg',
+  'mg',
+  'mespunt',
+  'snuf',
+  'teentje',
+  'teentjes',
+  'takje',
+  'takjes',
+  'plak',
+  'plakken',
+  'eetlepel',
+  'theelepel',
+  'cup',
+  'cups',
+  'ounce',
+  'oz',
+  'lb',
+  'pond',
+  'kilo',
+  'per',
+  'of',
+]);
+
+/**
+ * Extra zoektermen uit een zoekterm: losse woorden (zonder eenheden) en delen van samenstellingen.
+ * Bijv. "kerriepoeder" → ["kerrie", "poeder"] zodat "Kerrie, poeder" in NEVO matcht.
+ */
+function getExtraSearchTerms(searchTerm: string): string[] {
+  const terms: string[] = [];
+  const words = searchTerm
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length >= 2 && !UNIT_AND_STOP.has(w) && !/^\d+$/.test(w));
+
+  for (const word of words) {
+    // Samenstellingen: veel NEVO-namen zijn "X, y" of "Xy" (bijv. "Kerrie, poeder", "Kokosolie", "Kokosvet")
+    const compoundEndings = [
+      'poeder',
+      'olie',
+      'vet',
+      'saus',
+      'kruiden',
+      'pasta',
+      'puree',
+      'sap',
+      'melk',
+      'room',
+      'boter',
+      'meel',
+      'bloem',
+      'azijn',
+      'siroop',
+      'jam',
+    ];
+    for (const end of compoundEndings) {
+      if (word.length > end.length && word.endsWith(end)) {
+        const stem = word.slice(0, -end.length);
+        if (stem.length >= 2) {
+          terms.push(stem);
+          terms.push(end);
+        }
+        break;
+      }
+    }
+  }
+  return terms;
+}
+
 /**
  * Haal opgeslagen match op voor een genormaliseerde recept-ingredienttekst.
  * Wordt gebruikt om het systeem slimmer te maken: eerdere keuzes worden hergebruikt.
@@ -122,6 +206,220 @@ export async function getMatchForRecipeIngredientAction(
         customFoodId: data.custom_food_id ?? undefined,
       },
     };
+  } catch (e) {
+    return {
+      ok: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: e instanceof Error ? e.message : 'Onbekende fout',
+      },
+    };
+  }
+}
+
+/** Match-resultaat voor één ingrediëntregel (voor weergave in UI) */
+export type ResolvedIngredientMatch = {
+  source: 'nevo' | 'custom';
+  nevoCode?: number;
+  customFoodId?: string;
+  /** Huidige weergavenaam uit de database (custom_foods.name_nl of nevo_foods.name_nl) */
+  displayName?: string;
+};
+
+/**
+ * Haal voor een lijst ingrediënten de opgeslagen matches op uit recipe_ingredient_matches.
+ * Per ingrediënt kunnen meerdere mogelijke regels worden geprobeerd (bijv. "olijfolie 2 el" en "olijfolie"),
+ * zodat een eerder opgeslagen match uit een ander recept altijd wordt gevonden.
+ */
+export async function getResolvedIngredientMatchesAction(
+  lineOptionsPerIngredient: string[][],
+): Promise<ActionResult<(ResolvedIngredientMatch | null)[]>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: {
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
+        },
+      };
+    }
+
+    if (
+      !Array.isArray(lineOptionsPerIngredient) ||
+      lineOptionsPerIngredient.length === 0
+    ) {
+      return { ok: true, data: [] };
+    }
+
+    const normsPerIngredient = lineOptionsPerIngredient.map((options) =>
+      options
+        .map((line) => normalizeIngredientText(String(line ?? '').trim()))
+        .filter((n) => n.length > 0),
+    );
+    const uniqueNorms = [...new Set(normsPerIngredient.flat())].filter(
+      (n) => n.length > 0,
+    );
+
+    if (uniqueNorms.length === 0) {
+      return {
+        ok: true,
+        data: lineOptionsPerIngredient.map(() => null),
+      };
+    }
+
+    const { data: rows, error } = await supabase
+      .from('recipe_ingredient_matches')
+      .select('normalized_text, source, nevo_code, custom_food_id')
+      .in('normalized_text', uniqueNorms);
+
+    if (error) {
+      return {
+        ok: false,
+        error: { code: 'DB_ERROR', message: error.message },
+      };
+    }
+
+    const map = new Map<
+      string,
+      {
+        source: 'nevo' | 'custom';
+        nevoCode?: number;
+        customFoodId?: string;
+        displayName?: string;
+      }
+    >();
+    for (const row of rows ?? []) {
+      const norm = String(row.normalized_text ?? '').trim();
+      if (!norm) continue;
+      map.set(norm, {
+        source: row.source as 'nevo' | 'custom',
+        nevoCode: row.nevo_code ?? undefined,
+        customFoodId: row.custom_food_id ?? undefined,
+      });
+    }
+
+    // Haal actuele weergavenamen op uit de database (na wijziging in ingredientendatabase)
+    const customIds = [
+      ...new Set(
+        [...map.values()].flatMap((m) =>
+          m.customFoodId ? [m.customFoodId] : [],
+        ),
+      ),
+    ];
+    const nevoCodes = [
+      ...new Set(
+        [...map.values()].flatMap((m) =>
+          m.nevoCode != null ? [m.nevoCode] : [],
+        ),
+      ),
+    ];
+    const customNamesById: Record<string, string> = {};
+    if (customIds.length > 0) {
+      const { data: customRows } = await supabase
+        .from('custom_foods')
+        .select('id, name_nl')
+        .in('id', customIds);
+      for (const r of customRows ?? []) {
+        const id = r.id as string;
+        const name = (r.name_nl as string)?.trim();
+        if (id && name) customNamesById[id] = name;
+      }
+    }
+    const nevoNamesByCode: Record<number, string> = {};
+    if (nevoCodes.length > 0) {
+      const { data: nevoRows } = await supabase
+        .from('nevo_foods')
+        .select('nevo_code, name_nl')
+        .in('nevo_code', nevoCodes);
+      for (const r of nevoRows ?? []) {
+        const code = r.nevo_code as number;
+        const name = (r.name_nl as string)?.trim();
+        if (code != null && name) nevoNamesByCode[code] = name;
+      }
+    }
+    for (const match of map.values()) {
+      if (match.customFoodId && customNamesById[match.customFoodId]) {
+        match.displayName = customNamesById[match.customFoodId];
+      } else if (
+        match.nevoCode != null &&
+        nevoNamesByCode[match.nevoCode] != null
+      ) {
+        match.displayName = nevoNamesByCode[match.nevoCode];
+      }
+    }
+
+    const data = normsPerIngredient.map((norms) => {
+      for (const norm of norms) {
+        const match = map.get(norm);
+        if (match) return match;
+      }
+      return null;
+    });
+    return { ok: true, data };
+  } catch (e) {
+    return {
+      ok: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: e instanceof Error ? e.message : 'Onbekende fout',
+      },
+    };
+  }
+}
+
+/**
+ * Haal actuele weergavenamen (name_nl) op voor custom_foods op basis van id.
+ * Gebruikt bij receptweergave zodat na wijziging in de ingredientendatabase
+ * de nieuwe naam in de ingredientenlijst wordt getoond.
+ */
+export async function getCustomFoodNamesByIdsAction(
+  customFoodIds: string[],
+): Promise<ActionResult<Record<string, string>>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: { code: 'AUTH_ERROR', message: 'Je moet ingelogd zijn' },
+      };
+    }
+
+    const ids = [...new Set(customFoodIds)].filter(
+      (id): id is string => typeof id === 'string' && id.length > 0,
+    );
+    if (ids.length === 0) {
+      return { ok: true, data: {} };
+    }
+
+    const { data: rows, error } = await supabase
+      .from('custom_foods')
+      .select('id, name_nl')
+      .in('id', ids);
+
+    if (error) {
+      return {
+        ok: false,
+        error: { code: 'DB_ERROR', message: error.message },
+      };
+    }
+
+    const result: Record<string, string> = {};
+    for (const r of rows ?? []) {
+      const id = r.id as string;
+      const name = (r.name_nl as string)?.trim();
+      if (id && name) result[id] = name;
+    }
+    return { ok: true, data: result };
   } catch (e) {
     return {
       ok: false,
@@ -254,9 +552,14 @@ export type IngredientCandidate = {
   fiber_g?: number | null;
 };
 
+/** Normaliseer voor vergelijking: lowercase, spaties en komma's verwijderen (NEVO: "Olijf, olie" → "olijfolie"). */
+function normalizeForMatch(s: string): string {
+  return (s ?? '').toLowerCase().replace(/[,\s]+/g, '');
+}
+
 /**
- * Sorteer zoekresultaten op relevantie: exacte match, dan begint met zoekterm, dan heel woord, dan substring.
- * Zo komt "Uien" bovenaan bij zoeken op "ui" in plaats van "Beschuit".
+ * Sorteer zoekresultaten op relevantie: exacte match, dan zoekregel bevat productnaam, dan begint met zoekterm, dan heel woord, dan substring.
+ * NEVO-namen met komma (bijv. "Olijf, olie") matchen ook op genormaliseerde zoekregel "olijfolie 2 el".
  */
 function sortCandidatesByRelevance(
   candidates: IngredientCandidate[],
@@ -264,18 +567,24 @@ function sortCandidatesByRelevance(
 ): IngredientCandidate[] {
   const q = query.trim().toLowerCase();
   if (!q) return candidates;
+  const qNorm = normalizeForMatch(q);
 
   const score = (name: string): number => {
     const n = (name ?? '').toLowerCase();
     if (n === q) return 0;
-    if (n.startsWith(q)) return 1;
+    // Zoekregel bevat productnaam (bijv. "kokosolie 2 el" bevat "kokosolie") → hoge relevantie
+    if (n.length >= 2 && q.includes(n)) return 1;
+    // NEVO "Olijf, olie" vs zoekregel "olijfolie 2 el": genormaliseerd bevat zoekregel de productnaam
+    const nNorm = normalizeForMatch(n);
+    if (nNorm.length >= 2 && qNorm.includes(nNorm)) return 1;
+    if (n.startsWith(q)) return 2;
     const wordBoundary = new RegExp(
       `\\b${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`,
       'i',
     );
-    if (wordBoundary.test(n)) return 2;
-    if (n.includes(q)) return 3;
-    return 4;
+    if (wordBoundary.test(n)) return 3;
+    if (n.includes(q)) return 4;
+    return 5;
   };
 
   return [...candidates].sort((a, b) => {
@@ -318,6 +627,10 @@ export async function searchIngredientCandidatesAction(
       searchTerm.indexOf(' ') > 0 ? searchTerm.split(/\s+/)[0] : '';
     const searchTerms: string[] = [searchTerm];
     if (firstWord && firstWord !== searchTerm) searchTerms.push(firstWord);
+    // Extra termen uit samenstellingen (bijv. "kerriepoeder" → "kerrie", "poeder") zodat NEVO "Kerrie, poeder" matcht
+    for (const t of getExtraSearchTerms(searchTerm)) {
+      if (t && !searchTerms.includes(t)) searchTerms.push(t);
+    }
     if (
       raw.length > searchTerm.length + 5 &&
       !searchTerms.includes(raw.slice(0, 40).trim())

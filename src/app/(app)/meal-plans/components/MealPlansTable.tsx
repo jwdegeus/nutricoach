@@ -37,10 +37,10 @@ export function MealPlansTable({ plans }: MealPlansTableProps) {
   }
 
   return (
-    <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+    <div className="rounded-lg bg-white p-6 shadow-xs dark:bg-zinc-900">
       <Heading>Meal Plans ({plans.length})</Heading>
       <div className="mt-4">
-        <Table>
+        <Table className="[--gutter:--spacing(6)] sm:[--gutter:--spacing(8)]">
           <TableHead>
             <TableRow>
               <TableHeader>Start Datum</TableHeader>

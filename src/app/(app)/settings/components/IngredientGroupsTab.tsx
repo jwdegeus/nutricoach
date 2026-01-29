@@ -429,7 +429,7 @@ export function IngredientGroupsTab({
       </div>
 
       {/* Categories Table */}
-      <div className="rounded-lg bg-white shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+      <div className="rounded-lg bg-white shadow-xs dark:bg-zinc-900">
         <div className="p-6">
           <div className="mb-4 flex items-center justify-between gap-2 flex-wrap">
             <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -475,7 +475,7 @@ export function IngredientGroupsTab({
             </div>
           )}
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="[--gutter:--spacing(6)] sm:[--gutter:--spacing(8)]">
               <TableHead>
                 <TableRow>
                   <TableHeader className="w-10" title="Selecteer">

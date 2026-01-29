@@ -138,10 +138,15 @@ const EXTRA_INGREDIENT_SYNONYMS: Record<string, string[]> = {
  */
 const SUBSTRING_FALSE_POSITIVE_IF_CONTAINS: Record<string, string | string[]> =
   {
-    bloem: 'zonnebloem',
+    // "bloem" in "zonnebloem" = zaden; in "bloemkool(rijst)" = groente (geen tarwe)
+    bloem: ['zonnebloem', 'bloemkoolrijst', 'bloemkool'],
     ei: ['romeinse', 'romaine'],
     ijs: 'radijs',
     oca: 'avocado',
+    // "rijst" in "bloemkoolrijst" = groente (cauliflower rice), geen graan/zuivel
+    rijst: ['bloemkoolrijst', 'bloemkool'],
+    // "kool" in "bloemkool" = bloemkool (cauliflower), geen gewone kool/zuivel
+    kool: ['bloemkoolrijst', 'bloemkool'],
     // "pasta" als in paste/spread (notenpasta, amandelpasta, tomatenpasta) ≠ glutenpasta
     pasta: [
       'notenpasta',
@@ -184,6 +189,55 @@ const PASTA_AS_PASTE_INDICATORS = [
   'tahin',
   'tahini',
 ];
+
+/** Bloemkool(rijst) is groente, geen gluten/zuivel – uitsluiten voor die regels */
+function isBloemkoolRelated(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  return (
+    lower.includes('bloemkoolrijst') ||
+    lower.includes('bloemkool') ||
+    lower === 'cauliflower rice' ||
+    lower.includes('cauliflower rice')
+  );
+}
+
+function isDairyRule(forbidden: {
+  term: string;
+  ruleLabel?: string;
+  ruleCode?: string;
+}): boolean {
+  const t = (forbidden.term ?? '').toLowerCase();
+  const l = (forbidden.ruleLabel ?? '').toLowerCase();
+  const c = (forbidden.ruleCode ?? '').toLowerCase();
+  return (
+    t === 'dairy' ||
+    t === 'zuivel' ||
+    l.includes('zuivel') ||
+    l.includes('dairy') ||
+    c.includes('dairy') ||
+    c.includes('zuivel')
+  );
+}
+
+function isGlutenRule(forbidden: {
+  term: string;
+  ruleLabel?: string;
+  ruleCode?: string;
+}): boolean {
+  const t = (forbidden.term ?? '').toLowerCase();
+  const l = (forbidden.ruleLabel ?? '').toLowerCase();
+  const c = (forbidden.ruleCode ?? '').toLowerCase();
+  return (
+    t === 'gluten' ||
+    t === 'pasta' ||
+    t === 'tarwe' ||
+    t === 'wheat' ||
+    l.includes('gluten') ||
+    c.includes('gluten') ||
+    c.includes('pasta') ||
+    c.includes('wahls_forbidden_gluten')
+  );
+}
 
 function isPastaAsPaste(text: string): boolean {
   const lower = text.toLowerCase().trim();
@@ -331,6 +385,11 @@ export function findForbiddenMatches(
 
   for (const forbidden of ruleset.forbidden) {
     const lowerTerm = forbidden.term.toLowerCase();
+
+    // Bloemkool(rijst) is groente, geen gluten/zuivel – nooit als zodanig flaggen
+    if (context === 'ingredients' && isBloemkoolRelated(lowerText)) {
+      if (isDairyRule(forbidden) || isGlutenRule(forbidden)) continue;
+    }
 
     // For ingredients, check if the text exactly matches the forbidden term or any synonym
     // This handles cases like "orzo" matching "pasta" (where "orzo" is a synonym of "pasta")

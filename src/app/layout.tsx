@@ -25,7 +25,7 @@ export default async function RootLayout({
     <html
       lang={locale}
       suppressHydrationWarning
-      className="text-stone-950 antialiased lg:bg-stone-50 dark:bg-stone-950 dark:text-stone-50 dark:lg:bg-stone-900"
+      className="text-zinc-950 antialiased lg:bg-zinc-100 dark:bg-zinc-900 dark:text-zinc-50 dark:lg:bg-zinc-950"
     >
       <head>
         <link rel="preconnect" href="https://rsms.me/" />

@@ -264,7 +264,7 @@ export function RunsTable({ runs }: RunsTableProps) {
 
   if (runs.length === 0) {
     return (
-      <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+      <div className="rounded-lg bg-white p-6 shadow-xs dark:bg-zinc-900">
         <Heading>Meal Plan Runs</Heading>
         <div className="mt-4">
           <Text className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -372,10 +372,10 @@ export function RunsTable({ runs }: RunsTableProps) {
         confirmColor="red"
         isLoading={isPending}
       />
-      <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+      <div className="rounded-lg bg-white p-6 shadow-xs dark:bg-zinc-900">
         <Heading>Meal Plan Runs ({runs.length})</Heading>
         <div className="mt-4">
-          <Table>
+          <Table className="[--gutter:--spacing(6)] sm:[--gutter:--spacing(8)]">
             <TableHead>
               <TableRow>
                 <TableHeader>Datum</TableHeader>

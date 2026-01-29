@@ -217,80 +217,79 @@ export function DietTypesAdminClient() {
         </div>
       )}
 
-      <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        <div className="overflow-x-auto">
-          <Table striped>
-            <TableHead>
+      <div className="overflow-x-auto">
+        <Table
+          className="[--gutter:--spacing(6)] sm:[--gutter:--spacing(8)]"
+          striped
+        >
+          <TableHead>
+            <TableRow>
+              <TableHeader>Naam</TableHeader>
+              <TableHeader>Volgorde</TableHeader>
+              <TableHeader>Status</TableHeader>
+              <TableHeader className="text-right"></TableHeader>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {dietTypes.length === 0 ? (
               <TableRow>
-                <TableHeader>Naam</TableHeader>
-                <TableHeader>Volgorde</TableHeader>
-                <TableHeader>Status</TableHeader>
-                <TableHeader className="text-right"></TableHeader>
+                <TableCell
+                  colSpan={4}
+                  className="text-center text-zinc-500 dark:text-zinc-400 py-8"
+                >
+                  Geen dieettypes gevonden
+                </TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {dietTypes.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    className="text-center text-zinc-500 dark:text-zinc-400 py-8"
-                  >
-                    Geen dieettypes gevonden
+            ) : (
+              dietTypes.map((dietType) => (
+                <TableRow key={dietType.id}>
+                  <TableCell>
+                    <Text className="font-medium text-zinc-950 dark:text-white">
+                      {dietType.name}
+                    </Text>
+                  </TableCell>
+                  <TableCell>
+                    <Text className="text-sm text-zinc-500 dark:text-zinc-400">
+                      {dietType.displayOrder}
+                    </Text>
+                  </TableCell>
+                  <TableCell>
+                    {dietType.isActive ? (
+                      <Badge color="green">Actief</Badge>
+                    ) : (
+                      <Badge color="zinc">Inactief</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end">
+                      <Dropdown>
+                        <DropdownButton plain>
+                          <EllipsisVerticalIcon className="h-5 w-5 text-zinc-500" />
+                          <span className="sr-only">Acties</span>
+                        </DropdownButton>
+                        <DropdownMenu anchor="bottom end">
+                          <DropdownSection>
+                            <DropdownItem onClick={() => handleEdit(dietType)}>
+                              <PencilIcon data-slot="icon" />
+                              <span>Bewerken</span>
+                            </DropdownItem>
+                            <DropdownItem
+                              onClick={() => handleDelete(dietType.id)}
+                              className="text-red-600 data-focus:text-white data-focus:bg-red-600 dark:text-red-400"
+                            >
+                              <TrashIcon data-slot="icon" />
+                              <span>Verwijderen</span>
+                            </DropdownItem>
+                          </DropdownSection>
+                        </DropdownMenu>
+                      </Dropdown>
+                    </div>
                   </TableCell>
                 </TableRow>
-              ) : (
-                dietTypes.map((dietType) => (
-                  <TableRow key={dietType.id}>
-                    <TableCell>
-                      <Text className="font-medium text-zinc-950 dark:text-white">
-                        {dietType.name}
-                      </Text>
-                    </TableCell>
-                    <TableCell>
-                      <Text className="text-sm text-zinc-500 dark:text-zinc-400">
-                        {dietType.displayOrder}
-                      </Text>
-                    </TableCell>
-                    <TableCell>
-                      {dietType.isActive ? (
-                        <Badge color="green">Actief</Badge>
-                      ) : (
-                        <Badge color="zinc">Inactief</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end">
-                        <Dropdown>
-                          <DropdownButton plain>
-                            <EllipsisVerticalIcon className="h-5 w-5 text-zinc-500" />
-                            <span className="sr-only">Acties</span>
-                          </DropdownButton>
-                          <DropdownMenu anchor="bottom end">
-                            <DropdownSection>
-                              <DropdownItem
-                                onClick={() => handleEdit(dietType)}
-                              >
-                                <PencilIcon data-slot="icon" />
-                                <span>Bewerken</span>
-                              </DropdownItem>
-                              <DropdownItem
-                                onClick={() => handleDelete(dietType.id)}
-                                className="text-red-600 data-focus:text-white data-focus:bg-red-600 dark:text-red-400"
-                              >
-                                <TrashIcon data-slot="icon" />
-                                <span>Verwijderen</span>
-                              </DropdownItem>
-                            </DropdownSection>
-                          </DropdownMenu>
-                        </Dropdown>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
 
       <ConfirmDialog

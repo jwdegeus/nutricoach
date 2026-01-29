@@ -250,7 +250,7 @@ export function RecipeImageUpload({
   };
 
   return (
-    <div className="mt-4">
+    <div className="mt-4 min-w-0 max-w-full">
       <input
         ref={fileInputRef}
         type="file"
@@ -387,10 +387,10 @@ export function RecipeImageUpload({
           <button
             onClick={handleClick}
             disabled={isUploading}
-            className="w-full border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg p-8 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors flex flex-col items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full min-w-0 border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg p-6 sm:p-8 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors flex flex-col items-center justify-center gap-2 disabled:opacity-50 box-border"
           >
-            <PhotoIcon className="h-12 w-12 text-zinc-400 dark:text-zinc-500" />
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">
+            <PhotoIcon className="h-12 w-12 shrink-0 text-zinc-400 dark:text-zinc-500" />
+            <span className="text-sm text-zinc-600 dark:text-zinc-400 text-center break-words">
               {isUploading ? 'Uploaden...' : 'Upload foto van eindresultaat'}
             </span>
           </button>

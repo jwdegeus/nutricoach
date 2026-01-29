@@ -519,11 +519,11 @@ export async function importRecipeFromUrlAction(
         `[importRecipeFromUrlAction] Fetched HTML, size: ${html.length} bytes`,
       );
 
-      // Try JSON-LD first (faster and more reliable)
+      // Try JSON-LD first (faster and more reliable) – pass existing html to avoid duplicate fetch
       try {
         const { fetchAndParseRecipeJsonLd } =
           await import('../server/fetchAndParseRecipeJsonLd');
-        const jsonLdResult = await fetchAndParseRecipeJsonLd(input.url);
+        const jsonLdResult = await fetchAndParseRecipeJsonLd(input.url, html);
         console.log(
           '[importRecipeFromUrlAction] JSON-LD result:',
           jsonLdResult.ok ? 'OK' : 'FAILED',

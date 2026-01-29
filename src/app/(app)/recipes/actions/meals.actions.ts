@@ -670,10 +670,21 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
       Array.isArray(updatedMealData.ingredientRefs)
     ) {
       updatedMealData.ingredientRefs = updatedMealData.ingredientRefs.map(
-        (ref: any) => ({
-          ...ref,
-          quantityG: Math.round(ref.quantityG * ratio),
-        }),
+        (ref: any) => {
+          const next: any = { ...ref };
+          const currentG = ref.quantityG ?? ref.quantity_g;
+          if (typeof currentG === 'number' && currentG > 0) {
+            next.quantityG = Math.round(currentG * ratio);
+            if (ref.quantity_g != null) next.quantity_g = next.quantityG;
+          }
+          if (
+            typeof ref.quantity === 'number' &&
+            Number.isFinite(ref.quantity)
+          ) {
+            next.quantity = Math.round(ref.quantity * ratio * 10) / 10;
+          }
+          return next;
+        },
       );
     }
 
@@ -689,90 +700,80 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
           if (ing.quantity !== null && ing.quantity !== undefined) {
             updated.quantity = Math.round(ing.quantity * ratio * 10) / 10; // Round to 1 decimal
           }
+          if (ing.amount !== null && ing.amount !== undefined) {
+            const amt =
+              typeof ing.amount === 'number'
+                ? ing.amount
+                : parseFloat(String(ing.amount));
+            if (Number.isFinite(amt)) {
+              updated.amount = Math.round(amt * ratio * 10) / 10;
+            }
+          }
           return updated;
         },
       );
     }
 
-    // Update instructions to reflect new portion size
+    // Update instructions to reflect new portion size (voor X persoon/personen)
+    const portionLabel =
+      newServings === 1 ? '1 persoon' : `${newServings} personen`;
     const updatedAiAnalysis = { ...currentAiAnalysis };
     if (servingsChanged && currentAiAnalysis.instructions) {
       const instructions = currentAiAnalysis.instructions;
 
+      const applyInstructionPortionUpdates = (text: string): string => {
+        let updatedText = text;
+        // "voor X personen" / "voor X persoon"
+        updatedText = updatedText.replace(
+          /voor\s+(\d+)\s+personen?/gi,
+          `voor ${portionLabel}`,
+        );
+        // Losse "X personen" / "X persoon" (alleen als dat het oude portieaantal was)
+        updatedText = updatedText.replace(
+          /(\d+)\s+personen?/g,
+          (match: string, num: string) => {
+            const oldNum = parseInt(num, 10);
+            if (oldNum === oldServings) return portionLabel;
+            return match;
+          },
+        );
+        // "qty x porties" → nieuwe qty en porties
+        updatedText = updatedText.replace(
+          /(\d+(?:[.,]\d+)?)\s*(?:x|×)\s*(\d+)/g,
+          (match: string, qty: string, multiplier: string) => {
+            const quantity = parseFloat(qty.replace(',', '.'));
+            const mult = parseInt(multiplier, 10);
+            if (mult === oldServings && Number.isFinite(quantity)) {
+              const newQty = Math.round(quantity * ratio * 10) / 10;
+              return `${newQty} x ${portionLabel}`;
+            }
+            return match;
+          },
+        );
+        return updatedText;
+      };
+
       if (Array.isArray(instructions)) {
-        // Update each instruction step
         updatedAiAnalysis.instructions = instructions.map(
           (instruction: any) => {
             const instructionText =
               typeof instruction === 'string'
                 ? instruction
                 : instruction?.text || instruction?.step || String(instruction);
-
-            // Replace common portion references in instructions
-            let updatedText = instructionText;
-
-            // Replace "voor X personen" or "voor X personen" patterns
-            updatedText = updatedText.replace(
-              /voor\s+(\d+)\s+personen?/gi,
-              `voor ${newServings} personen`,
-            );
-
-            // Replace "X personen" patterns
-            updatedText = updatedText.replace(
-              /(\d+)\s+personen?/g,
-              (match: string, num: string) => {
-                const oldNum = parseInt(num);
-                if (oldNum === oldServings) {
-                  return `${newServings} personen`;
-                }
-                return match;
-              },
-            );
-
-            // Replace numeric quantities that might be portion-related
-            // This is a simple heuristic - we look for numbers followed by common units
-            updatedText = updatedText.replace(
-              /(\d+(?:[.,]\d+)?)\s*(?:x|×)\s*(\d+)/g,
-              (match: string, qty: string, multiplier: string) => {
-                const quantity = parseFloat(qty.replace(',', '.'));
-                const mult = parseInt(multiplier);
-                if (mult === oldServings) {
-                  const newQty = Math.round(quantity * ratio * 10) / 10;
-                  return `${newQty} x ${newServings}`;
-                }
-                return match;
-              },
-            );
-
+            const updatedText = applyInstructionPortionUpdates(instructionText);
             if (typeof instruction === 'string') {
               return updatedText;
-            } else {
-              return {
-                ...instruction,
-                text: updatedText,
-                step: updatedText,
-              };
             }
+            return {
+              ...instruction,
+              text: updatedText,
+              step: updatedText,
+            };
           },
         );
       } else if (typeof instructions === 'string') {
-        // Single string instruction
-        let updatedText = instructions;
-        updatedText = updatedText.replace(
-          /voor\s+(\d+)\s+personen?/gi,
-          `voor ${newServings} personen`,
-        );
-        updatedText = updatedText.replace(
-          /(\d+)\s+personen?/g,
-          (match, num) => {
-            const oldNum = parseInt(num);
-            if (oldNum === oldServings) {
-              return `${newServings} personen`;
-            }
-            return match;
-          },
-        );
-        updatedAiAnalysis.instructions = updatedText;
+        updatedAiAnalysis.instructions =
+          applyInstructionPortionUpdates(instructions);
       }
     }
 
@@ -939,9 +940,12 @@ export async function updateRecipeContentAction(args: {
       }
     }
 
+    // Bewaar de volledige ingrediëntenlijst (niet alleen unmatched), zodat de editor
+    // na opslaan nog steeds alle rijen toont en gekoppelde ingrediënten (ingredientRefs)
+    // niet verdwijnen bij een volgende bewerking.
     const updatedMealData = {
       ...currentMealData,
-      ingredients: ingredientsUnmatched,
+      ingredients: ingredientRows,
       ingredientRefs,
     };
 

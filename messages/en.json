@@ -146,7 +146,11 @@
     "noExtractedData": "No extracted data available. Please try again.",
     "translateToDutch": "Translate to Dutch",
     "translating": "Translating...",
-    "translateFailed": "Translation failed. Please try again."
+    "translateFailed": "Translation failed. Please try again.",
+    "warningCookMinutesMissing": "Cook time is missing",
+    "warningRestingTimeNotIncluded": "Resting time is not included in total time",
+    "warningPrepMinutesMissing": "Prep time is missing",
+    "warningTotalMinutesMissing": "Total time is missing"
   },
   "recipes": {
     "pageTitle": "Recipes Database",

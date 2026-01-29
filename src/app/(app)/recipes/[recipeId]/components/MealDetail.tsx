@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/catalyst/badge';
 import { Text } from '@/components/catalyst/text';
@@ -41,7 +41,9 @@ import {
 } from '../../actions/meals.actions';
 import {
   getRecipeNutritionSummaryAction,
+  getResolvedIngredientMatchesAction,
   type RecipeNutritionSummary,
+  type ResolvedIngredientMatch,
 } from '../actions/ingredient-matching.actions';
 import { quantityUnitToGrams } from '@/src/lib/recipes/quantity-unit-to-grams';
 import {
@@ -55,18 +57,24 @@ type MealDetailProps = {
   meal: CustomMealRecord | any;
   mealSource: 'custom' | 'gemini';
   nevoFoodNamesByCode: Record<string, string>;
+  /** Actuele namen uit ingredientendatabase (custom_foods) voor weergave na wijziging */
+  customFoodNamesById?: Record<string, string>;
   /** Compliance score 0–100% volgens dieetregels */
   complianceScore?: RecipeComplianceResult | null;
   /** Wordt aangeroepen nadat AI Magician een aangepaste versie heeft toegepast, zodat de pagina kan verversen */
   onRecipeApplied?: () => void;
+  /** Wordt aangeroepen na het koppelen van een ingrediënt (stille refresh + notificatie, geen volledige paginaload) */
+  onIngredientMatched?: () => void;
 };
 
 export function MealDetail({
   meal,
   mealSource,
   nevoFoodNamesByCode,
+  customFoodNamesById = {},
   complianceScore,
   onRecipeApplied,
+  onIngredientMatched,
 }: MealDetailProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [aiMagicianOpen, setAiMagicianOpen] = useState(false);
@@ -100,6 +108,12 @@ export function MealDetail({
   const [recipeNutritionSummary, setRecipeNutritionSummary] =
     useState<RecipeNutritionSummary | null>(null);
   const [recipeNutritionLoading, setRecipeNutritionLoading] = useState(false);
+  /** Opgeslagen matches voor legacy-ingrediënten (uit recipe_ingredient_matches); null = nog niet geladen */
+  const [resolvedLegacyMatches, setResolvedLegacyMatches] = useState<
+    (ResolvedIngredientMatch | null)[] | null
+  >(null);
+  /** Een ingrediëntmatch wordt opgeslagen; voorkomt gelijktijdige updates */
+  const [savingIngredientMatch, setSavingIngredientMatch] = useState(false);
 
   const router = useRouter();
 
@@ -264,6 +278,92 @@ export function MealDetail({
     meal?.updated_at ?? meal?.updatedAt,
   ]);
 
+  // Laad opgeslagen matches voor legacy-ingrediënten (recipe_ingredient_matches) zodat alleen twijfelgevallen het waarschuwingsicoon tonen.
+  // Per ingrediënt proberen we meerdere mogelijke regels (volledige regel, naam+hoeveelheid+eenheid, alleen naam) zodat een eerder opgeslagen match uit een ander recept altijd wordt gevonden.
+  const hasLegacyIngredientsOnly =
+    (displayMealData?.ingredients?.length ?? 0) > 0 &&
+    (displayMealData?.ingredientRefs?.length ?? 0) === 0;
+  useEffect(() => {
+    if (
+      !meal?.id ||
+      !hasLegacyIngredientsOnly ||
+      !displayMealData?.ingredients
+    ) {
+      setResolvedLegacyMatches(null);
+      return;
+    }
+    const ingredients = displayMealData.ingredients as any[];
+    const lineOptionsPerIngredient = ingredients.map((ing: any) => {
+      const name = ing.name || ing.original_line || '';
+      const qty = ing.quantity ?? ing.amount;
+      const numQty =
+        typeof qty === 'number'
+          ? qty
+          : typeof qty === 'string'
+            ? parseFloat(qty)
+            : undefined;
+      const unit = (ing.unit ?? 'g')?.toString().trim() || 'g';
+      const options: string[] = [];
+      if (ing.original_line?.trim()) options.push(ing.original_line.trim());
+      if (name.trim() && numQty != null && unit) {
+        const fullLine = `${name.trim()} ${numQty} ${unit}`.trim();
+        if (!options.includes(fullLine)) options.push(fullLine);
+      }
+      if (name.trim() && !options.includes(name.trim()))
+        options.push(name.trim());
+      return options.length > 0 ? options : [name || ''];
+    });
+    if (lineOptionsPerIngredient.every((opts) => opts.length === 0)) {
+      setResolvedLegacyMatches(null);
+      return;
+    }
+    let cancelled = false;
+    getResolvedIngredientMatchesAction(lineOptionsPerIngredient).then(
+      (result) => {
+        if (cancelled) return;
+        if (result.ok) setResolvedLegacyMatches(result.data);
+        else setResolvedLegacyMatches(null);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [meal?.id, hasLegacyIngredientsOnly, displayMealData?.ingredients]);
+
+  const handleLegacyIngredientConfirmed = useCallback(() => {
+    if (onIngredientMatched) {
+      onIngredientMatched();
+      return;
+    }
+    onRecipeApplied?.();
+    const ingredients = displayMealData?.ingredients as any[] | undefined;
+    if (ingredients?.length) {
+      const lineOptionsPerIngredient = ingredients.map((ing: any) => {
+        const name = ing.name || ing.original_line || '';
+        const qty = ing.quantity ?? ing.amount;
+        const numQty =
+          typeof qty === 'number'
+            ? qty
+            : typeof qty === 'string'
+              ? parseFloat(qty)
+              : undefined;
+        const unit = (ing.unit ?? 'g')?.toString().trim() || 'g';
+        const options: string[] = [];
+        if (ing.original_line?.trim()) options.push(ing.original_line.trim());
+        if (name.trim() && numQty != null && unit) {
+          const fullLine = `${name.trim()} ${numQty} ${unit}`.trim();
+          if (!options.includes(fullLine)) options.push(fullLine);
+        }
+        if (name.trim() && !options.includes(name.trim()))
+          options.push(name.trim());
+        return options.length > 0 ? options : [name || ''];
+      });
+      getResolvedIngredientMatchesAction(lineOptionsPerIngredient).then((r) => {
+        if (r.ok) setResolvedLegacyMatches(r.data);
+      });
+    }
+  }, [onIngredientMatched, onRecipeApplied, displayMealData?.ingredients]);
+
   const formatDietTypeName = (
     dietKey: string | null | undefined,
   ): string | null => {
@@ -279,9 +379,9 @@ export function MealDetail({
   return (
     <div className="space-y-6">
       {/* Header Info */}
-      <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        <div className="flex items-start gap-6 mb-4">
-          <div className="flex-1">
+      <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10 overflow-hidden">
+        <div className="flex flex-col gap-6 mb-4 md:flex-row md:items-start">
+          <div className="flex-1 min-w-0">
             <h2 className="text-2xl font-bold text-zinc-950 dark:text-white mb-2">
               {mealName}
             </h2>
@@ -406,8 +506,8 @@ export function MealDetail({
             )}
           </div>
 
-          {/* Source Image Upload/Display - Right aligned */}
-          <div className="flex-shrink-0">
+          {/* Source Image Upload/Display - Right on desktop, below on mobile */}
+          <div className="flex-shrink-0 w-full md:w-auto min-w-0 max-w-full">
             <RecipeImageUpload
               mealId={meal.id}
               source={mealSource}
@@ -588,8 +688,10 @@ export function MealDetail({
               displayMealData.ingredientRefs.length > 0 &&
               displayMealData.ingredientRefs.map((ref: any, idx: number) => {
                 const name =
+                  (ref.customFoodId && customFoodNamesById[ref.customFoodId]) ||
+                  (ref.nevoCode != null &&
+                    nevoFoodNamesByCode[String(ref.nevoCode)]) ||
                   ref.displayName ||
-                  nevoFoodNamesByCode[ref.nevoCode] ||
                   (ref.customFoodId
                     ? 'Eigen ingrediënt'
                     : `NEVO ${ref.nevoCode}`);
@@ -636,7 +738,8 @@ export function MealDetail({
               displayMealData.ingredients.length > 0 &&
               displayMealData.ingredients.map((ing: any, idx: number) => {
                 const name =
-                  ing.name || ing.original_line || `Ingrediënt ${idx + 1}`;
+                  resolvedLegacyMatches?.[idx]?.displayName ??
+                  (ing.name || ing.original_line || `Ingrediënt ${idx + 1}`);
                 const quantity = ing.quantity ?? ing.amount;
                 const numQty =
                   typeof quantity === 'number'
@@ -663,11 +766,13 @@ export function MealDetail({
                       quantity={numQty}
                       unit={unit}
                       note={note}
-                      match={null}
+                      match={resolvedLegacyMatches?.[idx] ?? null}
                       mealId={meal.id}
                       mealSource={mealSource}
                       ingredientIndex={idx}
-                      onConfirmed={onRecipeApplied}
+                      onConfirmed={handleLegacyIngredientConfirmed}
+                      externalSaving={savingIngredientMatch}
+                      onSavingChange={setSavingIngredientMatch}
                     />
                   </li>
                 );

@@ -99,6 +99,104 @@ describe('Diet Validator', () => {
     });
   });
 
+  describe('findForbiddenMatches - bloemkoolrijst vs rijst', () => {
+    const dairyWithRijstRuleset: DietRuleset = {
+      dietId: 'test-diet',
+      version: 1,
+      forbidden: [
+        {
+          term: 'dairy',
+          synonyms: ['melk', 'kaas', 'rijst'],
+          ruleCode: 'wahls_forbidden_dairy',
+          ruleLabel: 'Zuivel (Strikt verboden)',
+          substitutionSuggestions: ['amandelmelk'],
+        },
+      ],
+    };
+
+    it('should NOT flag bloemkoolrijst as dairy (cauliflower rice is vegetable)', () => {
+      const matches = findForbiddenMatches(
+        'bloemkoolrijst',
+        dairyWithRijstRuleset,
+        'ingredients',
+      );
+      assert.strictEqual(
+        matches.length,
+        0,
+        'bloemkoolrijst is cauliflower rice, not dairy',
+      );
+    });
+
+    it('should NOT flag bloemkool as dairy', () => {
+      const matches = findForbiddenMatches(
+        'bloemkool',
+        dairyWithRijstRuleset,
+        'ingredients',
+      );
+      assert.strictEqual(matches.length, 0, 'bloemkool is cabbage, not dairy');
+    });
+
+    it('should still flag plain rijst when rule has rijst as forbidden', () => {
+      const matches = findForbiddenMatches(
+        'rijst',
+        dairyWithRijstRuleset,
+        'ingredients',
+      );
+      assert.strictEqual(matches.length, 1, 'plain rijst should be flagged');
+    });
+  });
+
+  describe('findForbiddenMatches - bloemkoolrijst vs gluten', () => {
+    const glutenRulesetWithBloem: DietRuleset = {
+      dietId: 'test-diet',
+      version: 1,
+      forbidden: [
+        {
+          term: 'gluten',
+          synonyms: ['tarwe', 'bloem', 'pasta', 'brood'],
+          ruleCode: 'wahls_forbidden_gluten',
+          ruleLabel: 'Gluten (Strikt verboden)',
+          substitutionSuggestions: ['courgette noodles'],
+        },
+      ],
+    };
+
+    it('should NOT flag bloemkoolrijst as gluten (cauliflower rice is vegetable)', () => {
+      const matches = findForbiddenMatches(
+        'bloemkoolrijst',
+        glutenRulesetWithBloem,
+        'ingredients',
+      );
+      assert.strictEqual(
+        matches.length,
+        0,
+        'bloemkoolrijst is cauliflower rice, not gluten',
+      );
+    });
+
+    it('should NOT flag bloemkool as gluten', () => {
+      const matches = findForbiddenMatches(
+        'bloemkool',
+        glutenRulesetWithBloem,
+        'ingredients',
+      );
+      assert.strictEqual(
+        matches.length,
+        0,
+        'bloemkool is vegetable, not gluten',
+      );
+    });
+
+    it('should still flag plain bloem (flour) as gluten', () => {
+      const matches = findForbiddenMatches(
+        'tarwebloem',
+        glutenRulesetWithBloem,
+        'ingredients',
+      );
+      assert.strictEqual(matches.length, 1, 'tarwebloem should be flagged');
+    });
+  });
+
   describe('normalizeForMatching', () => {
     it('should lowercase and collapse spaces', () => {
       assert.strictEqual(

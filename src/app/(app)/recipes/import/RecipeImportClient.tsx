@@ -125,6 +125,43 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+/** Map known English warning strings from Gemini to recipeImport translation keys (user language) */
+const WARNING_TRANSLATION_MAP: { pattern: RegExp | string; key: string }[] = [
+  {
+    pattern: /cook_minutes is missing|cook time is missing/i,
+    key: 'warningCookMinutesMissing',
+  },
+  {
+    pattern: /resting time is not included in total/i,
+    key: 'warningRestingTimeNotIncluded',
+  },
+  {
+    pattern: /prep_minutes is missing|prep time is missing/i,
+    key: 'warningPrepMinutesMissing',
+  },
+  {
+    pattern: /total_minutes is missing|total time is missing/i,
+    key: 'warningTotalMinutesMissing',
+  },
+];
+
+function getWarningDisplayText(
+  warning: string,
+  t: (key: string) => string,
+): string {
+  const normalized = warning.trim();
+  for (const { pattern, key } of WARNING_TRANSLATION_MAP) {
+    if (
+      typeof pattern === 'string'
+        ? normalized.toLowerCase() === pattern.toLowerCase()
+        : pattern.test(normalized)
+    ) {
+      return t(key);
+    }
+  }
+  return warning;
+}
+
 /** Detect native "Failed to fetch" / network errors from server actions */
 function isNetworkOrFetchError(err: unknown): boolean {
   if (err instanceof TypeError && err.message === 'Failed to fetch')
@@ -641,16 +678,29 @@ export function RecipeImportClient({
   // Handle camera capture
   const handleOpenCamera = useCallback(async () => {
     try {
-      // Prefer back camera on mobile; fallback to default camera (desktop / no environment)
+      // Prefer portrait on mobile (narrow screen or portrait orientation)
+      const isPortraitPreferred =
+        typeof window !== 'undefined' &&
+        (window.innerWidth < 640 || window.innerHeight > window.innerWidth);
+      const videoConstraints: MediaTrackConstraints = isPortraitPreferred
+        ? {
+            facingMode: 'environment',
+            width: { ideal: 720 },
+            height: { ideal: 1280 },
+          }
+        : { facingMode: 'environment' };
+
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
+          video: videoConstraints,
           audio: false,
         });
       } catch {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
+          video: isPortraitPreferred
+            ? { width: { ideal: 720 }, height: { ideal: 1280 } }
+            : true,
           audio: false,
         });
       }
@@ -1326,7 +1376,7 @@ export function RecipeImportClient({
                                   key={idx}
                                   className="text-sm text-amber-700 dark:text-amber-300"
                                 >
-                                  {warning}
+                                  {getWarningDisplayText(warning, t)}
                                 </li>
                               ))}
                             </ul>
@@ -1519,7 +1569,7 @@ export function RecipeImportClient({
         <DialogTitle>{t('cameraTitle')}</DialogTitle>
         <DialogBody>
           <div className="space-y-4">
-            <div className="relative bg-zinc-900 rounded-lg overflow-hidden aspect-video">
+            <div className="relative bg-zinc-900 rounded-lg overflow-hidden aspect-[3/4] max-h-[70vh] sm:max-h-none">
               <video
                 ref={videoRef}
                 autoPlay

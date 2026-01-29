@@ -629,7 +629,7 @@ export function GuardRailsOverview({
         </div>
       )}
 
-      <div className="rounded-lg bg-white shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+      <div className="rounded-lg bg-white shadow-xs dark:bg-zinc-900">
         <div className="p-6">
           {sortedConstraints.length === 0 ? (
             <div className="py-8 text-center">
@@ -638,7 +638,7 @@ export function GuardRailsOverview({
               </Text>
             </div>
           ) : (
-            <Table>
+            <Table className="[--gutter:--spacing(6)] sm:[--gutter:--spacing(8)]">
               <TableHead>
                 <TableRow>
                   <TableHeader>Categorie</TableHeader>

@@ -1172,13 +1172,13 @@ export function GuardRailsVNextOverview({
     return (
       <div className="space-y-6">
         {/* Header skeleton */}
-        <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+        <div className="rounded-lg bg-white p-6 shadow-xs dark:bg-zinc-900">
           <div className="h-6 w-64 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse mb-2" />
           <div className="h-4 w-96 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
         </div>
 
         {/* Table skeleton */}
-        <div className="rounded-lg bg-white shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+        <div className="rounded-lg bg-white shadow-xs dark:bg-zinc-900">
           <div className="p-6">
             <div className="space-y-3">
               {[1, 2, 3, 4, 5].map((i) => (
@@ -1213,7 +1213,7 @@ export function GuardRailsVNextOverview({
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+        <div className="rounded-lg bg-white p-6 shadow-xs dark:bg-zinc-900">
           <div className="space-y-3">
             {[1, 2, 3, 4, 5].map((i) => (
               <div
@@ -1230,7 +1230,7 @@ export function GuardRailsVNextOverview({
   if (!data) {
     return (
       <div className="space-y-6">
-        <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+        <div className="rounded-lg bg-white p-6 shadow-xs dark:bg-zinc-900">
           <Text className="text-zinc-500 dark:text-zinc-400">
             Geen guard rails regels gevonden voor dit dieet.
           </Text>
@@ -1244,7 +1244,7 @@ export function GuardRailsVNextOverview({
   return (
     <div className="space-y-6">
       {/* Header Card */}
-      <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+      <div className="rounded-lg bg-white p-6 shadow-xs dark:bg-zinc-900">
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-lg font-semibold text-zinc-950 dark:text-white">
@@ -1274,7 +1274,7 @@ export function GuardRailsVNextOverview({
       </div>
 
       {/* Group Policies Table - Consolidated view (only constraints) */}
-      <div className="rounded-lg bg-white shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+      <div className="rounded-lg bg-white shadow-xs dark:bg-zinc-900">
         <div className="p-6">
           <div className="mb-4 flex items-center justify-between">
             <div>
@@ -1355,7 +1355,7 @@ export function GuardRailsVNextOverview({
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="[--gutter:--spacing(6)] sm:[--gutter:--spacing(8)]">
                 <TableHead>
                   <TableRow>
                     <TableHeader className="w-10" title="Selecteer">

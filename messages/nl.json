@@ -155,7 +155,11 @@
     "noExtractedData": "Geen geëxtraheerde data beschikbaar. Probeer opnieuw.",
     "translateToDutch": "Vertaal naar Nederlands",
     "translating": "Vertalen...",
-    "translateFailed": "Vertalen mislukt. Probeer het opnieuw."
+    "translateFailed": "Vertalen mislukt. Probeer het opnieuw.",
+    "warningCookMinutesMissing": "Kooktijd ontbreekt",
+    "warningRestingTimeNotIncluded": "Rusttijd is niet meegenomen in totale tijd",
+    "warningPrepMinutesMissing": "Bereidingstijd ontbreekt",
+    "warningTotalMinutesMissing": "Totale tijd ontbreekt"
   },
   "recipes": {
     "pageTitle": "Recepten Database",

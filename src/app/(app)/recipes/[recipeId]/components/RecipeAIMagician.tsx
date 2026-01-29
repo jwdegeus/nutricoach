@@ -407,9 +407,9 @@ export function RecipeAIMagician({
             <nav className="-mb-px flex space-x-8">
               <button
                 onClick={() => setActiveTab('analyse')}
-                className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-t ${
+                className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900 rounded-t ${
                   activeTab === 'analyse'
-                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
                     : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
                 }`}
                 aria-selected={activeTab === 'analyse'}
@@ -421,9 +421,9 @@ export function RecipeAIMagician({
               </button>
               <button
                 onClick={() => setActiveTab('rewrite')}
-                className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-t ${
+                className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900 rounded-t ${
                   activeTab === 'rewrite'
-                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
                     : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
                 }`}
                 aria-selected={activeTab === 'rewrite'}

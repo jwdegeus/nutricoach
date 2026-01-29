@@ -9,7 +9,9 @@ import Link from 'next/link';
 import { MealDetail } from './MealDetail';
 import { getMealByIdAction } from '../../actions/meals.actions';
 import { getRecipeComplianceScoresAction } from '../../actions/recipe-compliance.actions';
+import { getCustomFoodNamesByIdsAction } from '../actions/ingredient-matching.actions';
 import type { RecipeComplianceResult } from '../../actions/recipe-compliance.actions';
+import { useToast } from '@/src/components/app/ToastContext';
 
 type RecipeDetailPageClientProps = {
   mealId: string;
@@ -21,8 +23,12 @@ export function RecipeDetailPageClient({
   mealSource,
 }: RecipeDetailPageClientProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [meal, setMeal] = useState<any>(null);
   const [nevoFoodNamesByCode, setNevoFoodNamesByCode] = useState<
+    Record<string, string>
+  >({});
+  const [customFoodNamesById, setCustomFoodNamesById] = useState<
     Record<string, string>
   >({});
   const [complianceScore, setComplianceScore] =
@@ -30,101 +36,132 @@ export function RecipeDetailPageClient({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Define loadMeal function that can be called from multiple places
-  const loadMeal = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  // Refetch meal data (with or without loading spinner)
+  const loadMealInternal = useCallback(
+    async (showLoadingSpinner: boolean) => {
+      try {
+        if (showLoadingSpinner) {
+          setLoading(true);
+          setError(null);
+        }
 
-      // Load meal
-      const mealResult = await getMealByIdAction(mealId, mealSource);
+        // Load meal
+        const mealResult = await getMealByIdAction(mealId, mealSource);
 
-      if (!mealResult.ok) {
-        if (mealResult.error.code === 'AUTH_ERROR') {
-          router.push('/login');
+        if (!mealResult.ok) {
+          if (mealResult.error.code === 'AUTH_ERROR') {
+            router.push('/login');
+            return;
+          }
+          setError(mealResult.error.message);
+          if (showLoadingSpinner) setLoading(false);
           return;
         }
-        setError(mealResult.error.message);
-        setLoading(false);
-        return;
-      }
 
-      const loadedMeal = mealResult.data;
-      console.log('[MealDetailPageClient] Meal loaded:', {
-        id: loadedMeal.id,
-        name: loadedMeal.name,
-        sourceImageUrl: loadedMeal.sourceImageUrl,
-        source_image_url: loadedMeal.source_image_url,
-        sourceImagePath: loadedMeal.sourceImagePath,
-        source_image_path: loadedMeal.source_image_path,
-        allKeys: Object.keys(loadedMeal),
-        fullMeal: JSON.stringify(loadedMeal, null, 2).substring(0, 500),
-      });
-      setMeal(loadedMeal);
+        const loadedMeal = mealResult.data;
+        console.log('[MealDetailPageClient] Meal loaded:', {
+          id: loadedMeal.id,
+          name: loadedMeal.name,
+          sourceImageUrl: loadedMeal.sourceImageUrl,
+          source_image_url: loadedMeal.source_image_url,
+          sourceImagePath: loadedMeal.sourceImagePath,
+          source_image_path: loadedMeal.source_image_path,
+          allKeys: Object.keys(loadedMeal),
+          fullMeal: JSON.stringify(loadedMeal, null, 2).substring(0, 500),
+        });
+        setMeal(loadedMeal);
 
-      // Compliance score voor dieetregels (ingrediënten + bereidingsinstructies)
-      const base = loadedMeal.mealData ?? loadedMeal.meal_data ?? {};
-      const instructions =
-        loadedMeal.aiAnalysis?.instructions ??
-        (loadedMeal as { ai_analysis?: { instructions?: unknown } }).ai_analysis
-          ?.instructions;
-      const mealPayload =
-        Array.isArray(instructions) && instructions.length > 0
-          ? {
-              ...(typeof base === 'object' && base !== null ? base : {}),
-              instructions,
+        // Compliance score voor dieetregels (ingrediënten + bereidingsinstructies)
+        const base = loadedMeal.mealData ?? loadedMeal.meal_data ?? {};
+        const instructions =
+          loadedMeal.aiAnalysis?.instructions ??
+          (loadedMeal as { ai_analysis?: { instructions?: unknown } })
+            .ai_analysis?.instructions;
+        const mealPayload =
+          Array.isArray(instructions) && instructions.length > 0
+            ? {
+                ...(typeof base === 'object' && base !== null ? base : {}),
+                instructions,
+              }
+            : base;
+        const complianceResult = await getRecipeComplianceScoresAction([
+          { id: loadedMeal.id, source: mealSource, mealData: mealPayload },
+        ]);
+        if (complianceResult.ok && complianceResult.data[loadedMeal.id]) {
+          setComplianceScore(complianceResult.data[loadedMeal.id]);
+        } else {
+          setComplianceScore(null);
+        }
+
+        // Build NEVO food names map
+        const nevoCodes = new Set<string>();
+        const mealData = loadedMeal.mealData || loadedMeal.meal_data;
+        if (mealData?.ingredientRefs) {
+          for (const ref of mealData.ingredientRefs) {
+            if (ref.nevoCode != null) nevoCodes.add(String(ref.nevoCode));
+          }
+        }
+
+        const namesMap: Record<string, string> = {};
+        for (const code of nevoCodes) {
+          try {
+            const codeNum = parseInt(code, 10);
+            if (!isNaN(codeNum)) {
+              namesMap[code] = `NEVO ${code}`;
+            } else {
+              namesMap[code] = `NEVO ${code}`;
             }
-          : base;
-      const complianceResult = await getRecipeComplianceScoresAction([
-        { id: loadedMeal.id, source: mealSource, mealData: mealPayload },
-      ]);
-      if (complianceResult.ok && complianceResult.data[loadedMeal.id]) {
-        setComplianceScore(complianceResult.data[loadedMeal.id]);
-      } else {
-        setComplianceScore(null);
-      }
-
-      // Build NEVO food names map
-      const nevoCodes = new Set<string>();
-      const mealData = loadedMeal.mealData || loadedMeal.meal_data;
-      if (mealData?.ingredientRefs) {
-        for (const ref of mealData.ingredientRefs) {
-          nevoCodes.add(ref.nevoCode);
-        }
-      }
-
-      const namesMap: Record<string, string> = {};
-      for (const code of nevoCodes) {
-        try {
-          const codeNum = parseInt(code, 10);
-          if (!isNaN(codeNum)) {
-            // Note: getNevoFoodByCode is server-only, so we'll need to fetch via API
-            // For now, just use the displayName or code
+          } catch {
             namesMap[code] = `NEVO ${code}`;
+          }
+        }
+
+        if (mealData?.ingredientRefs) {
+          for (const ref of mealData.ingredientRefs) {
+            if (ref.displayName && ref.nevoCode != null) {
+              namesMap[String(ref.nevoCode)] = ref.displayName;
+            }
+          }
+        }
+
+        setNevoFoodNamesByCode(namesMap);
+
+        // Actuele namen uit ingredientendatabase (custom_foods) voor weergave in recept
+        const customFoodIds = (mealData?.ingredientRefs ?? [])
+          .map((ref: { customFoodId?: string }) => ref.customFoodId)
+          .filter(
+            (id: unknown): id is string =>
+              typeof id === 'string' && id.length > 0,
+          );
+        if (customFoodIds.length > 0) {
+          const namesResult =
+            await getCustomFoodNamesByIdsAction(customFoodIds);
+          if (namesResult.ok) {
+            setCustomFoodNamesById(namesResult.data);
           } else {
-            namesMap[code] = `NEVO ${code}`;
+            setCustomFoodNamesById({});
           }
-        } catch {
-          namesMap[code] = `NEVO ${code}`;
+        } else {
+          setCustomFoodNamesById({});
         }
-      }
 
-      // Try to get names from ingredientRefs displayName
-      if (mealData?.ingredientRefs) {
-        for (const ref of mealData.ingredientRefs) {
-          if (ref.displayName) {
-            namesMap[ref.nevoCode] = ref.displayName;
-          }
-        }
+        if (showLoadingSpinner) setLoading(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Onbekende fout');
+        if (showLoadingSpinner) setLoading(false);
       }
+    },
+    [mealId, mealSource, router],
+  );
 
-      setNevoFoodNamesByCode(namesMap);
-      setLoading(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Onbekende fout');
-      setLoading(false);
-    }
-  }, [mealId, mealSource, router]);
+  const loadMeal = useCallback(
+    () => loadMealInternal(true),
+    [loadMealInternal],
+  );
+  const loadMealSilent = useCallback(
+    () => loadMealInternal(false),
+    [loadMealInternal],
+  );
 
   // Listen for recipe source updates
   useEffect(() => {
@@ -250,8 +287,17 @@ export function RecipeDetailPageClient({
         meal={meal}
         mealSource={mealSource}
         nevoFoodNamesByCode={nevoFoodNamesByCode}
+        customFoodNamesById={customFoodNamesById}
         complianceScore={complianceScore}
         onRecipeApplied={loadMeal}
+        onIngredientMatched={() => {
+          loadMealSilent();
+          showToast({
+            type: 'success',
+            title: 'Ingrediënt gekoppeld',
+            description: 'Het recept is bijgewerkt.',
+          });
+        }}
       />
     </div>
   );

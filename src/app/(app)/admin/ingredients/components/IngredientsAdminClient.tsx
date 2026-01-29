@@ -13,7 +13,7 @@ import {
 } from '@/components/catalyst/table';
 import { Button } from '@/components/catalyst/button';
 import { Badge } from '@/components/catalyst/badge';
-import { Input } from '@/components/catalyst/input';
+import { Input, InputGroup } from '@/components/catalyst/input';
 import {
   Dialog,
   DialogTitle,
@@ -38,13 +38,16 @@ import {
   PaginationGap,
 } from '@/components/catalyst/pagination';
 import {
-  MagnifyingGlassIcon,
   PlusIcon,
   ArrowPathIcon,
   EllipsisVerticalIcon,
   PencilSquareIcon,
   TrashIcon,
 } from '@heroicons/react/20/solid';
+import {
+  MagnifyingGlassIcon,
+  ChevronDownIcon,
+} from '@heroicons/react/16/solid';
 
 type SourceType = 'nevo' | 'custom';
 
@@ -126,7 +129,7 @@ export function IngredientsAdminClient({
 }: IngredientsAdminClientProps = {}) {
   const router = useRouter();
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>(
-    initialFilterNoCategory ? 'nevo' : 'nevo',
+    initialFilterNoCategory ? 'nevo' : 'all',
   );
   const [noCategoryFilter, setNoCategoryFilter] = useState(
     initialFilterNoCategory,
@@ -325,8 +328,11 @@ export function IngredientsAdminClient({
     onPageChange: (p: number) => void,
   ) => (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-700">
-        <Table striped>
+      <div className="overflow-x-auto">
+        <Table
+          className="[--gutter:--spacing(6)] sm:[--gutter:--spacing(8)]"
+          striped
+        >
           <TableHead>
             <TableRow>
               <TableHeader className="py-3 px-4">Bron</TableHeader>
@@ -483,12 +489,12 @@ export function IngredientsAdminClient({
   return (
     <div className={embedded ? 'space-y-6' : 'space-y-6 p-6'}>
       {!embedded && (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-1">
             <h1 className="text-2xl font-bold text-zinc-950 dark:text-white">
               Ingrediënten (NEVO)
             </h1>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
               Bekijk NEVO-voedingsmiddelen en voedingswaarden. Voeg eigen
               ingredienten toe als ze niet in NEVO staan.
             </p>
@@ -500,7 +506,7 @@ export function IngredientsAdminClient({
         </div>
       )}
       {embedded && (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
             Ingrediënten
           </h2>
@@ -517,39 +523,47 @@ export function IngredientsAdminClient({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Bron:
-          </label>
-          <select
-            value={sourceFilter}
-            onChange={(e) => {
-              const next = e.target.value as SourceFilter;
-              setSourceFilter(next);
-              if (next !== 'nevo') setNoCategoryFilter(false);
-              setPage(1);
-            }}
-            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
-          >
+      <div className="flex flex-wrap items-end gap-3">
+        <Dropdown>
+          <DropdownButton outline className="min-w-[140px] justify-between">
+            {SOURCE_OPTIONS.find((o) => o.value === sourceFilter)?.label ??
+              'Bron'}
+            <ChevronDownIcon />
+          </DropdownButton>
+          <DropdownMenu>
             {SOURCE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
+              <DropdownItem
+                key={opt.value}
+                onClick={() => {
+                  setSourceFilter(opt.value);
+                  if (opt.value !== 'nevo') setNoCategoryFilter(false);
+                  setPage(1);
+                }}
+              >
                 {opt.label}
-              </option>
+              </DropdownItem>
             ))}
-          </select>
+          </DropdownMenu>
+        </Dropdown>
+        <div className="min-w-[200px] flex-1 max-w-sm">
+          <InputGroup>
+            <MagnifyingGlassIcon data-slot="icon" />
+            <Input
+              name="search"
+              type="search"
+              placeholder="Zoek op naam…"
+              aria-label="Zoeken"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </InputGroup>
         </div>
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-          <Input
-            type="search"
-            placeholder="Zoek op naam..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Button plain onClick={loadList} disabled={loading}>
+        <Button
+          plain
+          onClick={loadList}
+          disabled={loading}
+          className="shrink-0"
+        >
           <ArrowPathIcon
             className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`}
           />

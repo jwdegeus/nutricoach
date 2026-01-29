@@ -377,7 +377,7 @@ export function RecipesList({
     <>
       <div className="overflow-x-auto -mx-6 sm:-mx-4 lg:-mx-10">
         <div className="inline-block min-w-full px-6 sm:px-4 lg:px-10">
-          <Table className="[--gutter:--spacing(4)] sm:[--gutter:--spacing(6)]">
+          <Table className="[--gutter:--spacing(6)] sm:[--gutter:--spacing(8)]">
             <TableHead>
               <TableRow>
                 <TableHeader className="w-0"></TableHeader>

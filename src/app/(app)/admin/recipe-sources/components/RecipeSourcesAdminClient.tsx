@@ -300,8 +300,11 @@ export function RecipeSourcesAdminClient() {
         </div>
       )}
 
-      <div className="rounded-lg bg-white shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10 overflow-hidden">
-        <Table striped>
+      <div className="overflow-hidden">
+        <Table
+          className="[--gutter:--spacing(6)] sm:[--gutter:--spacing(8)]"
+          striped
+        >
           <TableHead>
             <TableRow>
               <TableHeader>Naam</TableHeader>

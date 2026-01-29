@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Dropdown,
   DropdownButton,
   DropdownMenu,
   DropdownItem,
 } from '@/components/catalyst/dropdown';
+import { Menu } from '@headlessui/react';
 import { Button } from '@/components/catalyst/button';
 import {
   Dialog,
@@ -31,6 +32,7 @@ import {
   createCustomFoodFromIngredientAction,
   createCustomFoodManualAction,
 } from '../actions/ingredient-matching.actions';
+import { useToast } from '@/src/components/app/ToastContext';
 import type { NutritionalProfile } from '@/src/lib/nevo/nutrition-calculator';
 import { quantityUnitToGrams } from '@/src/lib/recipes/quantity-unit-to-grams';
 import type { IngredientCandidate } from '../actions/ingredient-matching.actions';
@@ -68,6 +70,10 @@ type IngredientRowWithNutritionProps = {
   ingredientIndex?: number;
   /** Na bevestigen van een match: callback om recept te verversen */
   onConfirmed?: () => void;
+  /** Wordt true wanneer een andere rij aan het opslaan is; voorkomt gelijktijdige updates */
+  externalSaving?: boolean;
+  /** Callback wanneer deze rij begint/stopt met opslaan (voor globale lock) */
+  onSavingChange?: (saving: boolean) => void;
 };
 
 function formatNutri(value: number | null | undefined, unit: string): string {
@@ -88,7 +94,12 @@ export function IngredientRowWithNutrition({
   mealSource,
   ingredientIndex,
   onConfirmed,
+  externalSaving = false,
+  onSavingChange,
 }: IngredientRowWithNutritionProps) {
+  const { showToast } = useToast();
+  const closeDropdownRef = useRef<(() => void) | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   const [nutrition, setNutrition] = useState<
     NutritionalProfile | null | undefined
   >(undefined);
@@ -130,6 +141,7 @@ export function IngredientRowWithNutrition({
     mealSource != null &&
     ingredientIndex != null &&
     typeof onConfirmed === 'function';
+  const isSaving = savingMatch || externalSaving;
 
   useEffect(() => {
     if (!match) {
@@ -184,12 +196,20 @@ export function IngredientRowWithNutrition({
     }
   };
 
-  const loadSuggestions = () => loadSuggestionsWithQuery(displayName.trim());
+  const loadSuggestions = () => {
+    setConfirmError(null);
+    loadSuggestionsWithQuery(displayName.trim());
+  };
 
-  const confirmSuggestion = async (candidate: IngredientCandidate) => {
-    if (!canSearchSuggestions || savingMatch) return;
-    const normalized = normalizeText(displayName);
+  const confirmSuggestion = async (
+    candidate: IngredientCandidate,
+    closeMenu?: () => void,
+  ) => {
+    if (!canSearchSuggestions || isSaving) return;
+    setConfirmError(null);
     setSavingMatch(true);
+    onSavingChange?.(true);
+    const normalized = normalizeText(displayName);
     const saveResult = await saveIngredientMatchAction({
       normalizedText: normalized,
       source: candidate.source,
@@ -198,6 +218,13 @@ export function IngredientRowWithNutrition({
     });
     if (!saveResult.ok) {
       setSavingMatch(false);
+      onSavingChange?.(false);
+      setConfirmError(saveResult.error.message);
+      showToast({
+        type: 'error',
+        title: 'Koppelen mislukt',
+        description: saveResult.error.message,
+      });
       return;
     }
     const updateResult = await updateRecipeIngredientMatchAction({
@@ -220,21 +247,38 @@ export function IngredientRowWithNutrition({
       unit: unit ?? undefined,
     });
     setSavingMatch(false);
+    onSavingChange?.(false);
     if (updateResult.ok) {
+      closeMenu?.();
       onConfirmed?.();
+    } else {
+      setConfirmError(updateResult.error.message);
+      showToast({
+        type: 'error',
+        title: 'Koppelen mislukt',
+        description: updateResult.error.message,
+      });
     }
   };
 
   const handleAiAdd = async () => {
-    if (!canSearchSuggestions || aiLoading) return;
+    if (!canSearchSuggestions || aiLoading || isSaving) return;
     setAiError(null);
+    setConfirmError(null);
     setAiLoading(true);
+    onSavingChange?.(true);
     const result = await createCustomFoodFromIngredientAction({
       ingredientText: displayName.trim(),
     });
     if (!result.ok) {
       setAiLoading(false);
+      onSavingChange?.(false);
       setAiError(result.error.message);
+      showToast({
+        type: 'error',
+        title: 'AI toevoegen mislukt',
+        description: result.error.message,
+      });
       return;
     }
     const normalized = normalizeText(displayName);
@@ -245,7 +289,13 @@ export function IngredientRowWithNutrition({
     });
     if (!saveResult.ok) {
       setAiLoading(false);
+      onSavingChange?.(false);
       setAiError(saveResult.error.message);
+      showToast({
+        type: 'error',
+        title: 'Koppelen mislukt',
+        description: saveResult.error.message,
+      });
       return;
     }
     const updateResult = await updateRecipeIngredientMatchAction({
@@ -264,10 +314,17 @@ export function IngredientRowWithNutrition({
       unit: unit ?? undefined,
     });
     setAiLoading(false);
+    onSavingChange?.(false);
     if (updateResult.ok) {
+      closeDropdownRef.current?.();
       onConfirmed?.();
     } else {
       setAiError(updateResult.error.message);
+      showToast({
+        type: 'error',
+        title: 'Koppelen mislukt',
+        description: updateResult.error.message,
+      });
     }
   };
 
@@ -287,7 +344,7 @@ export function IngredientRowWithNutrition({
   };
 
   const handleManualSubmit = async () => {
-    if (!canSearchSuggestions || manualSaving) return;
+    if (!canSearchSuggestions || manualSaving || isSaving) return;
     const nameNl = manualForm.name_nl.trim();
     if (!nameNl) {
       setManualError('Naam (NL) is verplicht');
@@ -295,6 +352,8 @@ export function IngredientRowWithNutrition({
     }
     setManualSaving(true);
     setManualError(null);
+    setConfirmError(null);
+    onSavingChange?.(true);
     const result = await createCustomFoodManualAction({
       name_nl: nameNl,
       name_en: manualForm.name_en.trim() || null,
@@ -314,7 +373,13 @@ export function IngredientRowWithNutrition({
     });
     if (!result.ok) {
       setManualSaving(false);
+      onSavingChange?.(false);
       setManualError(result.error.message);
+      showToast({
+        type: 'error',
+        title: 'Toevoegen mislukt',
+        description: result.error.message,
+      });
       return;
     }
     const normalized = normalizeText(displayName);
@@ -325,7 +390,13 @@ export function IngredientRowWithNutrition({
     });
     if (!saveResult.ok) {
       setManualSaving(false);
+      onSavingChange?.(false);
       setManualError(saveResult.error.message);
+      showToast({
+        type: 'error',
+        title: 'Koppelen mislukt',
+        description: saveResult.error.message,
+      });
       return;
     }
     const updateResult = await updateRecipeIngredientMatchAction({
@@ -344,12 +415,20 @@ export function IngredientRowWithNutrition({
       unit: unit ?? undefined,
     });
     setManualSaving(false);
+    onSavingChange?.(false);
     if (updateResult.ok) {
       setManualModalOpen(false);
       setAiError(null);
+      setConfirmError(null);
+      closeDropdownRef.current?.();
       onConfirmed?.();
     } else {
       setManualError(updateResult.error.message);
+      showToast({
+        type: 'error',
+        title: 'Koppelen mislukt',
+        description: updateResult.error.message,
+      });
     }
   };
 
@@ -393,6 +472,12 @@ export function IngredientRowWithNutrition({
         anchor="bottom start"
         className="w-[var(--button-width)] min-w-[18rem] max-w-[22rem] p-0"
       >
+        <Menu.Item as={React.Fragment}>
+          {({ close }) => {
+            closeDropdownRef.current = close;
+            return <span className="sr-only" aria-hidden />;
+          }}
+        </Menu.Item>
         <div className="p-4">
           {!match && (
             <div className="space-y-4">
@@ -406,7 +491,7 @@ export function IngredientRowWithNutrition({
                     <Button
                       outline={true}
                       className="shrink-0 sm:w-auto"
-                      disabled={suggestionsLoading || savingMatch}
+                      disabled={suggestionsLoading || isSaving}
                       onClick={loadSuggestions}
                     >
                       <MagnifyingGlassIcon className="mr-2 h-4 w-4 shrink-0" />
@@ -427,14 +512,14 @@ export function IngredientRowWithNutrition({
                           }
                         }}
                         className="min-w-0"
-                        disabled={suggestionsLoading || savingMatch}
+                        disabled={suggestionsLoading || isSaving}
                       />
                       <Button
                         outline={true}
                         className="shrink-0"
                         disabled={
                           suggestionsLoading ||
-                          savingMatch ||
+                          isSaving ||
                           !manualSearchQuery.trim()
                         }
                         onClick={() =>
@@ -456,24 +541,45 @@ export function IngredientRowWithNutrition({
                             key={i}
                             className="border-b border-zinc-100 dark:border-zinc-800 last:border-b-0"
                           >
-                            <DropdownItem
-                              onClick={() => confirmSuggestion(c)}
-                              disabled={savingMatch}
-                              className="flex flex-col items-stretch gap-1.5 w-full rounded-none py-3 px-4 text-left data-focus:bg-zinc-100 data-focus:text-zinc-950 dark:data-focus:bg-zinc-700 dark:data-focus:text-white [&_.text-zinc-500]:data-focus:text-zinc-600 dark:[&_.text-zinc-400]:data-focus:text-zinc-300"
-                            >
-                              <span className="block truncate text-sm font-medium text-zinc-900 dark:text-white">
-                                {c.name_nl}
-                              </span>
-                              {c.food_group_nl && (
-                                <span className="block truncate text-xs text-zinc-500 dark:text-zinc-400">
-                                  {c.food_group_nl}
-                                </span>
+                            <Menu.Item as={React.Fragment}>
+                              {({ close }) => (
+                                <button
+                                  type="button"
+                                  disabled={isSaving}
+                                  onMouseDown={(e: React.MouseEvent) => {
+                                    if (isSaving) return;
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    confirmSuggestion(c, close);
+                                  }}
+                                  onClick={(e: React.MouseEvent) =>
+                                    e.preventDefault()
+                                  }
+                                  className="flex flex-col items-stretch gap-1.5 w-full rounded-none py-3 px-4 text-left text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white data-focus:bg-zinc-100 data-focus:text-zinc-950 dark:data-focus:bg-zinc-700 dark:data-focus:text-white data-disabled:opacity-50 data-[focus]:outline-hidden group cursor-default [&_.text-zinc-500]:data-focus:text-zinc-600 dark:[&_.text-zinc-400]:data-focus:text-zinc-300"
+                                >
+                                  <span className="block truncate text-sm font-medium text-zinc-900 dark:text-white">
+                                    {c.name_nl}
+                                  </span>
+                                  {c.food_group_nl && (
+                                    <span className="block truncate text-xs text-zinc-500 dark:text-zinc-400">
+                                      {c.food_group_nl}
+                                    </span>
+                                  )}
+                                </button>
                               )}
-                            </DropdownItem>
+                            </Menu.Item>
                           </li>
                         ))}
                       </ul>
                     </div>
+                  )}
+                  {confirmError && (
+                    <p
+                      className="text-xs text-red-600 dark:text-red-400 mt-2"
+                      role="alert"
+                    >
+                      Koppelen mislukt: {confirmError}
+                    </p>
                   )}
                   {!suggestionsLoading && suggestions.length === 0 && (
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
@@ -495,7 +601,7 @@ export function IngredientRowWithNutrition({
                         <Button
                           outline={true}
                           className="w-full"
-                          disabled={savingMatch || manualSaving}
+                          disabled={isSaving || manualSaving}
                           onClick={openManualModal}
                         >
                           <PlusIcon className="mr-2 h-4 w-4 shrink-0" />
@@ -506,7 +612,7 @@ export function IngredientRowWithNutrition({
                     <Button
                       outline={true}
                       className="w-full"
-                      disabled={aiLoading || savingMatch}
+                      disabled={aiLoading || isSaving}
                       onClick={handleAiAdd}
                     >
                       <SparklesIcon className="mr-2 h-4 w-4 shrink-0" />

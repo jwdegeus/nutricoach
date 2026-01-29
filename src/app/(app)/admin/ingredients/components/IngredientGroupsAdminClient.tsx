@@ -171,12 +171,12 @@ export function IngredientGroupsAdminClient() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
             Ingredientgroepen
           </h2>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
             Categorieën voor dieetregels (verboden/vereist). Koppel groepen aan
             diëten via Instellingen → Dieettype bewerken → Ingredientgroepen.
           </p>
@@ -207,8 +207,11 @@ export function IngredientGroupsAdminClient() {
           Laden...
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
-          <Table striped>
+        <div className="overflow-x-auto">
+          <Table
+            className="[--gutter:--spacing(6)] sm:[--gutter:--spacing(8)]"
+            striped
+          >
             <TableHead>
               <TableRow>
                 <TableHeader>Naam (NL)</TableHeader>

@@ -850,56 +850,62 @@ function mapRecipeToDraft(recipe: any, sourceUrl: string): RecipeDraft {
 /**
  * Fetch and parse recipe from URL
  *
- * @param url - URL to fetch recipe from
+ * @param url - URL to fetch recipe from (used when html not provided)
+ * @param existingHtml - Optional pre-fetched HTML to avoid duplicate fetch
  * @returns Recipe draft or error
  */
 export async function fetchAndParseRecipeJsonLd(
   url: string,
+  existingHtml?: string,
 ): Promise<FetchAndParseResult> {
   try {
-    // Fetch HTML
+    // Use pre-fetched HTML if provided, otherwise fetch
     let html: string;
-    try {
-      html = await fetchHtml(url);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to fetch URL';
-      const errorCode = (error as any)?.code;
+    if (existingHtml != null && existingHtml.length > 0) {
+      html = existingHtml;
+    } else {
+      try {
+        html = await fetchHtml(url);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Failed to fetch URL';
+        const errorCode = (error as any)?.code;
 
-      if (
-        errorCode === 'ACCESS_DENIED' ||
-        errorCode === 'NOT_FOUND' ||
-        errorCode === 'CLIENT_ERROR' ||
-        errorCode === 'SERVER_ERROR'
-      ) {
+        if (
+          errorCode === 'ACCESS_DENIED' ||
+          errorCode === 'NOT_FOUND' ||
+          errorCode === 'CLIENT_ERROR' ||
+          errorCode === 'SERVER_ERROR'
+        ) {
+          return {
+            ok: false,
+            errorCode: 'NO_RECIPE_FOUND',
+            message: errorMessage,
+          };
+        }
+
+        if (errorCode === 'UNSUPPORTED_CONTENT_TYPE') {
+          return {
+            ok: false,
+            errorCode: 'UNSUPPORTED_CONTENT_TYPE',
+            message: errorMessage,
+          };
+        }
+
+        if (errorCode === 'RESPONSE_TOO_LARGE') {
+          return {
+            ok: false,
+            errorCode: 'RESPONSE_TOO_LARGE',
+            message: errorMessage,
+          };
+        }
+
         return {
           ok: false,
-          errorCode: 'NO_RECIPE_FOUND',
+          errorCode: 'FETCH_FAILED',
           message: errorMessage,
         };
       }
-
-      if (errorCode === 'UNSUPPORTED_CONTENT_TYPE') {
-        return {
-          ok: false,
-          errorCode: 'UNSUPPORTED_CONTENT_TYPE',
-          message: errorMessage,
-        };
-      }
-
-      if (errorCode === 'RESPONSE_TOO_LARGE') {
-        return {
-          ok: false,
-          errorCode: 'RESPONSE_TOO_LARGE',
-          message: errorMessage,
-        };
-      }
-
-      return {
-        ok: false,
-        errorCode: 'FETCH_FAILED',
-        message: errorMessage,
-      };
     }
 
     // Extract JSON-LD blocks
