@@ -12,15 +12,23 @@ import { Text } from '@/components/catalyst/text';
 import { Select } from '@/components/catalyst/select';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/src/components/app/ToastContext';
 
-export function LanguageSelector() {
+interface LanguageSelectorProps {
+  /** When true, the section heading/description is omitted (provided by parent layout). */
+  hideSectionHeading?: boolean;
+}
+
+export function LanguageSelector({
+  hideSectionHeading,
+}: LanguageSelectorProps = {}) {
   const t = useTranslations('account');
   const tCommon = useTranslations('common');
   const locale = useLocale();
   const router = useRouter();
+  const { showToast } = useToast();
   const [selectedLanguage, setSelectedLanguage] = useState(locale);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -30,7 +38,6 @@ export function LanguageSelector() {
   async function handleLanguageChange(newLanguage: string) {
     setSelectedLanguage(newLanguage);
     setError(null);
-    setSuccess(null);
 
     startTransition(async () => {
       const result = await updateLanguagePreference(newLanguage);
@@ -38,8 +45,11 @@ export function LanguageSelector() {
         setError(result.error);
         setSelectedLanguage(locale); // Revert on error
       } else if (result?.success) {
-        setSuccess(result.message);
-        // Reload the page to apply new language
+        showToast({
+          type: 'success',
+          title: tCommon('success'),
+          description: result.message,
+        });
         router.refresh();
       }
     });
@@ -47,22 +57,18 @@ export function LanguageSelector() {
 
   return (
     <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-      <div className="mb-6">
-        <h2 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
-          {t('languagePreference')}
-        </h2>
-        <Text className="mt-1">{t('languageDescription')}</Text>
-      </div>
+      {!hideSectionHeading && (
+        <div className="mb-6">
+          <h2 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
+            {t('languagePreference')}
+          </h2>
+          <Text className="mt-1">{t('languageDescription')}</Text>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">
           <strong>{tCommon('error')}:</strong> {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-4 rounded-lg bg-green-50 p-4 text-sm text-green-600 dark:bg-green-950/50 dark:text-green-400">
-          <strong>{tCommon('success')}:</strong> {success}
         </div>
       )}
 

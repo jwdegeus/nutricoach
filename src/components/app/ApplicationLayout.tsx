@@ -28,6 +28,8 @@ import {
 import { SidebarLayout } from '@/components/catalyst/sidebar-layout';
 import { Avatar } from '@/components/catalyst/avatar';
 import { Link } from '@/components/catalyst/link';
+import { Breadcrumbs } from '@/components/catalyst/breadcrumbs';
+import { getBreadcrumbs } from '@/src/lib/nav';
 import { useTranslatedNavItems } from '@/src/lib/nav-hooks';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/src/lib/supabase/client';
@@ -191,6 +193,11 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
   const mainItems = navItems.filter((item) => !item.group);
   const secondaryItems = navItems.filter((item) => item.group === 'secondary');
   const tCommon = useTranslations('common');
+  const breadcrumbs = getBreadcrumbs(pathname, (key: string) => {
+    if (key.startsWith('common.')) return tCommon(key.slice(7));
+    if (key.startsWith('nav.')) return tNav(key.slice(4));
+    return key;
+  });
 
   return (
     <ToastProvider>
@@ -357,7 +364,14 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
           </Sidebar>
         }
       >
-        {children}
+        <>
+          {!/^\/recipes\/[^/]+$/.test(pathname) &&
+            pathname !== '/account' &&
+            !pathname.startsWith('/account/') && (
+              <Breadcrumbs items={breadcrumbs} className="mb-2" />
+            )}
+          {children}
+        </>
         <RecipeImportModal
           open={isImportModalOpen}
           onClose={() => setIsImportModalOpen(false)}

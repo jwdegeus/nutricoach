@@ -22,24 +22,59 @@ export type RecipeComplianceResult = {
   dietId: string | null;
   /** True when the diet has no configured rules (fallback ruleset was used); UI should show "N.v.t." instead of a percentage. */
   noRulesConfigured?: boolean;
+  /** Aantal atomen (ingrediënt of stap) met een blocking violation; handig voor UI-tekst zoals "1 item wijkt af". */
+  violatingCount?: number;
 };
 
+const INGREDIENT_PATH_PREFIX = 'ingredientRefs[';
+const INGREDIENT_PATH_PREFIX_LEGACY = 'ingredients[';
+
+function isIngredientPath(path: string): boolean {
+  return (
+    path.startsWith(INGREDIENT_PATH_PREFIX) ||
+    path.startsWith(INGREDIENT_PATH_PREFIX_LEGACY)
+  );
+}
+
 /**
- * Compute compliance score 0–100 from guardrails decision and target counts.
- * Score = share of evaluated atoms (ingredients + steps) that have no blocking violation.
+ * Compute compliance score 0–100 and violating count from guardrails decision.
+ *
+ * Score = alleen ingrediënten: round((compliantIngredients / totalIngredients) * 100).
+ * Bereidingsstappen worden wel geëvalueerd (voor decision.ok en violations), maar
+ * tellen niet mee in het percentage. Zo sluit 100% aan bij "geen ingrediënten om
+ * te vervangen" / AI magician heeft geen verbeteringen.
+ *
+ * violatingCount = totaal aantal atomen (ingrediënt + stap) met een violation,
+ * voor de tooltip ("X item(s) wijkt af").
  */
-function complianceScoreFromDecision(
+function complianceFromDecision(
   decision: GuardDecision,
-  totalAtoms: number,
-): number {
-  if (totalAtoms === 0) return 100;
+  ingredientCount: number,
+): { scorePercent: number; violatingCount: number } {
+  if (ingredientCount === 0) {
+    const violatingPaths = new Set(
+      decision.matches
+        .filter((m) => decision.appliedRuleIds.includes(m.ruleId))
+        .map((m) => m.targetPath),
+    );
+    return { scorePercent: 100, violatingCount: violatingPaths.size };
+  }
   const violatingPaths = new Set(
     decision.matches
       .filter((m) => decision.appliedRuleIds.includes(m.ruleId))
       .map((m) => m.targetPath),
   );
-  const compliantCount = Math.max(0, totalAtoms - violatingPaths.size);
-  return Math.round((compliantCount / totalAtoms) * 100);
+  const violatingIngredientPaths = new Set(
+    [...violatingPaths].filter(isIngredientPath),
+  );
+  const compliantIngredients = Math.max(
+    0,
+    ingredientCount - violatingIngredientPaths.size,
+  );
+  const scorePercent = Math.round(
+    (compliantIngredients / ingredientCount) * 100,
+  );
+  return { scorePercent, violatingCount: violatingPaths.size };
 }
 
 /**
@@ -115,15 +150,45 @@ export async function getRecipeComplianceScoresAction(
   const scores: Record<string, RecipeComplianceResult> = {};
 
   for (const item of items) {
-    const mealPayload = item.mealData ?? item.meal_data ?? null;
+    const raw = (item.mealData ?? item.meal_data ?? null) as Record<
+      string,
+      unknown
+    > | null;
+    const mealPayload = raw
+      ? {
+          ...raw,
+          ingredientRefs:
+            (raw.ingredientRefs as unknown[]) ??
+            (raw.ingredient_refs as unknown[]) ??
+            undefined,
+          instructions: (raw.instructions as unknown) ?? undefined,
+          name: raw.name ?? raw.meal_name ?? undefined,
+          steps: raw.steps ?? undefined,
+        }
+      : null;
     const targets = mapMealToGuardrailsTargets(
       mealPayload as Parameters<typeof mapMealToGuardrailsTargets>[0],
       'nl',
     );
-    const totalAtoms = targets.ingredient.length + targets.step.length;
+    const ingredientCount = targets.ingredient.length;
 
-    if (totalAtoms === 0) {
-      scores[item.id] = { scorePercent: 100, ok: true, dietId };
+    if (ingredientCount === 0) {
+      const decision: GuardDecision = evaluateGuardrails({
+        ruleset,
+        context,
+        targets,
+      });
+      const violatingPaths = new Set(
+        decision.matches
+          .filter((m) => decision.appliedRuleIds.includes(m.ruleId))
+          .map((m) => m.targetPath),
+      );
+      scores[item.id] = {
+        scorePercent: 100,
+        ok: decision.ok,
+        dietId,
+        violatingCount: violatingPaths.size,
+      };
       continue;
     }
 
@@ -133,11 +198,15 @@ export async function getRecipeComplianceScoresAction(
       targets,
     });
 
-    const scorePercent = complianceScoreFromDecision(decision, totalAtoms);
+    const { scorePercent, violatingCount } = complianceFromDecision(
+      decision,
+      ingredientCount,
+    );
     scores[item.id] = {
       scorePercent,
       ok: decision.ok,
       dietId,
+      violatingCount,
     };
   }
 

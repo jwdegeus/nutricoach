@@ -29,6 +29,18 @@ export const CUSTOM_FOODS_SECTIONS: {
       { key: 'name_en', label: 'Naam (EN)', type: 'text' },
       { key: 'synonym', label: 'Synoniem', type: 'text' },
       {
+        key: 'ingredient_category_id',
+        label: 'Ingredientgroep',
+        type: 'text',
+        placeholder: 'Kies een NutriCoach ingredientgroep',
+      },
+      {
+        key: 'fndds_food_group_nl',
+        label: 'FNDDS categorie',
+        type: 'text',
+        placeholder: 'Kies een FNDDS categorie',
+      },
+      {
         key: 'food_group_nl',
         label: 'Groep (NL)',
         type: 'text',

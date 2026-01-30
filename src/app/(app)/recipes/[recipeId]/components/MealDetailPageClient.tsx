@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Heading } from '@/components/catalyst/heading';
-import { Button } from '@/components/catalyst/button';
-import { ArrowLeftIcon } from '@heroicons/react/20/solid';
-import Link from 'next/link';
+import { Breadcrumbs } from '@/components/catalyst/breadcrumbs';
 import { MealDetail } from './MealDetail';
 import { getMealByIdAction } from '../../actions/meals.actions';
 import { getRecipeComplianceScoresAction } from '../../actions/recipe-compliance.actions';
-import { getCustomFoodNamesByIdsAction } from '../actions/ingredient-matching.actions';
+import {
+  getCustomFoodNamesByIdsAction,
+  getNevoFoodNamesByCodesAction,
+} from '../actions/ingredient-matching.actions';
 import type { RecipeComplianceResult } from '../../actions/recipe-compliance.actions';
 import { useToast } from '@/src/components/app/ToastContext';
 
@@ -23,6 +25,9 @@ export function RecipeDetailPageClient({
   mealSource,
 }: RecipeDetailPageClientProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const tCommon = useTranslations('common');
+  const tNav = useTranslations('nav');
   const { showToast } = useToast();
   const [meal, setMeal] = useState<any>(null);
   const [nevoFoodNamesByCode, setNevoFoodNamesByCode] = useState<
@@ -59,19 +64,22 @@ export function RecipeDetailPageClient({
         }
 
         const loadedMeal = mealResult.data;
-        console.log('[MealDetailPageClient] Meal loaded:', {
-          id: loadedMeal.id,
-          name: loadedMeal.name,
-          sourceImageUrl: loadedMeal.sourceImageUrl,
-          source_image_url: loadedMeal.source_image_url,
-          sourceImagePath: loadedMeal.sourceImagePath,
-          source_image_path: loadedMeal.source_image_path,
-          allKeys: Object.keys(loadedMeal),
-          fullMeal: JSON.stringify(loadedMeal, null, 2).substring(0, 500),
-        });
         setMeal(loadedMeal);
 
-        // Compliance score voor dieetregels (ingrediënten + bereidingsinstructies)
+        const mealData = loadedMeal.mealData || loadedMeal.meal_data;
+        const nevoCodesList: string[] = [];
+        if (mealData?.ingredientRefs) {
+          for (const ref of mealData.ingredientRefs) {
+            if (ref.nevoCode != null) nevoCodesList.push(String(ref.nevoCode));
+          }
+        }
+        const customFoodIds = (mealData?.ingredientRefs ?? [])
+          .map((ref: { customFoodId?: string }) => ref.customFoodId)
+          .filter(
+            (id: unknown): id is string =>
+              typeof id === 'string' && id.length > 0,
+          );
+
         const base = loadedMeal.mealData ?? loadedMeal.meal_data ?? {};
         const instructions =
           loadedMeal.aiAnalysis?.instructions ??
@@ -84,66 +92,49 @@ export function RecipeDetailPageClient({
                 instructions,
               }
             : base;
-        const complianceResult = await getRecipeComplianceScoresAction([
-          { id: loadedMeal.id, source: mealSource, mealData: mealPayload },
-        ]);
+
+        // Compliance, NEVO-namen en custom-namen parallel opvragen (minder wachttijd)
+        const [complianceResult, nevoNamesResult, customNamesResult] =
+          await Promise.all([
+            getRecipeComplianceScoresAction([
+              { id: loadedMeal.id, source: mealSource, mealData: mealPayload },
+            ]),
+            nevoCodesList.length > 0
+              ? getNevoFoodNamesByCodesAction(nevoCodesList)
+              : Promise.resolve({
+                  ok: true as const,
+                  data: {} as Record<string, string>,
+                }),
+            customFoodIds.length > 0
+              ? getCustomFoodNamesByIdsAction(customFoodIds)
+              : Promise.resolve({
+                  ok: true as const,
+                  data: {} as Record<string, string>,
+                }),
+          ]);
+
         if (complianceResult.ok && complianceResult.data[loadedMeal.id]) {
           setComplianceScore(complianceResult.data[loadedMeal.id]);
         } else {
           setComplianceScore(null);
         }
 
-        // Build NEVO food names map
-        const nevoCodes = new Set<string>();
-        const mealData = loadedMeal.mealData || loadedMeal.meal_data;
-        if (mealData?.ingredientRefs) {
-          for (const ref of mealData.ingredientRefs) {
-            if (ref.nevoCode != null) nevoCodes.add(String(ref.nevoCode));
+        const nevoNamesMap = nevoNamesResult.ok ? nevoNamesResult.data : {};
+        for (const code of nevoCodesList) {
+          if (!nevoNamesMap[code] && mealData?.ingredientRefs) {
+            const ref = mealData.ingredientRefs.find(
+              (r: { nevoCode?: string | number }) =>
+                String(r.nevoCode) === code,
+            );
+            if (ref?.displayName) nevoNamesMap[code] = ref.displayName;
           }
+          if (!nevoNamesMap[code]) nevoNamesMap[code] = `NEVO ${code}`;
         }
+        setNevoFoodNamesByCode(nevoNamesMap);
 
-        const namesMap: Record<string, string> = {};
-        for (const code of nevoCodes) {
-          try {
-            const codeNum = parseInt(code, 10);
-            if (!isNaN(codeNum)) {
-              namesMap[code] = `NEVO ${code}`;
-            } else {
-              namesMap[code] = `NEVO ${code}`;
-            }
-          } catch {
-            namesMap[code] = `NEVO ${code}`;
-          }
-        }
-
-        if (mealData?.ingredientRefs) {
-          for (const ref of mealData.ingredientRefs) {
-            if (ref.displayName && ref.nevoCode != null) {
-              namesMap[String(ref.nevoCode)] = ref.displayName;
-            }
-          }
-        }
-
-        setNevoFoodNamesByCode(namesMap);
-
-        // Actuele namen uit ingredientendatabase (custom_foods) voor weergave in recept
-        const customFoodIds = (mealData?.ingredientRefs ?? [])
-          .map((ref: { customFoodId?: string }) => ref.customFoodId)
-          .filter(
-            (id: unknown): id is string =>
-              typeof id === 'string' && id.length > 0,
-          );
-        if (customFoodIds.length > 0) {
-          const namesResult =
-            await getCustomFoodNamesByIdsAction(customFoodIds);
-          if (namesResult.ok) {
-            setCustomFoodNamesById(namesResult.data);
-          } else {
-            setCustomFoodNamesById({});
-          }
-        } else {
-          setCustomFoodNamesById({});
-        }
+        setCustomFoodNamesById(
+          customNamesResult.ok ? customNamesResult.data : {},
+        );
 
         if (showLoadingSpinner) setLoading(false);
       } catch (err) {
@@ -213,6 +204,17 @@ export function RecipeDetailPageClient({
     };
   }, [meal, loadMeal]);
 
+  // Bij terugkeren naar het tabblad opnieuw namen ophalen (ingrediëntomschrijving kan zijn bijgewerkt)
+  useEffect(() => {
+    if (typeof document === 'undefined' || !meal) return;
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadMealSilent();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () =>
+      document.removeEventListener('visibilitychange', handleVisibility);
+  }, [meal, loadMealSilent]);
+
   // Initial load
   useEffect(() => {
     // Validate mealId
@@ -227,21 +229,36 @@ export function RecipeDetailPageClient({
     queueMicrotask(() => loadMeal());
   }, [mealId, mealSource, loadMeal]);
 
+  const recipeBreadcrumbs = [
+    { label: tCommon('home'), href: '/dashboard' },
+    { label: tNav('recipes'), href: '/recipes' },
+    {
+      label:
+        meal?.name ||
+        meal?.mealName ||
+        meal?.meal_name ||
+        (loading ? 'Laden...' : error ? 'Fout' : 'Recept'),
+      href: pathname ?? `/recipes/${mealId}`,
+    },
+  ];
+
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Link href="/recipes">
-            <Button outline>
-              <ArrowLeftIcon className="h-4 w-4 mr-2" />
-              Terug naar recepten
-            </Button>
-          </Link>
-          <Heading level={1}>Laden...</Heading>
-        </div>
-        <div className="text-center py-12">
-          <p className="text-zinc-500 dark:text-zinc-400">
-            Recept details worden geladen...
+      <div className="mt-6 space-y-6">
+        <div
+          className="h-5 w-48 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700"
+          aria-hidden
+        />
+        <div className="flex min-h-[50vh] flex-col items-center justify-center gap-6 py-16">
+          <div
+            className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600 dark:border-zinc-600 dark:border-t-zinc-300"
+            aria-hidden
+          />
+          <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+            Recept wordt geladen...
+          </p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-500">
+            Receptgegevens en ingrediënten worden opgehaald
           </p>
         </div>
       </div>
@@ -251,15 +268,12 @@ export function RecipeDetailPageClient({
   if (error || !meal) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Link href="/recipes">
-            <Button outline>
-              <ArrowLeftIcon className="h-4 w-4 mr-2" />
-              Terug naar recepten
-            </Button>
-          </Link>
-          <Heading level={1}>Fout</Heading>
-        </div>
+        <Breadcrumbs
+          items={recipeBreadcrumbs}
+          currentPageClassName="text-zinc-500 dark:text-zinc-400"
+          className="mb-2"
+        />
+        <Heading level={1}>Fout</Heading>
         <div className="text-center py-12">
           <p className="text-red-600 dark:text-red-400">
             {error || 'Recept niet gevonden'}
@@ -270,19 +284,12 @@ export function RecipeDetailPageClient({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/recipes">
-          <Button outline>
-            <ArrowLeftIcon className="h-4 w-4 mr-2" />
-            Terug naar recepten
-          </Button>
-        </Link>
-        <Heading level={1}>
-          {meal.name || meal.mealName || meal.meal_name || 'Recept Details'}
-        </Heading>
-      </div>
-
+    <div className="mt-6 space-y-6">
+      <Breadcrumbs
+        items={recipeBreadcrumbs}
+        currentPageClassName="text-zinc-500 dark:text-zinc-400"
+        className="mb-2"
+      />
       <MealDetail
         meal={meal}
         mealSource={mealSource}

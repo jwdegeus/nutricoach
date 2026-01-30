@@ -34,7 +34,6 @@ import type {
   EvaluationContext,
   Locale,
 } from '@/src/lib/guardrails-vnext/types';
-import { generateRecipeAdaptationWithGemini } from './gemini-recipe-adaptation.service';
 
 /** Haal eerste voorgestelde alternatief uit suggestion-tekst (bijv. "Vervang door X of Y" → "X"). */
 function firstSuggestedAlternativeFromSuggestion(
@@ -273,6 +272,7 @@ export class RecipeAdaptationService {
   /**
    * Alleen analyse: violations uit dieetregels, geen AI-rewrite.
    * Gebruikt in twee-fase flow (eerst "Analyseer recept", daarna "Genereer aangepaste versie").
+   * Geeft ook eerder gekozen substituties terug voor snellere suggesties.
    */
   async getAnalysisOnly(
     recipeId: string,
@@ -281,6 +281,8 @@ export class RecipeAdaptationService {
     violations: ViolationDetail[];
     summary: string;
     recipeName: string;
+    noRulesConfigured?: boolean;
+    learnedSubstitutions?: Record<string, string>;
   }> {
     const recipe = await this.loadRecipeForAnalysis(recipeId);
     if (!recipe) {
@@ -296,6 +298,7 @@ export class RecipeAdaptationService {
         violations: [],
         summary: 'Geen dieetregels geconfigureerd voor dit dieet.',
         recipeName: recipe.mealName,
+        noRulesConfigured: true,
       };
     }
     const violations = this.analyzeRecipeForViolations(recipe, ruleset);
@@ -304,10 +307,38 @@ export class RecipeAdaptationService {
       violations.length === 0
         ? 'Geen afwijkingen gevonden! Dit recept past perfect bij jouw dieet.'
         : `${violations.length} ingrediënt${violations.length !== 1 ? 'en' : ''} wijk${violations.length !== 1 ? 'en' : 't'} af van je dieetvoorkeuren.`;
+
+    let learnedSubstitutions: Record<string, string> | undefined;
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user?.id) {
+        const { data: rows } = await supabase
+          .from('diet_ingredient_substitutions')
+          .select('original_normalized, substitute_display_name')
+          .eq('user_id', user.id)
+          .eq('diet_id', dietId);
+        if (rows?.length) {
+          learnedSubstitutions = {};
+          for (const r of rows) {
+            if (r.original_normalized && r.substitute_display_name) {
+              learnedSubstitutions[r.original_normalized] =
+                r.substitute_display_name;
+            }
+          }
+        }
+      }
+    } catch {
+      // Optioneel: negeer als tabel nog niet bestaat of RLS faalt
+    }
+
     return {
       violations,
       summary,
       recipeName: recipe.mealName,
+      learnedSubstitutions,
     };
   }
 
@@ -1695,9 +1726,17 @@ export class RecipeAdaptationService {
     ruleset: DietRuleset,
     strict: boolean,
     violationChoices?: Array<{ choice: ViolationChoice; substitute?: string }>,
-  ): { ingredients: IngredientLine[]; steps: StepLine[] } {
+  ): {
+    ingredients: IngredientLine[];
+    steps: StepLine[];
+    substitutions: Array<{ originalName: string; substituteName: string }>;
+  } {
     const ingredients: IngredientLine[] = [];
     const steps: StepLine[] = [];
+    const substitutions: Array<{
+      originalName: string;
+      substituteName: string;
+    }> = [];
 
     if (violationChoices?.length !== undefined) {
       console.log(
@@ -1855,7 +1894,7 @@ export class RecipeAdaptationService {
         const stepText = typeof step === 'string' ? step : String(step);
         steps.push({ step: index + 1, text: stepText });
       });
-      return { ingredients, steps };
+      return { ingredients, steps, substitutions: [] };
     }
 
     for (const ing of originalIngredients) {
@@ -1909,11 +1948,17 @@ export class RecipeAdaptationService {
       }
 
       if (substitution) {
+        const substituteName =
+          substitution.charAt(0).toUpperCase() + substitution.slice(1);
         ingredients.push({
-          name: substitution.charAt(0).toUpperCase() + substitution.slice(1),
+          name: substituteName,
           quantity: String(quantity),
           unit: unit,
           note: note || `vervanging voor ${ingredientName}`,
+        });
+        substitutions.push({
+          originalName: ingredientName,
+          substituteName,
         });
       } else {
         ingredients.push({
@@ -1963,7 +2008,7 @@ export class RecipeAdaptationService {
       });
     });
 
-    return { ingredients, steps };
+    return { ingredients, steps, substitutions };
   }
 
   /**
@@ -2064,20 +2109,50 @@ export class RecipeAdaptationService {
     let draft: RecipeAdaptationDraft;
 
     if (violations.length > 0) {
-      // Gemini als "chef" met dieetregels: intro, volledige herschrijving, why_this_works
-      const ingredientsToRemove =
-        violationChoices
-          ?.map((vc, i) =>
-            vc.choice === 'remove' ? violations[i]?.ingredientName : null,
-          )
-          .filter((n): n is string => Boolean(n)) ?? [];
-      draft = await generateRecipeAdaptationWithGemini(
-        recipe,
+      // Alleen niet-conforme ingredienten vervangen; recept en volgorde behouden (geen volledige herschrijving).
+      const defaultChoices: Array<{
+        choice: ViolationChoice;
+        substitute?: string;
+      }> =
+        violationChoices ??
+        violations.map((v) => {
+          const rule = ruleset.forbidden.find((r) => r.ruleCode === v.ruleCode);
+          const sub =
+            rule?.substitutionSuggestions?.[0] ??
+            firstSuggestedAlternativeFromSuggestion(v.suggestion);
+          return {
+            choice: 'substitute' as ViolationChoice,
+            substitute: sub ?? undefined,
+          };
+        });
+      const {
+        ingredients: rewriteIngredients,
+        steps: rewriteSteps,
+        substitutions: substitutionPairs,
+      } = this.generateRewrite(
+        {
+          mealData: recipe.mealData,
+          mealName: recipe.mealName,
+          steps: recipe.steps,
+        },
         violations,
         ruleset,
-        dietName,
-        ingredientsToRemove.length > 0 ? { ingredientsToRemove } : undefined,
+        false,
+        defaultChoices,
       );
+      const summary =
+        substitutionPairs.length > 0
+          ? `${substitutionPairs.length} ingrediënt${substitutionPairs.length !== 1 ? 'en' : ''} vervangen door passende alternatieven. Bereidingswijze licht aangepast waar nodig.`
+          : `${violations.length} afwijking${violations.length !== 1 ? 'en' : ''} gevonden.`;
+      draft = {
+        analysis: { violations, summary },
+        rewrite: {
+          title: recipe.mealName,
+          ingredients: rewriteIngredients,
+          steps: rewriteSteps,
+        },
+        substitutions: substitutionPairs,
+      };
     } else {
       // Geen afwijkingen: geen AI-call, alleen samenvatting
       const summary =

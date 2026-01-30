@@ -24,6 +24,8 @@ import {
   PlusIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/16/solid';
+import { TrashIcon } from '@heroicons/react/20/solid';
+import { Badge } from '@/components/catalyst/badge';
 import {
   getIngredientNutritionAction,
   searchIngredientCandidatesAction,
@@ -38,9 +40,11 @@ import { quantityUnitToGrams } from '@/src/lib/recipes/quantity-unit-to-grams';
 import type { IngredientCandidate } from '../actions/ingredient-matching.actions';
 
 type Match = {
-  source: 'nevo' | 'custom';
+  source: 'nevo' | 'custom' | 'fndds';
   nevoCode?: number;
   customFoodId?: string;
+  /** FNDDS survey food fdc_id when source is fndds */
+  fdcId?: number;
 };
 
 function normalizeText(text: string): string {
@@ -60,7 +64,7 @@ type IngredientRowWithNutritionProps = {
   unit?: string;
   /** Optionele opmerking tussen haakjes */
   note?: string;
-  /** Match met database (NEVO of custom). Bij null toont dropdown "Nog niet gematcht" + suggesties */
+  /** Match met database (NEVO, custom of FNDDS). Bij null toont dropdown "Nog niet gematcht" + suggesties */
   match: Match | null;
   /** Voor legacy-ingrediënten: mealId om ref op te slaan */
   mealId?: string;
@@ -74,6 +78,8 @@ type IngredientRowWithNutritionProps = {
   externalSaving?: boolean;
   /** Callback wanneer deze rij begint/stopt met opslaan (voor globale lock) */
   onSavingChange?: (saving: boolean) => void;
+  /** Callback om dit ingrediënt uit het recept te verwijderen (toont prullenbak bij hover) */
+  onRemove?: () => void;
 };
 
 function formatNutri(value: number | null | undefined, unit: string): string {
@@ -96,6 +102,7 @@ export function IngredientRowWithNutrition({
   onConfirmed,
   externalSaving = false,
   onSavingChange,
+  onRemove,
 }: IngredientRowWithNutritionProps) {
   const { showToast } = useToast();
   const closeDropdownRef = useRef<(() => void) | null>(null);
@@ -127,13 +134,15 @@ export function IngredientRowWithNutrition({
 
   const unitNorm = (unit ?? 'g').toLowerCase().trim();
   const effectiveG =
-    amountG > 0
-      ? amountG
-      : unitNorm === 'g' && typeof quantity === 'number' && quantity > 0
-        ? quantity
-        : typeof quantity === 'number' && quantity > 0 && unit
-          ? quantityUnitToGrams(quantity, unit)
-          : 100;
+    amountG === 0
+      ? 0
+      : amountG > 0
+        ? amountG
+        : unitNorm === 'g' && typeof quantity === 'number' && quantity > 0
+          ? quantity
+          : typeof quantity === 'number' && quantity > 0 && unit
+            ? quantityUnitToGrams(quantity, unit)
+            : 100;
   const MIN_CHARS_AUTO_SEARCH = 3;
   const canSearchSuggestions =
     !match &&
@@ -149,7 +158,7 @@ export function IngredientRowWithNutrition({
       return;
     }
     setNutrition(undefined);
-  }, [match?.source, match?.nevoCode, match?.customFoodId]);
+  }, [match?.source, match?.nevoCode, match?.customFoodId, match?.fdcId]);
 
   // Na 3 tekens direct zoeken in het handmatige zoekveld (debounced 300 ms)
   useEffect(() => {
@@ -172,6 +181,7 @@ export function IngredientRowWithNutrition({
       source: match.source,
       nevoCode: match.nevoCode,
       customFoodId: match.customFoodId,
+      fdcId: match.fdcId,
       amountG: effectiveG,
     });
     setLoading(false);
@@ -188,11 +198,19 @@ export function IngredientRowWithNutrition({
     if (!q) return;
     setSuggestionsLoading(true);
     setSuggestions([]);
+    setConfirmError(null);
     setHasSearched(true);
-    const searchResult = await searchIngredientCandidatesAction(q, 15);
-    setSuggestionsLoading(false);
-    if (searchResult.ok && searchResult.data.length > 0) {
-      setSuggestions(searchResult.data);
+    try {
+      const searchResult = await searchIngredientCandidatesAction(q, 15);
+      if (searchResult.ok) {
+        setSuggestions(searchResult.data);
+      } else {
+        setConfirmError(searchResult.error.message ?? 'Zoeken mislukt');
+      }
+    } catch (err) {
+      setConfirmError(err instanceof Error ? err.message : 'Zoeken mislukt');
+    } finally {
+      setSuggestionsLoading(false);
     }
   };
 
@@ -215,6 +233,7 @@ export function IngredientRowWithNutrition({
       source: candidate.source,
       nevoCode: candidate.nevoCode,
       customFoodId: candidate.customFoodId,
+      fdcId: candidate.fdcId,
     });
     if (!saveResult.ok) {
       setSavingMatch(false);
@@ -227,6 +246,7 @@ export function IngredientRowWithNutrition({
       });
       return;
     }
+    // Gebruik altijd de inhoud uit het recept; nooit 100g als default.
     const updateResult = await updateRecipeIngredientMatchAction({
       mealId: mealId!,
       source: mealSource!,
@@ -235,6 +255,7 @@ export function IngredientRowWithNutrition({
         source: candidate.source,
         nevoCode: candidate.nevoCode,
         customFoodId: candidate.customFoodId,
+        fdcId: candidate.fdcId,
       },
       displayName: candidate.name_nl,
       quantityG:
@@ -242,7 +263,7 @@ export function IngredientRowWithNutrition({
           ? quantity
           : typeof quantity === 'number' && unit
             ? undefined
-            : effectiveG,
+            : 0,
       quantity: typeof quantity === 'number' ? quantity : undefined,
       unit: unit ?? undefined,
     });
@@ -298,6 +319,7 @@ export function IngredientRowWithNutrition({
       });
       return;
     }
+    // Gebruik altijd de inhoud uit het recept; nooit 100g als default (bij onbekende hoeveelheid 0).
     const updateResult = await updateRecipeIngredientMatchAction({
       mealId: mealId!,
       source: mealSource!,
@@ -309,7 +331,7 @@ export function IngredientRowWithNutrition({
           ? quantity
           : typeof quantity === 'number' && unit
             ? undefined
-            : effectiveG,
+            : 0,
       quantity: typeof quantity === 'number' ? quantity : undefined,
       unit: unit ?? undefined,
     });
@@ -410,7 +432,7 @@ export function IngredientRowWithNutrition({
           ? quantity
           : typeof quantity === 'number' && unit
             ? undefined
-            : effectiveG,
+            : 0,
       quantity: typeof quantity === 'number' ? quantity : undefined,
       unit: unit ?? undefined,
     });
@@ -432,378 +454,434 @@ export function IngredientRowWithNutrition({
     }
   };
 
-  const displayQuantity = quantityLabel ?? `${effectiveG}g`;
+  // Toon geen "100g" als fallback wanneer het recept geen hoeveelheid opgeeft (bijv. "naar smaak").
+  // 100g wordt intern gebruikt voor nutri-berekening per 100g, niet als recepthoeveelheid.
+  const displayQuantity =
+    quantityLabel ??
+    (effectiveG > 0 && effectiveG !== 100 ? `${effectiveG}g` : undefined);
 
   return (
-    <Dropdown>
-      <DropdownButton
-        as="button"
-        type="button"
-        onClick={match ? loadNutrition : undefined}
-        className="w-full rounded-lg px-2 py-1.5 text-left text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/80"
-      >
-        {!match && (
-          <ExclamationTriangleIcon
-            className="mr-1.5 inline-block h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400"
-            aria-hidden
-            title="Nog niet gematcht – klik om te matchen"
-          />
-        )}
-        <span className="font-medium text-zinc-900 dark:text-white">
-          {displayName}
-        </span>
-        {displayQuantity && (
-          <>
-            {' '}
-            <span className="text-zinc-500 dark:text-zinc-500">
-              {displayQuantity}
+    <div className="group flex items-center gap-1 w-full rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/80 -mx-1 px-1">
+      <div className="flex-1 min-w-0">
+        <Dropdown>
+          <DropdownButton
+            as="button"
+            type="button"
+            onClick={match ? loadNutrition : undefined}
+            className="w-full rounded-lg px-2 py-1.5 text-left text-sm text-zinc-600 dark:text-zinc-400"
+          >
+            {!match && (
+              <ExclamationTriangleIcon
+                className="mr-1.5 inline-block h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400"
+                aria-hidden
+                title="Nog niet gematcht – klik om te matchen"
+              />
+            )}
+            <span className="font-medium text-zinc-900 dark:text-white">
+              {displayName}
             </span>
-          </>
-        )}
-        {note && (
-          <span className="text-zinc-500 dark:text-zinc-500 italic">
-            {' '}
-            ({note})
-          </span>
-        )}
-        <ChevronDownIcon className="ml-1 inline-block h-4 w-4 text-zinc-400" />
-      </DropdownButton>
-      <DropdownMenu
-        anchor="bottom start"
-        className="w-[var(--button-width)] min-w-[18rem] max-w-[22rem] p-0"
-      >
-        <Menu.Item as={React.Fragment}>
-          {({ close }) => {
-            closeDropdownRef.current = close;
-            return <span className="sr-only" aria-hidden />;
-          }}
-        </Menu.Item>
-        <div className="p-4">
-          {!match && (
-            <div className="space-y-4">
-              <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Nog niet gematcht met de database. Zoek suggesties of laat later
-                AI het ingrediënt toevoegen.
-              </p>
-              {canSearchSuggestions && (
-                <>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-2">
-                    <Button
-                      outline={true}
-                      className="shrink-0 sm:w-auto"
-                      disabled={suggestionsLoading || isSaving}
-                      onClick={loadSuggestions}
-                    >
-                      <MagnifyingGlassIcon className="mr-2 h-4 w-4 shrink-0" />
-                      <span className="truncate">
-                        {suggestionsLoading ? 'Zoeken...' : 'Zoek suggesties'}
-                      </span>
-                    </Button>
-                    <div className="flex min-w-0 flex-1 gap-2">
-                      <Input
-                        type="search"
-                        placeholder="Zoeken vanaf 3 tekens (bijv. uien)"
-                        value={manualSearchQuery}
-                        onChange={(e) => setManualSearchQuery(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            loadSuggestionsWithQuery(manualSearchQuery);
-                          }
-                        }}
-                        className="min-w-0"
-                        disabled={suggestionsLoading || isSaving}
-                      />
-                      <Button
-                        outline={true}
-                        className="shrink-0"
-                        disabled={
-                          suggestionsLoading ||
-                          isSaving ||
-                          !manualSearchQuery.trim()
-                        }
-                        onClick={() =>
-                          loadSuggestionsWithQuery(manualSearchQuery)
-                        }
-                      >
-                        Zoek
-                      </Button>
-                    </div>
-                  </div>
-                  {suggestions.length > 0 && (
-                    <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4 mt-4 -mx-4 px-4">
-                      <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
-                        Mogelijk bedoelde u
-                      </p>
-                      <ul className="max-h-52 overflow-y-auto -mx-4">
-                        {suggestions.map((c, i) => (
-                          <li
-                            key={i}
-                            className="border-b border-zinc-100 dark:border-zinc-800 last:border-b-0"
+            {displayQuantity && (
+              <>
+                {' '}
+                <span className="text-zinc-500 dark:text-zinc-500">
+                  {displayQuantity}
+                </span>
+              </>
+            )}
+            {note && (
+              <span className="text-zinc-500 dark:text-zinc-500 italic">
+                {' '}
+                ({note})
+              </span>
+            )}
+            <ChevronDownIcon className="ml-1 inline-block h-4 w-4 text-zinc-400" />
+          </DropdownButton>
+          <DropdownMenu
+            anchor="bottom start"
+            className="w-[var(--button-width)] min-w-[18rem] max-w-[22rem] p-0"
+          >
+            <Menu.Item as={React.Fragment}>
+              {({ close }) => {
+                closeDropdownRef.current = close;
+                return <span className="sr-only" aria-hidden />;
+              }}
+            </Menu.Item>
+            <div className="p-4">
+              {!match && (
+                <div className="space-y-4">
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                    Nog niet gematcht met de database. Zoek suggesties of laat
+                    later AI het ingrediënt toevoegen.
+                  </p>
+                  {canSearchSuggestions && (
+                    <>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-2">
+                        <Button
+                          outline={true}
+                          className="shrink-0 sm:w-auto"
+                          disabled={suggestionsLoading || isSaving}
+                          onClick={loadSuggestions}
+                        >
+                          <MagnifyingGlassIcon className="mr-2 h-4 w-4 shrink-0" />
+                          <span className="truncate">
+                            {suggestionsLoading
+                              ? 'Zoeken...'
+                              : 'Zoek suggesties'}
+                          </span>
+                        </Button>
+                        <div className="flex min-w-0 flex-1 gap-2">
+                          <Input
+                            type="search"
+                            placeholder="Zoeken vanaf 3 tekens (bijv. uien)"
+                            value={manualSearchQuery}
+                            onChange={(e) =>
+                              setManualSearchQuery(e.target.value)
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                loadSuggestionsWithQuery(manualSearchQuery);
+                              }
+                            }}
+                            className="min-w-0"
+                            disabled={suggestionsLoading || isSaving}
+                          />
+                          <Button
+                            outline={true}
+                            className="shrink-0"
+                            disabled={
+                              suggestionsLoading ||
+                              isSaving ||
+                              !manualSearchQuery.trim()
+                            }
+                            onClick={() =>
+                              loadSuggestionsWithQuery(manualSearchQuery)
+                            }
                           >
-                            <Menu.Item as={React.Fragment}>
-                              {({ close }) => (
-                                <button
-                                  type="button"
-                                  disabled={isSaving}
-                                  onMouseDown={(e: React.MouseEvent) => {
-                                    if (isSaving) return;
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    confirmSuggestion(c, close);
-                                  }}
-                                  onClick={(e: React.MouseEvent) =>
-                                    e.preventDefault()
-                                  }
-                                  className="flex flex-col items-stretch gap-1.5 w-full rounded-none py-3 px-4 text-left text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white data-focus:bg-zinc-100 data-focus:text-zinc-950 dark:data-focus:bg-zinc-700 dark:data-focus:text-white data-disabled:opacity-50 data-[focus]:outline-hidden group cursor-default [&_.text-zinc-500]:data-focus:text-zinc-600 dark:[&_.text-zinc-400]:data-focus:text-zinc-300"
-                                >
-                                  <span className="block truncate text-sm font-medium text-zinc-900 dark:text-white">
-                                    {c.name_nl}
-                                  </span>
-                                  {c.food_group_nl && (
-                                    <span className="block truncate text-xs text-zinc-500 dark:text-zinc-400">
-                                      {c.food_group_nl}
-                                    </span>
+                            Zoek
+                          </Button>
+                        </div>
+                      </div>
+                      {suggestions.length > 0 && (
+                        <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4 mt-4 -mx-4 px-4">
+                          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
+                            Mogelijk bedoelde u
+                          </p>
+                          <ul className="max-h-52 overflow-y-auto -mx-4">
+                            {suggestions.map((c, i) => (
+                              <li
+                                key={i}
+                                className="border-b border-zinc-100 dark:border-zinc-800 last:border-b-0"
+                              >
+                                <Menu.Item as={React.Fragment}>
+                                  {({ close }) => (
+                                    <button
+                                      type="button"
+                                      disabled={isSaving}
+                                      onMouseDown={(e: React.MouseEvent) => {
+                                        if (isSaving) return;
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        confirmSuggestion(c, close);
+                                      }}
+                                      onClick={(e: React.MouseEvent) =>
+                                        e.preventDefault()
+                                      }
+                                      className="flex flex-col items-stretch gap-1.5 w-full rounded-none py-3 px-4 text-left text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white data-focus:bg-zinc-100 data-focus:text-zinc-950 dark:data-focus:bg-zinc-700 dark:data-focus:text-white data-disabled:opacity-50 data-[focus]:outline-hidden group cursor-default [&_.text-zinc-500]:data-focus:text-zinc-600 dark:[&_.text-zinc-400]:data-focus:text-zinc-300"
+                                    >
+                                      <span className="flex items-center gap-2 flex-wrap">
+                                        <span className="block truncate text-sm font-medium text-zinc-900 dark:text-white min-w-0">
+                                          {c.name_nl}
+                                        </span>
+                                        <Badge
+                                          color={
+                                            c.sourceLabel === 'Nevo'
+                                              ? 'blue'
+                                              : c.sourceLabel === 'AI'
+                                                ? 'purple'
+                                                : c.sourceLabel === 'FNDDS'
+                                                  ? 'emerald'
+                                                  : 'zinc'
+                                          }
+                                          className="shrink-0 text-xs"
+                                        >
+                                          {c.sourceLabel}
+                                        </Badge>
+                                      </span>
+                                      {c.food_group_nl && (
+                                        <span className="block truncate text-xs text-zinc-500 dark:text-zinc-400">
+                                          {c.food_group_nl}
+                                        </span>
+                                      )}
+                                    </button>
                                   )}
-                                </button>
-                              )}
-                            </Menu.Item>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {confirmError && (
-                    <p
-                      className="text-xs text-red-600 dark:text-red-400 mt-2"
-                      role="alert"
-                    >
-                      Koppelen mislukt: {confirmError}
-                    </p>
-                  )}
-                  {!suggestionsLoading && suggestions.length === 0 && (
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                      {hasSearched
-                        ? 'Geen suggesties gevonden.'
-                        : 'Klik op "Zoek suggesties" om te zoeken in NEVO en eigen ingredienten.'}
-                    </p>
-                  )}
-                  <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4 mt-4">
-                    <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-3 leading-relaxed">
-                      Ingrediënt niet gevonden? Laat AI het ingrediënt opzoeken,
-                      nutriwaardes invullen en toevoegen aan de database.
-                    </p>
-                    {aiError && (
-                      <div className="mb-3 space-y-2">
-                        <p className="text-xs text-red-600 dark:text-red-400">
-                          {aiError}
+                                </Menu.Item>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {confirmError && (
+                        <p
+                          className="text-xs text-red-600 dark:text-red-400 mt-2"
+                          role="alert"
+                        >
+                          Koppelen mislukt: {confirmError}
                         </p>
+                      )}
+                      {!suggestionsLoading && suggestions.length === 0 && (
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                          {hasSearched
+                            ? 'Geen suggesties gevonden.'
+                            : 'Klik op "Zoek suggesties" om te zoeken in NEVO, eigen ingredienten en FNDDS.'}
+                        </p>
+                      )}
+                      <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4 mt-4">
+                        <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-3 leading-relaxed">
+                          Ingrediënt niet gevonden? Laat AI het ingrediënt
+                          opzoeken, nutriwaardes invullen en toevoegen aan de
+                          database.
+                        </p>
+                        {aiError && (
+                          <div className="mb-3 space-y-2">
+                            <p className="text-xs text-red-600 dark:text-red-400">
+                              {aiError}
+                            </p>
+                            <Button
+                              outline={true}
+                              className="w-full"
+                              disabled={isSaving || manualSaving}
+                              onClick={openManualModal}
+                            >
+                              <PlusIcon className="mr-2 h-4 w-4 shrink-0" />
+                              Handmatig toevoegen
+                            </Button>
+                          </div>
+                        )}
                         <Button
                           outline={true}
                           className="w-full"
-                          disabled={isSaving || manualSaving}
-                          onClick={openManualModal}
+                          disabled={aiLoading || isSaving}
+                          onClick={handleAiAdd}
                         >
-                          <PlusIcon className="mr-2 h-4 w-4 shrink-0" />
-                          Handmatig toevoegen
+                          <SparklesIcon className="mr-2 h-4 w-4 shrink-0" />
+                          <span className="truncate">
+                            {aiLoading
+                              ? 'AI zoekt en voegt toe...'
+                              : 'Laat AI zoeken en toevoegen'}
+                          </span>
                         </Button>
                       </div>
-                    )}
-                    <Button
-                      outline={true}
-                      className="w-full"
-                      disabled={aiLoading || isSaving}
-                      onClick={handleAiAdd}
-                    >
-                      <SparklesIcon className="mr-2 h-4 w-4 shrink-0" />
-                      <span className="truncate">
-                        {aiLoading
-                          ? 'AI zoekt en voegt toe...'
-                          : 'Laat AI zoeken en toevoegen'}
-                      </span>
-                    </Button>
-                  </div>
-                </>
+                    </>
+                  )}
+                </div>
+              )}
+              {match && loading && (
+                <p className="text-sm text-zinc-500 dark:text-zinc-500 py-3">
+                  Nutriwaardes laden...
+                </p>
+              )}
+              {match && nutrition === null && !loading && (
+                <p className="text-sm text-zinc-500 dark:text-zinc-500 py-3">
+                  Geen nutriwaardes beschikbaar.
+                </p>
+              )}
+              {match && nutrition && (
+                <div>
+                  <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
+                    Nutriwaardes ({effectiveG}g)
+                  </p>
+                  <dl className="grid grid-cols-[1fr_auto] gap-y-2 gap-x-6 text-sm">
+                    <dt className="text-zinc-600 dark:text-zinc-400">
+                      Energie
+                    </dt>
+                    <dd className="text-right tabular-nums text-zinc-900 dark:text-white">
+                      {formatNutri(nutrition.energy_kcal, 'kcal')}
+                    </dd>
+                    <dt className="text-zinc-600 dark:text-zinc-400">Eiwit</dt>
+                    <dd className="text-right tabular-nums text-zinc-900 dark:text-white">
+                      {formatNutri(nutrition.protein_g, 'g')}
+                    </dd>
+                    <dt className="text-zinc-600 dark:text-zinc-400">Vet</dt>
+                    <dd className="text-right tabular-nums text-zinc-900 dark:text-white">
+                      {formatNutri(nutrition.fat_g, 'g')}
+                    </dd>
+                    <dt className="text-zinc-600 dark:text-zinc-400">
+                      Koolhydraten
+                    </dt>
+                    <dd className="text-right tabular-nums text-zinc-900 dark:text-white">
+                      {formatNutri(nutrition.carbs_g, 'g')}
+                    </dd>
+                    <dt className="text-zinc-600 dark:text-zinc-400">Vezels</dt>
+                    <dd className="text-right tabular-nums text-zinc-900 dark:text-white">
+                      {formatNutri(nutrition.fiber_g, 'g')}
+                    </dd>
+                    <dt className="text-zinc-600 dark:text-zinc-400">
+                      Natrium
+                    </dt>
+                    <dd className="text-right tabular-nums text-zinc-900 dark:text-white">
+                      {formatNutri(nutrition.sodium_mg, 'mg')}
+                    </dd>
+                  </dl>
+                </div>
               )}
             </div>
-          )}
-          {match && loading && (
-            <p className="text-sm text-zinc-500 dark:text-zinc-500 py-3">
-              Nutriwaardes laden...
-            </p>
-          )}
-          {match && nutrition === null && !loading && (
-            <p className="text-sm text-zinc-500 dark:text-zinc-500 py-3">
-              Geen nutriwaardes beschikbaar.
-            </p>
-          )}
-          {match && nutrition && (
-            <div>
-              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
-                Nutriwaardes ({effectiveG}g)
-              </p>
-              <dl className="grid grid-cols-[1fr_auto] gap-y-2 gap-x-6 text-sm">
-                <dt className="text-zinc-600 dark:text-zinc-400">Energie</dt>
-                <dd className="text-right tabular-nums text-zinc-900 dark:text-white">
-                  {formatNutri(nutrition.energy_kcal, 'kcal')}
-                </dd>
-                <dt className="text-zinc-600 dark:text-zinc-400">Eiwit</dt>
-                <dd className="text-right tabular-nums text-zinc-900 dark:text-white">
-                  {formatNutri(nutrition.protein_g, 'g')}
-                </dd>
-                <dt className="text-zinc-600 dark:text-zinc-400">Vet</dt>
-                <dd className="text-right tabular-nums text-zinc-900 dark:text-white">
-                  {formatNutri(nutrition.fat_g, 'g')}
-                </dd>
-                <dt className="text-zinc-600 dark:text-zinc-400">
-                  Koolhydraten
-                </dt>
-                <dd className="text-right tabular-nums text-zinc-900 dark:text-white">
-                  {formatNutri(nutrition.carbs_g, 'g')}
-                </dd>
-                <dt className="text-zinc-600 dark:text-zinc-400">Vezels</dt>
-                <dd className="text-right tabular-nums text-zinc-900 dark:text-white">
-                  {formatNutri(nutrition.fiber_g, 'g')}
-                </dd>
-                <dt className="text-zinc-600 dark:text-zinc-400">Natrium</dt>
-                <dd className="text-right tabular-nums text-zinc-900 dark:text-white">
-                  {formatNutri(nutrition.sodium_mg, 'mg')}
-                </dd>
-              </dl>
-            </div>
-          )}
-        </div>
-      </DropdownMenu>
+          </DropdownMenu>
 
-      <Dialog
-        open={manualModalOpen}
-        onClose={() => setManualModalOpen(false)}
-        size="md"
-      >
-        <DialogTitle>Ingrediënt handmatig toevoegen</DialogTitle>
-        <DialogBody>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-            Voeg het ingrediënt toe als eigen ingrediënt. Vul minimaal de
-            Nederlandse naam in; voedingswaarden zijn optioneel (per 100 g).
-          </p>
-          {manualError && (
-            <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
-              {manualError}
-            </div>
-          )}
-          <div className="space-y-4">
-            <Field>
-              <Label>Naam (NL) *</Label>
-              <Input
-                value={manualForm.name_nl}
-                onChange={(e) =>
-                  setManualForm((f) => ({ ...f, name_nl: e.target.value }))
-                }
-                placeholder="bijv. Kokosmelk"
-              />
-            </Field>
-            <Field>
-              <Label>Naam (EN)</Label>
-              <Input
-                value={manualForm.name_en}
-                onChange={(e) =>
-                  setManualForm((f) => ({ ...f, name_en: e.target.value }))
-                }
-                placeholder="optioneel"
-              />
-            </Field>
-            <Field>
-              <Label>Voedingsmiddelgroep (NL)</Label>
-              <Input
-                value={manualForm.food_group_nl}
-                onChange={(e) =>
-                  setManualForm((f) => ({
-                    ...f,
-                    food_group_nl: e.target.value,
-                  }))
-                }
-                placeholder="bijv. Overig, Diversen"
-              />
-            </Field>
-            <div className="grid grid-cols-2 gap-4">
-              <Field>
-                <Label>Energie (kcal/100g)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={manualForm.energy_kcal}
-                  onChange={(e) =>
-                    setManualForm((f) => ({
-                      ...f,
-                      energy_kcal: e.target.value,
-                    }))
-                  }
-                  placeholder="–"
-                />
-              </Field>
-              <Field>
-                <Label>Eiwit (g)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={manualForm.protein_g}
-                  onChange={(e) =>
-                    setManualForm((f) => ({ ...f, protein_g: e.target.value }))
-                  }
-                  placeholder="–"
-                />
-              </Field>
-              <Field>
-                <Label>Vet (g)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={manualForm.fat_g}
-                  onChange={(e) =>
-                    setManualForm((f) => ({ ...f, fat_g: e.target.value }))
-                  }
-                  placeholder="–"
-                />
-              </Field>
-              <Field>
-                <Label>Koolhydraten (g)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={manualForm.carbs_g}
-                  onChange={(e) =>
-                    setManualForm((f) => ({ ...f, carbs_g: e.target.value }))
-                  }
-                  placeholder="–"
-                />
-              </Field>
-              <Field>
-                <Label>Vezel (g)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={manualForm.fiber_g}
-                  onChange={(e) =>
-                    setManualForm((f) => ({ ...f, fiber_g: e.target.value }))
-                  }
-                  placeholder="–"
-                />
-              </Field>
-            </div>
-          </div>
-        </DialogBody>
-        <DialogActions>
-          <Button plain onClick={() => setManualModalOpen(false)}>
-            Annuleren
-          </Button>
-          <Button
-            onClick={handleManualSubmit}
-            disabled={manualSaving || !manualForm.name_nl.trim()}
+          <Dialog
+            open={manualModalOpen}
+            onClose={() => setManualModalOpen(false)}
+            size="md"
           >
-            {manualSaving ? 'Toevoegen...' : 'Toevoegen'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Dropdown>
+            <DialogTitle>Ingrediënt handmatig toevoegen</DialogTitle>
+            <DialogBody>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                Voeg het ingrediënt toe als eigen ingrediënt. Vul minimaal de
+                Nederlandse naam in; voedingswaarden zijn optioneel (per 100 g).
+              </p>
+              {manualError && (
+                <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                  {manualError}
+                </div>
+              )}
+              <div className="space-y-4">
+                <Field>
+                  <Label>Naam (NL) *</Label>
+                  <Input
+                    value={manualForm.name_nl}
+                    onChange={(e) =>
+                      setManualForm((f) => ({ ...f, name_nl: e.target.value }))
+                    }
+                    placeholder="bijv. Kokosmelk"
+                  />
+                </Field>
+                <Field>
+                  <Label>Naam (EN)</Label>
+                  <Input
+                    value={manualForm.name_en}
+                    onChange={(e) =>
+                      setManualForm((f) => ({ ...f, name_en: e.target.value }))
+                    }
+                    placeholder="optioneel"
+                  />
+                </Field>
+                <Field>
+                  <Label>Voedingsmiddelgroep (NL)</Label>
+                  <Input
+                    value={manualForm.food_group_nl}
+                    onChange={(e) =>
+                      setManualForm((f) => ({
+                        ...f,
+                        food_group_nl: e.target.value,
+                      }))
+                    }
+                    placeholder="bijv. Overig, Diversen"
+                  />
+                </Field>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field>
+                    <Label>Energie (kcal/100g)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={manualForm.energy_kcal}
+                      onChange={(e) =>
+                        setManualForm((f) => ({
+                          ...f,
+                          energy_kcal: e.target.value,
+                        }))
+                      }
+                      placeholder="–"
+                    />
+                  </Field>
+                  <Field>
+                    <Label>Eiwit (g)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={manualForm.protein_g}
+                      onChange={(e) =>
+                        setManualForm((f) => ({
+                          ...f,
+                          protein_g: e.target.value,
+                        }))
+                      }
+                      placeholder="–"
+                    />
+                  </Field>
+                  <Field>
+                    <Label>Vet (g)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={manualForm.fat_g}
+                      onChange={(e) =>
+                        setManualForm((f) => ({ ...f, fat_g: e.target.value }))
+                      }
+                      placeholder="–"
+                    />
+                  </Field>
+                  <Field>
+                    <Label>Koolhydraten (g)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={manualForm.carbs_g}
+                      onChange={(e) =>
+                        setManualForm((f) => ({
+                          ...f,
+                          carbs_g: e.target.value,
+                        }))
+                      }
+                      placeholder="–"
+                    />
+                  </Field>
+                  <Field>
+                    <Label>Vezel (g)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={manualForm.fiber_g}
+                      onChange={(e) =>
+                        setManualForm((f) => ({
+                          ...f,
+                          fiber_g: e.target.value,
+                        }))
+                      }
+                      placeholder="–"
+                    />
+                  </Field>
+                </div>
+              </div>
+            </DialogBody>
+            <DialogActions>
+              <Button plain onClick={() => setManualModalOpen(false)}>
+                Annuleren
+              </Button>
+              <Button
+                onClick={handleManualSubmit}
+                disabled={manualSaving || !manualForm.name_nl.trim()}
+              >
+                {manualSaving ? 'Toevoegen...' : 'Toevoegen'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+        </Dropdown>
+      </div>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="shrink-0 flex items-center justify-center w-8 h-8 rounded transition-colors opacity-0 group-hover:opacity-100 hover:opacity-100 text-zinc-500 hover:text-red-600 hover:bg-red-50 dark:text-zinc-400 dark:hover:text-red-400 dark:hover:bg-red-950/30"
+          title="Ingrediënt uit recept verwijderen"
+          aria-label={`${displayName} uit recept verwijderen`}
+        >
+          <TrashIcon className="h-4 w-4" />
+        </button>
+      )}
+    </div>
   );
 }

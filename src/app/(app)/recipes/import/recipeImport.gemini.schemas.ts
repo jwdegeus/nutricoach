@@ -30,6 +30,14 @@ export const geminiIngredientSchema = z.object({
     .optional()
     .default(null)
     .describe('Optional note or additional information about the ingredient'),
+  section: z
+    .string()
+    .nullable()
+    .optional()
+    .default(null)
+    .describe(
+      'Section heading when the recipe has grouped ingredients (e.g. "Steak & Marinade", "Pico de Gallo"). Null if no sections.',
+    ),
 });
 
 /**

@@ -17,7 +17,7 @@ export function NevoIngredientDetailPageClient({
   const name = String(item.name_nl ?? item.name_en ?? 'NEVO-ingrediënt');
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen">
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">

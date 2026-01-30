@@ -942,6 +942,31 @@ export function IngredientGroupDetailPageClient({
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
             Ingrediënten in deze groep ({itemsTotalCount})
           </h2>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+            <span className="inline-flex items-center gap-1">
+              <span
+                className="inline-block h-2 w-2 rounded-full bg-zinc-400 dark:bg-zinc-500"
+                aria-hidden
+              />
+              Eigen NutriCoach-label
+            </span>
+            {' · '}
+            <span className="inline-flex items-center gap-1">
+              <span
+                className="inline-block h-2 w-2 rounded-full bg-green-500"
+                aria-hidden
+              />
+              Gekoppeld aan NEVO
+            </span>
+            {' · '}
+            <span className="inline-flex items-center gap-1">
+              <span
+                className="inline-block h-2 w-2 rounded-full bg-blue-500"
+                aria-hidden
+              />
+              FNDDS (toekomstig)
+            </span>
+          </span>
           {hasNevoGroups && (
             <Button
               onClick={handleDeduplicate}
@@ -1063,9 +1088,14 @@ export function IngredientGroupDetailPageClient({
                       aria-label={`Selecteer ${item.term_nl || item.term}`}
                     />
                     <Badge
-                      color={item.nevo_food_id != null ? 'blue' : 'zinc'}
+                      color={item.nevo_food_id != null ? 'green' : 'zinc'}
                       className="group relative text-xs cursor-pointer"
                       onClick={() => handleOpenItemEdit(item)}
+                      title={
+                        item.nevo_food_id != null
+                          ? 'Gekoppeld aan NEVO'
+                          : 'Eigen NutriCoach-label (geen koppeling)'
+                      }
                     >
                       <span className="pr-0.5">
                         {item.term_nl || item.term}

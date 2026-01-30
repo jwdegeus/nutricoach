@@ -729,12 +729,32 @@ export function RecipeImportClient({
 
     if (!ctx) return;
 
-    // Set canvas dimensions to match video
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const streamW = video.videoWidth;
+    const streamH = video.videoHeight;
+    if (streamW === 0 || streamH === 0) return;
 
-    // Draw video frame to canvas
-    ctx.drawImage(video, 0, 0);
+    // WYSIWYG: capture exactly what the user sees in the preview.
+    // The video is shown with object-cover, so we compute the visible source
+    // rectangle and draw that to a canvas with the same aspect ratio as the display.
+    const displayRect = video.getBoundingClientRect();
+    const displayW = displayRect.width;
+    const displayH = displayRect.height;
+    const scale = Math.max(displayW / streamW, displayH / streamH);
+    const srcW = displayW / scale;
+    const srcH = displayH / scale;
+    const srcX = (streamW - srcW) / 2;
+    const srcY = (streamH - srcH) / 2;
+
+    const pixelRatio = Math.min(
+      2,
+      typeof window !== 'undefined' ? (window.devicePixelRatio ?? 1) : 1,
+    );
+    const outW = Math.round(displayW * pixelRatio);
+    const outH = Math.round(displayH * pixelRatio);
+    canvas.width = outW;
+    canvas.height = outH;
+
+    ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
 
     // Convert canvas to blob
     canvas.toBlob(

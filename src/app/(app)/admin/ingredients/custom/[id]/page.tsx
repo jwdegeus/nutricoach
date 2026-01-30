@@ -8,8 +8,8 @@ type PageProps = {
 };
 
 export const metadata = {
-  title: 'Eigen ingrediënt bewerken | NutriCoach Admin',
-  description: 'Bewerk eigen ingrediënt en verrijk gegevens met AI',
+  title: 'NutriCoach ingrediënt bewerken | NutriCoach Admin',
+  description: 'Bewerk NutriCoach ingrediënt en verrijk gegevens met AI',
 };
 
 export default async function CustomIngredientEditPage({ params }: PageProps) {

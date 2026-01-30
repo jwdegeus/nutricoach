@@ -39,6 +39,8 @@ export type RecipeAdaptationRecord = {
   nutritionEstimate: any | null;
   confidence: number | null;
   openQuestions: string[];
+  /** Gekozen substituties (origineel → alternatief) voor leren bij volgende keer */
+  substitutionPairs?: Array<{ originalName: string; substituteName: string }>;
   createdAt: string;
   updatedAt: string;
 };
@@ -123,6 +125,13 @@ export class RecipeAdaptationDbService {
       nutrition_estimate: null, // Not in RecipeAdaptationDraft type yet
       confidence: adaptation.confidence || null,
       open_questions: adaptation.openQuestions || [],
+      substitution_pairs: (adaptation.substitutions ?? []).map(
+        (s) =>
+          ({
+            originalName: s.originalName,
+            substituteName: s.substituteName,
+          }) as any,
+      ),
     };
 
     const insertDataWithIntro = {
@@ -447,6 +456,12 @@ export class RecipeAdaptationDbService {
       nutritionEstimate: row.nutrition_estimate,
       confidence: row.confidence ? Number(row.confidence) : null,
       openQuestions: (row.open_questions || []) as string[],
+      substitutionPairs: Array.isArray(row.substitution_pairs)
+        ? (row.substitution_pairs as any[]).map((p: any) => ({
+            originalName: p.originalName ?? p.original_name ?? '',
+            substituteName: p.substituteName ?? p.substitute_name ?? '',
+          }))
+        : undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

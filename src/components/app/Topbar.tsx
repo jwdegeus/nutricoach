@@ -1,11 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Search, User, Settings, LogOut, ChevronRight } from 'lucide-react';
-import { cn } from '@/src/lib/utils';
+import { Search, User, Settings, LogOut } from 'lucide-react';
 import { getPageTitle, getBreadcrumbs } from '@/src/lib/nav';
 import { Input } from '@/components/catalyst/input';
+import { Breadcrumbs } from '@/components/catalyst/breadcrumbs';
 import { MobileSidebar } from '@/src/components/app/MobileSidebar';
 import {
   Dropdown,
@@ -36,23 +35,9 @@ export function Topbar() {
           </div>
 
           {/* Breadcrumbs */}
-          <nav className="hidden md:flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-            {breadcrumbs.map((crumb, index) => (
-              <div key={crumb.href} className="flex items-center gap-2">
-                {index > 0 && <ChevronRight className="h-4 w-4" />}
-                <Link
-                  href={crumb.href}
-                  className={cn(
-                    'hover:text-gray-900 dark:hover:text-white transition-colors',
-                    index === breadcrumbs.length - 1 &&
-                      'text-gray-900 dark:text-white font-medium',
-                  )}
-                >
-                  {crumb.label}
-                </Link>
-              </div>
-            ))}
-          </nav>
+          <div className="hidden md:flex items-center">
+            <Breadcrumbs items={breadcrumbs} />
+          </div>
 
           {/* Page title (mobile) */}
           <h2 className="text-sm font-medium text-gray-500 md:hidden dark:text-gray-400">

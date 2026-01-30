@@ -413,6 +413,19 @@ Alleen objecten met confidence >= ${AI_SUGGESTION_MIN_CONFIDENCE} opnemen.`;
       'bloemkool',
       'cauliflower rice',
       'cauliflower',
+      'kokosyoghurt',
+      'kokos yoghurt',
+      'amandelyoghurt',
+      'amandel yoghurt',
+      'haveryoghurt',
+      'sojayoghurt',
+      'plantaardige yoghurt',
+      'kokosmelk',
+      'amandelmelk',
+      'havermelk',
+      'sojamelk',
+      'rijstmelk',
+      'plantaardige melk',
     ];
     const isDairyFalsePositive = (ingredient: string, ruleLabel: string) => {
       if (!isDairyRule(ruleLabel)) return false;

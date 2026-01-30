@@ -14,6 +14,11 @@
     "db:status": "supabase db remote commit",
     "db:migration": "supabase migration new",
     "import:nevo": "tsx scripts/import-nevo-data.ts",
+    "import:fdc-foundation": "tsx scripts/import-fdc-foundation.ts",
+    "import:fndds-survey": "tsx scripts/import-fndds-survey.ts",
+    "normalize:fndds-nutrients": "tsx scripts/normalize-fndds-nutrients.ts",
+    "map:fndds-nutrients": "tsx scripts/map-fndds-nutrients.ts",
+    "import:fndds-translations-csv": "tsx scripts/import-fndds-translations-csv.ts",
     "prepare": "husky"
   },
   "dependencies": {

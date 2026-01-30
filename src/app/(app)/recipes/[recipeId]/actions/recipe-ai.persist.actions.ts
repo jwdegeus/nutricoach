@@ -529,6 +529,39 @@ export async function applyRecipeAdaptationAction(
       };
     }
 
+    // Onthoud gekozen substituties voor volgende keer (snellere suggesties)
+    const substitutionPairs = (
+      adaptation as {
+        substitutionPairs?: Array<{
+          originalName: string;
+          substituteName: string;
+        }>;
+      }
+    ).substitutionPairs;
+    if (substitutionPairs?.length) {
+      const normalize = (s: string) =>
+        s.toLowerCase().trim().replace(/\s+/g, ' ');
+      try {
+        for (const p of substitutionPairs) {
+          const originalNormalized = normalize(p.originalName);
+          if (!originalNormalized || !p.substituteName?.trim()) continue;
+          await supabase.from('diet_ingredient_substitutions').upsert(
+            {
+              user_id: user.id,
+              diet_id: adaptation.dietId,
+              original_normalized: originalNormalized,
+              substitute_display_name: p.substituteName.trim(),
+            },
+            {
+              onConflict: 'user_id,diet_id,original_normalized',
+            },
+          );
+        }
+      } catch {
+        // Tabel of migratie nog niet aanwezig; negeer, apply is al gelukt
+      }
+    }
+
     await dbService.updateStatus(adaptationId, user.id, 'applied');
 
     return {

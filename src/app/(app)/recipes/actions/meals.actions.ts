@@ -1,8 +1,12 @@
 'use server';
 
+import { del } from '@vercel/blob';
+import { unlink } from 'fs/promises';
+import { existsSync } from 'fs';
 import { createClient } from '@/src/lib/supabase/server';
 import { CustomMealsService } from '@/src/lib/custom-meals/customMeals.service';
 import { MealHistoryService } from '@/src/lib/meal-history';
+import { isVercelBlobUrl } from '@/src/lib/storage/storage.service';
 import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
 import type { MealSlot } from '@/src/lib/diets';
 
@@ -238,7 +242,11 @@ export async function updateMealDietTypeAction(args: {
 }
 
 /**
- * Delete a meal (custom meal or meal history)
+ * Delete a meal (custom meal or meal history).
+ * - Custom: verwijdert ook de receptafbeelding in Vercel Blob (of lokaal bestand) en
+ *   gerelateerde recipe_adaptations. meal_consumption_log en recipe_imports krijgen
+ *   ON DELETE SET NULL, recipe_ingredients heeft ON DELETE CASCADE.
+ * - Gemini (meal_history): verwijdert gerelateerde recipe_adaptations.
  */
 export async function deleteMealAction(args: {
   mealId: string;
@@ -260,7 +268,68 @@ export async function deleteMealAction(args: {
       };
     }
 
+    // Verwijder recipe_adaptations die naar dit recept verwijzen (geen FK, dus handmatig)
+    const { error: adaptationsError } = await supabase
+      .from('recipe_adaptations')
+      .delete()
+      .eq('recipe_id', args.mealId)
+      .eq('user_id', user.id);
+
+    if (adaptationsError) {
+      return {
+        ok: false,
+        error: {
+          code: 'DB_ERROR',
+          message: adaptationsError.message,
+        },
+      };
+    }
+
     if (args.source === 'custom') {
+      // Haal afbeelding-url/pad op vóór verwijderen, zodat we de blob kunnen verwijderen
+      const { data: meal, error: fetchError } = await supabase
+        .from('custom_meals')
+        .select('source_image_url, source_image_path')
+        .eq('id', args.mealId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (fetchError) {
+        return {
+          ok: false,
+          error: {
+            code: 'DB_ERROR',
+            message: fetchError.message,
+          },
+        };
+      }
+
+      const pathOrUrl = (meal?.source_image_path ?? meal?.source_image_url) as
+        | string
+        | null
+        | undefined;
+      if (pathOrUrl) {
+        if (isVercelBlobUrl(pathOrUrl)) {
+          try {
+            await del(pathOrUrl);
+          } catch (blobError) {
+            console.warn(
+              '[deleteMealAction] Failed to delete blob:',
+              blobError,
+            );
+          }
+        } else if (existsSync(pathOrUrl)) {
+          try {
+            await unlink(pathOrUrl);
+          } catch (unlinkError) {
+            console.warn(
+              '[deleteMealAction] Failed to delete local file:',
+              unlinkError,
+            );
+          }
+        }
+      }
+
       const { error } = await supabase
         .from('custom_meals')
         .delete()
@@ -277,7 +346,6 @@ export async function deleteMealAction(args: {
         };
       }
     } else {
-      // Delete from meal_history
       const { error } = await supabase
         .from('meal_history')
         .delete()
@@ -851,6 +919,7 @@ export async function updateRecipeContentAction(args: {
     quantity?: string | number | null;
     unit?: string | null;
     note?: string | null;
+    section?: string | null;
   }>;
   instructions: Array<{ step: number; text: string }>;
 }): Promise<ActionResult<void>> {
@@ -901,6 +970,10 @@ export async function updateRecipeContentAction(args: {
       unit: ing.unit != null && ing.unit !== '' ? String(ing.unit) : null,
       note: ing.note != null && ing.note !== '' ? String(ing.note) : null,
       original_line: String(ing.name ?? '').trim(),
+      section:
+        ing.section != null && String(ing.section).trim() !== ''
+          ? String(ing.section).trim()
+          : null,
     }));
 
     const ingredientRefs: Array<{
@@ -919,11 +992,16 @@ export async function updateRecipeContentAction(args: {
       }
       const { data: match } = await supabase
         .from('recipe_ingredient_matches')
-        .select('source, nevo_code, custom_food_id')
+        .select('source, nevo_code, custom_food_id, fdc_id')
         .eq('normalized_text', norm)
         .maybeSingle();
 
-      if (match && (match.nevo_code != null || match.custom_food_id != null)) {
+      if (
+        match &&
+        (match.nevo_code != null ||
+          match.custom_food_id != null ||
+          match.fdc_id != null)
+      ) {
         const quantityG = quantityGFromIngredient(ing);
         ingredientRefs.push({
           displayName: ing.name || ing.original_line,
@@ -933,6 +1011,9 @@ export async function updateRecipeContentAction(args: {
             : {}),
           ...(match.source === 'custom' && match.custom_food_id != null
             ? { customFoodId: match.custom_food_id }
+            : {}),
+          ...(match.source === 'fndds' && match.fdc_id != null
+            ? { fdcId: match.fdc_id }
             : {}),
         });
       } else {
@@ -984,6 +1065,105 @@ export async function updateRecipeContentAction(args: {
       error: {
         code: 'DB_ERROR',
         message: error instanceof Error ? error.message : 'Unknown error',
+      },
+    };
+  }
+}
+
+/**
+ * Verwijder één ingrediënt uit een recept (op index). Werkt voor zowel
+ * ingredientRefs-only als legacy ingredients; verwijdert op dezelfde index uit beide.
+ */
+export async function removeRecipeIngredientAction(args: {
+  mealId: string;
+  source: 'custom' | 'gemini';
+  index: number;
+}): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: {
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
+        },
+      };
+    }
+
+    const tableName =
+      args.source === 'custom' ? 'custom_meals' : 'meal_history';
+
+    const { data: row, error: fetchError } = await supabase
+      .from(tableName)
+      .select('meal_data')
+      .eq('id', args.mealId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (fetchError || !row) {
+      return {
+        ok: false,
+        error: {
+          code: fetchError ? 'DB_ERROR' : 'VALIDATION_ERROR',
+          message: fetchError?.message ?? 'Recept niet gevonden',
+        },
+      };
+    }
+
+    const mealData = (row.meal_data as Record<string, unknown>) || {};
+    const ingredients = Array.isArray(mealData.ingredients)
+      ? [...(mealData.ingredients as unknown[])]
+      : [];
+    const ingredientRefs = Array.isArray(mealData.ingredientRefs)
+      ? [...(mealData.ingredientRefs as unknown[])]
+      : [];
+
+    const i = args.index;
+    if (i < 0 || i >= Math.max(ingredients.length, ingredientRefs.length)) {
+      return {
+        ok: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Ongeldige index',
+        },
+      };
+    }
+
+    const newIngredients = ingredients.filter((_, idx) => idx !== i);
+    const newRefs = ingredientRefs.filter((_, idx) => idx !== i);
+
+    const { error: updateError } = await supabase
+      .from(tableName)
+      .update({
+        meal_data: {
+          ...mealData,
+          ingredients: newIngredients,
+          ingredientRefs: newRefs,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', args.mealId)
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      return {
+        ok: false,
+        error: { code: 'DB_ERROR', message: updateError.message },
+      };
+    }
+
+    return { ok: true, data: undefined };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
       },
     };
   }

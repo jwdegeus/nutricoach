@@ -38,8 +38,10 @@ export type FetchAndParseResult =
 const FETCH_TIMEOUT_MS =
   typeof process !== 'undefined' && process.env.RECIPE_FETCH_TIMEOUT_MS
     ? parseInt(process.env.RECIPE_FETCH_TIMEOUT_MS, 10)
-    : 30_000; // 30 seconden standaard; sommige sites (bv. foolproofliving.com) zijn traag
+    : 35_000; // 35s standaard; veel receptensites zijn traag (DNS + TTFB)
 const MAX_RESPONSE_SIZE = 3 * 1024 * 1024; // 3MB
+/** Stop met body lezen na deze grootte; recept staat meestal in het begin van de HTML */
+const MAX_BODY_READ_SIZE = 1.5 * 1024 * 1024; // 1.5MB
 const MAX_REDIRECTS = 5; // Increased for sites with multiple redirects
 const ALLOWED_CONTENT_TYPES = [
   'text/html',
@@ -109,35 +111,40 @@ function isPrivateIP(ip: string): boolean {
   return false;
 }
 
+/** Cache voor goedgekeurde hostnames (SSRF-check al gedaan), TTL 5 min */
+const hostnameValidationCache = new Map<string, number>();
+const HOSTNAME_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function isHostnameCached(hostname: string): boolean {
+  const until = hostnameValidationCache.get(hostname);
+  return until != null && Date.now() < until;
+}
+
+function cacheHostnameValid(hostname: string): void {
+  hostnameValidationCache.set(hostname, Date.now() + HOSTNAME_CACHE_TTL_MS);
+}
+
 /**
- * Resolve hostname and check for private IPs (SSRF mitigation)
+ * Resolve hostname and check for private IPs (SSRF mitigation).
+ * Only IPv4 is resolved (faster; IPv6 check skipped for speed; most recipe sites use IPv4).
+ * Result is cached for 5 min.
  */
 async function validateHostname(hostname: string): Promise<void> {
+  if (isHostnameCached(hostname)) return;
+
   try {
-    const addresses = await dns.resolve4(hostname);
-    for (const addr of addresses) {
+    const addresses4 = await dns.resolve4(hostname);
+    for (const addr of addresses4) {
       if (isPrivateIP(addr)) {
         throw new Error(`Hostname resolves to private IP: ${addr}`);
       }
     }
-
-    // Also check IPv6
-    try {
-      const addresses6 = await dns.resolve6(hostname);
-      for (const addr of addresses6) {
-        if (isPrivateIP(addr)) {
-          throw new Error(`Hostname resolves to private IPv6: ${addr}`);
-        }
-      }
-    } catch {
-      // IPv6 not available, ignore
-    }
+    cacheHostnameValid(hostname);
   } catch (error) {
     if (error instanceof Error && error.message.includes('private IP')) {
       throw error;
     }
     // DNS resolution failed - allow it to fail at fetch time
-    // This prevents blocking on DNS issues while still checking resolved IPs
   }
 }
 
@@ -154,9 +161,57 @@ function getHostname(url: string): string {
 }
 
 /**
+ * Read response body as stream and stop after maxBytes to avoid long waits on huge pages.
+ * Recipe content is usually in the first part of the HTML.
+ */
+async function readResponseBodyWithLimit(
+  response: Response,
+  maxBytes: number,
+  signal?: AbortSignal,
+): Promise<string> {
+  const body = response.body;
+  if (!body) {
+    return response.text();
+  }
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (totalBytes < maxBytes) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+      totalBytes += value.length;
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const toDecode = concatChunks(chunks, maxBytes);
+  const decoder = new TextDecoder('utf-8', { fatal: false });
+  return decoder.decode(toDecode);
+}
+
+/** Concatenate Uint8Arrays and take at most maxBytes */
+function concatChunks(chunks: Uint8Array[], maxBytes: number): Uint8Array {
+  const total = chunks.reduce((acc, c) => acc + c.length, 0);
+  const size = Math.min(total, maxBytes);
+  const out = new Uint8Array(size);
+  let offset = 0;
+  for (const c of chunks) {
+    if (offset >= size) break;
+    const take = Math.min(c.length, size - offset);
+    out.set(c.subarray(0, take), offset);
+    offset += take;
+  }
+  return out;
+}
+
+/**
  * Fetch HTML with security checks
  */
 export async function fetchHtml(url: string): Promise<string> {
+  const totalStart = Date.now();
   console.log(`[fetchHtml] Starting fetch for URL: ${url}`);
 
   // Validate URL scheme
@@ -164,17 +219,21 @@ export async function fetchHtml(url: string): Promise<string> {
     throw new Error('URL must use http:// or https://');
   }
 
-  // Validate hostname and check for private IPs
+  // Validate hostname and check for private IPs (SSRF)
   const hostname = getHostname(url);
-  console.log(`[fetchHtml] Hostname: ${hostname}`);
+  const dnsStart = Date.now();
   try {
     await validateHostname(hostname);
-    console.log(`[fetchHtml] DNS validation passed`);
+    const dnsMs = Date.now() - dnsStart;
+    console.log(
+      `[fetchHtml] DNS validation passed${dnsMs > 0 ? ` in ${dnsMs}ms` : ''}`,
+    );
   } catch (error) {
     console.error(`[fetchHtml] DNS validation failed:`, error);
     throw error;
   }
 
+  const fetchStart = Date.now();
   // Create AbortController for timeout
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -223,8 +282,9 @@ export async function fetchHtml(url: string): Promise<string> {
         redirect: 'manual', // Handle redirects manually for SSRF checks
       });
 
+      const ttfbMs = Date.now() - fetchStart;
       console.log(
-        `[fetchHtml] Response status: ${response.status}, content-type: ${response.headers.get('content-type')}`,
+        `[fetchHtml] Response status: ${response.status}, content-type: ${response.headers.get('content-type')}${ttfbMs > 0 ? ` (TTFB ${ttfbMs}ms)` : ''}`,
       );
 
       // Check content type (more lenient - allow if it contains text/html or is empty)
@@ -314,11 +374,20 @@ export async function fetchHtml(url: string): Promise<string> {
         }
       }
 
-      // Use response.text() which automatically handles decompression (gzip, deflate, br)
-      // This is simpler and more reliable than manual stream reading
-      console.log(`[fetchHtml] Reading response body...`);
-      const html = await response.text();
-      console.log(`[fetchHtml] Response received, size: ${html.length} bytes`);
+      // Read body as stream and stop after MAX_BODY_READ_SIZE so we don't wait for huge pages
+      const bodyStart = Date.now();
+      console.log(
+        `[fetchHtml] Reading response body (max ${MAX_BODY_READ_SIZE / 1024}KB)...`,
+      );
+      const html = await readResponseBodyWithLimit(
+        response,
+        MAX_BODY_READ_SIZE,
+        controller.signal,
+      );
+      const bodyMs = Date.now() - bodyStart;
+      console.log(
+        `[fetchHtml] Response received, size: ${html.length} bytes${bodyMs > 0 ? ` (body ${bodyMs}ms)` : ''}`,
+      );
 
       // Check actual size after decompression (safety check)
       if (html.length > MAX_RESPONSE_SIZE) {
@@ -329,7 +398,10 @@ export async function fetchHtml(url: string): Promise<string> {
         throw error;
       }
 
-      console.log(`[fetchHtml] Fetch successful, returning HTML`);
+      const totalMs = Date.now() - totalStart;
+      console.log(
+        `[fetchHtml] Fetch successful in ${totalMs}ms total, returning HTML`,
+      );
       return html;
     }
 
@@ -361,6 +433,106 @@ export async function fetchHtml(url: string): Promise<string> {
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+function stripHtml(raw: string): string {
+  return raw
+    .replace(/<[^>]+>/g, '')
+    .replace(/&[^;]+;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Extract ingredient section headings and counts from HTML (for JSON-LD imports that have flat ingredients).
+ * Looks for WP Recipe Maker (.wprm-recipe-ingredient-group) or generic h3/h4 + ul.
+ */
+export function extractIngredientSectionsFromHtml(
+  html: string,
+): { section: string; count: number }[] {
+  const sections: { section: string; count: number }[] = [];
+
+  // WP Recipe Maker: group-name (any tag) then ul.wprm-recipe-ingredients; name may contain inner HTML (e.g. <strong>)
+  const wprmNameThenList =
+    /<[^>]*class="[^"]*wprm-recipe-ingredient-group-name[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>[\s\S]*?<ul[^>]*class="[^"]*wprm-recipe-ingredients[^"]*"[^>]*>([\s\S]*?)<\/ul>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = wprmNameThenList.exec(html)) !== null) {
+    const name = stripHtml(m[1]);
+    const listContent = m[2];
+    const liCount = (listContent.match(/<li[^>]*>/gi) || []).length;
+    if (name && liCount > 0) sections.push({ section: name, count: liCount });
+  }
+  if (sections.length > 0) return sections;
+
+  // WPRM: div.wprm-recipe-ingredient-group containing heading + ul (order may vary)
+  const wprmGroupRegex =
+    /<[^>]*class="[^"]*wprm-recipe-ingredient-group[^"]*"[^>]*>[\s\S]*?<[^>]*class="[^"]*wprm-recipe-ingredient-group-name[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>[\s\S]*?<ul[^>]*class="[^"]*wprm-recipe-ingredients[^"]*"[^>]*>([\s\S]*?)<\/ul>/gi;
+  while ((m = wprmGroupRegex.exec(html)) !== null) {
+    const name = stripHtml(m[1]);
+    const liCount = (m[2].match(/<li[^>]*>/gi) || []).length;
+    if (name && liCount > 0) sections.push({ section: name, count: liCount });
+  }
+  if (sections.length > 0) return sections;
+
+  // WPRM fallback: div with wprm-recipe-ingredient-group, then first h3/h4 (text) and first ul (count li)
+  const wprmDivRegex =
+    /<div[^>]*class="[^"]*wprm-recipe-ingredient-group[^"]*"[^>]*>([\s\S]*?)<\/div>\s*(?=<div[^>]*class="[^"]*wprm-recipe-ingredient-group"|$)/gi;
+  while ((m = wprmDivRegex.exec(html)) !== null) {
+    const block = m[1];
+    const headMatch = /<h[34][^>]*>([\s\S]*?)<\/h[34]\s*>/i.exec(block);
+    const ulMatch = /<ul[^>]*>([\s\S]*?)<\/ul>/i.exec(block);
+    if (headMatch && ulMatch) {
+      const name = stripHtml(headMatch[1]);
+      const liCount = (ulMatch[1].match(/<li[^>]*>/gi) || []).length;
+      if (name && liCount > 0) sections.push({ section: name, count: liCount });
+    }
+  }
+  if (sections.length > 0) return sections;
+
+  // Generic: h3 or h4 followed by first ul (within ~2k chars)
+  const headingRegex = /<h[34][^>]*>([\s\S]*?)<\/h[34]\s*>/gi;
+  while ((m = headingRegex.exec(html)) !== null) {
+    const name = stripHtml(m[1]);
+    const afterHeading = html.slice(
+      m.index + m[0].length,
+      m.index + m[0].length + 2000,
+    );
+    const ulMatch = /<ul[^>]*>([\s\S]*?)<\/ul>/i.exec(afterHeading);
+    if (ulMatch) {
+      const liCount = (ulMatch[1].match(/<li[^>]*>/gi) || []).length;
+      if (name && liCount > 0) sections.push({ section: name, count: liCount });
+    }
+  }
+
+  return sections;
+}
+
+/**
+ * Assign section to each ingredient by index using (section, count) pairs.
+ * If total from sections does not match ingredient count, still assigns by position (extra ingredients get null section).
+ */
+export function assignSectionsToIngredients<
+  T extends { section?: string | null },
+>(
+  ingredients: T[],
+  sectionsWithCounts: { section: string; count: number }[],
+): T[] {
+  if (sectionsWithCounts.length === 0) return ingredients;
+
+  let sectionIdx = 0;
+  let remainingInSection = sectionsWithCounts[0]?.count ?? 0;
+  return ingredients.map((ing) => {
+    if (remainingInSection <= 0 && sectionIdx + 1 < sectionsWithCounts.length) {
+      sectionIdx++;
+      remainingInSection = sectionsWithCounts[sectionIdx].count;
+    }
+    const section =
+      remainingInSection > 0
+        ? (sectionsWithCounts[sectionIdx]?.section ?? null)
+        : null;
+    if (remainingInSection > 0) remainingInSection--;
+    return { ...ing, section };
+  });
 }
 
 /**

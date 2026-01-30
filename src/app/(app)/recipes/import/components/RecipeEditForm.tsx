@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, Fragment } from 'react';
 import { Button } from '@/components/catalyst/button';
 import { Input } from '@/components/catalyst/input';
 import { Textarea } from '@/components/catalyst/textarea';
@@ -86,6 +86,7 @@ export function RecipeEditForm({
               quantity: ing.quantity,
               unit: ing.unit || null,
               note: ing.note || null,
+              section: ing.section ?? null,
             })),
           instructions: instructions
             .filter((inst) => inst.text.trim()) // Filter out empty instructions
@@ -191,25 +192,87 @@ export function RecipeEditForm({
           <div>
             <Subheading level={4}>Ingrediënten</Subheading>
             <ul className="mt-2 space-y-1">
-              {ingredients.map((ing, idx) => (
-                <li key={idx} className="text-sm">
-                  <span className="font-medium">{ing.name}</span>
-                  {(ing.quantity !== null || ing.unit) && (
-                    <span className="text-zinc-500 dark:text-zinc-400">
-                      {' '}
-                      {ing.quantity !== null && ing.quantity}
-                      {ing.quantity !== null && ing.unit && ' '}
-                      {ing.unit}
-                    </span>
-                  )}
-                  {ing.note && (
-                    <span className="text-zinc-500 dark:text-zinc-400 italic">
-                      {' '}
-                      ({ing.note})
-                    </span>
-                  )}
-                </li>
-              ))}
+              {(() => {
+                const hasSections = ingredients.some(
+                  (ing: { section?: string | null }) =>
+                    ing.section != null && String(ing.section).trim() !== '',
+                );
+                if (!hasSections) {
+                  return ingredients.map((ing, idx) => (
+                    <li key={idx} className="text-sm">
+                      <span className="font-medium">{ing.name}</span>
+                      {(ing.quantity !== null || ing.unit) && (
+                        <span className="text-zinc-500 dark:text-zinc-400">
+                          {' '}
+                          {ing.quantity !== null && ing.quantity}
+                          {ing.quantity !== null && ing.unit && ' '}
+                          {ing.unit}
+                        </span>
+                      )}
+                      {ing.note && (
+                        <span className="text-zinc-500 dark:text-zinc-400 italic">
+                          {' '}
+                          ({ing.note})
+                        </span>
+                      )}
+                    </li>
+                  ));
+                }
+                const groups: { section: string | null; indices: number[] }[] =
+                  [];
+                let curSection: string | null = null;
+                let curIndices: number[] = [];
+                for (let i = 0; i < ingredients.length; i++) {
+                  const s =
+                    ingredients[i].section != null &&
+                    String(ingredients[i].section).trim() !== ''
+                      ? String(ingredients[i].section).trim()
+                      : null;
+                  if (s !== curSection) {
+                    if (curIndices.length > 0)
+                      groups.push({ section: curSection, indices: curIndices });
+                    curSection = s;
+                    curIndices = [i];
+                  } else {
+                    curIndices.push(i);
+                  }
+                }
+                if (curIndices.length > 0)
+                  groups.push({ section: curSection, indices: curIndices });
+                return groups.map((group, gi) => (
+                  <Fragment key={gi}>
+                    {group.section && (
+                      <li className="list-none mt-3 first:mt-0">
+                        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                          {group.section}
+                        </span>
+                      </li>
+                    )}
+                    {group.indices.map((idx) => {
+                      const ing = ingredients[idx];
+                      return (
+                        <li key={idx} className="text-sm">
+                          <span className="font-medium">{ing.name}</span>
+                          {(ing.quantity !== null || ing.unit) && (
+                            <span className="text-zinc-500 dark:text-zinc-400">
+                              {' '}
+                              {ing.quantity !== null && ing.quantity}
+                              {ing.quantity !== null && ing.unit && ' '}
+                              {ing.unit}
+                            </span>
+                          )}
+                          {ing.note && (
+                            <span className="text-zinc-500 dark:text-zinc-400 italic">
+                              {' '}
+                              ({ing.note})
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </Fragment>
+                ));
+              })()}
             </ul>
           </div>
 
@@ -340,6 +403,7 @@ export function RecipeEditForm({
                     unit: null,
                     note: null,
                     original_line: '',
+                    section: null,
                   },
                 ]);
               }}

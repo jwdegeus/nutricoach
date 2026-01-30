@@ -49,6 +49,11 @@ type RecipeAIMagicianProps = {
 /** Severity voor weergave: verboden / beter van niet / niet gewenst */
 type ViolationSeverity = 'verboden' | 'niet_gewenst' | 'beter_van_niet';
 
+/** Genormaliseerde ingrediëntnaam voor lookup in learnedSubstitutions (zelfde als server). */
+function normalizeIngredientForLookup(s: string): string {
+  return s.toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
 function getViolationSeverity(v: {
   ruleCode?: string;
   ruleLabel?: string;
@@ -116,7 +121,7 @@ export function RecipeAIMagician({
   const [rewriteError, setRewriteError] = useState<string | null>(null);
   /** Per violation-index: keuze (Kies X / Vervang door Y / Schrappen uit menu). */
   const [violationChoices, setViolationChoices] = useState<
-    Record<number, { choice: ViolationChoice }>
+    Record<number, { choice: ViolationChoice; substitute?: string }>
   >({});
 
   // Load diet ID when dialog opens
@@ -210,11 +215,21 @@ export function RecipeAIMagician({
           type: 'analysis_only',
           data: result.data,
         });
-        const defaults: Record<number, { choice: ViolationChoice }> = {};
+        const learned = result.data.learnedSubstitutions;
+        const defaults: Record<
+          number,
+          { choice: ViolationChoice; substitute?: string }
+        > = {};
         result.data.violations.forEach((v, i) => {
-          defaults[i] = {
-            choice: v.allowedAlternativeInText ? 'use_allowed' : 'substitute',
-          };
+          const learnedSub =
+            learned?.[normalizeIngredientForLookup(v.ingredientName)];
+          defaults[i] = learnedSub
+            ? { choice: 'substitute', substitute: learnedSub }
+            : {
+                choice: v.allowedAlternativeInText
+                  ? 'use_allowed'
+                  : 'substitute',
+              };
         });
         setViolationChoices(defaults);
       } else {
@@ -262,11 +277,18 @@ export function RecipeAIMagician({
               };
             }
           ).data;
+    const learned =
+      'learnedSubstitutions' in analysisData
+        ? (analysisData as { learnedSubstitutions?: Record<string, string> })
+            .learnedSubstitutions
+        : undefined;
     const choicesArray = analysisData.violations.map((v, i) => ({
       choice:
         violationChoices[i]?.choice ??
         (v.allowedAlternativeInText ? 'use_allowed' : 'substitute'),
-      substitute: undefined,
+      substitute:
+        violationChoices[i]?.substitute ??
+        learned?.[normalizeIngredientForLookup(v.ingredientName)],
     }));
     setRewriteError(null);
     setPersistError(null);
@@ -391,8 +413,9 @@ export function RecipeAIMagician({
     <Dialog open={open} onClose={handleClose} size="2xl">
       <DialogTitle>AI Magician</DialogTitle>
       <DialogDescription>
-        Analyseer hoe &quot;{recipeName}&quot; past bij jouw dieet en krijg een
-        aangepaste versie.
+        Vervang alleen de ingrediënten in &quot;{recipeName}&quot; die niet
+        passen bij jouw dieet door passende alternatieven. Jouw keuzes worden
+        onthouden voor volgende keer.
       </DialogDescription>
 
       <DialogBody>
@@ -448,8 +471,9 @@ export function RecipeAIMagician({
             <div className="text-center">
               <SparklesIcon className="h-12 w-12 text-blue-500 dark:text-blue-400 mx-auto mb-4" />
               <Text className="text-zinc-600 dark:text-zinc-400">
-                Laat de AI Magician analyseren hoe dit recept past bij jouw
-                dieetvoorkeuren en krijg suggesties voor aanpassingen.
+                Laat de AI Magician alleen de ingrediënten die niet passen bij
+                jouw dieet vervangen door passende alternatieven. De rest van
+                het recept blijft hetzelfde.
               </Text>
             </div>
             <div className="flex justify-center pt-4">
@@ -479,7 +503,7 @@ export function RecipeAIMagician({
           </div>
         )}
 
-        {/* Loading State - Gemini zoekt alternatieven voor geselecteerde producten */}
+        {/* Loading State - alternatieven worden toegepast */}
         {state.type === 'loading_rewrite' && (
           <div className="space-y-4 py-8">
             <div className="text-center">
@@ -488,10 +512,10 @@ export function RecipeAIMagician({
                 aria-hidden
               />
               <Text className="text-zinc-700 dark:text-zinc-300 font-medium block mb-1">
-                Gemini zoekt alternatieven voor de geselecteerde producten
+                Niet-conforme ingrediënten worden vervangen door jouw keuzes
               </Text>
               <Text className="text-sm text-zinc-500 dark:text-zinc-400">
-                Dit kan even duren…
+                Even geduld…
               </Text>
             </div>
             <div className="space-y-2 mt-6 max-w-sm mx-auto" aria-hidden>
@@ -630,6 +654,25 @@ export function RecipeAIMagician({
                                 {violation.suggestion}
                               </Text>
                             </div>
+                            {'learnedSubstitutions' in state.data &&
+                              state.data.learnedSubstitutions?.[
+                                normalizeIngredientForLookup(
+                                  violation.ingredientName,
+                                )
+                              ] && (
+                                <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                                  Laatste keer gekozen:{' '}
+                                  <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                                    {
+                                      state.data.learnedSubstitutions[
+                                        normalizeIngredientForLookup(
+                                          violation.ingredientName,
+                                        )
+                                      ]
+                                    }
+                                  </span>
+                                </div>
+                              )}
                             <div className="mt-3">
                               <Text className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-2 block">
                                 Jouw keuze

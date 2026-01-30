@@ -48,3 +48,6 @@ supabase/.volumes
 # uploaded files (stored locally, can be migrated to CDN/S3 later)
 /public/uploads
 .env*.local
+
+#custom temp files
+/temp

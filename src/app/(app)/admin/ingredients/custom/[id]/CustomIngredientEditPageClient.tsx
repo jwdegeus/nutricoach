@@ -15,7 +15,7 @@ export function CustomIngredientEditPageClient({
   initialData,
 }: CustomIngredientEditPageClientProps) {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen">
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -29,7 +29,7 @@ export function CustomIngredientEditPageClient({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold text-zinc-950 dark:text-white">
-                  Eigen ingrediënt bewerken
+                  NutriCoach ingrediënt bewerken
                 </h1>
                 <Badge color={initialData.created_by ? 'amber' : 'zinc'}>
                   {initialData.created_by ? 'AI generated' : 'NutriCoach'}

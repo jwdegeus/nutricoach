@@ -54,6 +54,7 @@ export type RecipeAIState =
         summary: string;
         recipeName: string;
         noRulesConfigured?: boolean;
+        learnedSubstitutions?: Record<string, string>;
       };
     }
   | {
@@ -114,6 +115,8 @@ export type GetRecipeAnalysisResult =
         summary: string;
         recipeName: string;
         noRulesConfigured?: boolean;
+        /** Gekozen alternatieven uit eerdere keren (genormaliseerde ingrediëntnaam → substitutie) voor snellere suggesties */
+        learnedSubstitutions?: Record<string, string>;
       };
     }
   | { ok: false; error: { code: string; message: string } };
@@ -188,6 +191,8 @@ export type RecipeAdaptationDraft = {
   diagnostics?: {
     guardrailsVnext?: GuardrailsVNextDiagnostics;
   };
+  /** Gekozen substituties (origineel → alternatief) voor leren bij volgende keer */
+  substitutions?: Array<{ originalName: string; substituteName: string }>;
 };
 
 /**

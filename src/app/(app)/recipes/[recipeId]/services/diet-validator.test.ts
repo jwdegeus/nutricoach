@@ -195,6 +195,83 @@ describe('Diet Validator', () => {
       );
       assert.strictEqual(matches.length, 1, 'tarwebloem should be flagged');
     });
+
+    it('should NOT flag "Kool bloem- rauw" as gluten (bloemkool, word order)', () => {
+      const matches = findForbiddenMatches(
+        'Kool bloem- rauw',
+        glutenRulesetWithBloem,
+        'ingredients',
+      );
+      assert.strictEqual(
+        matches.length,
+        0,
+        'kool bloem = bloemkool (cauliflower), not flour/gluten',
+      );
+    });
+
+    it('should NOT flag "kool bloem rauw" as gluten (bloemkool)', () => {
+      const matches = findForbiddenMatches(
+        'kool bloem rauw',
+        glutenRulesetWithBloem,
+        'ingredients',
+      );
+      assert.strictEqual(
+        matches.length,
+        0,
+        'kool bloem = bloemkool (cauliflower), not gluten',
+      );
+    });
+  });
+
+  describe('findForbiddenMatches - kokosyoghurt vs zuivel (dairy alternative)', () => {
+    const dairyRuleset: DietRuleset = {
+      dietId: 'test-diet',
+      version: 1,
+      forbidden: [
+        {
+          term: 'dairy',
+          synonyms: ['melk', 'kaas', 'yoghurt', 'boter'],
+          ruleCode: 'wahls_forbidden_dairy',
+          ruleLabel: 'Zuivel (Strikt verboden)',
+          substitutionSuggestions: ['amandelmelk', 'kokosyoghurt'],
+        },
+      ],
+    };
+
+    it('should NOT flag Kokosyoghurt (ongezoet) as zuivel (dairy alternative)', () => {
+      const matches = findForbiddenMatches(
+        'Kokosyoghurt (ongezoet)',
+        dairyRuleset,
+        'ingredients',
+      );
+      assert.strictEqual(
+        matches.length,
+        0,
+        'kokosyoghurt is dairy alternative, not zuivel',
+      );
+    });
+
+    it('should NOT flag amandelyoghurt as zuivel', () => {
+      const matches = findForbiddenMatches(
+        'amandelyoghurt',
+        dairyRuleset,
+        'ingredients',
+      );
+      assert.strictEqual(
+        matches.length,
+        0,
+        'amandelyoghurt is dairy alternative',
+      );
+    });
+
+    it('should still flag plain yoghurt as zuivel', () => {
+      const matches = findForbiddenMatches(
+        'yoghurt',
+        dairyRuleset,
+        'ingredients',
+      );
+      assert.strictEqual(matches.length, 1, 'plain yoghurt should be flagged');
+    });
   });
 
   describe('normalizeForMatching', () => {

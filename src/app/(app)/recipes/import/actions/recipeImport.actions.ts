@@ -521,8 +521,11 @@ export async function importRecipeFromUrlAction(
 
       // Try JSON-LD first (faster and more reliable) – pass existing html to avoid duplicate fetch
       try {
-        const { fetchAndParseRecipeJsonLd } =
-          await import('../server/fetchAndParseRecipeJsonLd');
+        const {
+          fetchAndParseRecipeJsonLd,
+          extractIngredientSectionsFromHtml,
+          assignSectionsToIngredients,
+        } = await import('../server/fetchAndParseRecipeJsonLd');
         const jsonLdResult = await fetchAndParseRecipeJsonLd(input.url, html);
         console.log(
           '[importRecipeFromUrlAction] JSON-LD result:',
@@ -541,6 +544,89 @@ export async function importRecipeFromUrlAction(
               '[importRecipeFromUrlAction] Recipe extracted via JSON-LD:',
               jsonLdResult.draft,
             );
+            let ingredientsList = jsonLdResult.draft.ingredients.map((ing) => {
+              const text = ing.text.trim();
+              let quantity: number | null = null;
+              let unit: string | null = null;
+              let name: string = text;
+              let note: string | null = null;
+              const noteMatch = text.match(/^(.+?)\s*\(([^)]+)\)$/);
+              const mainPart = noteMatch ? noteMatch[1].trim() : text;
+              if (noteMatch) note = noteMatch[2].trim();
+              const qtyUnitMatch = mainPart.match(
+                /^([\d\s½¼¾⅓⅔⅛⅜⅝⅞]+)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/,
+              );
+              if (qtyUnitMatch) {
+                const qtyStr = qtyUnitMatch[1].trim();
+                const fractionMap: Record<string, number> = {
+                  '½': 0.5,
+                  '¼': 0.25,
+                  '¾': 0.75,
+                  '⅓': 0.333,
+                  '⅔': 0.667,
+                  '⅛': 0.125,
+                  '⅜': 0.375,
+                  '⅝': 0.625,
+                  '⅞': 0.875,
+                };
+                let qty = 0;
+                for (const part of qtyStr.split(/\s+/)) {
+                  if (fractionMap[part]) qty += fractionMap[part];
+                  else {
+                    const num = parseFloat(part);
+                    if (!isNaN(num)) qty += num;
+                  }
+                }
+                if (qty > 0) {
+                  quantity = qty;
+                  unit = qtyUnitMatch[2].trim();
+                  name = qtyUnitMatch[3].trim();
+                }
+              } else {
+                const unitMatch = mainPart.match(
+                  /^([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/,
+                );
+                if (unitMatch) {
+                  unit = unitMatch[1].trim();
+                  name = unitMatch[2].trim();
+                } else name = mainPart;
+              }
+              return {
+                original_line: ing.text,
+                name,
+                quantity,
+                unit,
+                note,
+                section: null as string | null,
+              };
+            });
+            const sectionsFromHtml = extractIngredientSectionsFromHtml(html);
+            const sectionTotal = sectionsFromHtml.reduce(
+              (s, x) => s + x.count,
+              0,
+            );
+            console.log(
+              '[importRecipeFromUrlAction] Ingredient sections from HTML:',
+              sectionsFromHtml.length,
+              'groups,',
+              sectionTotal,
+              'items; JSON-LD ingredients:',
+              ingredientsList.length,
+            );
+            if (sectionsFromHtml.length > 0) {
+              ingredientsList = assignSectionsToIngredients(
+                ingredientsList,
+                sectionsFromHtml,
+              );
+              const withSection = ingredientsList.filter(
+                (i) => i.section != null && i.section !== '',
+              ).length;
+              console.log(
+                '[importRecipeFromUrlAction] Assigned section to',
+                withSection,
+                'ingredients',
+              );
+            }
             const jsonLdExtractedRecipe = {
               title: jsonLdResult.draft.title,
               language_detected: jsonLdResult.draft.sourceLanguage || 'en',
@@ -554,55 +640,7 @@ export async function importRecipeFromUrlAction(
                       : Math.round(servingsNum);
                   })()
                 : null,
-              ingredients: jsonLdResult.draft.ingredients.map((ing) => {
-                const text = ing.text.trim();
-                let quantity: number | null = null;
-                let unit: string | null = null;
-                let name: string = text;
-                let note: string | null = null;
-                const noteMatch = text.match(/^(.+?)\s*\(([^)]+)\)$/);
-                const mainPart = noteMatch ? noteMatch[1].trim() : text;
-                if (noteMatch) note = noteMatch[2].trim();
-                const qtyUnitMatch = mainPart.match(
-                  /^([\d\s½¼¾⅓⅔⅛⅜⅝⅞]+)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/,
-                );
-                if (qtyUnitMatch) {
-                  const qtyStr = qtyUnitMatch[1].trim();
-                  const fractionMap: Record<string, number> = {
-                    '½': 0.5,
-                    '¼': 0.25,
-                    '¾': 0.75,
-                    '⅓': 0.333,
-                    '⅔': 0.667,
-                    '⅛': 0.125,
-                    '⅜': 0.375,
-                    '⅝': 0.625,
-                    '⅞': 0.875,
-                  };
-                  let qty = 0;
-                  for (const part of qtyStr.split(/\s+/)) {
-                    if (fractionMap[part]) qty += fractionMap[part];
-                    else {
-                      const num = parseFloat(part);
-                      if (!isNaN(num)) qty += num;
-                    }
-                  }
-                  if (qty > 0) {
-                    quantity = qty;
-                    unit = qtyUnitMatch[2].trim();
-                    name = qtyUnitMatch[3].trim();
-                  }
-                } else {
-                  const unitMatch = mainPart.match(
-                    /^([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/,
-                  );
-                  if (unitMatch) {
-                    unit = unitMatch[1].trim();
-                    name = unitMatch[2].trim();
-                  } else name = mainPart;
-                }
-                return { original_line: ing.text, name, quantity, unit, note };
-              }),
+              ingredients: ingredientsList,
               instructions: jsonLdResult.draft.steps.map((step, idx) => ({
                 step: idx + 1,
                 text: step.text,

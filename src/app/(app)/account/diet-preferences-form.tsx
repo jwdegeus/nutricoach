@@ -26,7 +26,14 @@ import type {
   VarietyLevel,
 } from '@/src/app/(app)/onboarding/onboarding.types';
 
-export function DietPreferencesForm() {
+interface DietPreferencesFormProps {
+  /** When true, the section heading/description is omitted (provided by parent layout). */
+  hideSectionHeading?: boolean;
+}
+
+export function DietPreferencesForm({
+  hideSectionHeading,
+}: DietPreferencesFormProps = {}) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -198,15 +205,17 @@ export function DietPreferencesForm() {
 
   return (
     <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-      <div className="mb-6">
-        <h2 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
-          Dieetvoorkeuren
-        </h2>
-        <Text className="mt-1">
-          Pas je dieetvoorkeuren aan. Deze instellingen worden gebruikt voor het
-          plannen van je maaltijden.
-        </Text>
-      </div>
+      {!hideSectionHeading && (
+        <div className="mb-6">
+          <h2 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
+            Dieetvoorkeuren
+          </h2>
+          <Text className="mt-1">
+            Pas je dieetvoorkeuren aan. Deze instellingen worden gebruikt voor
+            het plannen van je maaltijden.
+          </Text>
+        </div>
+      )}
 
       {error && (
         <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">

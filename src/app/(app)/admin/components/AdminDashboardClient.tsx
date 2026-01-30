@@ -37,6 +37,7 @@ type AdminStats = {
   ingredients: {
     nevo: number;
     custom: number;
+    fndds: number;
     withoutCategory: number;
   };
 };
@@ -55,10 +56,10 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
     stats: StatItem[];
   }> = [
     {
-      name: 'Recept Bronnen',
+      name: 'Receptenbeheer',
       description:
-        'Beheer alle recept bronnen in het systeem. Wijzig, verwijder of voeg samen.',
-      href: '/admin/recipe-sources',
+        'Beheer recept bronnen, categorieën, tags en keukens (Indiaas, Japans, etc.).',
+      href: '/admin/receptenbeheer',
       icon: TagIcon,
       iconBackground: 'bg-blue-500',
       stats: [
@@ -107,19 +108,23 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
       ],
     },
     {
-      name: 'Ingrediënten (NEVO)',
+      name: 'Ingrediënten',
       description:
-        'Bekijk NEVO-voedingsmiddelen en voedingswaarden. Voeg eigen ingredienten toe als ze niet in NEVO staan.',
+        'Beheer ingrediënten uit alle bronnen: NEVO, FNDDS en eigen ingrediënten. Bekijk voedingswaarden en koppel categorieën.',
       href: '/admin/ingredients',
       icon: BeakerIcon,
       iconBackground: 'bg-amber-500',
       stats: [
         {
-          label: 'NEVO-ingrediënten',
+          label: 'NEVO',
           value: stats.ingredients.nevo.toLocaleString(),
         },
         {
-          label: 'Eigen ingredienten',
+          label: 'FNDDS',
+          value: stats.ingredients.fndds.toLocaleString(),
+        },
+        {
+          label: 'Eigen ingrediënten',
           value: stats.ingredients.custom,
         },
         {

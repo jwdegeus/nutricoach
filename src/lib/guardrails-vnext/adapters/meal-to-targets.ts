@@ -17,7 +17,10 @@ export type MealLike = Pick<Meal, 'name' | 'ingredientRefs' | 'ingredients'> & {
 /**
  * Map meal to guardrails evaluation targets
  *
- * Uses ingredientRefs (displayName), ingredients (name), and optional steps/instructions.
+ * Ingredients: we gebruiken ingredientRefs OF ingredients (niet beide), zodat
+ * één fysiek ingrediënt = één atoom. Dat sluit aan bij de AI magician en voorkomt
+ * dat de compliance-score lager is door dubbele telling (bijv. 94% bij "geen verbeteringen").
+ * Steps: elke bereidingsstap is één atoom (een verboden term in een stap telt als violation).
  */
 export function mapMealToGuardrailsTargets(
   meal: MealLike | Meal | null | undefined,
@@ -41,13 +44,41 @@ export function mapMealToGuardrailsTargets(
 
   const m = meal as MealLike & {
     ingredientRefs?: Array<{ displayName?: string; nevoCode?: string }>;
+    ingredient_refs?: Array<{
+      displayName?: string;
+      display_name?: string;
+      nevoCode?: string;
+      nevo_code?: string;
+    }>;
     ingredients?: Array<{ name?: string }>;
+    steps?: Array<{ text?: string } | string>;
+    instructions?: string[];
   };
 
-  // Ingredients: ingredientRefs first (displayName or nevoCode), then legacy ingredients
-  if (m.ingredientRefs?.length) {
-    m.ingredientRefs.forEach((ref, i) => {
-      const text = (ref.displayName || ref.nevoCode || '').trim();
+  // Ingredients: ingredientRefs OF ingredient_refs (snake_case) OF legacy ingredients; één bron, één atoom per ingrediënt
+  const refs =
+    m.ingredientRefs ??
+    (
+      m as {
+        ingredient_refs?: Array<{
+          displayName?: string;
+          display_name?: string;
+          nevoCode?: string;
+          nevo_code?: string;
+        }>;
+      }
+    ).ingredient_refs;
+  if (refs?.length) {
+    refs.forEach((ref: any, i: number) => {
+      const text = (
+        ref.displayName ??
+        ref.display_name ??
+        ref.nevoCode ??
+        ref.nevo_code ??
+        ''
+      )
+        .toString()
+        .trim();
       if (text) {
         ingredientAtoms.push({
           text: text.toLowerCase(),
@@ -56,8 +87,7 @@ export function mapMealToGuardrailsTargets(
         });
       }
     });
-  }
-  if (m.ingredients?.length) {
+  } else if (m.ingredients?.length) {
     m.ingredients.forEach((ing, i) => {
       const name = (
         typeof ing === 'object' && ing && 'name' in ing
@@ -74,9 +104,9 @@ export function mapMealToGuardrailsTargets(
     });
   }
 
-  // Steps: optional steps[] or instructions[]
+  // Steps: steps[] of instructions[] (camelCase of snake_case)
   const steps =
-    (m as { steps?: Array<{ text?: string }> }).steps ??
+    (m as { steps?: Array<{ text?: string } | string> }).steps ??
     (m as { instructions?: string[] }).instructions;
   if (Array.isArray(steps)) {
     steps.forEach((s, i) => {

@@ -208,7 +208,8 @@ REQUIRED OUTPUT FORMAT (strict JSON):
       "quantity": number or null,
       "unit": "string or null (e.g., 'g', 'ml', 'el', 'tl')",
       "name": "Normalized ingredient name in original language (REQUIRED)",
-      "note": "string or null"
+      "note": "string or null",
+      "section": "string or null - ONLY set when the page has clear ingredient section headings (e.g. 'Steak & Marinade', 'Cucumber-Radish Pico de Gallo'). Set the same section string on every ingredient that belongs to that block. Omit or null if no sections."
     }
   ],
   "instructions": [
@@ -228,6 +229,7 @@ CRITICAL RULES:
 4. Instructions MUST be objects with "step" (number) and "text" fields (NOT strings)
 5. Always include "language_detected", "translated_to", "servings", and "times" fields (use null if not available)
 6. Number instruction steps starting from 1
+7. Ingredient sections: If the page has clear ingredient block headings (e.g. "Steak & Marinade", "Cucumber-Radish Pico de Gallo", "Avocado Dressing", "Bowl"), set "section" on each ingredient to the exact heading of its block. If there are no such headings, omit "section" or set null.
 
 UNIT CONVERSION (convert English units to metric):
 - "cups" or "cup" → "ml" (1 cup = 240 ml, so "1 cup" becomes "240 ml", "2 cups" becomes "480 ml")
@@ -462,6 +464,11 @@ export async function processRecipeUrlWithGemini(args: {
             note: {
               type: ['string', 'null'],
               description: 'Note in original language if present',
+            },
+            section: {
+              type: ['string', 'null'],
+              description:
+                'Section heading when the recipe has grouped ingredients (e.g. Steak & Marinade, Pico de Gallo). Set on every ingredient in that block. Null if no sections.',
             },
           },
           required: ['original_line', 'name'],

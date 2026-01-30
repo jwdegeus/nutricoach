@@ -67,11 +67,13 @@ export interface MealIngredient {
 }
 
 /**
- * Recipe ingredient: NEVO and/or custom food with amount (for aggregated nutrition)
+ * Recipe ingredient: NEVO, custom and/or FNDDS with amount (for aggregated nutrition)
  */
 export interface RecipeIngredient {
   nevo_food_id?: number;
   custom_food_id?: string;
+  /** FNDDS survey food fdc_id when source is FNDDS */
+  fndds_fdc_id?: number;
   amount_g: number;
 }
 
@@ -303,6 +305,9 @@ export async function calculateRecipeNutrition(
       if (ing.custom_food_id) {
         return calculateCustomFoodNutrition(ing.custom_food_id, amountG);
       }
+      if (ing.fndds_fdc_id != null) {
+        return calculateFnddsNutrition(ing.fndds_fdc_id, amountG);
+      }
       return null;
     }),
   );
@@ -481,6 +486,9 @@ export function calculateNutriScoreFromProfile(
   return 'E';
 }
 
+const NEVO_SEARCH_COLS =
+  'nevo_code, name_nl, name_en, food_group_nl, energy_kcal, protein_g, fat_g, carbs_g, fiber_g';
+
 /**
  * Search for NEVO foods by name
  *
@@ -493,23 +501,43 @@ export async function searchNevoFoods(
   limit: number = 20,
 ): Promise<any[]> {
   const supabase = await createServerClient();
+  const trimmed = searchTerm.trim();
+  if (!trimmed) return [];
 
-  const { data, error } = await supabase
-    .from('nevo_foods')
-    .select(
-      'nevo_code, name_nl, name_en, food_group_nl, energy_kcal, protein_g, fat_g, carbs_g',
-    )
-    .or(
-      `name_nl.ilike.%${searchTerm}%,name_en.ilike.%${searchTerm}%,synonym.ilike.%${searchTerm}%`,
-    )
-    .limit(limit);
+  // Twee aparte ilike-queries i.p.v. .or() om PostgREST/URL-encoding problemen te vermijden
+  const pattern = `%${trimmed.replace(/'/g, "''")}%`;
 
-  if (error) {
-    console.error('Error searching NEVO foods:', error);
+  const [byNl, byEn] = await Promise.all([
+    supabase
+      .from('nevo_foods')
+      .select(NEVO_SEARCH_COLS)
+      .ilike('name_nl', pattern)
+      .limit(limit),
+    supabase
+      .from('nevo_foods')
+      .select(NEVO_SEARCH_COLS)
+      .ilike('name_en', pattern)
+      .limit(limit),
+  ]);
+
+  if (byNl.error) {
+    console.error('Error searching NEVO foods (name_nl):', byNl.error);
     return [];
   }
+  if (byEn.error) {
+    console.error('Error searching NEVO foods (name_en):', byEn.error);
+    return byNl.data ?? [];
+  }
 
-  return data || [];
+  const seen = new Set<number>();
+  const merged: any[] = [];
+  for (const row of [...(byNl.data ?? []), ...(byEn.data ?? [])]) {
+    if (seen.has(row.nevo_code)) continue;
+    seen.add(row.nevo_code);
+    merged.push(row);
+    if (merged.length >= limit) break;
+  }
+  return merged;
 }
 
 /**
@@ -640,6 +668,127 @@ export async function calculateCustomFoodNutrition(
       : null,
     vit_c_mg: food.vit_c_mg ? food.vit_c_mg * multiplier : null,
   };
+}
+
+/** Keys that map to NutritionalProfile (used for FNDDS row → profile). */
+const NUTRITIONAL_PROFILE_KEYS: (keyof NutritionalProfile)[] = [
+  'energy_kj',
+  'energy_kcal',
+  'water_g',
+  'protein_g',
+  'fat_g',
+  'saturated_fat_g',
+  'monounsaturated_fat_g',
+  'polyunsaturated_fat_g',
+  'omega3_fat_g',
+  'omega6_fat_g',
+  'trans_fat_g',
+  'carbs_g',
+  'sugar_g',
+  'free_sugars_g',
+  'starch_g',
+  'fiber_g',
+  'alcohol_g',
+  'cholesterol_mg',
+  'sodium_mg',
+  'potassium_mg',
+  'calcium_mg',
+  'phosphorus_mg',
+  'magnesium_mg',
+  'iron_mg',
+  'copper_mg',
+  'selenium_ug',
+  'zinc_mg',
+  'iodine_ug',
+  'vit_a_rae_ug',
+  'vit_d_ug',
+  'vit_e_mg',
+  'vit_k_ug',
+  'vit_b1_mg',
+  'vit_b2_mg',
+  'vit_b6_mg',
+  'vit_b12_ug',
+  'niacin_equiv_mg',
+  'folate_equiv_ug',
+  'vit_c_mg',
+];
+
+/**
+ * Calculate nutritional values for an FNDDS survey food (per 100g from fndds_survey_food_nutrients_mapped).
+ *
+ * @param fdcId - FNDDS survey food fdc_id
+ * @param amountG - Amount in grams
+ * @returns Nutritional profile for the specified amount
+ */
+export async function calculateFnddsNutrition(
+  fdcId: number,
+  amountG: number,
+): Promise<NutritionalProfile | null> {
+  const supabase = await createServerClient();
+
+  const { data: rows, error } = await supabase
+    .from('fndds_survey_food_nutrients_mapped')
+    .select('internal_nutrient_key, amount_per_100g')
+    .eq('fdc_id', fdcId);
+
+  if (error || !rows?.length) {
+    return null;
+  }
+
+  const multiplier = amountG / 100;
+  const profile: NutritionalProfile = {
+    energy_kj: null,
+    energy_kcal: null,
+    water_g: null,
+    protein_g: null,
+    fat_g: null,
+    saturated_fat_g: null,
+    monounsaturated_fat_g: null,
+    polyunsaturated_fat_g: null,
+    omega3_fat_g: null,
+    omega6_fat_g: null,
+    trans_fat_g: null,
+    carbs_g: null,
+    sugar_g: null,
+    free_sugars_g: null,
+    starch_g: null,
+    fiber_g: null,
+    alcohol_g: null,
+    cholesterol_mg: null,
+    sodium_mg: null,
+    potassium_mg: null,
+    calcium_mg: null,
+    phosphorus_mg: null,
+    magnesium_mg: null,
+    iron_mg: null,
+    copper_mg: null,
+    selenium_ug: null,
+    zinc_mg: null,
+    iodine_ug: null,
+    vit_a_rae_ug: null,
+    vit_d_ug: null,
+    vit_e_mg: null,
+    vit_k_ug: null,
+    vit_b1_mg: null,
+    vit_b2_mg: null,
+    vit_b6_mg: null,
+    vit_b12_ug: null,
+    niacin_equiv_mg: null,
+    folate_equiv_ug: null,
+    vit_c_mg: null,
+  };
+
+  for (const row of rows as {
+    internal_nutrient_key: string;
+    amount_per_100g: number | null;
+  }[]) {
+    const key = row.internal_nutrient_key as keyof NutritionalProfile;
+    if (NUTRITIONAL_PROFILE_KEYS.includes(key) && row.amount_per_100g != null) {
+      (profile[key] as number) = Number(row.amount_per_100g) * multiplier;
+    }
+  }
+
+  return profile;
 }
 
 /**

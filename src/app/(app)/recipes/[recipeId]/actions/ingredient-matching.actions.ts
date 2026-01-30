@@ -2,9 +2,9 @@
 
 import { createClient } from '@/src/lib/supabase/server';
 import {
-  searchNevoFoods,
   calculateIngredientNutrition,
   calculateCustomFoodNutrition,
+  calculateFnddsNutrition,
   calculateRecipeNutrition,
   scaleProfile,
   calculateNutriScoreFromProfile,
@@ -41,29 +41,6 @@ function normalizeIngredientText(text: string): string {
   return text.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
-/**
- * Haal een korte zoekterm uit een ingrediëntregel voor NEVO/custom zoeken.
- * Bijv. "794 - 907 g Kipfilet zonder botten en vel 100g (of kippendijen)" → "kipfilet".
- * Verwijderd: voorlopende getallen/eenheden, trailing "100g", haakjes.
- */
-function extractIngredientSearchTerm(fullLine: string): string {
-  let s = fullLine.toLowerCase().trim().replace(/\s+/g, ' ');
-  if (!s) return '';
-
-  // Verwijder voorlopende getallen, streepjes, spaties en "g" (bijv. "794 - 907 g ")
-  s = s.replace(/^[\d\s\-.,]+(g\s*)?/i, '').trim();
-  // Verwijder trailing "100g", "per 100g", en haakjes met inhoud
-  s = s.replace(/\s*(per\s+)?\d+\s*g\s*$/i, '').trim();
-  s = s.replace(/\s*\([^)]*\)\s*$/g, '').trim();
-  if (!s) return fullLine.trim().slice(0, 50);
-
-  // Gebruik de eerste 1–4 woorden als zoekterm (NEVO-namen zijn vaak kort: "Kipfilet", "Kip, filet")
-  const words = s.split(/\s+/).filter((w) => w.length > 0);
-  const take = Math.min(words.length, 4);
-  const kernel = words.slice(0, take).join(' ');
-  return kernel.length > 0 ? kernel : s.slice(0, 50);
-}
-
 /** Eenheden en stopwoorden die we niet als zoekterm gebruiken */
 const UNIT_AND_STOP = new Set([
   'g',
@@ -91,7 +68,9 @@ const UNIT_AND_STOP = new Set([
   'plak',
   'plakken',
   'eetlepel',
+  'eetlepels',
   'theelepel',
+  'theelepels',
   'cup',
   'cups',
   'ounce',
@@ -102,6 +81,38 @@ const UNIT_AND_STOP = new Set([
   'per',
   'of',
 ]);
+
+/**
+ * Haal een korte zoekterm uit een ingrediëntregel voor NEVO/custom zoeken.
+ * Bijv. "794 - 907 g Kipfilet zonder botten en vel 100g (of kippendijen)" → "kipfilet".
+ * Verwijderd: voorlopende getallen/eenheden, trailing "100g", haakjes.
+ */
+function extractIngredientSearchTerm(fullLine: string): string {
+  let s = fullLine.toLowerCase().trim().replace(/\s+/g, ' ');
+  if (!s) return '';
+
+  // Verwijder voorlopende getallen, streepjes, spaties en "g" (bijv. "794 - 907 g ")
+  s = s.replace(/^[\d\s\-.,]+(g\s*)?/i, '').trim();
+  // Verwijder voorlopende eenheden (bijv. "theelepel", "eetlepel") zodat "1/2 theelepel paprikapoeder" → "paprikapoeder"
+  const leadingWords = s.split(/\s+/);
+  while (
+    leadingWords.length > 0 &&
+    UNIT_AND_STOP.has(leadingWords[0].toLowerCase())
+  ) {
+    leadingWords.shift();
+    s = leadingWords.join(' ').trim();
+  }
+  // Verwijder trailing "100g", "per 100g", en haakjes met inhoud
+  s = s.replace(/\s*(per\s+)?\d+\s*g\s*$/i, '').trim();
+  s = s.replace(/\s*\([^)]*\)\s*$/g, '').trim();
+  if (!s) return fullLine.trim().slice(0, 50);
+
+  // Gebruik de eerste 1–4 woorden als zoekterm (NEVO-namen zijn vaak kort: "Kipfilet", "Kip, filet")
+  const words = s.split(/\s+/).filter((w) => w.length > 0);
+  const take = Math.min(words.length, 4);
+  const kernel = words.slice(0, take).join(' ');
+  return kernel.length > 0 ? kernel : s.slice(0, 50);
+}
 
 /**
  * Extra zoektermen uit een zoekterm: losse woorden (zonder eenheden) en delen van samenstellingen.
@@ -156,9 +167,10 @@ export async function getMatchForRecipeIngredientAction(
   normalizedText: string,
 ): Promise<
   ActionResult<{
-    source: 'nevo' | 'custom';
+    source: 'nevo' | 'custom' | 'fndds';
     nevoCode?: number;
     customFoodId?: string;
+    fdcId?: number;
   } | null>
 > {
   try {
@@ -185,7 +197,7 @@ export async function getMatchForRecipeIngredientAction(
     const norm = normalizeIngredientText(trimmed);
     const { data, error } = await supabase
       .from('recipe_ingredient_matches')
-      .select('source, nevo_code, custom_food_id')
+      .select('source, nevo_code, custom_food_id, fdc_id')
       .eq('normalized_text', norm)
       .maybeSingle();
 
@@ -201,9 +213,10 @@ export async function getMatchForRecipeIngredientAction(
     return {
       ok: true,
       data: {
-        source: data.source as 'nevo' | 'custom',
+        source: data.source as 'nevo' | 'custom' | 'fndds',
         nevoCode: data.nevo_code ?? undefined,
         customFoodId: data.custom_food_id ?? undefined,
+        fdcId: data.fdc_id ?? undefined,
       },
     };
   } catch (e) {
@@ -219,10 +232,11 @@ export async function getMatchForRecipeIngredientAction(
 
 /** Match-resultaat voor één ingrediëntregel (voor weergave in UI) */
 export type ResolvedIngredientMatch = {
-  source: 'nevo' | 'custom';
+  source: 'nevo' | 'custom' | 'fndds';
   nevoCode?: number;
   customFoodId?: string;
-  /** Huidige weergavenaam uit de database (custom_foods.name_nl of nevo_foods.name_nl) */
+  fdcId?: number;
+  /** Huidige weergavenaam uit de database (custom_foods.name_nl, nevo_foods.name_nl of FNDDS) */
   displayName?: string;
 };
 
@@ -257,11 +271,22 @@ export async function getResolvedIngredientMatchesAction(
       return { ok: true, data: [] };
     }
 
-    const normsPerIngredient = lineOptionsPerIngredient.map((options) =>
-      options
-        .map((line) => normalizeIngredientText(String(line ?? '').trim()))
-        .filter((n) => n.length > 0),
-    );
+    const normsPerIngredient = lineOptionsPerIngredient.map((options) => {
+      const norms: string[] = [];
+      for (const line of options) {
+        const trimmed = String(line ?? '').trim();
+        if (!trimmed) continue;
+        const norm = normalizeIngredientText(trimmed);
+        if (norm && !norms.includes(norm)) norms.push(norm);
+        // Voeg korte zoekterm toe voor betere matching (bijv. "1/2 tl paprikapoeder" → "paprikapoeder")
+        const short = extractIngredientSearchTerm(trimmed);
+        if (short) {
+          const normShort = normalizeIngredientText(short);
+          if (normShort && !norms.includes(normShort)) norms.push(normShort);
+        }
+      }
+      return norms;
+    });
     const uniqueNorms = [...new Set(normsPerIngredient.flat())].filter(
       (n) => n.length > 0,
     );
@@ -275,7 +300,7 @@ export async function getResolvedIngredientMatchesAction(
 
     const { data: rows, error } = await supabase
       .from('recipe_ingredient_matches')
-      .select('normalized_text, source, nevo_code, custom_food_id')
+      .select('normalized_text, source, nevo_code, custom_food_id, fdc_id')
       .in('normalized_text', uniqueNorms);
 
     if (error) {
@@ -288,9 +313,10 @@ export async function getResolvedIngredientMatchesAction(
     const map = new Map<
       string,
       {
-        source: 'nevo' | 'custom';
+        source: 'nevo' | 'custom' | 'fndds';
         nevoCode?: number;
         customFoodId?: string;
+        fdcId?: number;
         displayName?: string;
       }
     >();
@@ -298,9 +324,10 @@ export async function getResolvedIngredientMatchesAction(
       const norm = String(row.normalized_text ?? '').trim();
       if (!norm) continue;
       map.set(norm, {
-        source: row.source as 'nevo' | 'custom',
+        source: row.source as 'nevo' | 'custom' | 'fndds',
         nevoCode: row.nevo_code ?? undefined,
         customFoodId: row.custom_food_id ?? undefined,
+        fdcId: row.fdc_id ?? undefined,
       });
     }
 
@@ -317,6 +344,11 @@ export async function getResolvedIngredientMatchesAction(
         [...map.values()].flatMap((m) =>
           m.nevoCode != null ? [m.nevoCode] : [],
         ),
+      ),
+    ];
+    const fdcIds = [
+      ...new Set(
+        [...map.values()].flatMap((m) => (m.fdcId != null ? [m.fdcId] : [])),
       ),
     ];
     const customNamesById: Record<string, string> = {};
@@ -343,6 +375,31 @@ export async function getResolvedIngredientMatchesAction(
         if (code != null && name) nevoNamesByCode[code] = name;
       }
     }
+    const fnddsNamesByFdcId: Record<number, string> = {};
+    if (fdcIds.length > 0) {
+      const { data: transRows } = await supabase
+        .from('fndds_survey_food_translations')
+        .select('fdc_id, display_name')
+        .eq('locale', 'nl-NL')
+        .in('fdc_id', fdcIds);
+      for (const r of transRows ?? []) {
+        const id = r.fdc_id as number;
+        const name = (r.display_name as string)?.trim();
+        if (id != null && name) fnddsNamesByFdcId[id] = name;
+      }
+      const missingFdcIds = fdcIds.filter((id) => !fnddsNamesByFdcId[id]);
+      if (missingFdcIds.length > 0) {
+        const { data: foodRows } = await supabase
+          .from('fndds_survey_foods')
+          .select('fdc_id, description')
+          .in('fdc_id', missingFdcIds);
+        for (const r of foodRows ?? []) {
+          const id = r.fdc_id as number;
+          const name = (r.description as string)?.trim();
+          if (id != null && name) fnddsNamesByFdcId[id] = name;
+        }
+      }
+    }
     for (const match of map.values()) {
       if (match.customFoodId && customNamesById[match.customFoodId]) {
         match.displayName = customNamesById[match.customFoodId];
@@ -351,6 +408,8 @@ export async function getResolvedIngredientMatchesAction(
         nevoNamesByCode[match.nevoCode] != null
       ) {
         match.displayName = nevoNamesByCode[match.nevoCode];
+      } else if (match.fdcId != null && fnddsNamesByFdcId[match.fdcId]) {
+        match.displayName = fnddsNamesByFdcId[match.fdcId];
       }
     }
 
@@ -432,14 +491,74 @@ export async function getCustomFoodNamesByIdsAction(
 }
 
 /**
- * Sla een bevestigde match op (recepttekst → NEVO of custom product).
+ * Haal actuele weergavenamen (name_nl) op voor nevo_foods op basis van nevo_code.
+ * Gebruikt bij receptweergave zodat na wijziging in de ingredientendatabase
+ * de nieuwe naam in de ingredientenlijst wordt getoond.
+ */
+export async function getNevoFoodNamesByCodesAction(
+  nevoCodes: (string | number)[],
+): Promise<ActionResult<Record<string, string>>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: { code: 'AUTH_ERROR', message: 'Je moet ingelogd zijn' },
+      };
+    }
+
+    const codes = [...new Set(nevoCodes)]
+      .map((c) => (typeof c === 'number' ? c : parseInt(String(c), 10)))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    if (codes.length === 0) {
+      return { ok: true, data: {} };
+    }
+
+    const { data: rows, error } = await supabase
+      .from('nevo_foods')
+      .select('nevo_code, name_nl')
+      .in('nevo_code', codes);
+
+    if (error) {
+      return {
+        ok: false,
+        error: { code: 'DB_ERROR', message: error.message },
+      };
+    }
+
+    const result: Record<string, string> = {};
+    for (const r of rows ?? []) {
+      const code = r.nevo_code as number;
+      const name = (r.name_nl as string)?.trim();
+      if (code != null && name) result[String(code)] = name;
+    }
+    return { ok: true, data: result };
+  } catch (e) {
+    return {
+      ok: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: e instanceof Error ? e.message : 'Onbekende fout',
+      },
+    };
+  }
+}
+
+/**
+ * Sla een bevestigde match op (recepttekst → NEVO, custom of FNDDS product).
  * Wordt aangeroepen wanneer de gebruiker kiest uit "Mogelijk bedoelde u …?"
  */
 export async function saveIngredientMatchAction(args: {
   normalizedText: string;
-  source: 'nevo' | 'custom';
+  source: 'nevo' | 'custom' | 'fndds';
   nevoCode?: number;
   customFoodId?: string;
+  /** FNDDS survey food fdc_id when source is fndds */
+  fdcId?: number;
 }): Promise<ActionResult<void>> {
   try {
     const supabase = await createClient();
@@ -481,6 +600,7 @@ export async function saveIngredientMatchAction(args: {
           source: 'nevo',
           nevo_code: args.nevoCode,
           custom_food_id: null,
+          fdc_id: null,
           created_by: user.id,
         },
         { onConflict: 'normalized_text' },
@@ -510,6 +630,37 @@ export async function saveIngredientMatchAction(args: {
           source: 'custom',
           nevo_code: null,
           custom_food_id: args.customFoodId,
+          fdc_id: null,
+          created_by: user.id,
+        },
+        { onConflict: 'normalized_text' },
+      );
+      if (error) {
+        return {
+          ok: false,
+          error: { code: 'DB_ERROR', message: error.message },
+        };
+      }
+      return { ok: true, data: undefined };
+    }
+
+    if (args.source === 'fndds') {
+      if (args.fdcId == null) {
+        return {
+          ok: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'fdcId is verplicht voor source fndds',
+          },
+        };
+      }
+      const { error } = await supabase.from('recipe_ingredient_matches').upsert(
+        {
+          normalized_text: norm,
+          source: 'fndds',
+          nevo_code: null,
+          custom_food_id: null,
+          fdc_id: args.fdcId,
           created_by: user.id,
         },
         { onConflict: 'normalized_text' },
@@ -538,10 +689,17 @@ export async function saveIngredientMatchAction(args: {
   }
 }
 
+/** Weergavelabel voor de bron in zoekresultaten (eigen / AI / Nevo / FNDDS). */
+export type IngredientSourceLabel = 'Eigen' | 'AI' | 'Nevo' | 'FNDDS';
+
 export type IngredientCandidate = {
-  source: 'nevo' | 'custom';
+  source: 'nevo' | 'custom' | 'fndds';
+  /** Label voor weergave bij zoekresultaten */
+  sourceLabel: IngredientSourceLabel;
   nevoCode?: number;
   customFoodId?: string;
+  /** FNDDS survey food (fdc_id) */
+  fdcId?: number;
   name_nl: string;
   name_en?: string | null;
   food_group_nl?: string | null;
@@ -596,9 +754,11 @@ function sortCandidatesByRelevance(
 }
 
 /**
- * Zoek ingrediënten in NEVO + custom_foods op naam/synonym.
+ * Zoek ingrediënten in NEVO, custom_foods en FNDDS op naam.
  * Voor uitklapmenu "Wijzig match" en voor AI-suggesties.
  * Gebruikt een verkorte zoekterm uit de ingrediëntregel (bijv. "Kipfilet" uit "794 g Kipfilet zonder botten en vel 100g").
+ * Bronnen: nevo_foods (name_nl, name_en), custom_foods (name_nl, name_en), fndds_survey_foods (description) + fndds_survey_food_translations (display_name nl-NL).
+ * Bij Supabase-fouten wordt ok: false met error.message teruggegeven zodat de UI de echte fout toont.
  */
 export async function searchIngredientCandidatesAction(
   query: string,
@@ -650,19 +810,123 @@ export async function searchIngredientCandidatesAction(
     const seenKeys = new Set<string>();
     const nevoCandidates: IngredientCandidate[] = [];
     const customCandidates: IngredientCandidate[] = [];
+    const fnddsCandidates: IngredientCandidate[] = [];
+
+    const nevoCols =
+      'nevo_code, name_nl, name_en, food_group_nl, energy_kcal, protein_g, fat_g, carbs_g, fiber_g';
+    type CustomRow = {
+      id: string;
+      name_nl: string | null;
+      name_en: string | null;
+      food_group_nl: string | null;
+      energy_kcal: number | null;
+      protein_g: number | null;
+      fat_g: number | null;
+      carbs_g: number | null;
+      fiber_g: number | null;
+      created_by?: string | null;
+    };
+    const customCols =
+      'id, name_nl, name_en, food_group_nl, energy_kcal, protein_g, fat_g, carbs_g, fiber_g, created_by';
 
     for (const q of searchTerms) {
-      if (nevoCandidates.length + customCandidates.length >= limit) break;
-      const remaining = limit - nevoCandidates.length - customCandidates.length;
+      if (
+        nevoCandidates.length +
+          customCandidates.length +
+          fnddsCandidates.length >=
+        limit
+      )
+        break;
+      const remaining =
+        limit -
+        nevoCandidates.length -
+        customCandidates.length -
+        fnddsCandidates.length;
       if (remaining <= 0) break;
 
-      const nevoResults = await searchNevoFoods(q, remaining);
-      for (const r of nevoResults) {
+      const pattern = `%${q.replace(/'/g, "''")}%`;
+
+      // NEVO: inline queries zodat we fouten kunnen doorgeven (searchNevoFoods geeft [] bij error)
+      const [
+        nevoByNl,
+        nevoByEn,
+        customByNl,
+        customByEn,
+        fnddsByDesc,
+        fnddsByDisplay,
+      ] = await Promise.all([
+        supabase
+          .from('nevo_foods')
+          .select(nevoCols)
+          .ilike('name_nl', pattern)
+          .limit(remaining),
+        supabase
+          .from('nevo_foods')
+          .select(nevoCols)
+          .ilike('name_en', pattern)
+          .limit(remaining),
+        supabase
+          .from('custom_foods')
+          .select(customCols)
+          .ilike('name_nl', pattern)
+          .limit(remaining),
+        supabase
+          .from('custom_foods')
+          .select(customCols)
+          .ilike('name_en', pattern)
+          .limit(remaining),
+        supabase
+          .from('fndds_survey_foods')
+          .select('fdc_id, description')
+          .ilike('description', pattern)
+          .limit(remaining),
+        supabase
+          .from('fndds_survey_food_translations')
+          .select('fdc_id, display_name')
+          .eq('locale', 'nl-NL')
+          .ilike('display_name', pattern)
+          .limit(remaining),
+      ]);
+
+      if (nevoByNl.error) {
+        return {
+          ok: false,
+          error: {
+            code: 'DB_ERROR',
+            message: `NEVO zoeken (name_nl): ${nevoByNl.error.message}`,
+          },
+        };
+      }
+      if (nevoByEn.error) {
+        return {
+          ok: false,
+          error: {
+            code: 'DB_ERROR',
+            message: `NEVO zoeken (name_en): ${nevoByEn.error.message}`,
+          },
+        };
+      }
+      if (customByNl.error && customByEn.error) {
+        return {
+          ok: false,
+          error: {
+            code: 'DB_ERROR',
+            message: `Eigen ingredienten zoeken: ${customByNl.error.message}`,
+          },
+        };
+      }
+
+      const nevoList = [...(nevoByNl.data ?? []), ...(nevoByEn.data ?? [])];
+      const nevoSeen = new Set<number>();
+      for (const r of nevoList) {
+        if (nevoSeen.has(r.nevo_code)) continue;
+        nevoSeen.add(r.nevo_code);
         const key = `nevo:${r.nevo_code}`;
         if (seenKeys.has(key)) continue;
         seenKeys.add(key);
         nevoCandidates.push({
           source: 'nevo',
+          sourceLabel: 'Nevo',
           nevoCode: r.nevo_code,
           name_nl: r.name_nl ?? '',
           name_en: r.name_en ?? null,
@@ -675,20 +939,21 @@ export async function searchIngredientCandidatesAction(
         });
       }
 
-      const { data: customRows } = await supabase
-        .from('custom_foods')
-        .select(
-          'id, name_nl, name_en, food_group_nl, energy_kcal, protein_g, fat_g, carbs_g, fiber_g',
-        )
-        .or(`name_nl.ilike.%${q}%,name_en.ilike.%${q}%,synonym.ilike.%${q}%`)
-        .limit(remaining);
-
-      for (const r of customRows || []) {
+      const customList = [
+        ...(customByNl.data ?? []),
+        ...(customByEn.data ?? []),
+      ];
+      const customSeen = new Set<string>();
+      for (const r of customList) {
+        if (customSeen.has(r.id)) continue;
+        customSeen.add(r.id);
         const key = `custom:${r.id}`;
         if (seenKeys.has(key)) continue;
         seenKeys.add(key);
+        const createdBy = (r as CustomRow).created_by;
         customCandidates.push({
           source: 'custom',
+          sourceLabel: createdBy ? 'AI' : 'Eigen',
           customFoodId: r.id,
           name_nl: r.name_nl ?? '',
           name_en: r.name_en ?? null,
@@ -700,9 +965,57 @@ export async function searchIngredientCandidatesAction(
           fiber_g: r.fiber_g ?? null,
         });
       }
+
+      // FNDDS: description (EN) + display_name (nl-NL); per fdc_id één candidate met beste naam
+      const fnddsByDescList = (fnddsByDesc.data ?? []) as {
+        fdc_id: number;
+        description: string;
+      }[];
+      const fnddsByDisplayList = (fnddsByDisplay.data ?? []) as {
+        fdc_id: number;
+        display_name: string;
+      }[];
+      const fnddsMap = new Map<
+        number,
+        { name_nl: string; name_en: string | null }
+      >();
+      for (const row of fnddsByDisplayList) {
+        if (!fnddsMap.has(row.fdc_id))
+          fnddsMap.set(row.fdc_id, {
+            name_nl: row.display_name ?? '',
+            name_en: null,
+          });
+        else fnddsMap.get(row.fdc_id)!.name_nl = row.display_name ?? '';
+      }
+      for (const row of fnddsByDescList) {
+        const cur = fnddsMap.get(row.fdc_id);
+        if (!cur)
+          fnddsMap.set(row.fdc_id, {
+            name_nl: row.description ?? '',
+            name_en: row.description ?? null,
+          });
+        else cur.name_en = row.description ?? null;
+      }
+      for (const [fdcId, names] of fnddsMap) {
+        if (!names.name_nl && !names.name_en) continue;
+        const key = `fndds:${fdcId}`;
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        fnddsCandidates.push({
+          source: 'fndds',
+          sourceLabel: 'FNDDS',
+          fdcId,
+          name_nl: names.name_nl || names.name_en || '',
+          name_en: names.name_en || null,
+        });
+      }
     }
 
-    let combined = [...nevoCandidates, ...customCandidates].slice(0, limit);
+    let combined = [
+      ...nevoCandidates,
+      ...customCandidates,
+      ...fnddsCandidates,
+    ].slice(0, limit);
     combined = sortCandidatesByRelevance(combined, raw);
     return { ok: true, data: combined };
   } catch (e) {
@@ -717,13 +1030,15 @@ export async function searchIngredientCandidatesAction(
 }
 
 /**
- * Haal nutriwaardes op voor één ingrediënt (NEVO of custom) voor gegeven hoeveelheid in gram.
+ * Haal nutriwaardes op voor één ingrediënt (NEVO, custom of FNDDS) voor gegeven hoeveelheid in gram.
  * Voor uitklapmenu bij geklikte ingrediënten.
  */
 export async function getIngredientNutritionAction(args: {
-  source: 'nevo' | 'custom';
+  source: 'nevo' | 'custom' | 'fndds';
   nevoCode?: number;
   customFoodId?: string;
+  /** FNDDS survey food fdc_id when source is fndds */
+  fdcId?: number;
   amountG: number;
 }): Promise<ActionResult<NutritionalProfile | null>> {
   try {
@@ -760,6 +1075,11 @@ export async function getIngredientNutritionAction(args: {
         args.customFoodId,
         amountG,
       );
+      return { ok: true, data: profile };
+    }
+
+    if (args.source === 'fndds' && args.fdcId != null) {
+      const profile = await calculateFnddsNutrition(args.fdcId, amountG);
       return { ok: true, data: profile };
     }
 
@@ -849,9 +1169,15 @@ export async function getRecipeNutritionSummaryAction(args: {
 
     const recipeIngredients: RecipeIngredient[] = [];
 
-    const refs = Array.isArray(mealData.ingredientRefs)
+    const rawRefs = Array.isArray(mealData.ingredientRefs)
       ? (mealData.ingredientRefs as any[])
       : [];
+    const refs = rawRefs.filter(
+      (r: any) =>
+        r != null &&
+        typeof r === 'object' &&
+        (r.nevoCode != null || r.customFoodId != null || r.fdcId != null),
+    );
     if (refs.length > 0) {
       for (const ref of refs) {
         let amountG = Number(ref.quantityG ?? ref.quantity_g ?? 0);
@@ -866,6 +1192,11 @@ export async function getRecipeNutritionSummaryAction(args: {
         if (ref.customFoodId ?? ref.custom_food_id) {
           recipeIngredients.push({
             custom_food_id: ref.customFoodId ?? ref.custom_food_id,
+            amount_g: amountG,
+          });
+        } else if (ref.fdcId != null) {
+          recipeIngredients.push({
+            fndds_fdc_id: ref.fdcId,
             amount_g: amountG,
           });
         } else {
@@ -891,7 +1222,7 @@ export async function getRecipeNutritionSummaryAction(args: {
         const norm = normalizeIngredientText(line);
         const { data: match } = await supabase
           .from('recipe_ingredient_matches')
-          .select('source, nevo_code, custom_food_id')
+          .select('source, nevo_code, custom_food_id, fdc_id')
           .eq('normalized_text', norm)
           .maybeSingle();
 
@@ -919,6 +1250,11 @@ export async function getRecipeNutritionSummaryAction(args: {
         } else if (match.source === 'custom' && match.custom_food_id) {
           recipeIngredients.push({
             custom_food_id: match.custom_food_id,
+            amount_g: amountG,
+          });
+        } else if (match.source === 'fndds' && match.fdc_id != null) {
+          recipeIngredients.push({
+            fndds_fdc_id: match.fdc_id,
             amount_g: amountG,
           });
         }
@@ -971,7 +1307,7 @@ export async function getRecipeNutritionSummaryAction(args: {
 }
 
 /**
- * Vervang een legacy-ingrediënt door een gematchte ref (NEVO of custom).
+ * Vervang een legacy-ingrediënt door een gematchte ref (NEVO, custom of FNDDS).
  * Voegt de ref toe aan ingredientRefs en verwijdert het ingrediënt op de gegeven index uit ingredients.
  */
 export async function updateRecipeIngredientMatchAction(args: {
@@ -979,9 +1315,11 @@ export async function updateRecipeIngredientMatchAction(args: {
   source: 'custom' | 'gemini';
   ingredientIndex: number;
   match: {
-    source: 'nevo' | 'custom';
+    source: 'nevo' | 'custom' | 'fndds';
     nevoCode?: number;
     customFoodId?: string;
+    /** FNDDS survey food fdc_id when source is fndds */
+    fdcId?: number;
   };
   displayName: string;
   /** Hoeveelheid in gram (alleen wanneer eenheid = g). Anders quantity + unit gebruiken. */
@@ -1068,8 +1406,15 @@ export async function updateRecipeIngredientMatchAction(args: {
           ? args.quantityG
           : 0;
       if (fallbackG > 0) newRef.quantityG = fallbackG;
+      else if (typeof args.quantityG === 'number' && args.quantityG === 0)
+        newRef.quantityG = 0;
     }
-    if (!newRef.quantityG && newRef.quantity == null) {
+    const hasQuantity =
+      (typeof newRef.quantityG === 'number' && newRef.quantityG > 0) ||
+      (newRef.quantity != null && newRef.unit);
+    const hasExplicitNone =
+      typeof args.quantityG === 'number' && args.quantityG === 0;
+    if (!hasQuantity && !hasExplicitNone) {
       return {
         ok: false,
         error: {
@@ -1082,29 +1427,55 @@ export async function updateRecipeIngredientMatchAction(args: {
       newRef.nevoCode = String(args.match.nevoCode);
     } else if (args.match.source === 'custom' && args.match.customFoodId) {
       newRef.customFoodId = args.match.customFoodId;
+    } else if (args.match.source === 'fndds' && args.match.fdcId != null) {
+      newRef.fdcId = args.match.fdcId;
     } else {
       return {
         ok: false,
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'Match moet nevoCode of customFoodId hebben',
+          message: 'Match moet nevoCode, customFoodId of fdcId hebben',
         },
       };
     }
 
-    const ingredientRefs = Array.isArray(mealData.ingredientRefs)
-      ? [...(mealData.ingredientRefs as any[])]
+    const existingRefs = Array.isArray(mealData.ingredientRefs)
+      ? (mealData.ingredientRefs as any[])
       : [];
-    ingredientRefs.push(newRef);
-
-    const updatedIngredients = ingredients.filter(
-      (_: unknown, i: number) => i !== args.ingredientIndex,
-    );
+    // Parallel array: refs[i] hoort bij ingredients[i], zodat volgorde behouden blijft.
+    const ingredientRefs: any[] = Array(ingredients.length).fill(null);
+    if (existingRefs.length === ingredients.length) {
+      // Al parallel-formaat: overnemen en nieuwe ref op juiste index zetten.
+      for (let i = 0; i < ingredients.length; i++) {
+        ingredientRefs[i] =
+          i === args.ingredientIndex ? newRef : existingRefs[i];
+      }
+    } else {
+      // Dense refs of leeg: bestaande refs toewijzen op index via displayName-match, nieuwe ref op ingredientIndex.
+      for (let i = 0; i < ingredients.length; i++) {
+        if (i === args.ingredientIndex) {
+          ingredientRefs[i] = newRef;
+          continue;
+        }
+        const ingName =
+          (
+            ingredients[i]?.name ??
+            ingredients[i]?.original_line ??
+            ''
+          )?.trim() || '';
+        const normIng = normalizeIngredientText(ingName);
+        const existing = existingRefs.find((r: any) => {
+          const rName = (r?.displayName ?? '')?.trim() || '';
+          return normIng && normalizeIngredientText(rName) === normIng;
+        });
+        ingredientRefs[i] = existing ?? null;
+      }
+    }
 
     const updatedMealData = {
       ...mealData,
       ingredientRefs,
-      ingredients: updatedIngredients,
+      ingredients, // lijst ongewijzigd, volgorde behouden
     };
 
     const { error: updateError } = await supabase
@@ -1135,12 +1506,11 @@ export async function updateRecipeIngredientMatchAction(args: {
   }
 }
 
-/** AI-response voor voedingswaarden per 100g (voor custom_foods insert) */
+/** AI-response voor voedingswaarden per 100g (voor custom_foods insert). Geen food_group_nl: AI-generated krijgt geen eigen categorie (voorkomt rommel). */
 const CUSTOM_FOOD_AI_SCHEMA = {
   type: 'object',
   properties: {
     name_nl: { type: 'string' },
-    food_group_nl: { type: 'string' },
     energy_kcal: { type: 'number' },
     protein_g: { type: 'number' },
     fat_g: { type: 'number' },
@@ -1196,9 +1566,8 @@ Gebruik betrouwbare bronnen (NEVO, USDA, wetenschappelijke waarden). Als het een
 
 Ingrediënt: "${text}"
 
-Return een JSON object met exact deze velden (laat velden weg voor onbekende waarden):
+Return een JSON object met exact deze velden (laat velden weg voor onbekende waarden). Geen voedingsgroep/categorie: die wordt niet gebruikt.
 - name_nl: Nederlandse naam van het ingrediënt (verplicht)
-- food_group_nl: Voedingsgroep in het Nederlands (bijv. "Groente", "Granen", "Zuivel")
 - energy_kcal: energie in kcal per 100g
 - protein_g: eiwit in gram per 100g
 - fat_g: totaal vet in gram per 100g
@@ -1243,14 +1612,10 @@ Return een JSON object met exact deze velden (laat velden weg voor onbekende waa
     }
 
     const nameNl = String(parsed.name_nl ?? text).trim() || text;
-    const foodGroupNl =
-      typeof parsed.food_group_nl === 'string' && parsed.food_group_nl.trim()
-        ? parsed.food_group_nl.trim()
-        : 'Overig';
-
+    // Geen categorie bij AI-generated: altijd vaste default (voorkomt rommel en "verloren" categorieën).
     const row: Record<string, unknown> = {
       created_by: user.id,
-      food_group_nl: foodGroupNl,
+      food_group_nl: 'Overig',
       food_group_en: 'Other',
       name_nl: nameNl,
       name_en: null,

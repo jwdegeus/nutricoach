@@ -16,6 +16,5 @@ export default function AppLayout({
   children: React.ReactNode;
 }>) {
   // Onboarding gating is handled in middleware.ts for better performance
-  // Use ClientOnlyApplicationLayout to prevent hydration mismatches with Headless UI
   return <ClientOnlyApplicationLayout>{children}</ClientOnlyApplicationLayout>;
 }

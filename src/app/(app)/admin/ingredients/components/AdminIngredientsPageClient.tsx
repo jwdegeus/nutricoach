@@ -45,8 +45,8 @@ export function AdminIngredientsPageClient() {
             Ingrediënten en groepen
           </h1>
           <p className="max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
-            Beheer NEVO- en eigen ingrediënten, en beheer ingredientgroepen
-            (categorieën) voor dieetregels.
+            Beheer ingrediënten uit alle bronnen (NEVO, AI, NutriCoach, FNDDS)
+            en beheer ingredientgroepen (categorieën) voor dieetregels.
           </p>
         </div>
       </div>

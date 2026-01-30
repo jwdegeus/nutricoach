@@ -130,6 +130,14 @@ export function getPageTitle(
   return t ? t('nav.dashboard') : 'Dashboard';
 }
 
+// Admin sub-routes for breadcrumbs (path prefix -> label)
+const ADMIN_BREADCRUMB_SEGMENTS: Array<{ path: string; label: string }> = [
+  { path: '/admin/receptenbeheer', label: 'Receptenbeheer' },
+  { path: '/admin/recipe-sources', label: 'Recept bronnen' },
+  { path: '/admin/ingredients', label: 'Ingrediënten' },
+  { path: '/admin/diet-types', label: 'Dieettypes' },
+];
+
 // Helper function to get breadcrumbs from route
 export function getBreadcrumbs(
   pathname: string,
@@ -139,6 +147,31 @@ export function getBreadcrumbs(
   const breadcrumbs = [{ label: homeLabel, href: '/dashboard' }];
 
   if (pathname === '/dashboard') {
+    return breadcrumbs;
+  }
+
+  // Admin routes: Home > Admin > [sub-route]
+  if (pathname.startsWith('/admin')) {
+    breadcrumbs.push({ label: 'Admin', href: '/admin' });
+    if (pathname === '/admin') return breadcrumbs;
+    for (const { path, label } of ADMIN_BREADCRUMB_SEGMENTS) {
+      if (pathname === path || pathname.startsWith(path + '/')) {
+        breadcrumbs.push({ label, href: path });
+        break;
+      }
+    }
+    return breadcrumbs;
+  }
+
+  // Recept detail: Home > Recepten > Recept (huidige pagina)
+  if (pathname.startsWith('/recipes/') && pathname !== '/recipes') {
+    const recipesLabel = t
+      ? baseNavItems.find((i) => i.href === '/recipes')
+        ? t('nav.recipes')
+        : 'Recepten'
+      : 'Recepten';
+    breadcrumbs.push({ label: recipesLabel, href: '/recipes' });
+    breadcrumbs.push({ label: 'Recept', href: pathname });
     return breadcrumbs;
   }
 

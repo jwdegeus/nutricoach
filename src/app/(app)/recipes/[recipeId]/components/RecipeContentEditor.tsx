@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, Fragment } from 'react';
 import { Button } from '@/components/catalyst/button';
 import { Input } from '@/components/catalyst/input';
 import { Textarea } from '@/components/catalyst/textarea';
@@ -14,6 +14,7 @@ type IngredientRow = {
   quantity?: string | number | null;
   unit?: string | null;
   note?: string | null;
+  section?: string | null;
 };
 
 type InstructionRow = { step: number; text: string };
@@ -48,6 +49,7 @@ function ingredientsFromMealData(mealData: any): IngredientRow[] {
     quantity: item.quantity ?? item.amount ?? null,
     unit: item.unit ?? null,
     note: item.note ?? item.notes ?? null,
+    section: item.section ?? null,
   }));
 }
 
@@ -118,6 +120,7 @@ export function RecipeContentEditor({
           quantity: i.quantity,
           unit: i.unit,
           note: i.note,
+          section: i.section ?? null,
         })),
         instructions: cleanInst,
       });
@@ -134,7 +137,7 @@ export function RecipeContentEditor({
   const addIngredient = () => {
     setIngredients((prev) => [
       ...prev,
-      { name: '', quantity: null, unit: null, note: null },
+      { name: '', quantity: null, unit: null, note: null, section: null },
     ]);
   };
 
@@ -212,48 +215,146 @@ export function RecipeContentEditor({
       <Fieldset>
         <Label>Ingrediënten</Label>
         <div className="space-y-3 mt-2">
-          {ingredients.map((ing, idx) => (
-            <div key={idx} className="flex flex-wrap items-start gap-2">
-              <Input
-                placeholder="Naam"
-                value={ing.name ?? ''}
-                onChange={(e) => updateIngredient(idx, 'name', e.target.value)}
-                className="flex-1 min-w-[120px]"
-              />
-              <Input
-                placeholder="Hoeveelheid"
-                value={ing.quantity ?? ''}
-                onChange={(e) =>
-                  updateIngredient(idx, 'quantity', e.target.value || null)
-                }
-                className="w-24"
-              />
-              <Input
-                placeholder="Eenheid"
-                value={ing.unit ?? ''}
-                onChange={(e) =>
-                  updateIngredient(idx, 'unit', e.target.value || null)
-                }
-                className="w-20"
-              />
-              <Input
-                placeholder="Opmerking"
-                value={ing.note ?? ''}
-                onChange={(e) =>
-                  updateIngredient(idx, 'note', e.target.value || null)
-                }
-                className="flex-1 min-w-[100px]"
-              />
-              <button
-                type="button"
-                onClick={() => removeIngredient(idx)}
-                className="p-2 text-zinc-500 hover:text-red-600"
-                aria-label="Verwijderen"
-              >
-                <TrashIcon className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
+          {(() => {
+            const hasSections = ingredients.some(
+              (i) => i.section != null && String(i.section).trim() !== '',
+            );
+            if (!hasSections) {
+              return (
+                <>
+                  {ingredients.map((ing, idx) => (
+                    <div key={idx} className="flex flex-wrap items-start gap-2">
+                      <Input
+                        placeholder="Naam"
+                        value={ing.name ?? ''}
+                        onChange={(e) =>
+                          updateIngredient(idx, 'name', e.target.value)
+                        }
+                        className="flex-1 min-w-[120px]"
+                      />
+                      <Input
+                        placeholder="Hoeveelheid"
+                        value={ing.quantity ?? ''}
+                        onChange={(e) =>
+                          updateIngredient(
+                            idx,
+                            'quantity',
+                            e.target.value || null,
+                          )
+                        }
+                        className="w-24"
+                      />
+                      <Input
+                        placeholder="Eenheid"
+                        value={ing.unit ?? ''}
+                        onChange={(e) =>
+                          updateIngredient(idx, 'unit', e.target.value || null)
+                        }
+                        className="w-20"
+                      />
+                      <Input
+                        placeholder="Opmerking"
+                        value={ing.note ?? ''}
+                        onChange={(e) =>
+                          updateIngredient(idx, 'note', e.target.value || null)
+                        }
+                        className="flex-1 min-w-[100px]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeIngredient(idx)}
+                        className="p-2 text-zinc-500 hover:text-red-600"
+                        aria-label="Verwijderen"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </>
+              );
+            }
+            const groups: { section: string | null; indices: number[] }[] = [];
+            let curSection: string | null = null;
+            let curIndices: number[] = [];
+            for (let i = 0; i < ingredients.length; i++) {
+              const s =
+                ingredients[i].section != null &&
+                String(ingredients[i].section).trim() !== ''
+                  ? String(ingredients[i].section).trim()
+                  : null;
+              if (s !== curSection) {
+                if (curIndices.length > 0)
+                  groups.push({ section: curSection, indices: curIndices });
+                curSection = s;
+                curIndices = [i];
+              } else {
+                curIndices.push(i);
+              }
+            }
+            if (curIndices.length > 0)
+              groups.push({ section: curSection, indices: curIndices });
+
+            return groups.map((group, gi) => (
+              <Fragment key={gi}>
+                {group.section && (
+                  <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300 pt-2 first:pt-0">
+                    {group.section}
+                  </div>
+                )}
+                {group.indices.map((idx) => {
+                  const ing = ingredients[idx];
+                  return (
+                    <div key={idx} className="flex flex-wrap items-start gap-2">
+                      <Input
+                        placeholder="Naam"
+                        value={ing.name ?? ''}
+                        onChange={(e) =>
+                          updateIngredient(idx, 'name', e.target.value)
+                        }
+                        className="flex-1 min-w-[120px]"
+                      />
+                      <Input
+                        placeholder="Hoeveelheid"
+                        value={ing.quantity ?? ''}
+                        onChange={(e) =>
+                          updateIngredient(
+                            idx,
+                            'quantity',
+                            e.target.value || null,
+                          )
+                        }
+                        className="w-24"
+                      />
+                      <Input
+                        placeholder="Eenheid"
+                        value={ing.unit ?? ''}
+                        onChange={(e) =>
+                          updateIngredient(idx, 'unit', e.target.value || null)
+                        }
+                        className="w-20"
+                      />
+                      <Input
+                        placeholder="Opmerking"
+                        value={ing.note ?? ''}
+                        onChange={(e) =>
+                          updateIngredient(idx, 'note', e.target.value || null)
+                        }
+                        className="flex-1 min-w-[100px]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeIngredient(idx)}
+                        className="p-2 text-zinc-500 hover:text-red-600"
+                        aria-label="Verwijderen"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </Fragment>
+            ));
+          })()}
           <Button outline onClick={addIngredient} className="mt-1">
             <PlusIcon className="h-4 w-4 mr-1" />
             Ingrediënt toevoegen

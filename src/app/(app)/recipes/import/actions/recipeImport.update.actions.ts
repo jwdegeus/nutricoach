@@ -37,6 +37,7 @@ const updateRecipeImportInputSchema = z.object({
           quantity: z.number().nullable().optional(),
           unit: z.string().nullable().optional(),
           note: z.string().nullable().optional(),
+          section: z.string().nullable().optional(),
         }),
       )
       .optional(),
@@ -149,7 +150,6 @@ export async function updateRecipeImportAction(
 
     if (input.updates.ingredients !== undefined) {
       updatedRecipe.ingredients = input.updates.ingredients.map((ing, idx) => {
-        // Preserve original_line from current recipe if available, otherwise use name
         const currentIng = currentRecipe.ingredients?.[idx];
         return {
           original_line: currentIng?.original_line || ing.name,
@@ -157,6 +157,7 @@ export async function updateRecipeImportAction(
           quantity: ing.quantity ?? null,
           unit: ing.unit ?? null,
           note: ing.note ?? null,
+          section: ing.section ?? currentIng?.section ?? null,
         };
       });
     }

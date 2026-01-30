@@ -13,13 +13,17 @@ import {
 import { Text } from '@/components/catalyst/text';
 import type { User } from '@supabase/supabase-js';
 import { useTranslations } from 'next-intl';
-import { LanguageSelector } from './language-selector';
 
 interface AccountProfileProps {
   user: User;
+  /** When true, the section heading/description is omitted (provided by parent layout). */
+  hideSectionHeading?: boolean;
 }
 
-export function AccountProfile({ user }: AccountProfileProps) {
+export function AccountProfile({
+  user,
+  hideSectionHeading,
+}: AccountProfileProps) {
   const t = useTranslations('account');
   const tCommon = useTranslations('common');
   const [error, setError] = useState<string | null>(null);
@@ -58,12 +62,14 @@ export function AccountProfile({ user }: AccountProfileProps) {
       )}
 
       <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        <div className="mb-6">
-          <h2 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
-            {t('profileData')}
-          </h2>
-          <Text className="mt-1">{t('profileDescription')}</Text>
-        </div>
+        {!hideSectionHeading && (
+          <div className="mb-6">
+            <h2 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
+              {t('profileData')}
+            </h2>
+            <Text className="mt-1">{t('profileDescription')}</Text>
+          </div>
+        )}
         <form action={handleSubmit}>
           <FieldGroup>
             <Field>
@@ -155,8 +161,6 @@ export function AccountProfile({ user }: AccountProfileProps) {
           </div>
         </div>
       </div>
-
-      <LanguageSelector />
     </div>
   );
 }

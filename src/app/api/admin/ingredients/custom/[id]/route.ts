@@ -74,6 +74,8 @@ export async function GET(
 const UPDATABLE_FIELDS = [
   'food_group_nl',
   'food_group_en',
+  'ingredient_category_id',
+  'fndds_food_group_nl',
   'name_nl',
   'name_en',
   'synonym',

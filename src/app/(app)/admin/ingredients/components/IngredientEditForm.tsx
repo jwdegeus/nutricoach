@@ -5,12 +5,17 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/catalyst/button';
 import { Input } from '@/components/catalyst/input';
 import { Field, Label } from '@/components/catalyst/fieldset';
-import { Select } from '@/components/catalyst/select';
+import {
+  Listbox,
+  ListboxOption,
+  ListboxLabel,
+} from '@/components/catalyst/listbox';
 import {
   CUSTOM_FOODS_SECTIONS,
   ALL_CUSTOM_FOOD_KEYS,
 } from '../custom/custom-foods-fields';
 import { suggestIngredientEnrichmentAction } from '../custom/actions/ingredient-enrich.actions';
+import { getIngredientCategoriesAction } from '@/src/app/(app)/settings/actions/ingredient-categories-admin.actions';
 import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
 import { CheckIcon, SparklesIcon, TrashIcon } from '@heroicons/react/20/solid';
 
@@ -85,7 +90,12 @@ const NUMERIC_KEYS = new Set([
   'vit_c_mg',
 ]);
 
-type Source = 'nevo' | 'custom';
+type Source = 'nevo' | 'custom' | 'fndds_survey';
+
+/** API path segment: fndds_survey uses route /api/.../fndds/[id]. */
+function apiSegmentForSource(source: Source): string {
+  return source === 'fndds_survey' ? 'fndds' : source;
+}
 
 type IngredientEditFormProps = {
   source: Source;
@@ -124,6 +134,12 @@ export function IngredientEditForm({
     [],
   );
   const [groupsLoading, setGroupsLoading] = useState(true);
+  const [ingredientCategories, setIngredientCategories] = useState<
+    Array<{ id: string; name_nl: string; name_en: string | null }>
+  >([]);
+  const [fnddsFoodGroups, setFnddsFoodGroups] = useState<string[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [fnddsGroupsLoading, setFnddsGroupsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [enriching, setEnriching] = useState(false);
@@ -149,6 +165,50 @@ export function IngredientEditForm({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (source !== 'custom') return;
+    let cancelled = false;
+    setCategoriesLoading(true);
+    getIngredientCategoriesAction()
+      .then((result) => {
+        if (!cancelled && result.ok && result.data) {
+          const active = result.data.filter((c) => c.is_active);
+          setIngredientCategories(
+            active.map((c) => ({
+              id: c.id,
+              name_nl: c.name_nl,
+              name_en: c.name_en,
+            })),
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCategoriesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [source]);
+
+  useEffect(() => {
+    if (source !== 'custom') return;
+    let cancelled = false;
+    setFnddsGroupsLoading(true);
+    fetch('/api/admin/ingredients/fndds-food-groups')
+      .then((res) => res.json())
+      .then((json) => {
+        if (!cancelled && json.ok && json.data?.groups) {
+          setFnddsFoodGroups(json.data.groups);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setFnddsGroupsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [source]);
 
   const groupOptions = useMemo(() => {
     const currentNl = form.food_group_nl?.trim() ?? '';
@@ -223,7 +283,8 @@ export function IngredientEditForm({
     setSaveError(null);
     try {
       const body = formAsRecord();
-      const res = await fetch(`/api/admin/ingredients/${source}/${id}`, {
+      const segment = apiSegmentForSource(source);
+      const res = await fetch(`/api/admin/ingredients/${segment}/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -244,7 +305,8 @@ export function IngredientEditForm({
     setDeleting(true);
     setDeleteError(null);
     try {
-      const res = await fetch(`/api/admin/ingredients/${source}/${id}`, {
+      const segment = apiSegmentForSource(source);
+      const res = await fetch(`/api/admin/ingredients/${segment}/${id}`, {
         method: 'DELETE',
       });
       const json = await res.json();
@@ -263,9 +325,43 @@ export function IngredientEditForm({
     }
   }, [source, id, router]);
 
-  const algemeenFieldsWithoutGroup = CUSTOM_FOODS_SECTIONS[0].fields.filter(
-    (f) => f.key !== 'food_group_nl' && f.key !== 'food_group_en',
+  const algemeenBaseFields = CUSTOM_FOODS_SECTIONS[0].fields.filter(
+    (f) =>
+      f.key !== 'food_group_nl' &&
+      f.key !== 'food_group_en' &&
+      f.key !== 'ingredient_category_id' &&
+      f.key !== 'fndds_food_group_nl',
   );
+  const algemeenFieldsWithGroup =
+    source === 'custom'
+      ? [
+          ...algemeenBaseFields.slice(0, 3),
+          {
+            key: 'ingredient_category_id',
+            label: 'Ingredientgroep',
+            type: 'text' as const,
+          },
+          {
+            key: 'fndds_food_group_nl',
+            label: 'FNDDS categorie',
+            type: 'text' as const,
+          },
+          {
+            key: 'food_group',
+            label: 'Groep (NEVO)',
+            type: 'text' as const,
+          },
+          ...algemeenBaseFields.slice(3),
+        ]
+      : [
+          ...algemeenBaseFields.slice(0, 3),
+          {
+            key: 'food_group',
+            label: 'Groep (NEVO)',
+            type: 'text' as const,
+          },
+          ...algemeenBaseFields.slice(3),
+        ];
 
   return (
     <>
@@ -301,17 +397,7 @@ export function IngredientEditForm({
       <div className="mt-8 space-y-10">
         {CUSTOM_FOODS_SECTIONS.map((section, sectionIndex) => {
           const isAlgemeen = section.title === 'Algemeen';
-          const fields = isAlgemeen
-            ? [
-                ...algemeenFieldsWithoutGroup.slice(0, 3),
-                {
-                  key: 'food_group',
-                  label: 'Groep (NEVO)',
-                  type: 'text' as const,
-                },
-                ...algemeenFieldsWithoutGroup.slice(3),
-              ]
-            : section.fields;
+          const fields = isAlgemeen ? algemeenFieldsWithGroup : section.fields;
 
           return (
             <section
@@ -323,29 +409,110 @@ export function IngredientEditForm({
               </h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {fields.map((field) => {
+                  if (
+                    field.key === 'ingredient_category_id' &&
+                    source === 'custom'
+                  ) {
+                    return (
+                      <Field key="ingredient_category_id">
+                        <Label>Ingredientgroep</Label>
+                        <Listbox
+                          value={form.ingredient_category_id ?? ''}
+                          onChange={(id) => {
+                            updateField('ingredient_category_id', id ?? '');
+                            const cat = ingredientCategories.find(
+                              (c) => c.id === id,
+                            );
+                            if (cat) {
+                              updateField('food_group_nl', cat.name_nl);
+                              updateField(
+                                'food_group_en',
+                                cat.name_en ?? cat.name_nl,
+                              );
+                            }
+                          }}
+                          disabled={categoriesLoading}
+                          placeholder={
+                            categoriesLoading
+                              ? 'Laden...'
+                              : '— Kies een ingredientgroep'
+                          }
+                          aria-label="Kies een ingredientgroep"
+                        >
+                          <ListboxOption value="">
+                            <ListboxLabel>
+                              — Kies een ingredientgroep
+                            </ListboxLabel>
+                          </ListboxOption>
+                          {ingredientCategories.map((c) => (
+                            <ListboxOption key={c.id} value={c.id}>
+                              <ListboxLabel>{c.name_nl}</ListboxLabel>
+                            </ListboxOption>
+                          ))}
+                        </Listbox>
+                      </Field>
+                    );
+                  }
+                  if (
+                    field.key === 'fndds_food_group_nl' &&
+                    source === 'custom'
+                  ) {
+                    return (
+                      <Field key="fndds_food_group_nl">
+                        <Label>FNDDS categorie</Label>
+                        <Listbox
+                          value={form.fndds_food_group_nl ?? ''}
+                          onChange={(nl) =>
+                            updateField('fndds_food_group_nl', nl ?? '')
+                          }
+                          disabled={fnddsGroupsLoading}
+                          placeholder={
+                            fnddsGroupsLoading
+                              ? 'Laden...'
+                              : '— Kies een FNDDS categorie'
+                          }
+                          aria-label="Kies een FNDDS categorie"
+                        >
+                          <ListboxOption value="">
+                            <ListboxLabel>
+                              — Kies een FNDDS categorie
+                            </ListboxLabel>
+                          </ListboxOption>
+                          {fnddsFoodGroups.map((g) => (
+                            <ListboxOption key={g} value={g}>
+                              <ListboxLabel>{g}</ListboxLabel>
+                            </ListboxOption>
+                          ))}
+                        </Listbox>
+                      </Field>
+                    );
+                  }
                   if (field.key === 'food_group') {
                     return (
                       <Field key="food_group">
                         <Label>Groep (NEVO)</Label>
-                        <Select
+                        <Listbox
                           value={form.food_group_nl ?? ''}
-                          onChange={(e) => {
-                            const nl = e.target.value;
+                          onChange={(nl) => {
                             const opt = groupOptions.find((g) => g.nl === nl);
-                            updateField('food_group_nl', nl);
-                            updateField('food_group_en', opt?.en ?? nl);
+                            updateField('food_group_nl', nl ?? '');
+                            updateField('food_group_en', opt?.en ?? nl ?? '');
                           }}
                           disabled={groupsLoading}
+                          placeholder={
+                            groupsLoading ? 'Laden...' : '— Kies een groep'
+                          }
+                          aria-label="Kies een groep"
                         >
-                          <option value="">
-                            {groupsLoading ? 'Laden...' : '— Kies een groep'}
-                          </option>
+                          <ListboxOption value="">
+                            <ListboxLabel>— Kies een groep</ListboxLabel>
+                          </ListboxOption>
                           {groupOptions.map((g) => (
-                            <option key={g.nl} value={g.nl}>
-                              {g.nl}
-                            </option>
+                            <ListboxOption key={g.nl} value={g.nl}>
+                              <ListboxLabel>{g.nl}</ListboxLabel>
+                            </ListboxOption>
                           ))}
-                        </Select>
+                        </Listbox>
                       </Field>
                     );
                   }

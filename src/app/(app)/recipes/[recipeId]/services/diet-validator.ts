@@ -139,7 +139,14 @@ const EXTRA_INGREDIENT_SYNONYMS: Record<string, string[]> = {
 const SUBSTRING_FALSE_POSITIVE_IF_CONTAINS: Record<string, string | string[]> =
   {
     // "bloem" in "zonnebloem" = zaden; in "bloemkool(rijst)" = groente (geen tarwe)
-    bloem: ['zonnebloem', 'bloemkoolrijst', 'bloemkool'],
+    // "kool bloem" / "bloem kool" = bloemkool (word order / typo), zie ook isBloemkoolRelated
+    bloem: [
+      'zonnebloem',
+      'bloemkoolrijst',
+      'bloemkool',
+      'kool bloem',
+      'bloem kool',
+    ],
     ei: ['romeinse', 'romaine'],
     ijs: 'radijs',
     oca: 'avocado',
@@ -147,6 +154,36 @@ const SUBSTRING_FALSE_POSITIVE_IF_CONTAINS: Record<string, string | string[]> =
     rijst: ['bloemkoolrijst', 'bloemkool'],
     // "kool" in "bloemkool" = bloemkool (cauliflower), geen gewone kool/zuivel
     kool: ['bloemkoolrijst', 'bloemkool'],
+    // Zuivelalternatieven: bevatten "yoghurt"/"melk" maar zijn geen zuivel
+    yoghurt: [
+      'kokosyoghurt',
+      'kokos yoghurt',
+      'amandelyoghurt',
+      'amandel yoghurt',
+      'haveryoghurt',
+      'haver yoghurt',
+      'sojayoghurt',
+      'soja yoghurt',
+      'plantaardige yoghurt',
+      'plantyoghurt',
+      'oatyoghurt',
+      'oat yoghurt',
+    ],
+    melk: [
+      'kokosmelk',
+      'kokos melk',
+      'amandelmelk',
+      'amandel melk',
+      'havermelk',
+      'haver melk',
+      'rijstmelk',
+      'rijst melk',
+      'sojamelk',
+      'soja melk',
+      'oatmelk',
+      'oat melk',
+      'plantaardige melk',
+    ],
     // "pasta" als in paste/spread (notenpasta, amandelpasta, tomatenpasta) ≠ glutenpasta
     pasta: [
       'notenpasta',
@@ -193,11 +230,15 @@ const PASTA_AS_PASTE_INDICATORS = [
 /** Bloemkool(rijst) is groente, geen gluten/zuivel – uitsluiten voor die regels */
 function isBloemkoolRelated(text: string): boolean {
   const lower = text.toLowerCase().trim();
+  const normalized = lower.replace(/-/g, ' ').replace(/\s+/g, ' ');
   return (
     lower.includes('bloemkoolrijst') ||
     lower.includes('bloemkool') ||
     lower === 'cauliflower rice' ||
-    lower.includes('cauliflower rice')
+    lower.includes('cauliflower rice') ||
+    normalized.includes('cauliflower') ||
+    normalized.includes('bloem kool') ||
+    normalized.includes('kool bloem')
   );
 }
 
@@ -478,8 +519,16 @@ export function findForbiddenMatches(
           const patterns = Array.isArray(excludeIfContains)
             ? excludeIfContains
             : [excludeIfContains];
-          if (patterns.some((p) => lowerText.includes(p))) {
-            continue; // bv. "ei" in "romeinse sla", "pasta" in "notenpasta"
+          const textToCheck = lowerText;
+          const normalizedForWordOrder = lowerText
+            .replace(/-/g, ' ')
+            .replace(/\s+/g, ' ');
+          if (
+            patterns.some((p) => textToCheck.includes(p)) ||
+            (found === 'bloem' &&
+              patterns.some((p) => normalizedForWordOrder.includes(p)))
+          ) {
+            continue; // bv. "ei" in "romeinse sla", "pasta" in "notenpasta", "kool bloem-" = bloemkool
           }
         }
         if (found === 'pasta' && isPastaAsPaste(lowerText)) continue;
@@ -564,7 +613,15 @@ export function findForbiddenMatches(
             const patterns = Array.isArray(excludeIfContains)
               ? excludeIfContains
               : [excludeIfContains];
-            if (patterns.some((p) => lowerText.includes(p))) continue;
+            const normalizedForWordOrder = lowerText
+              .replace(/-/g, ' ')
+              .replace(/\s+/g, ' ');
+            if (
+              patterns.some((p) => lowerText.includes(p)) ||
+              (lowerSynonym === 'bloem' &&
+                patterns.some((p) => normalizedForWordOrder.includes(p)))
+            )
+              continue;
           }
           if (lowerTerm === 'pasta' && isPastaAsPaste(lowerText)) continue;
           console.log(
