@@ -8,16 +8,6 @@ import {
   NavbarSection,
 } from '@/components/catalyst/navbar';
 import { getPageTitle } from '@/src/lib/nav';
-import { User, Settings, LogOut } from 'lucide-react';
-import {
-  Dropdown,
-  DropdownButton,
-  DropdownItem,
-  DropdownDivider,
-  DropdownLabel,
-  DropdownMenu,
-} from '@/components/catalyst/dropdown';
-import { AvatarButton } from '@/components/catalyst/avatar';
 import { UserMenu } from './user-menu';
 
 export function CatalystNavbar() {

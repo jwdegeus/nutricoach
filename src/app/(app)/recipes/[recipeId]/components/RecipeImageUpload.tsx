@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/catalyst/button';
 import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
@@ -123,6 +124,7 @@ export function RecipeImageUpload({
     }
 
     setImageLoadError(false); // Reset error state when URL changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- previewUrl is derived in this effect, omit to avoid loop
   }, [currentImageUrl, mealId]);
 
   const handleFileSelect = async (
@@ -267,59 +269,17 @@ export function RecipeImageUpload({
             disabled={isUploading || isDeleting}
           >
             {!imageLoadError ? (
-              <img
-                src={previewUrl}
-                alt="Recept foto"
-                className="rounded-lg max-w-full h-auto max-h-48 object-contain shadow-sm hover:shadow-md transition-shadow"
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  // Extract all available information
-                  const errorInfo: Record<string, any> = {
-                    mealId: String(mealId),
-                    imageUrl: String(previewUrl || 'null'),
-                    src: String(target.src || 'unknown'),
-                    naturalWidth: target.naturalWidth ?? 0,
-                    naturalHeight: target.naturalHeight ?? 0,
-                    complete: target.complete ?? false,
-                    width: target.width ?? 0,
-                    height: target.height ?? 0,
-                    errorType: e.type || 'unknown',
-                    timestamp: new Date().toISOString(),
-                  };
-
-                  // Try to get more info from the event
-                  try {
-                    if ('message' in e) {
-                      errorInfo.message = String((e as any).message);
-                    }
-                    if ('error' in e) {
-                      errorInfo.error = String((e as any).error);
-                    }
-                  } catch (_err) {
-                    // Ignore errors when extracting event properties
-                  }
-
-                  // Log with explicit stringification to avoid serialization issues
-                  console.error(
-                    '[RecipeImageUpload] Image failed to load:',
-                    JSON.stringify(errorInfo, null, 2),
-                  );
-                  console.error('[RecipeImageUpload] Raw error event:', e);
-                  console.error('[RecipeImageUpload] Image element:', target);
-
-                  setImageLoadError(true);
-                }}
-                onLoad={() => {
-                  console.log(
-                    '[RecipeImageUpload] Image loaded successfully:',
-                    {
-                      mealId,
-                      imageUrl: previewUrl,
-                    },
-                  );
-                  setImageLoadError(false);
-                }}
-              />
+              <span className="relative block max-h-48 w-full min-h-[120px]">
+                <Image
+                  src={previewUrl}
+                  alt="Recept foto"
+                  fill
+                  className="rounded-lg object-contain shadow-sm hover:shadow-md transition-shadow"
+                  sizes="(max-width: 768px) 100vw, 320px"
+                  unoptimized
+                  onError={() => setImageLoadError(true)}
+                />
+              </span>
             ) : (
               <div className="rounded-lg max-w-full h-48 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center border-2 border-dashed border-zinc-300 dark:border-zinc-700">
                 <div className="text-center p-4">

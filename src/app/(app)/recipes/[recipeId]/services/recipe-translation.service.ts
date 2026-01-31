@@ -274,14 +274,14 @@ Translated instruction:`;
 export async function translateRecipe(
   recipe: {
     name: string;
-    mealData?: any;
-    aiAnalysis?: any;
+    mealData?: Record<string, unknown>;
+    aiAnalysis?: Record<string, unknown>;
   },
   userId: string,
 ): Promise<{
   translatedName: string;
-  translatedMealData: any;
-  translatedAiAnalysis: any;
+  translatedMealData: Record<string, unknown>;
+  translatedAiAnalysis: Record<string, unknown>;
   sourceLanguage: 'nl' | 'en' | 'other';
   targetLanguage: 'nl' | 'en';
 }> {
@@ -313,20 +313,29 @@ export async function translateRecipe(
   // Translate ingredients (legacy format)
   if (mealData.ingredients && Array.isArray(mealData.ingredients)) {
     translatedMealData.ingredients = await Promise.all(
-      mealData.ingredients.map(async (ing: any) => {
+      mealData.ingredients.map(async (ing: Record<string, unknown>) => {
         const translated = { ...ing };
 
         // Translate ingredient name
-        if (ing.name) {
+        if (ing.name != null && ing.name !== '') {
           translated.name = await translateIngredientName(
-            ing.name,
+            String(ing.name),
             targetLanguage,
           );
         }
 
         // Convert units if translating to Dutch
-        if (targetLanguage === 'nl' && ing.unit && ing.quantity) {
-          const converted = convertUnitToDutch(ing.unit, ing.quantity);
+        if (
+          targetLanguage === 'nl' &&
+          ing.unit != null &&
+          ing.quantity != null
+        ) {
+          const converted = convertUnitToDutch(
+            String(ing.unit),
+            typeof ing.quantity === 'number'
+              ? ing.quantity
+              : parseFloat(String(ing.quantity)),
+          );
           translated.unit = converted.unit;
           translated.quantity = converted.quantity;
         }
@@ -376,28 +385,32 @@ Translated text:`;
   if (aiAnalysis.instructions) {
     if (Array.isArray(aiAnalysis.instructions)) {
       translatedAiAnalysis.instructions = await Promise.all(
-        aiAnalysis.instructions.map(async (instruction: any) => {
-          const instructionText =
-            typeof instruction === 'string'
-              ? instruction
-              : instruction?.text || instruction?.step || String(instruction);
+        aiAnalysis.instructions.map(
+          async (instruction: string | { text?: string; step?: string }) => {
+            const instructionText =
+              typeof instruction === 'string'
+                ? instruction
+                : (instruction as { text?: string; step?: string })?.text ||
+                  (instruction as { text?: string; step?: string })?.step ||
+                  String(instruction);
 
-          const translatedText = await translateInstruction(
-            instructionText,
-            targetLanguage,
-            sourceLanguage,
-          );
+            const translatedText = await translateInstruction(
+              instructionText,
+              targetLanguage,
+              sourceLanguage,
+            );
 
-          if (typeof instruction === 'string') {
-            return translatedText;
-          } else {
-            return {
-              ...instruction,
-              text: translatedText,
-              step: translatedText,
-            };
-          }
-        }),
+            if (typeof instruction === 'string') {
+              return translatedText;
+            } else {
+              return {
+                ...instruction,
+                text: translatedText,
+                step: translatedText,
+              };
+            }
+          },
+        ),
       );
     } else if (typeof aiAnalysis.instructions === 'string') {
       translatedAiAnalysis.instructions = await translateInstruction(

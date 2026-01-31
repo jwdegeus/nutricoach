@@ -70,7 +70,7 @@ export function IngredientGroupDetailPageClient({
   const [nevoGroups, setNevoGroups] = useState<NevoFoodGroup[]>([]);
   const [items, setItems] = useState<CategoryItem[]>([]);
   const [itemsTotalCount, setItemsTotalCount] = useState(0);
-  const [itemsHasMore, setItemsHasMore] = useState(false);
+  const [_itemsHasMore, setItemsHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingItems, setLoadingItems] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -167,10 +167,12 @@ export function IngredientGroupDetailPageClient({
 
   useEffect(() => {
     loadCategory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadCategory stable, run when groupId changes
   }, [groupId]);
 
   useEffect(() => {
     if (category) loadItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: run when category id changes only
   }, [category?.id]);
 
   const refreshItems = () => {

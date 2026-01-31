@@ -33,9 +33,25 @@ import { logMealConsumptionAction } from '../actions/meals.actions';
 import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
 import type { MealSlot } from '@/src/lib/diets';
 
+type GeminiMealItem = Record<string, unknown> & {
+  source: 'gemini';
+  id: string;
+  name?: string;
+  meal_name?: string;
+  mealSlot?: string;
+  meal_slot?: string;
+  mealData?: { prepTime?: number; servings?: number };
+  meal_data?: { prepTime?: number; servings?: number };
+};
+
+/** Union: custom has name/mealSlot/mealData; gemini has meal_name/meal_slot/meal_data */
 type MealItem =
-  | (CustomMealRecord & { source: 'custom' })
-  | (any & { source: 'gemini' });
+  | (CustomMealRecord & {
+      source: 'custom';
+      meal_name?: string;
+      meal_data?: unknown;
+    })
+  | GeminiMealItem;
 
 type MealsListProps = {
   meals: MealItem[];
@@ -52,14 +68,14 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
       return;
     }
 
-    setLoggingMealId(meal.id);
+    setLoggingMealId(String(meal.id));
 
     try {
       const result = await logMealConsumptionAction({
         customMealId: meal.source === 'custom' ? meal.id : undefined,
         mealHistoryId: meal.source === 'gemini' ? meal.id : undefined,
-        mealName: meal.name || meal.meal_name,
-        mealSlot: (meal.mealSlot || meal.meal_slot) as MealSlot,
+        mealName: String(meal.name ?? meal.meal_name ?? ''),
+        mealSlot: (meal.mealSlot ?? meal.meal_slot ?? '') as MealSlot,
       });
 
       if (result.ok) {
@@ -91,7 +107,7 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
   };
 
   const handleView = (meal: MealItem) => {
-    router.push(`/meals/${meal.id}?source=${meal.source}`);
+    router.push(`/meals/${String(meal.id)}?source=${meal.source}`);
   };
 
   const handleEdit = (meal: MealItem) => {
@@ -103,7 +119,7 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
     // TODO: Implement delete functionality
     if (
       confirm(
-        `Weet je zeker dat je "${meal.name || meal.meal_name}" wilt verwijderen?`,
+        `Weet je zeker dat je "${meal.name ?? meal.meal_name ?? ''}" wilt verwijderen?`,
       )
     ) {
       console.log('Delete meal:', meal.id);
@@ -144,11 +160,11 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
       <TableBody>
         {meals.map((meal) => (
           <TableRow
-            key={meal.id}
-            href={`/meals/${meal.id}?source=${meal.source}`}
+            key={String(meal.id)}
+            href={`/meals/${String(meal.id)}?source=${meal.source}`}
           >
             <TableCell className="font-medium">
-              {meal.name || meal.meal_name}
+              {meal.name ?? meal.meal_name ?? ''}
             </TableCell>
             <TableCell>
               <Badge color={meal.source === 'custom' ? 'blue' : 'zinc'}>
@@ -156,27 +172,41 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
               </Badge>
             </TableCell>
             <TableCell className="capitalize">
-              {formatMealSlot(meal.mealSlot || meal.meal_slot)}
+              {formatMealSlot(String(meal.mealSlot ?? meal.meal_slot ?? ''))}
             </TableCell>
             <TableCell>
-              {meal.mealData?.prepTime ? (
-                <div className="flex items-center gap-1.5">
-                  <ClockIcon className="h-4 w-4 text-zinc-500" />
-                  <span>{meal.mealData.prepTime} min</span>
-                </div>
-              ) : (
-                <span className="text-zinc-400">-</span>
-              )}
+              {(() => {
+                const md = meal.mealData ?? meal.meal_data;
+                const prepTime =
+                  md && typeof md === 'object' && 'prepTime' in md
+                    ? (md as { prepTime?: number }).prepTime
+                    : undefined;
+                return prepTime != null ? (
+                  <div className="flex items-center gap-1.5">
+                    <ClockIcon className="h-4 w-4 text-zinc-500" />
+                    <span>{prepTime} min</span>
+                  </div>
+                ) : (
+                  <span className="text-zinc-400">-</span>
+                );
+              })()}
             </TableCell>
             <TableCell>
-              {meal.mealData?.servings ? (
-                <div className="flex items-center gap-1.5">
-                  <UserGroupIcon className="h-4 w-4 text-zinc-500" />
-                  <span>{meal.mealData.servings}</span>
-                </div>
-              ) : (
-                <span className="text-zinc-400">-</span>
-              )}
+              {(() => {
+                const md = meal.mealData ?? meal.meal_data;
+                const servings =
+                  md && typeof md === 'object' && 'servings' in md
+                    ? (md as { servings?: number }).servings
+                    : undefined;
+                return servings != null ? (
+                  <div className="flex items-center gap-1.5">
+                    <UserGroupIcon className="h-4 w-4 text-zinc-500" />
+                    <span>{servings}</span>
+                  </div>
+                ) : (
+                  <span className="text-zinc-400">-</span>
+                );
+              })()}
             </TableCell>
             <TableCell className="text-zinc-500">
               {meal.source === 'custom'

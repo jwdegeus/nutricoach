@@ -59,9 +59,12 @@ export async function searchNevoFoodsAction(
     const results = await searchNevoFoods(query.trim(), 15);
 
     // Format results
-    const formatted = results.map((food) => ({
-      nevoCode: String(food.nevo_code),
-      name: food.name_nl || food.name_en || `NEVO ${food.nevo_code}`,
+    const formatted = results.map((food: Record<string, unknown>) => ({
+      nevoCode: String(food.nevo_code ?? ''),
+      name:
+        String(food.name_nl ?? '').trim() ||
+        String(food.name_en ?? '').trim() ||
+        `NEVO ${food.nevo_code ?? ''}`,
     }));
 
     return {

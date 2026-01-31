@@ -163,7 +163,7 @@ function generateRuleId(source: string, id: string): string {
  */
 function determineRuleStatus(
   isActive: boolean,
-  strictness: 'hard' | 'soft',
+  _strictness: 'hard' | 'soft',
 ): RuleStatus {
   if (!isActive) {
     return 'deleted';
@@ -351,7 +351,7 @@ function mapRecipeAdaptationRuleToRule(rule: {
  * @param dietId - Diet ID
  * @returns Repository instance
  */
-async function createDefaultRepo(dietId: string): Promise<GuardrailsRepo> {
+async function createDefaultRepo(_dietId: string): Promise<GuardrailsRepo> {
   // Dynamic import to avoid server-only issues in tests
   const { createClient } = await import('@/src/lib/supabase/server');
   const supabase = await createClient();
@@ -384,7 +384,10 @@ async function createDefaultRepo(dietId: string): Promise<GuardrailsRepo> {
         return { constraints: [], errors: [error.message] };
       }
 
-      return { constraints: (data || []) as any };
+      type ConstraintRow = Awaited<
+        ReturnType<GuardrailsRepo['loadConstraints']>
+      >['constraints'][number];
+      return { constraints: (data || []) as ConstraintRow[] };
     },
 
     async loadRecipeAdaptationRules(dietId: string) {
@@ -402,7 +405,10 @@ async function createDefaultRepo(dietId: string): Promise<GuardrailsRepo> {
         return { rules: [], errors: [error.message] };
       }
 
-      return { rules: (data || []) as any };
+      type RuleRow = Awaited<
+        ReturnType<GuardrailsRepo['loadRecipeAdaptationRules']>
+      >['rules'][number];
+      return { rules: (data || []) as RuleRow[] };
     },
 
     async loadHeuristics(dietId: string) {
@@ -416,7 +422,10 @@ async function createDefaultRepo(dietId: string): Promise<GuardrailsRepo> {
         return { heuristics: [], errors: [error.message] };
       }
 
-      return { heuristics: (data || []) as any };
+      type HeuristicRow = Awaited<
+        ReturnType<GuardrailsRepo['loadHeuristics']>
+      >['heuristics'][number];
+      return { heuristics: (data || []) as HeuristicRow[] };
     },
   };
 }
@@ -513,8 +522,8 @@ export async function loadGuardrailsRuleset(
 ): Promise<GuardrailsRuleset> {
   const {
     dietId,
-    mode,
-    locale = 'nl',
+    mode: _mode,
+    locale: _locale = 'nl',
     now = new Date().toISOString(),
     repo,
   } = input;

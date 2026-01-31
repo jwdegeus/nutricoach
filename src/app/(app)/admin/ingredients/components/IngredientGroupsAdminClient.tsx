@@ -99,9 +99,11 @@ export function IngredientGroupsAdminClient() {
     setLoading(false);
   };
 
+  /* eslint-disable react-hooks/set-state-in-effect -- async fetch on mount */
   useEffect(() => {
     loadCategories();
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleCreate = async () => {
     if (!createForm.name_nl.trim()) {

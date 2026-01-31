@@ -24,7 +24,7 @@ type ActionResult<T> =
 export async function getAllMealsAction(): Promise<
   ActionResult<{
     customMeals: CustomMealRecord[];
-    mealHistory: any[]; // TODO: type this properly
+    mealHistory: unknown[];
   }>
 > {
   try {
@@ -164,7 +164,7 @@ export async function getTopConsumedMealsAction(): Promise<
 export async function getMealByIdAction(
   mealId: string,
   source: 'custom' | 'gemini',
-): Promise<ActionResult<CustomMealRecord | any>> {
+): Promise<ActionResult<CustomMealRecord | Record<string, unknown>>> {
   try {
     const supabase = await createClient();
     const {

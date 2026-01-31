@@ -2,7 +2,12 @@
 
 import { createClient } from '@/src/lib/supabase/server';
 import { RecipeAdaptationDbService } from '../services/recipe-adaptation-db.service';
-import type { RecipeAdaptationDraft } from '../recipe-ai.types';
+import type {
+  RecipeAdaptationDraft,
+  ViolationDetail,
+  IngredientLine,
+  StepLine,
+} from '../recipe-ai.types';
 import type { ValidationReport } from '../services/diet-validator';
 // vNext guard rails enforcement
 import {
@@ -251,9 +256,9 @@ function shouldBlockApply(decision: GuardDecision): boolean {
 function recordToDraft(record: {
   title: string;
   analysisSummary: string | null;
-  analysisViolations: any[];
-  rewriteIngredients: any[];
-  rewriteSteps: any[];
+  analysisViolations: unknown[];
+  rewriteIngredients: unknown[];
+  rewriteSteps: unknown[];
   rewriteIntro?: string | null;
   rewriteWhyThisWorks?: string[];
   confidence: number | null;
@@ -261,13 +266,13 @@ function recordToDraft(record: {
 }): RecipeAdaptationDraft {
   return {
     analysis: {
-      violations: record.analysisViolations || [],
+      violations: (record.analysisViolations || []) as ViolationDetail[],
       summary: record.analysisSummary || '',
     },
     rewrite: {
       title: record.title,
-      ingredients: record.rewriteIngredients || [],
-      steps: record.rewriteSteps || [],
+      ingredients: (record.rewriteIngredients || []) as IngredientLine[],
+      steps: (record.rewriteSteps || []) as StepLine[],
       intro: record.rewriteIntro ?? undefined,
       whyThisWorks: Array.isArray(record.rewriteWhyThisWorks)
         ? record.rewriteWhyThisWorks
@@ -313,7 +318,7 @@ export async function applyRecipeAdaptationAction(
       !raw ||
       typeof raw !== 'object' ||
       !('adaptationId' in raw) ||
-      typeof (raw as any).adaptationId !== 'string'
+      typeof (raw as Record<string, unknown>).adaptationId !== 'string'
     ) {
       return {
         ok: false,
@@ -468,12 +473,14 @@ export async function applyRecipeAdaptationAction(
           quantity: string;
           unit?: string;
           note?: string;
+          section?: string | null;
         }) => ({
           name: ing.name,
           quantity: ing.quantity,
           unit: ing.unit ?? null,
           note: ing.note ?? null,
           original_line: ing.name,
+          section: ing.section ?? null,
         }),
       ),
       ingredientRefs: [],

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { IngredientsAdminClient } from '@/src/app/(app)/admin/ingredients/components/IngredientsAdminClient';
 import { IngredientGroupsAdminClient } from '@/src/app/(app)/admin/ingredients/components/IngredientGroupsAdminClient';
@@ -17,25 +16,15 @@ export function AdminIngredientsPageClient() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
   const filterNoCategory = searchParams.get('filter') === 'noCategory';
-  const initialTab: TabId = tabParam === 'groups' ? 'groups' : 'ingredients';
-  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+  const activeTab: TabId = tabParam === 'groups' ? 'groups' : 'ingredients';
 
-  // Sync URL when tab changes
   const setActiveTabWithUrl = (tab: TabId) => {
-    setActiveTab(tab);
     const url =
       tab === 'ingredients'
         ? '/admin/ingredients'
         : '/admin/ingredients?tab=groups';
     router.replace(url, { scroll: false });
   };
-
-  // Sync state from URL (e.g. back/forward or direct link)
-  useEffect(() => {
-    const t = searchParams.get('tab');
-    const next: TabId = t === 'groups' ? 'groups' : 'ingredients';
-    if (next !== activeTab) setActiveTab(next);
-  }, [searchParams]);
 
   return (
     <div className="space-y-8">

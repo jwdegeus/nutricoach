@@ -12,7 +12,7 @@ import { createClient } from '@/src/lib/supabase/server';
 import { PantryService } from '@/src/lib/pantry/pantry.service';
 import { MealPlansService } from './mealPlans.service';
 import { AppError } from '@/src/lib/errors/app-error';
-import type { MealPlanResponse, Meal } from '@/src/lib/diets';
+import type { Meal } from '@/src/lib/diets';
 import type { MealSlot } from '@/src/lib/diets';
 
 /**

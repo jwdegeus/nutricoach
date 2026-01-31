@@ -301,21 +301,21 @@ export async function fetchHtml(url: string): Promise<string> {
           const error = new Error(
             'De website blokkeert toegang tot deze pagina (Access Denied). Probeer een andere URL of controleer of de pagina publiek toegankelijk is.',
           );
-          (error as any).code = 'ACCESS_DENIED';
+          (error as Error & { code?: string }).code = 'ACCESS_DENIED';
           throw error;
         }
         if (response.status === 404) {
           const error = new Error(
             'Pagina niet gevonden (404). Controleer of de URL correct is.',
           );
-          (error as any).code = 'NOT_FOUND';
+          (error as Error & { code?: string }).code = 'NOT_FOUND';
           throw error;
         }
         // Other 4xx errors
         const error = new Error(
           `Client error (${response.status}). De website weigert de request.`,
         );
-        (error as any).code = 'CLIENT_ERROR';
+        (error as Error & { code?: string }).code = 'CLIENT_ERROR';
         throw error;
       }
 
@@ -323,7 +323,7 @@ export async function fetchHtml(url: string): Promise<string> {
         const error = new Error(
           `Server error (${response.status}). De website heeft een probleem. Probeer het later opnieuw.`,
         );
-        (error as any).code = 'SERVER_ERROR';
+        (error as Error & { code?: string }).code = 'SERVER_ERROR';
         throw error;
       }
 
@@ -336,7 +336,7 @@ export async function fetchHtml(url: string): Promise<string> {
         const error = new Error(
           `Unsupported content type: ${contentType}. Expected text/html or application/xhtml+xml`,
         );
-        (error as any).code = 'UNSUPPORTED_CONTENT_TYPE';
+        (error as Error & { code?: string }).code = 'UNSUPPORTED_CONTENT_TYPE';
         throw error;
       }
 
@@ -369,7 +369,7 @@ export async function fetchHtml(url: string): Promise<string> {
           const error = new Error(
             `Response too large: ${size} bytes (max: ${MAX_RESPONSE_SIZE})`,
           );
-          (error as any).code = 'RESPONSE_TOO_LARGE';
+          (error as Error & { code?: string }).code = 'RESPONSE_TOO_LARGE';
           throw error;
         }
       }
@@ -394,7 +394,7 @@ export async function fetchHtml(url: string): Promise<string> {
         const error = new Error(
           `Response too large after decompression: ${html.length} bytes (max: ${MAX_RESPONSE_SIZE})`,
         );
-        (error as any).code = 'RESPONSE_TOO_LARGE';
+        (error as Error & { code?: string }).code = 'RESPONSE_TOO_LARGE';
         throw error;
       }
 
@@ -414,12 +414,14 @@ export async function fetchHtml(url: string): Promise<string> {
         const timeoutError = new Error(
           `Fetch timeout after ${FETCH_TIMEOUT_MS}ms. De website reageert te langzaam.`,
         );
-        (timeoutError as any).code = 'FETCH_TIMEOUT';
+        (timeoutError as Error & { code?: string }).code = 'FETCH_TIMEOUT';
         throw timeoutError;
       }
       // Preserve error codes from earlier in the function
-      if ((error as any).code) {
-        console.error(`[fetchHtml] Error with code: ${(error as any).code}`);
+      if ((error as Error & { code?: string }).code) {
+        console.error(
+          `[fetchHtml] Error with code: ${(error as Error & { code?: string }).code}`,
+        );
         throw error;
       }
       // Add more context to generic errors
@@ -575,10 +577,10 @@ function extractJsonLdBlocks(html: string): string[] {
 /**
  * Check if an object is a Recipe type (case-insensitive)
  */
-function isRecipeType(obj: any): boolean {
+function isRecipeType(obj: unknown): boolean {
   if (!obj || typeof obj !== 'object') return false;
 
-  const type = obj['@type'];
+  const type = (obj as Record<string, unknown>)['@type'];
   if (!type) return false;
 
   // Handle string
@@ -599,8 +601,8 @@ function isRecipeType(obj: any): boolean {
 /**
  * Find all Recipe objects in JSON-LD data
  */
-function findRecipes(data: any): any[] {
-  const recipes: any[] = [];
+function findRecipes(data: unknown): Record<string, unknown>[] {
+  const recipes: Record<string, unknown>[] = [];
 
   // Handle array
   if (Array.isArray(data)) {
@@ -612,16 +614,17 @@ function findRecipes(data: any): any[] {
 
   // Handle object
   if (data && typeof data === 'object') {
+    const dataObj = data as Record<string, unknown>;
     // Check @graph (common in JSON-LD)
-    if (Array.isArray(data['@graph'])) {
-      for (const item of data['@graph']) {
+    if (Array.isArray(dataObj['@graph'])) {
+      for (const item of dataObj['@graph'] as unknown[]) {
         recipes.push(...findRecipes(item));
       }
     }
 
     // Check if this object is a Recipe
     if (isRecipeType(data)) {
-      recipes.push(data);
+      recipes.push(dataObj as Record<string, unknown>);
     }
   }
 
@@ -631,7 +634,7 @@ function findRecipes(data: any): any[] {
 /**
  * Check if a recipe has sufficient fields
  */
-function hasSufficientFields(recipe: any): boolean {
+function hasSufficientFields(recipe: Record<string, unknown>): boolean {
   if (!recipe || typeof recipe !== 'object') return false;
 
   const hasTitle = !!recipe.name || !!recipe.headline;
@@ -654,23 +657,21 @@ function hasSufficientFields(recipe: any): boolean {
 /**
  * Extract text from recipe instruction (handles multiple formats)
  */
-function extractInstructionText(instruction: any): string | null {
+function extractInstructionText(instruction: unknown): string | null {
   if (typeof instruction === 'string') {
     return instruction.trim();
   }
 
   if (instruction && typeof instruction === 'object') {
+    const inst = instruction as Record<string, unknown>;
     // HowToStep format
-    if (instruction.text) {
-      return String(instruction.text).trim();
+    if (inst.text) {
+      return String(inst.text).trim();
     }
     // HowToSection format
-    if (
-      instruction.itemListElement &&
-      Array.isArray(instruction.itemListElement)
-    ) {
-      return instruction.itemListElement
-        .map((item: any) => extractInstructionText(item))
+    if (inst.itemListElement && Array.isArray(inst.itemListElement)) {
+      return (inst.itemListElement as unknown[])
+        .map((item: unknown) => extractInstructionText(item))
         .filter((text: string | null) => text)
         .join(' ');
     }
@@ -858,7 +859,7 @@ function isTrackingPixelOrNonImage(url: string): boolean {
  * Handles both string URLs and ImageObject with url property
  * Filters out tracking pixels and non-image URLs
  */
-function extractImageUrl(recipe: any): string | undefined {
+function extractImageUrl(recipe: Record<string, unknown>): string | undefined {
   if (!recipe.image) {
     return undefined;
   }
@@ -883,10 +884,10 @@ function extractImageUrl(recipe: any): string | undefined {
   else if (
     recipe.image &&
     typeof recipe.image === 'object' &&
-    recipe.image.url
+    (recipe.image as Record<string, unknown>).url
   ) {
-    imageUrl =
-      typeof recipe.image.url === 'string' ? recipe.image.url : undefined;
+    const imgUrl = (recipe.image as Record<string, unknown>).url;
+    imageUrl = typeof imgUrl === 'string' ? imgUrl : undefined;
   }
 
   // Filter out tracking pixels
@@ -903,7 +904,10 @@ function extractImageUrl(recipe: any): string | undefined {
 /**
  * Map JSON-LD Recipe to RecipeDraft
  */
-function mapRecipeToDraft(recipe: any, sourceUrl: string): RecipeDraft {
+function mapRecipeToDraft(
+  recipe: Record<string, unknown>,
+  sourceUrl: string,
+): RecipeDraft {
   // Extract title
   const title = recipe.name || recipe.headline || 'Untitled Recipe';
   if (typeof title !== 'string') {
@@ -956,9 +960,15 @@ function mapRecipeToDraft(recipe: any, sourceUrl: string): RecipeDraft {
   }
 
   // Extract times (ISO 8601 duration format: PT30M, PT1H30M, etc.)
-  const prepTimeMinutes = parseDurationToMinutes(recipe.prepTime);
-  const cookTimeMinutes = parseDurationToMinutes(recipe.cookTime);
-  const totalTimeMinutes = parseDurationToMinutes(recipe.totalTime);
+  const prepTimeMinutes = parseDurationToMinutes(
+    recipe.prepTime as string | null | undefined,
+  );
+  const cookTimeMinutes = parseDurationToMinutes(
+    recipe.cookTime as string | null | undefined,
+  );
+  const totalTimeMinutes = parseDurationToMinutes(
+    recipe.totalTime as string | null | undefined,
+  );
 
   // Extract ingredients
   const ingredients: { text: string }[] = [];
@@ -1041,7 +1051,7 @@ export async function fetchAndParseRecipeJsonLd(
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Failed to fetch URL';
-        const errorCode = (error as any)?.code;
+        const errorCode = (error as { code?: string })?.code;
 
         if (
           errorCode === 'ACCESS_DENIED' ||
@@ -1109,7 +1119,7 @@ export async function fetchAndParseRecipeJsonLd(
     }
 
     // Parse JSON-LD blocks and find recipes
-    const allRecipes: any[] = [];
+    const allRecipes: Record<string, unknown>[] = [];
 
     for (const block of jsonLdBlocks) {
       try {
@@ -1133,7 +1143,7 @@ export async function fetchAndParseRecipeJsonLd(
     }
 
     // Find first recipe with sufficient fields
-    let selectedRecipe: any | null = null;
+    let selectedRecipe: Record<string, unknown> | null = null;
     for (const recipe of allRecipes) {
       if (hasSufficientFields(recipe)) {
         selectedRecipe = recipe;

@@ -71,7 +71,6 @@ import {
   EllipsisVerticalIcon,
   ExclamationTriangleIcon,
   PauseIcon,
-  PencilIcon,
   PlayIcon,
   PlusIcon,
   SparklesIcon,
@@ -147,9 +146,9 @@ function CopyHashButton({ hash }: { hash: string }) {
  */
 export function GuardRailsVNextOverview({
   dietTypeId,
-  dietTypeName,
+  dietTypeName: _dietTypeName,
 }: GuardRailsVNextOverviewProps) {
-  const router = useRouter();
+  const _router = useRouter();
   const [groupPolicies, setGroupPolicies] = useState<GroupPolicyRow[]>([]);
   const [data, setData] = useState<GuardRailsRulesetViewModel | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -272,6 +271,7 @@ export function GuardRailsVNextOverview({
   useEffect(() => {
     loadData();
     loadCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run when dietTypeId changes only
   }, [dietTypeId]);
 
   async function loadCategories() {
@@ -280,8 +280,8 @@ export function GuardRailsVNextOverview({
       if (result.ok && result.data) {
         setCategories(result.data);
       }
-    } catch (err) {
-      console.error('Error loading categories:', err);
+    } catch (_err) {
+      console.error('Error loading categories:', _err);
     }
   }
 
@@ -306,7 +306,7 @@ export function GuardRailsVNextOverview({
         } else if (result.data) {
           setData(result.data);
         }
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij laden guard rails ruleset');
       } finally {
         setIsLoading(false);
@@ -358,15 +358,15 @@ export function GuardRailsVNextOverview({
         setShowPolicyEditDialog(false);
         setEditingPolicy(null);
         await loadData();
-      } catch (err) {
+      } catch (_err) {
         setError(
-          `Onverwachte fout: ${err instanceof Error ? err.message : 'Onbekende fout'}`,
+          `Onverwachte fout: ${_err instanceof Error ? _err.message : 'Onbekende fout'}`,
         );
       }
     });
   }
 
-  function handleDeletePolicyClick(
+  function _handleDeletePolicyClick(
     policy: GroupPolicyRow,
     e: React.MouseEvent,
   ) {
@@ -391,7 +391,7 @@ export function GuardRailsVNextOverview({
         );
         if ('error' in result) setError(result.error);
         else await loadData();
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij prioriteit wijzigen');
       }
     });
@@ -415,7 +415,7 @@ export function GuardRailsVNextOverview({
         );
         if ('error' in result) setError(result.error);
         else await loadData();
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij prioriteit wijzigen');
       }
     });
@@ -436,7 +436,7 @@ export function GuardRailsVNextOverview({
           if ('error' in result) setError(result.error);
           else await loadData();
         }
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij pauzeren/activeren');
       }
     });
@@ -473,7 +473,7 @@ export function GuardRailsVNextOverview({
         );
         if ('error' in result) setError(result.error);
         else await loadData();
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij verplaatsen');
       }
     });
@@ -483,7 +483,7 @@ export function GuardRailsVNextOverview({
     setDraggedPolicyConstraintId(null);
   }
 
-  function handleRowClick(rule: GuardRailsRulesetViewModel['rules'][0]) {
+  function _handleRowClick(rule: GuardRailsRulesetViewModel['rules'][0]) {
     setEditingRule(rule);
     setEditFormData({
       priority: rule.priority,
@@ -516,7 +516,7 @@ export function GuardRailsVNextOverview({
   /**
    * Check if a rule is a recipe adaptation rule (ingredient-based)
    */
-  function isRecipeAdaptationRule(ruleId: string): boolean {
+  function _isRecipeAdaptationRule(ruleId: string): boolean {
     const parts = ruleId.split(':');
     return (
       parts.length >= 3 &&
@@ -529,7 +529,7 @@ export function GuardRailsVNextOverview({
    * Get display label for target type
    * Uses the actual target value from the view model (which is already adjusted for constraints)
    */
-  function getTargetDisplayLabel(target: string): string {
+  function _getTargetDisplayLabel(target: string): string {
     // The target value is already correct from the view model:
     // - Constraints have target: "category"
     // - Recipe adaptation rules have their actual target from database
@@ -548,7 +548,7 @@ export function GuardRailsVNextOverview({
    * Determine which fields are editable based on rule source type
    * All fields are now editable - the backend will only save supported fields
    */
-  function getEditableFields(ruleId: string): {
+  function getEditableFields(_ruleId: string): {
     priority: boolean;
     strictness: boolean;
     action: boolean;
@@ -855,10 +855,10 @@ export function GuardRailsVNextOverview({
             loadData();
           }, 1000);
         }
-      } catch (err) {
-        console.error('Error creating rule:', err);
+      } catch (_err) {
+        console.error('Error creating rule:', _err);
         setError(
-          `Onverwachte fout bij aanmaken: ${err instanceof Error ? err.message : 'Onbekende fout'}`,
+          `Onverwachte fout bij aanmaken: ${_err instanceof Error ? _err.message : 'Onbekende fout'}`,
         );
       }
     });
@@ -937,16 +937,19 @@ export function GuardRailsVNextOverview({
         setEditingRule(null);
         setValidationErrors({});
         await loadData();
-      } catch (err) {
-        console.error('Error saving rule:', err);
+      } catch (_err) {
+        console.error('Error saving rule:', _err);
         setError(
-          `Onverwachte fout bij opslaan: ${err instanceof Error ? err.message : 'Onbekende fout'}`,
+          `Onverwachte fout bij opslaan: ${_err instanceof Error ? _err.message : 'Onbekende fout'}`,
         );
       }
     });
   }
 
-  async function handleBlockOrPause(ruleId: string, action: 'block' | 'pause') {
+  async function _handleBlockOrPause(
+    ruleId: string,
+    action: 'block' | 'pause',
+  ) {
     startTransition(async () => {
       try {
         const result = await blockOrPauseGuardRailRuleAction(ruleId, action);
@@ -955,13 +958,13 @@ export function GuardRailsVNextOverview({
           return;
         }
         await loadData();
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij blokkeren/pauzeren');
       }
     });
   }
 
-  function handleDeleteClick(ruleId: string) {
+  function _handleDeleteClick(ruleId: string) {
     setDeletingConstraintId(null);
     setDeletingRuleId(ruleId);
     setShowDeleteDialog(true);
@@ -985,7 +988,7 @@ export function GuardRailsVNextOverview({
           setDeletingConstraintIds([]);
           setSelectedConstraintIds(new Set());
           await loadData();
-        } catch (err) {
+        } catch (_err) {
           setError('Onverwachte fout bij verwijderen');
         }
       });
@@ -1003,7 +1006,7 @@ export function GuardRailsVNextOverview({
             setDeletingConstraintId(null);
             await loadData();
           }
-        } catch (err) {
+        } catch (_err) {
           setError('Onverwachte fout bij verwijderen');
         }
       });
@@ -1020,7 +1023,7 @@ export function GuardRailsVNextOverview({
         setShowDeleteDialog(false);
         setDeletingRuleId(null);
         await loadData();
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij verwijderen');
       }
     });
@@ -1045,17 +1048,17 @@ export function GuardRailsVNextOverview({
     }
   }
 
-  function handleDragStart(e: React.DragEvent, ruleId: string) {
+  function _handleDragStart(e: React.DragEvent, ruleId: string) {
     setDraggedRuleId(ruleId);
     e.dataTransfer.effectAllowed = 'move';
   }
 
-  function handleDragOver(e: React.DragEvent) {
+  function _handleDragOver(e: React.DragEvent) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   }
 
-  async function handleDrop(e: React.DragEvent, targetRuleId: string) {
+  async function _handleDrop(e: React.DragEvent, targetRuleId: string) {
     e.preventDefault();
     if (!draggedRuleId || !data || draggedRuleId === targetRuleId) {
       setDraggedRuleId(null);
@@ -1156,10 +1159,10 @@ export function GuardRailsVNextOverview({
         } else {
           await loadData();
         }
-      } catch (err) {
-        console.error('Error updating priority:', err);
+      } catch (_err) {
+        console.error('Error updating priority:', _err);
         setError(
-          `Onverwachte fout bij bijwerken prioriteit: ${err instanceof Error ? err.message : 'Onbekende fout'}`,
+          `Onverwachte fout bij bijwerken prioriteit: ${_err instanceof Error ? _err.message : 'Onbekende fout'}`,
         );
       } finally {
         setDraggedRuleId(null);

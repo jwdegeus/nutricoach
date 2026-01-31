@@ -46,12 +46,12 @@ function RunRow({
   getStatusBadgeColor,
   getRunTypeLabel,
   isStuck,
-  onAction,
+  onAction: _onAction,
   onCancel,
   onDelete,
 }: RunRowProps) {
   const [expanded, setExpanded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, _setError] = useState<string | null>(null);
   const runningDuration =
     run.status === 'running' ? calculateRunningDuration(run.createdAt) : null;
   const stuck = isStuck(run);

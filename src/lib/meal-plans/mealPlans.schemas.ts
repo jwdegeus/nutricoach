@@ -5,13 +5,6 @@
  */
 
 import { z } from 'zod';
-import {
-  mealPlanRequestSchema,
-  mealPlanResponseSchema,
-  dietRuleSetSchema,
-} from '@/src/lib/diets';
-import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner';
-import { mealPlanEnrichmentResponseSchema } from '@/src/lib/agents/meal-planner';
 
 /**
  * Schema for create meal plan input

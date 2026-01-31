@@ -12,10 +12,9 @@
 import {
   searchNevoFoods,
   calculateMealNutrition,
-  calculateIngredientNutrition,
   type MealIngredient,
 } from '@/src/lib/nevo/nutrition-calculator';
-import type { MealPlanResponse, Meal, MealPlanDay } from '@/src/lib/diets';
+import type { Meal, MealPlanDay } from '@/src/lib/diets';
 
 /**
  * NEVO food candidate (simplified for agent use)
@@ -53,9 +52,11 @@ export async function searchNevoFoodCandidates(
   const results = await searchNevoFoods(query, limit);
 
   return results.map((food) => ({
-    nevoCode: String(food.nevo_code), // Convert to string for JSON schema compatibility
-    name: food.name_nl || food.name_en || 'Unknown',
-    tags: food.food_group_nl ? [food.food_group_nl.toLowerCase()] : undefined,
+    nevoCode: String(food.nevo_code),
+    name: String(food.name_nl ?? food.name_en ?? 'Unknown'),
+    tags: food.food_group_nl
+      ? [String(food.food_group_nl).toLowerCase()]
+      : undefined,
   }));
 }
 

@@ -27,7 +27,6 @@ import {
 } from '@/components/catalyst/sidebar';
 import { SidebarLayout } from '@/components/catalyst/sidebar-layout';
 import { Avatar } from '@/components/catalyst/avatar';
-import { Link } from '@/components/catalyst/link';
 import { Breadcrumbs } from '@/components/catalyst/breadcrumbs';
 import { getBreadcrumbs } from '@/src/lib/nav';
 import { useTranslatedNavItems } from '@/src/lib/nav-hooks';
@@ -122,16 +121,21 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const supabase = createClient();
 
-    function updateUserInfo(user: any) {
-      const metadata = user.user_metadata || {};
-      const fullName = metadata.full_name || '';
-      const displayNameValue = metadata.display_name || '';
-      const userEmail = user.email || '';
+    function updateUserInfo(user: {
+      user_metadata?: Record<string, unknown>;
+      email?: string;
+    }) {
+      const metadata = (user.user_metadata || {}) as Record<string, unknown>;
+      const fullName = String(metadata.full_name ?? '').trim();
+      const displayNameValue = String(metadata.display_name ?? '').trim();
+      const userEmail = String(user.email ?? '').trim();
 
       if (fullName) {
         const names = fullName.split(' ').filter(Boolean);
         if (names.length >= 2) {
-          setInitials((names[0][0] + names[names.length - 1][0]).toUpperCase());
+          setInitials(
+            (names[0]![0]! + names[names.length - 1]![0]!).toUpperCase(),
+          );
         } else {
           setInitials(fullName.substring(0, 2).toUpperCase());
         }
@@ -141,7 +145,7 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
         setInitials(userEmail.substring(0, 2).toUpperCase());
       }
 
-      setDisplayName(displayNameValue || fullName || userEmail);
+      setDisplayName(displayNameValue || fullName || userEmail || 'User');
       setEmail(userEmail);
     }
 

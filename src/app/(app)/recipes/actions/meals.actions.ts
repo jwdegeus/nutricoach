@@ -29,7 +29,7 @@ type ActionResult<T> =
 export async function getAllMealsAction(): Promise<
   ActionResult<{
     customMeals: CustomMealRecord[];
-    mealHistory: any[]; // TODO: type this properly
+    mealHistory: Record<string, unknown>[];
   }>
 > {
   try {
@@ -737,9 +737,14 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
       updatedMealData.ingredientRefs &&
       Array.isArray(updatedMealData.ingredientRefs)
     ) {
+      type RefLike = {
+        quantityG?: number;
+        quantity_g?: number;
+        quantity?: number;
+      };
       updatedMealData.ingredientRefs = updatedMealData.ingredientRefs.map(
-        (ref: any) => {
-          const next: any = { ...ref };
+        (ref: RefLike) => {
+          const next: Record<string, unknown> = { ...ref };
           const currentG = ref.quantityG ?? ref.quantity_g;
           if (typeof currentG === 'number' && currentG > 0) {
             next.quantityG = Math.round(currentG * ratio);
@@ -763,10 +768,16 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
       Array.isArray(updatedMealData.ingredients)
     ) {
       updatedMealData.ingredients = updatedMealData.ingredients.map(
-        (ing: any) => {
+        (ing: Record<string, unknown>) => {
           const updated = { ...ing };
           if (ing.quantity !== null && ing.quantity !== undefined) {
-            updated.quantity = Math.round(ing.quantity * ratio * 10) / 10; // Round to 1 decimal
+            const q =
+              typeof ing.quantity === 'number'
+                ? ing.quantity
+                : parseFloat(String(ing.quantity));
+            if (Number.isFinite(q)) {
+              updated.quantity = Math.round(q * ratio * 10) / 10; // Round to 1 decimal
+            }
           }
           if (ing.amount !== null && ing.amount !== undefined) {
             const amt =
@@ -823,7 +834,7 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
 
       if (Array.isArray(instructions)) {
         updatedAiAnalysis.instructions = instructions.map(
-          (instruction: any) => {
+          (instruction: string | { text?: string; step?: string }) => {
             const instructionText =
               typeof instruction === 'string'
                 ? instruction
@@ -846,7 +857,11 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
     }
 
     // Update database
-    const updateData: any = {
+    const updateData: {
+      meal_data: Record<string, unknown>;
+      updated_at: string;
+      ai_analysis?: unknown;
+    } = {
       meal_data: updatedMealData,
       updated_at: new Date().toISOString(),
     };
@@ -1175,7 +1190,7 @@ export async function removeRecipeIngredientAction(args: {
 export async function getMealByIdAction(
   mealId: string,
   source: 'custom' | 'gemini',
-): Promise<ActionResult<CustomMealRecord | any>> {
+): Promise<ActionResult<CustomMealRecord | Record<string, unknown>>> {
   try {
     // Validate mealId
     if (!mealId || mealId === 'undefined' || mealId.trim() === '') {

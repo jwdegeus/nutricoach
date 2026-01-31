@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Heading } from '@/components/catalyst/heading';
 import { Text } from '@/components/catalyst/text';
-import { Button } from '@/components/catalyst/button';
 import { RecipeSourcesAdminClient } from '@/src/app/(app)/admin/recipe-sources/components/RecipeSourcesAdminClient';
 
 type TabId = 'bronnen' | 'categorieen' | 'tags' | 'keukens' | 'boeken';

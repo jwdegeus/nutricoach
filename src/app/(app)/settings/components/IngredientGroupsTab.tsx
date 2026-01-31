@@ -125,6 +125,7 @@ export function IngredientGroupsTab({
 
   useEffect(() => {
     loadCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadCategories stable, run when dietTypeId changes
   }, [dietTypeId]);
 
   useEffect(() => {
@@ -168,7 +169,7 @@ export function IngredientGroupsTab({
         if (result.data) {
           setCategories(result.data);
         }
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij laden categorieën');
       } finally {
         setIsLoading(false);
@@ -199,7 +200,7 @@ export function IngredientGroupsTab({
             : 'Fout bij laden items',
         );
       }
-    } catch (err) {
+    } catch (_err) {
       setError('Onverwachte fout bij laden items');
     } finally {
       setIsLoadingItems(false);
@@ -275,7 +276,7 @@ export function IngredientGroupsTab({
         if (selectedCategory?.id === deleteCategoryId) {
           handleCloseModal();
         }
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij verwijderen');
         setShowDeleteDialog(false);
         setDeleteCategoryId(null);
@@ -366,7 +367,7 @@ export function IngredientGroupsTab({
           display_order: 0,
         });
         loadCategories();
-      } catch (err) {
+      } catch (_err) {
         setCreateCategoryError('Onverwachte fout bij aanmaken');
       }
     });

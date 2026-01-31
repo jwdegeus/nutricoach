@@ -14,12 +14,7 @@ import { Text } from '@/components/catalyst/text';
 import { Badge } from '@/components/catalyst/badge';
 import { Button } from '@/components/catalyst/button';
 import { Field, Label, Description } from '@/components/catalyst/fieldset';
-import {
-  PlusIcon,
-  TrashIcon,
-  PencilIcon,
-  SparklesIcon,
-} from '@heroicons/react/20/solid';
+import { PlusIcon, PencilIcon, SparklesIcon } from '@heroicons/react/20/solid';
 import { ArrowPathIcon } from '@heroicons/react/16/solid';
 import {
   addIngredientCategoryItemAction,
@@ -66,7 +61,7 @@ export function IngredientGroupDetailModal({
   dietTypeName,
   items,
   totalCount,
-  hasMore,
+  hasMore: _hasMore,
   isLoadingItems = false,
   onItemsChanged,
 }: IngredientGroupDetailModalProps) {
@@ -75,7 +70,7 @@ export function IngredientGroupDetailModal({
   // Edit category name state
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
-  const [editNameError, setEditNameError] = useState<string | null>(null);
+  const [_editNameError, setEditNameError] = useState<string | null>(null);
 
   // Edit category code (slug) state
   const [isEditingCode, setIsEditingCode] = useState(false);
@@ -120,8 +115,9 @@ export function IngredientGroupDetailModal({
 
   // Update internal items when category changes or when items prop has new data
   // Use refs to track changes without causing dependency array issues
+  const categoryIdStable = category?.id ?? null;
   useEffect(() => {
-    const categoryId = category?.id ?? null;
+    const categoryId = categoryIdStable;
     const categoryChanged = categoryId !== prevCategoryIdRef.current;
 
     if (categoryChanged) {
@@ -139,7 +135,8 @@ export function IngredientGroupDetailModal({
     }
     // If items prop is empty but we have internal items, keep internal items
     // (this prevents flicker during reload)
-  }, [category?.id ?? null, items.length]); // Use stable dependencies: always 2 items in array
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: sync on category id + items.length only
+  }, [categoryIdStable, items.length]);
 
   // Use internal items for display
   const filteredItems = internalItems;
@@ -192,7 +189,7 @@ export function IngredientGroupDetailModal({
         setNewTagInput('');
         // Trigger parent reload in background (but don't wait for it)
         onItemsChanged?.();
-      } catch (err) {
+      } catch (_err) {
         setAddError('Onverwachte fout bij toevoegen');
         // Revert on error by reloading from parent
         onItemsChanged?.();
@@ -245,7 +242,7 @@ export function IngredientGroupDetailModal({
         setSelectedSuggestions(new Set());
         setAiSuggestions([]);
         onItemsChanged?.();
-      } catch (err) {
+      } catch (_err) {
         setAddError('Onverwachte fout bij toevoegen');
       }
     });
@@ -295,7 +292,7 @@ export function IngredientGroupDetailModal({
         setSelectedSuggestions(new Set());
         setAiSuggestions([]);
         onItemsChanged?.();
-      } catch (err) {
+      } catch (_err) {
         setAddError('Onverwachte fout bij toevoegen');
       }
     });
@@ -338,7 +335,7 @@ export function IngredientGroupDetailModal({
         );
       }
       // bij append en 0 nieuwe: geen fout, gewoon niets toegevoegd
-    } catch (err) {
+    } catch (_err) {
       setAddError('Onverwachte fout bij AI generatie');
     } finally {
       setIsGeneratingAI(false);
@@ -415,7 +412,7 @@ export function IngredientGroupDetailModal({
           return;
         }
         onItemsChanged?.();
-      } catch (err) {
+      } catch (_err) {
         setAddError('Onverwachte fout bij verwijderen');
         onItemsChanged?.();
       }
@@ -432,6 +429,7 @@ export function IngredientGroupDetailModal({
       setEditName(category.name_nl);
       setEditCode(category.code);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run when category identity (catId, catName, catCode) changes
   }, [catId, catName, catCode]);
 
   // Handle save category name
@@ -458,7 +456,7 @@ export function IngredientGroupDetailModal({
         setIsEditingName(false);
         // Refresh category data via callback
         onItemsChanged?.();
-      } catch (err) {
+      } catch (_err) {
         setEditNameError('Onverwachte fout bij opslaan');
       }
     });
@@ -497,7 +495,7 @@ export function IngredientGroupDetailModal({
         setIsEditingCode(false);
         // Refresh category data via callback
         onItemsChanged?.();
-      } catch (err) {
+      } catch (_err) {
         setEditCodeError('Onverwachte fout bij opslaan');
       }
     });

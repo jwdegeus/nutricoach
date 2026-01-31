@@ -130,7 +130,9 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
       if (!isNaN(codeNum)) {
         const food = await getNevoFoodByCode(codeNum);
         nevoFoodNamesByCode[code] =
-          food?.name_nl || food?.name_en || `NEVO ${code}`;
+          String(food?.name_nl ?? '').trim() ||
+          String(food?.name_en ?? '').trim() ||
+          `NEVO ${code}`;
       } else {
         nevoFoodNamesByCode[code] = `NEVO ${code}`;
       }

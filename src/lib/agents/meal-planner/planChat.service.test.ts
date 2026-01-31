@@ -14,7 +14,6 @@ import { AppError } from '@/src/lib/errors/app-error';
 import type {
   GuardDecision,
   GuardrailsRuleset,
-  EvaluationContext,
 } from '@/src/lib/guardrails-vnext/types';
 
 /**

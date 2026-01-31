@@ -85,11 +85,14 @@ function parsePipeDelimitedCSV(csvContent: string): string[][] {
   return dataRows;
 }
 
+/** NEVO food record (string/number/null values for DB) */
+type NevoFoodRecord = Record<string, string | number | null>;
+
 /**
  * Parse CSV row and convert to nevo_foods database record
  */
-function parseNevoFoodRow(row: string[]): any {
-  const record: any = {
+function parseNevoFoodRow(row: string[]): NevoFoodRecord {
+  const record: NevoFoodRecord = {
     nevo_version: row[0]?.replace(/^"|"$/g, '') || null,
     food_group_nl: row[1]?.replace(/^"|"$/g, '') || null,
     food_group_en: row[2]?.replace(/^"|"$/g, '') || null,
@@ -182,10 +185,22 @@ function parseNevoFoodRow(row: string[]): any {
   return record;
 }
 
+/** Recipe ingredient row for NEVO import */
+type RecipeRow = {
+  nevo_version: string | null;
+  recipe_nevo_code: number;
+  recipe_name_nl: string | null;
+  recipe_name_en: string | null;
+  ingredient_nevo_code: number;
+  ingredient_name_nl: string | null;
+  ingredient_name_en: string | null;
+  relative_amount: number;
+};
+
 /**
  * Parse recipe ingredients row
  */
-function parseRecipeRow(row: string[]): any {
+function parseRecipeRow(row: string[]): RecipeRow {
   return {
     nevo_version: row[0]?.replace(/^"|"$/g, '') || null,
     recipe_nevo_code: parseInt(row[1]?.replace(/^"|"$/g, '') || '0', 10),
@@ -198,10 +213,20 @@ function parseRecipeRow(row: string[]): any {
   };
 }
 
+/** Nutrient row for NEVO import */
+type NutrientRow = {
+  nutrient_group_nl: string | null;
+  nutrient_group_en: string | null;
+  nutrient_code: string | null;
+  nutrient_name_nl: string | null;
+  nutrient_name_en: string | null;
+  unit: string | null;
+};
+
 /**
  * Parse nutrients row
  */
-function parseNutrientRow(row: string[]): any {
+function parseNutrientRow(row: string[]): NutrientRow {
   return {
     nutrient_group_nl: row[0]?.replace(/^"|"$/g, '') || null,
     nutrient_group_en: row[1]?.replace(/^"|"$/g, '') || null,
@@ -212,10 +237,13 @@ function parseNutrientRow(row: string[]): any {
   };
 }
 
+/** Reference row for NEVO import */
+type ReferenceRow = { source_code: string; reference: string | null } | null;
+
 /**
  * Parse references row
  */
-function parseReferenceRow(row: string[]): any {
+function parseReferenceRow(row: string[]): ReferenceRow {
   // The references file has a pipe-delimited format: source_code|reference
   // But the header might be malformed, so we handle it carefully
   if (row.length < 2) {
@@ -268,7 +296,9 @@ async function importNevoFoods() {
 
   for (let i = 0; i < totalRows; i += batchSize) {
     const batch = dataRows.slice(i, i + batchSize);
-    const records = batch.map(parseNevoFoodRow).filter((r) => r.nevo_code > 0);
+    const records = batch
+      .map(parseNevoFoodRow)
+      .filter((r) => r.nevo_code != null && Number(r.nevo_code) > 0);
 
     console.log(
       `📦 Importing foods batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(totalRows / batchSize)} (${records.length} items)...`,
@@ -445,7 +475,11 @@ async function importReferences() {
     .map(parseReferenceRow)
     .filter((r) => r !== null && r !== undefined && r.source_code);
   const uniqueRecords = Array.from(
-    new Map(allRecords.map((r) => [r.source_code, r])).values(),
+    new Map(
+      allRecords
+        .filter((r): r is NonNullable<typeof r> => r != null)
+        .map((r) => [r.source_code, r]),
+    ).values(),
   );
 
   console.log(

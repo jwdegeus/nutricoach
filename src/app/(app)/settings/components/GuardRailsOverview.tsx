@@ -125,6 +125,7 @@ export function GuardRailsOverview({
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData stable, run when dietTypeId changes
   }, [dietTypeId]);
 
   async function loadData() {
@@ -204,7 +205,7 @@ export function GuardRailsOverview({
           // Convert legacy diet_rules to constraint format - include ALL rule types
           const convertedConstraints: Constraint[] = legacyData.map(
             (rule: DietRuleOutput) => {
-              const ruleValue = rule.ruleValue as any;
+              const ruleValue = rule.ruleValue as Record<string, unknown>;
               const isForbidden = rule.ruleType === 'exclude_ingredient';
               const isRequired = rule.ruleType === 'require_ingredient';
               const isMealStructure = rule.ruleType === 'meal_structure';
@@ -266,16 +267,18 @@ export function GuardRailsOverview({
                 strictness: 'hard' as const,
                 min_per_day:
                   ruleValue?.frequency === 'daily'
-                    ? ruleValue?.minimumAmount || ruleValue?.minAmountMl || 1
+                    ? Number(
+                        ruleValue?.minimumAmount ?? ruleValue?.minAmountMl ?? 1,
+                      )
                     : null,
                 min_per_week:
                   ruleValue?.frequency === '2x_weekly' ||
                   ruleValue?.frequency === 'weekly'
-                    ? ruleValue?.minimumAmount || 1
+                    ? Number(ruleValue?.minimumAmount ?? 1)
                     : null,
-                priority: rule.priority,
-                rule_priority: rule.priority,
-                is_active: rule.isActive,
+                priority: Number(rule.priority ?? 50),
+                rule_priority: Number(rule.priority ?? 50),
+                is_active: Boolean(rule.isActive),
                 isLegacy: true,
                 description: rule.description || undefined,
               };
@@ -325,10 +328,10 @@ export function GuardRailsOverview({
                   item.is_active !== false,
               );
             }
-          } catch (err) {
+          } catch (_err) {
             console.error(
               `Error loading items for category ${categoryId}:`,
-              err,
+              _err,
             );
           }
         },
@@ -336,8 +339,8 @@ export function GuardRailsOverview({
 
       await Promise.all(itemsPromises);
       setCategoryItems(itemsMap);
-    } catch (err) {
-      console.error('[GuardRailsOverview] Error loading data:', err);
+    } catch (_err) {
+      console.error('[GuardRailsOverview] Error loading data:', _err);
       setError('Onverwachte fout bij laden data');
     } finally {
       setIsLoading(false);
@@ -401,7 +404,7 @@ export function GuardRailsOverview({
         setShowEditDialog(false);
         setEditingConstraint(null);
         await loadData();
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij opslaan');
       }
     });
@@ -441,7 +444,7 @@ export function GuardRailsOverview({
         }
         setSuccess('Guard rail succesvol verwijderd');
         await loadData();
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij verwijderen');
       } finally {
         setDeletingConstraintId(null);
@@ -467,7 +470,7 @@ export function GuardRailsOverview({
           // Reload data to show new constraints
           await loadData();
         }
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij migreren');
       } finally {
         setIsMigrating(false);
@@ -491,7 +494,7 @@ export function GuardRailsOverview({
             );
             await loadData();
           }
-        } catch (err) {
+        } catch (_err) {
           setError('Onverwachte fout bij bijwerken');
         }
       });
@@ -513,7 +516,7 @@ export function GuardRailsOverview({
             );
             await loadData();
           }
-        } catch (err) {
+        } catch (_err) {
           setError('Onverwachte fout bij bijwerken');
         }
       });

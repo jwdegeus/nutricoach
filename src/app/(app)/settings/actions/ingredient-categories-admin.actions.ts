@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from '@/src/lib/supabase/server';
-import type { ActionResult, ActionResultWithOk } from '@/src/lib/types';
+import type { ActionResultWithOk } from '@/src/lib/types';
 import { getGeminiClient } from '@/src/lib/ai/gemini/gemini.client';
 
 /**
@@ -277,7 +277,8 @@ export async function getIngredientCategoryAction(categoryId: string): Promise<
       category_type: cat.category_type,
       display_order: cat.display_order ?? 0,
       is_active: cat.is_active ?? true,
-      items_count: (cat as any).items?.[0]?.count ?? 0,
+      items_count:
+        (cat as { items?: Array<{ count?: number }> }).items?.[0]?.count ?? 0,
       nevo_food_groups_nl: Array.isArray(cat.nevo_food_groups_nl)
         ? cat.nevo_food_groups_nl
         : [],
@@ -381,23 +382,46 @@ export async function getIngredientCategoriesAction(): Promise<
       };
     }
 
-    const categoriesWithCounts = (categories || []).map((cat: any) => ({
-      id: cat.id,
-      code: cat.code,
-      name_nl: cat.name_nl,
-      name_en: cat.name_en,
-      description: cat.description,
-      category_type: cat.category_type,
-      display_order: cat.display_order,
-      is_active: cat.is_active,
-      items_count: cat.items?.[0]?.count || 0,
-      nevo_food_groups_nl: Array.isArray(cat.nevo_food_groups_nl)
-        ? cat.nevo_food_groups_nl
-        : [],
-      nevo_food_groups_en: Array.isArray(cat.nevo_food_groups_en)
-        ? cat.nevo_food_groups_en
-        : [],
-    }));
+    type CategoryRow = {
+      id: string;
+      code: string;
+      name_nl: string;
+      name_en: string | null;
+      description: string | null;
+      category_type: 'forbidden' | 'required';
+      display_order: number;
+      is_active: boolean;
+      items_count?: number;
+      nevo_food_groups_nl?: string[];
+      nevo_food_groups_en?: string[];
+    };
+    const categoriesWithCounts: CategoryRow[] = (categories || []).map(
+      (cat: Record<string, unknown>) => {
+        const items = cat.items;
+        const itemsCount = Array.isArray(items)
+          ? (items[0] as { count?: number } | undefined)?.count
+          : undefined;
+        return {
+          id: String(cat.id),
+          code: String(cat.code),
+          name_nl: String(cat.name_nl),
+          name_en: cat.name_en != null ? String(cat.name_en) : null,
+          description: cat.description != null ? String(cat.description) : null,
+          category_type: (cat.category_type === 'required'
+            ? 'required'
+            : 'forbidden') as 'forbidden' | 'required',
+          display_order: Number(cat.display_order) || 0,
+          is_active: Boolean(cat.is_active),
+          items_count: Number(itemsCount) || 0,
+          nevo_food_groups_nl: Array.isArray(cat.nevo_food_groups_nl)
+            ? (cat.nevo_food_groups_nl as string[])
+            : [],
+          nevo_food_groups_en: Array.isArray(cat.nevo_food_groups_en)
+            ? (cat.nevo_food_groups_en as string[])
+            : [],
+        };
+      },
+    );
 
     return {
       ok: true,
@@ -499,7 +523,9 @@ export async function getIngredientCategoriesForDietAction(
       .eq('is_active', true);
 
     const usedCategoryIds = new Set(
-      (existingConstraints || []).map((c: any) => c.category_id),
+      (existingConstraints || []).map(
+        (c: { category_id?: string }) => c.category_id,
+      ),
     );
 
     // Get all active categories
@@ -527,21 +553,23 @@ export async function getIngredientCategoriesForDietAction(
     // 2. Categories with this diet's prefix (e.g., wahls_)
     // 3. Global/core categories (not starting with any known diet prefix)
     const filtered = (categories || [])
-      .filter((cat: any) => {
+      .filter((cat: Record<string, unknown>) => {
+        const catId = String(cat.id);
+        const catCode = String(cat.code ?? '');
         // Always include if already used in constraints for this diet
-        if (usedCategoryIds.has(cat.id)) {
+        if (usedCategoryIds.has(catId)) {
           return true;
         }
 
         // If we have a diet prefix (e.g., wahls_)
         if (dietPrefix) {
           // Include if category has this diet's prefix
-          if (cat.code.startsWith(dietPrefix)) {
+          if (catCode.startsWith(dietPrefix)) {
             return true;
           }
           // Include if category is global/core (doesn't start with any known diet prefix)
           const isGlobalCategory = !knownDietPrefixes.some((prefix) =>
-            cat.code.startsWith(prefix),
+            catCode.startsWith(prefix),
           );
           if (isGlobalCategory) {
             return true;
@@ -553,18 +581,23 @@ export async function getIngredientCategoriesForDietAction(
         // If no diet prefix detected, show all active categories (fallback)
         return true;
       })
-      .map((cat: any) => ({
-        id: cat.id,
-        code: cat.code,
-        name_nl: cat.name_nl,
-        category_type: cat.category_type,
-        is_diet_specific: dietPrefix ? cat.code.startsWith(dietPrefix) : false,
-      }))
+      .map((cat: Record<string, unknown>) => {
+        const catCode = String(cat.code ?? '');
+        return {
+          id: String(cat.id),
+          code: catCode,
+          name_nl: String(cat.name_nl ?? ''),
+          category_type: (cat.category_type === 'required'
+            ? 'required'
+            : 'forbidden') as 'forbidden' | 'required',
+          is_diet_specific: dietPrefix ? catCode.startsWith(dietPrefix) : false,
+        };
+      })
       .sort((a, b) => {
         // Sort: diet-specific first, then alphabetically
         if (a.is_diet_specific && !b.is_diet_specific) return -1;
         if (!a.is_diet_specific && b.is_diet_specific) return 1;
-        return a.name_nl.localeCompare(b.name_nl, 'nl');
+        return String(a.name_nl).localeCompare(String(b.name_nl), 'nl');
       });
 
     return {
@@ -691,27 +724,44 @@ export async function getDietCategoryConstraintsAction(
       };
     }
 
-    const formattedConstraints = (constraints || []).map((constraint: any) => {
-      // Handle case where category might be null (if category was deleted)
-      const category = constraint.category || {};
-      return {
-        id: constraint.id,
-        category_id: constraint.category_id,
-        category_code: category.code || 'unknown',
-        category_name_nl: category.name_nl || 'Onbekende categorie',
-        category_type: category.category_type || constraint.constraint_type,
-        constraint_type: constraint.constraint_type,
-        rule_action:
-          constraint.rule_action ||
-          (constraint.constraint_type === 'forbidden' ? 'block' : 'allow'),
-        strictness: constraint.strictness,
-        min_per_day: constraint.min_per_day,
-        min_per_week: constraint.min_per_week,
-        priority: constraint.priority,
-        rule_priority: constraint.rule_priority ?? constraint.priority ?? 50,
-        is_active: constraint.is_active ?? true,
-      };
-    });
+    const formattedConstraints = (constraints || []).map(
+      (constraint: Record<string, unknown>) => {
+        // Handle case where category might be null (if category was deleted)
+        const category = (constraint.category || {}) as Record<string, unknown>;
+        return {
+          id: String(constraint.id),
+          category_id: String(constraint.category_id),
+          category_code: String(category.code ?? 'unknown'),
+          category_name_nl: String(category.name_nl ?? 'Onbekende categorie'),
+          category_type: (String(
+            category.category_type ?? constraint.constraint_type,
+          ) === 'required'
+            ? 'required'
+            : 'forbidden') as 'forbidden' | 'required',
+          constraint_type: (String(constraint.constraint_type) === 'required'
+            ? 'required'
+            : 'forbidden') as 'forbidden' | 'required',
+          rule_action: (String(constraint.rule_action) === 'block'
+            ? 'block'
+            : 'allow') as 'allow' | 'block',
+          strictness: (String(constraint.strictness) === 'soft'
+            ? 'soft'
+            : 'hard') as 'hard' | 'soft',
+          min_per_day:
+            constraint.min_per_day != null
+              ? Number(constraint.min_per_day)
+              : null,
+          min_per_week:
+            constraint.min_per_week != null
+              ? Number(constraint.min_per_week)
+              : null,
+          priority: Number(constraint.priority) || 50,
+          rule_priority:
+            Number(constraint.rule_priority ?? constraint.priority) || 50,
+          is_active: Boolean(constraint.is_active ?? true),
+        };
+      },
+    );
 
     console.log(
       `[getDietCategoryConstraintsAction] Formatted ${formattedConstraints.length} constraints`,
@@ -1030,7 +1080,7 @@ export async function updateIngredientCategoryAction(
       };
     }
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (input.code !== undefined)
       updateData.code = input.code.trim().toLowerCase();
     if (input.name_nl !== undefined) updateData.name_nl = input.name_nl.trim();
@@ -1310,7 +1360,7 @@ export async function deleteIngredientCategoryAction(
       .eq('is_active', true);
 
     if (constraintsInUse && constraintsInUse.length > 0) {
-      const usageLines = constraintsInUse.map((c: any) => {
+      const usageLines = constraintsInUse.map((c: Record<string, unknown>) => {
         const nested = c.diet_type ?? c.diet_types;
         const name =
           nested &&
@@ -1434,7 +1484,7 @@ export async function updateDietCategoryConstraintAction(
       };
     }
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (input.rule_action !== undefined)
       updateData.rule_action = input.rule_action;
     if (input.strictness !== undefined)
@@ -1648,7 +1698,9 @@ export async function listIngredientCategoriesForDietAction(
       .eq('is_active', true);
 
     const usedCategoryIds = new Set(
-      (existingConstraints || []).map((c: any) => c.category_id),
+      (existingConstraints || []).map(
+        (c: { category_id?: string }) => c.category_id,
+      ),
     );
 
     // Known diet-specific prefixes
@@ -1672,32 +1724,38 @@ export async function listIngredientCategoriesForDietAction(
     }
 
     // Filter categories
-    const filteredCategories = (categories || []).filter((cat: any) => {
-      // Always include if already used
-      if (usedCategoryIds.has(cat.id)) {
+    const filteredCategories = (categories || []).filter(
+      (cat: Record<string, unknown>) => {
+        const catId = String(cat.id ?? '');
+        const catCode = String(cat.code ?? '');
+        // Always include if already used
+        if (usedCategoryIds.has(catId)) {
+          return true;
+        }
+
+        if (dietPrefix) {
+          // Include if has diet prefix
+          if (catCode.startsWith(dietPrefix)) {
+            return true;
+          }
+          // Include if global
+          const isGlobalCategory = !knownDietPrefixes.some((prefix) =>
+            catCode.startsWith(prefix),
+          );
+          if (isGlobalCategory) {
+            return true;
+          }
+          return false;
+        }
+
         return true;
-      }
-
-      if (dietPrefix) {
-        // Include if has diet prefix
-        if (cat.code.startsWith(dietPrefix)) {
-          return true;
-        }
-        // Include if global
-        const isGlobalCategory = !knownDietPrefixes.some((prefix) =>
-          cat.code.startsWith(prefix),
-        );
-        if (isGlobalCategory) {
-          return true;
-        }
-        return false;
-      }
-
-      return true;
-    });
+      },
+    );
 
     // Get item counts for filtered categories (efficient: count per category)
-    const categoryIds = filteredCategories.map((cat: any) => cat.id);
+    const categoryIds = filteredCategories.map((cat: Record<string, unknown>) =>
+      String(cat.id ?? ''),
+    );
     const itemsCountMap = new Map<string, number>();
 
     // For each category, get count efficiently
@@ -1722,19 +1780,25 @@ export async function listIngredientCategoriesForDietAction(
 
     // Map and sort categories
     const filtered = filteredCategories
-      .map((cat: any) => ({
-        id: cat.id,
-        code: cat.code,
-        name_nl: cat.name_nl,
-        category_type: cat.category_type,
-        is_diet_specific: dietPrefix ? cat.code.startsWith(dietPrefix) : false,
-        items_count: itemsCountMap.get(cat.id) || 0,
-      }))
+      .map((cat: Record<string, unknown>) => {
+        const catId = String(cat.id ?? '');
+        const catCode = String(cat.code ?? '');
+        return {
+          id: catId,
+          code: catCode,
+          name_nl: String(cat.name_nl ?? ''),
+          category_type: (cat.category_type === 'required'
+            ? 'required'
+            : 'forbidden') as 'forbidden' | 'required',
+          is_diet_specific: dietPrefix ? catCode.startsWith(dietPrefix) : false,
+          items_count: itemsCountMap.get(catId) || 0,
+        };
+      })
       .sort((a, b) => {
         // Sort: diet-specific first, then alphabetically
         if (a.is_diet_specific && !b.is_diet_specific) return -1;
         if (!a.is_diet_specific && b.is_diet_specific) return 1;
-        return a.name_nl.localeCompare(b.name_nl, 'nl');
+        return String(a.name_nl).localeCompare(String(b.name_nl), 'nl');
       });
 
     return {
@@ -1851,16 +1915,21 @@ export async function readIngredientCategoryItemsAction(
       };
     }
 
-    const formattedItems = (items || []).map((item: any) => ({
-      id: item.id,
-      term: item.term,
-      term_nl: item.term_nl,
-      synonyms: Array.isArray(item.synonyms) ? item.synonyms : [],
-      display_order: item.display_order,
-      is_active: item.is_active,
-      subgroup_id: item.subgroup_id || null,
-      nevo_food_id: item.nevo_food_id ?? null,
-    }));
+    const formattedItems = (items || []).map(
+      (item: Record<string, unknown>) => ({
+        id: String(item.id),
+        term: String(item.term ?? ''),
+        term_nl: item.term_nl != null ? String(item.term_nl) : null,
+        synonyms: Array.isArray(item.synonyms)
+          ? (item.synonyms as string[])
+          : [],
+        display_order: Number(item.display_order) || 0,
+        is_active: Boolean(item.is_active),
+        subgroup_id: item.subgroup_id != null ? String(item.subgroup_id) : null,
+        nevo_food_id:
+          item.nevo_food_id != null ? Number(item.nevo_food_id) : null,
+      }),
+    );
 
     return {
       ok: true,
@@ -1987,12 +2056,12 @@ export async function searchNevoIngredientsForCategoryAction(
       (f: { id: number }) => !usedSet.has(f.id),
     );
 
-    const out = filtered.map((f: any) => ({
-      id: f.id,
-      nevo_code: f.nevo_code,
-      name_nl: f.name_nl ?? '',
-      name_en: f.name_en ?? '',
-      food_group_nl: f.food_group_nl ?? '',
+    const out = filtered.map((f: Record<string, unknown>) => ({
+      id: Number(f.id),
+      nevo_code: Number(f.nevo_code),
+      name_nl: String(f.name_nl ?? ''),
+      name_en: String(f.name_en ?? ''),
+      food_group_nl: String(f.food_group_nl ?? ''),
     }));
 
     return { ok: true, data: out };
@@ -2332,15 +2401,19 @@ export async function getIngredientCategoryItemsAction(
       };
     }
 
-    const formattedItems = (items || []).map((item: any) => ({
-      id: item.id,
-      category_id: item.category_id,
-      term: item.term,
-      term_nl: item.term_nl,
-      synonyms: Array.isArray(item.synonyms) ? item.synonyms : [],
-      display_order: item.display_order,
-      is_active: item.is_active,
-    }));
+    const formattedItems = (items || []).map(
+      (item: Record<string, unknown>) => ({
+        id: String(item.id),
+        category_id: String(item.category_id ?? ''),
+        term: String(item.term ?? ''),
+        term_nl: item.term_nl != null ? String(item.term_nl) : null,
+        synonyms: Array.isArray(item.synonyms)
+          ? (item.synonyms as string[])
+          : [],
+        display_order: Number(item.display_order) || 0,
+        is_active: Boolean(item.is_active),
+      }),
+    );
 
     return {
       ok: true,
@@ -2508,7 +2581,7 @@ export async function updateIngredientCategoryItemAction(
       };
     }
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (input.term !== undefined)
       updateData.term = input.term.trim().toLowerCase();
     if (input.term_nl !== undefined)
@@ -2839,7 +2912,7 @@ VOORKOM DUPLICATEN met bestaande subgroepen.`;
 
       // Normalize and filter suggestions
       const normalized = suggestions
-        .map((s: any) => {
+        .map((s: Record<string, unknown>) => {
           if (
             !s.name ||
             !s.nameNl ||
@@ -2863,7 +2936,10 @@ VOORKOM DUPLICATEN met bestaande subgroepen.`;
           return {
             name: normalizedName,
             nameNl: normalizedNameNl,
-            description: s.description ? s.description.trim() : undefined,
+            description:
+              s.description != null && typeof s.description === 'string'
+                ? s.description.trim()
+                : undefined,
           };
         })
         .filter(
@@ -3105,10 +3181,10 @@ VOORKOM DUPLICATEN met bestaande termen en synoniemen.`;
 
       // Normalize and validate suggestions
       const normalized = suggestions
-        .map((s: any) => {
+        .map((s: Record<string, unknown>) => {
           if (!s.term || typeof s.term !== 'string') return null;
 
-          const normalizedTerm = normalizeTerm(s.term);
+          const normalizedTerm = normalizeTerm(String(s.term));
 
           // Check if this term already exists (case-insensitive)
           if (existingTerms.has(normalizedTerm)) {
@@ -3116,13 +3192,16 @@ VOORKOM DUPLICATEN met bestaande termen en synoniemen.`;
           }
 
           // Use Dutch term as primary, fallback to term if no termNl
-          const termNl = s.termNl ? normalizeTerm(s.termNl) : normalizedTerm;
+          const termNl =
+            s.termNl != null && typeof s.termNl === 'string'
+              ? normalizeTerm(s.termNl)
+              : normalizedTerm;
           return {
             term: normalizedTerm,
             termNl: termNl,
             synonyms: Array.isArray(s.synonyms)
               ? s.synonyms
-                  .map((syn: any) =>
+                  .map((syn: Record<string, unknown>) =>
                     typeof syn === 'string' ? normalizeTerm(syn) : null,
                   )
                   .filter(
@@ -3485,12 +3564,15 @@ export async function bulkAddIngredientCategoryItemsAction(input: {
     }
 
     const existingTermsSet = new Set(
-      (existingItems || []).map((item: any) => item.term.toLowerCase()),
+      (existingItems || []).map((item: { term: string }) =>
+        item.term.toLowerCase(),
+      ),
     );
     const existingInactiveTerms = new Map<string, string>(); // normalized term -> original term from DB
-    (existingItems || []).forEach((item: any) => {
+    (existingItems || []).forEach((item: Record<string, unknown>) => {
       if (!item.is_active) {
-        existingInactiveTerms.set(item.term.toLowerCase(), item.term);
+        const term = String(item.term ?? '');
+        existingInactiveTerms.set(term.toLowerCase(), term);
       }
     });
 
@@ -3677,7 +3759,7 @@ export async function migrateLegacyRulesToNewSystemAction(
 
     for (const rule of legacyRules) {
       try {
-        const ruleValue = rule.rule_value as any;
+        const ruleValue = rule.rule_value as Record<string, unknown>;
         const isForbidden = rule.rule_type === 'exclude_ingredient';
         const isRequired = rule.rule_type === 'require_ingredient';
 
@@ -4160,7 +4242,7 @@ export async function updateIngredientSubgroupAction(
     }
 
     // Build update object
-    const updates: Record<string, any> = {};
+    const updates: Record<string, unknown> = {};
     if (input.name !== undefined) {
       if (!input.name.trim() || input.name.trim().length < 2) {
         return {

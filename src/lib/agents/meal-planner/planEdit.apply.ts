@@ -15,12 +15,7 @@ import { PantryService } from '@/src/lib/pantry/pantry.service';
 import { MealPlanEditabilityService } from '@/src/lib/meal-plans/mealPlanEditability.service';
 import { AppError } from '@/src/lib/errors/app-error';
 import { mealPlanResponseSchema } from '@/src/lib/diets';
-import type {
-  MealPlanResponse,
-  MealPlanDay,
-  Meal,
-  MealSlot,
-} from '@/src/lib/diets';
+import type { MealPlanResponse, MealPlanDay, MealSlot } from '@/src/lib/diets';
 import type { PlanEdit } from './planEdit.types';
 
 /**

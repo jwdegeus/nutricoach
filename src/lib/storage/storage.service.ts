@@ -227,9 +227,9 @@ export class StorageService {
    * Upload to CDN (future implementation)
    */
   private async uploadCDN(
-    file: Buffer | string,
-    filename: string,
-    userId: string,
+    _file: Buffer | string,
+    _filename: string,
+    _userId: string,
   ): Promise<UploadResult> {
     // TODO: Implement CDN upload (e.g., Cloudflare R2, Cloudinary, etc.)
     throw new Error('CDN storage not yet implemented');
@@ -239,9 +239,9 @@ export class StorageService {
    * Upload to S3 (future implementation)
    */
   private async uploadS3(
-    file: Buffer | string,
-    filename: string,
-    userId: string,
+    _file: Buffer | string,
+    _filename: string,
+    _userId: string,
   ): Promise<UploadResult> {
     // TODO: Implement S3 upload
     throw new Error('S3 storage not yet implemented');

@@ -302,28 +302,28 @@ function parseGeminiResponse(
     return geminiExtractedRecipeSchema.parse(parsed);
   } catch (validationError) {
     // Check if this is a case where no recipe was found (empty ingredients/instructions)
-    const parsedData = parsed as any;
+    const parsedData = parsed as Record<string, unknown>;
+    const warnings = parsedData?.warnings as string[] | undefined;
     const hasWarnings =
-      parsedData?.warnings &&
-      Array.isArray(parsedData.warnings) &&
-      parsedData.warnings.length > 0;
+      warnings && Array.isArray(warnings) && warnings.length > 0;
     const hasAccessDenied =
       hasWarnings &&
-      parsedData.warnings.some(
+      warnings.some(
         (w: string) =>
           w.toLowerCase().includes('access denied') ||
           w.toLowerCase().includes('toegang geweigerd') ||
           w.toLowerCase().includes('geen receptinformatie'),
       );
+    const ingredientsArr = parsedData?.ingredients as unknown[] | undefined;
+    const instructionsArr = parsedData?.instructions as unknown[] | undefined;
     const isEmptyRecipe =
-      (!parsedData?.ingredients || parsedData.ingredients.length === 0) &&
-      (!parsedData?.instructions || parsedData.instructions.length === 0);
+      (!ingredientsArr || ingredientsArr.length === 0) &&
+      (!instructionsArr || instructionsArr.length === 0);
 
     if (hasAccessDenied || (isEmptyRecipe && hasWarnings)) {
       const warningMessage = hasAccessDenied
         ? 'De website blokkeert toegang tot deze pagina. Probeer een andere URL of controleer of de pagina publiek toegankelijk is.'
-        : parsedData.warnings?.[0] ||
-          'Geen receptinformatie gevonden op deze pagina.';
+        : warnings?.[0] || 'Geen receptinformatie gevonden op deze pagina.';
 
       throw new Error(warningMessage);
     }

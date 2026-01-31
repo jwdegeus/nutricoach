@@ -6,11 +6,7 @@ import {
   loadGuardrailsRuleset,
   evaluateGuardrails,
 } from '@/src/lib/guardrails-vnext';
-import type {
-  TextAtom,
-  GuardDecision,
-  GuardRuleMatch,
-} from '@/src/lib/guardrails-vnext/types';
+import type { TextAtom, GuardDecision } from '@/src/lib/guardrails-vnext/types';
 import { getGuardReasonLabel } from '@/src/lib/guardrails-vnext/ui/reasonLabels';
 
 /**

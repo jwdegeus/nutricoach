@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useRef, useCallback, useEffect, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
@@ -56,7 +57,7 @@ function compressImage(
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
-      const img = new Image();
+      const img = document.createElement('img');
       img.onload = () => {
         // Calculate new dimensions
         let width = img.width;
@@ -882,7 +883,7 @@ export function RecipeImportClient({
     } finally {
       setProcessingJob(false);
     }
-  }, [remoteJob, localSelectedFile, processingJob, locale, loadJob, t]);
+  }, [remoteJob, localSelectedFile, processingJob, loadJob, t]);
 
   // Handle retry (for failed jobs or full reset)
   const handleRetry = useCallback(async () => {
@@ -1148,11 +1149,14 @@ export function RecipeImportClient({
 
       {/* Preview */}
       {previewUrl && uiState !== 'failed' && (
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-          <img
+        <div className="relative rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden min-h-[200px] max-h-64 w-full bg-zinc-50 dark:bg-zinc-900">
+          <Image
             src={previewUrl}
             alt="Recept preview"
-            className="w-full h-auto max-h-64 object-contain bg-zinc-50 dark:bg-zinc-900"
+            fill
+            className="object-contain"
+            sizes="(max-width: 768px) 100vw, 512px"
+            unoptimized
           />
         </div>
       )}
@@ -1334,15 +1338,19 @@ export function RecipeImportClient({
                   </Text>
                   {validationErrors && (
                     <div className="space-y-2 mb-4">
-                      {validationErrors.stage && (
+                      {(validationErrors as { stage?: string }).stage && (
                         <Text className="text-sm text-red-600 dark:text-red-400">
                           <strong>{t('errorStage')}:</strong>{' '}
-                          {t(`errorStage${validationErrors.stage}` as any)}
+                          {(t as (key: string) => string)(
+                            `errorStage${(validationErrors as { stage?: string }).stage}`,
+                          )}
                         </Text>
                       )}
-                      {validationErrors.message && (
+                      {(validationErrors as { message?: string }).message && (
                         <Text className="text-sm text-red-500 dark:text-red-400">
-                          {String(validationErrors.message)}
+                          {String(
+                            (validationErrors as { message?: string }).message,
+                          )}
                         </Text>
                       )}
                     </div>
@@ -1410,7 +1418,10 @@ export function RecipeImportClient({
                   {/* Edit Form - Allows users to edit recipe before finalizing */}
                   {(() => {
                     // Debug logging
-                    const sourceImageMeta = remoteJob.sourceImageMeta as any;
+                    const sourceImageMeta = remoteJob.sourceImageMeta as Record<
+                      string,
+                      unknown
+                    >;
                     console.log(
                       '[RecipeImportClient] Rendering RecipeEditForm with sourceImageMeta:',
                       JSON.stringify(
@@ -1507,7 +1518,14 @@ export function RecipeImportClient({
                           id="meal-slot-select"
                           value={selectedMealSlot}
                           onChange={(e) =>
-                            setSelectedMealSlot(e.target.value as any)
+                            setSelectedMealSlot(
+                              e.target.value as
+                                | ''
+                                | 'breakfast'
+                                | 'lunch'
+                                | 'dinner'
+                                | 'snack',
+                            )
                           }
                           disabled={finalizingJob}
                         >

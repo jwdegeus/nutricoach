@@ -8,7 +8,6 @@
 
 import type {
   GuardRule,
-  GuardrailsRuleset,
   GuardDecision,
   GuardRuleMatch,
   DecisionTrace,

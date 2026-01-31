@@ -3,10 +3,6 @@
 import { isAdmin } from '@/src/lib/auth/roles';
 import type { ActionResult } from '@/src/lib/types';
 import { loadGuardrailsRuleset } from '@/src/lib/guardrails-vnext';
-import type {
-  GuardrailsRuleset,
-  GuardRule,
-} from '@/src/lib/guardrails-vnext/types';
 import { createClient } from '@/src/lib/supabase/server';
 
 /**
@@ -264,8 +260,11 @@ export async function getDietGroupPoliciesAction(
 
     // Get item counts for all categories
     const categoryIds = constraints
-      .map((c: any) => c.category_id)
-      .filter((id: string | null) => id !== null);
+      .map((c: { category_id?: string | null }) => c.category_id)
+      .filter(
+        (id: string | null | undefined): id is string =>
+          id != null && id !== '',
+      );
 
     const itemsCountMap = new Map<string, number>();
 
@@ -294,33 +293,60 @@ export async function getDietGroupPoliciesAction(
       return undefined;
     };
 
-    const policies: GroupPolicyRow[] = (constraints || [])
-      .filter((constraint: any) => constraint.category) // Filter out constraints with deleted categories
-      .map((constraint: any) => {
-        const category = constraint.category;
-        const ruleAction =
-          constraint.rule_action ||
+    type ConstraintRow = Record<string, unknown> & {
+      id: string;
+      category_id?: string;
+      category?:
+        | { name_nl?: string; code?: string }
+        | { name_nl?: string; code?: string }[];
+      rule_action?: string;
+      constraint_type?: string;
+      diet_logic?: string | null;
+    };
+    const constraintsList = (constraints || []) as ConstraintRow[];
+    const policies: GroupPolicyRow[] = constraintsList
+      .filter(
+        (constraint) =>
+          constraint.category != null &&
+          constraint.category_id != null &&
+          constraint.category_id !== '',
+      )
+      .map((constraint) => {
+        const rawCategory = constraint.category;
+        const category = Array.isArray(rawCategory)
+          ? rawCategory[0]
+          : (rawCategory as { name_nl?: string; code?: string } | undefined);
+        const ruleActionRaw =
+          (constraint.rule_action as string | undefined) ||
           (constraint.constraint_type === 'forbidden' ? 'block' : 'allow');
+        const ruleAction: 'allow' | 'block' =
+          ruleActionRaw === 'block' ? 'block' : 'allow';
         const dietLogicValue =
-          validDietLogic(constraint.diet_logic) ??
+          validDietLogic(constraint.diet_logic as string | null | undefined) ??
           (constraint.constraint_type === 'required' ? 'force' : 'drop');
+        const categoryId = String(constraint.category_id);
 
+        const strictness: 'hard' | 'soft' =
+          (constraint.strictness as string) === 'soft' ? 'soft' : 'hard';
         return {
           constraintId: constraint.id,
-          categoryId: constraint.category_id,
-          categoryName: category.name_nl || 'Onbekende categorie',
-          categorySlug: category.code || 'unknown',
+          categoryId,
+          categoryName: category?.name_nl || 'Onbekende categorie',
+          categorySlug: category?.code || 'unknown',
           action: ruleAction,
-          strictness: constraint.strictness || 'hard',
-          priority: constraint.rule_priority ?? constraint.priority ?? 100,
-          itemCount: itemsCountMap.get(constraint.category_id) || 0,
+          strictness,
+          priority:
+            (constraint.rule_priority as number | undefined) ??
+            (constraint.priority as number | undefined) ??
+            100,
+          itemCount: itemsCountMap.get(categoryId) || 0,
           provenance: 'db' as const,
-          isPaused: constraint.is_paused === true,
+          isPaused: (constraint.is_paused as boolean) === true,
           dietLogic: dietLogicValue,
-          minPerDay: constraint.min_per_day ?? null,
-          minPerWeek: constraint.min_per_week ?? null,
-          maxPerDay: constraint.max_per_day ?? null,
-          maxPerWeek: constraint.max_per_week ?? null,
+          minPerDay: (constraint.min_per_day as number | null) ?? null,
+          minPerWeek: (constraint.min_per_week as number | null) ?? null,
+          maxPerDay: (constraint.max_per_day as number | null) ?? null,
+          maxPerWeek: (constraint.max_per_week as number | null) ?? null,
         };
       })
       .sort((a, b) => {
@@ -394,7 +420,16 @@ export async function getDietTextRulesSummaryAction(
     }
 
     // Map to summary format
-    const mappedRules = (rules || []).map((rule: any) => {
+    type TextRuleRow = {
+      id: string;
+      rule_code?: string;
+      rule_label?: string;
+      priority?: number;
+      target?: string;
+      match_mode?: string;
+      term?: string;
+    };
+    const mappedRules = (rules || []).map((rule: TextRuleRow) => {
       // Infer strictness from rule_code (same logic as mapRecipeAdaptationRuleToRule)
       const strictness: 'hard' | 'soft' = rule.rule_code?.includes('SOFT')
         ? 'soft'

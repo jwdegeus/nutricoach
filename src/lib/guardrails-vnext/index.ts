@@ -36,10 +36,7 @@ export type {
 import type {
   GuardrailsRuleset,
   EvaluationContext,
-  EvaluationResult,
-  RulesetLoadResult,
   ConstraintCompilationResult,
-  GuardrailsEvaluateInput,
 } from './types';
 
 // Export evaluator
@@ -82,8 +79,8 @@ export type {
  * TODO: Implement in prompt-compiler.ts (or validator.ts)
  */
 export async function compileConstraintsForAI(
-  ruleset: GuardrailsRuleset,
-  context: EvaluationContext,
+  _ruleset: GuardrailsRuleset,
+  _context: EvaluationContext,
 ): Promise<ConstraintCompilationResult> {
   throw new Error('Not implemented yet - see prompt-compiler.ts');
 }

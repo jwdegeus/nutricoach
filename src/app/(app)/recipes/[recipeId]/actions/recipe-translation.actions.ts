@@ -100,7 +100,13 @@ export async function translateRecipeAction(args: {
 
     // Update meal in database
     // Handle different column names for custom_meals vs meal_history
-    const updateData: any = {
+    const updateData: {
+      meal_data: unknown;
+      ai_analysis: unknown;
+      updated_at: string;
+      name?: string;
+      meal_name?: string;
+    } = {
       meal_data: translation.translatedMealData,
       ai_analysis: translation.translatedAiAnalysis,
       updated_at: new Date().toISOString(),

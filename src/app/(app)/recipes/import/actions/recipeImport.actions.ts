@@ -253,7 +253,7 @@ export async function loadRecipeImportAction(
 
     // Debug logging for source_image_meta
     if (job.sourceImageMeta) {
-      const sourceImageMeta = job.sourceImageMeta as any;
+      const sourceImageMeta = job.sourceImageMeta as Record<string, unknown>;
       console.log(
         '[loadRecipeImportAction] Job source_image_meta:',
         JSON.stringify(
@@ -397,7 +397,12 @@ export async function updateRecipeImportStatusAction(
     }
 
     // Prepare update data
-    const updateData: any = {
+    const updateData: {
+      status: string;
+      updated_at: string;
+      finalized_at?: string;
+      validation_errors_json?: unknown;
+    } = {
       status: input.status,
       updated_at: new Date().toISOString(),
     };
@@ -826,7 +831,7 @@ export async function importRecipeFromUrlAction(
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to fetch URL';
-      const errorCode = (error as any)?.code;
+      const errorCode = (error as { code?: string })?.code;
 
       // Map specific error codes to user-friendly messages
       if (

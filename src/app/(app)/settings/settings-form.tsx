@@ -18,7 +18,7 @@ interface SettingsFormProps {
   user: User;
 }
 
-export function SettingsForm({ user }: SettingsFormProps) {
+export function SettingsForm({ user: _user }: SettingsFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -22,12 +23,17 @@ function RecipeThumbnail({
   }
 
   return (
-    <img
-      src={imageUrl}
-      alt={alt}
-      className="h-10 w-10 rounded-full object-cover ring-1 ring-zinc-950/5 dark:ring-white/10"
-      onError={() => setImageError(true)}
-    />
+    <span className="relative block h-10 w-10 rounded-full overflow-hidden ring-1 ring-zinc-950/5 dark:ring-white/10">
+      <Image
+        src={imageUrl}
+        alt={alt}
+        fill
+        className="object-cover"
+        sizes="40px"
+        unoptimized
+        onError={() => setImageError(true)}
+      />
+    </span>
   );
 }
 import { Badge } from '@/components/catalyst/badge';
@@ -80,9 +86,9 @@ import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.servic
 import type { MealSlot } from '@/src/lib/diets';
 import type { RecipeComplianceResult } from '../actions/recipe-compliance.actions';
 
-type MealItem =
+export type MealItem =
   | (CustomMealRecord & { source: 'custom' })
-  | (any & { source: 'gemini' });
+  | (Record<string, unknown> & { source: 'gemini' });
 
 type RecipesListProps = {
   meals: MealItem[];
@@ -207,20 +213,22 @@ export function RecipesList({
       return;
     }
 
-    setLoggingMealId(meal.id);
+    const mealIdStr = String(meal.id);
+    setLoggingMealId(mealIdStr);
 
+    const mealR = meal as Record<string, unknown>;
     try {
       const result = await logMealConsumptionAction({
-        customMealId: meal.source === 'custom' ? meal.id : undefined,
-        mealHistoryId: meal.source === 'gemini' ? meal.id : undefined,
-        mealName: meal.name || meal.meal_name,
-        mealSlot: (meal.mealSlot || meal.meal_slot) as MealSlot,
+        customMealId: meal.source === 'custom' ? mealIdStr : undefined,
+        mealHistoryId: meal.source === 'gemini' ? mealIdStr : undefined,
+        mealName: String(mealR.name ?? mealR.meal_name ?? mealR.mealName ?? ''),
+        mealSlot: (mealR.mealSlot ?? mealR.meal_slot ?? '') as MealSlot,
       });
 
       if (result.ok) {
         // Update local state optimistically - no page refresh needed
         if (onConsumptionLogged) {
-          onConsumptionLogged(meal.id, meal.source);
+          onConsumptionLogged(mealIdStr, meal.source);
         }
       } else {
         alert(`Fout: ${result.error.message}`);
@@ -258,11 +266,12 @@ export function RecipesList({
   };
 
   const handleView = (meal: MealItem) => {
-    if (!meal.id || meal.id === 'undefined') {
+    const id = String(meal.id);
+    if (!id || id === 'undefined') {
       alert('Recept ID ontbreekt');
       return;
     }
-    router.push(`/recipes/${meal.id}?source=${meal.source}`);
+    router.push(`/recipes/${id}?source=${meal.source}`);
   };
 
   const handleDelete = (meal: MealItem) => {
@@ -275,15 +284,16 @@ export function RecipesList({
 
     setIsDeleting(true);
     try {
+      const deleteId = String(mealToDelete.id);
       const result = await deleteMealAction({
-        mealId: mealToDelete.id,
+        mealId: deleteId,
         source: mealToDelete.source,
       });
 
       if (result.ok) {
         // Update local state - remove meal from list
         if (onMealDeleted) {
-          onMealDeleted(mealToDelete.id, mealToDelete.source);
+          onMealDeleted(deleteId, mealToDelete.source);
         }
         setDeleteDialogOpen(false);
         setMealToDelete(null);
@@ -303,7 +313,7 @@ export function RecipesList({
 
   const handleAddToMealPlan = (meal: MealItem) => {
     // TODO: Implement add to meal plan functionality
-    console.log('Add to meal plan:', meal.id);
+    console.log('Add to meal plan:', String(meal.id));
   };
 
   const handleRateRecipe = (meal: MealItem) => {
@@ -319,9 +329,10 @@ export function RecipesList({
   const handleDietTypeSelected = async (dietTypeName: string | null) => {
     if (!selectedMeal) return;
 
+    const selectedId = String(selectedMeal.id);
     try {
       const result = await updateMealDietTypeAction({
-        mealId: selectedMeal.id,
+        mealId: selectedId,
         source: selectedMeal.source,
         dietTypeName,
       });
@@ -329,7 +340,7 @@ export function RecipesList({
       if (result.ok) {
         // Update local state optimistically - no page refresh needed
         if (onDietTypeUpdated) {
-          onDietTypeUpdated(selectedMeal.id, selectedMeal.source, dietTypeName);
+          onDietTypeUpdated(selectedId, selectedMeal.source, dietTypeName);
         }
       } else {
         alert(`Fout: ${result.error.message}`);
@@ -344,7 +355,9 @@ export function RecipesList({
   };
 
   // Filter out invalid meals
-  const validMeals = meals.filter((meal) => meal.id && meal.id !== 'undefined');
+  const validMeals = meals.filter(
+    (meal) => meal.id != null && String(meal.id) !== 'undefined',
+  );
 
   // Check if there are no meals at all (not just on this page)
   const hasNoMeals =
@@ -403,38 +416,52 @@ export function RecipesList({
             </TableHead>
             <TableBody>
               {validMeals.map((meal) => {
+                const mealR = meal as Record<string, unknown>;
                 const imageUrl =
-                  meal.sourceImageUrl || meal.source_image_url || null;
+                  ((mealR.sourceImageUrl ?? mealR.source_image_url) as
+                    | string
+                    | null) ?? null;
+                const name = String(
+                  mealR.name ?? mealR.meal_name ?? mealR.mealName ?? 'Recept',
+                );
                 return (
                   <TableRow
-                    key={meal.id}
-                    href={`/recipes/${meal.id}?source=${meal.source}`}
+                    key={String(meal.id)}
+                    href={`/recipes/${String(meal.id)}?source=${meal.source}`}
                   >
                     <TableCell>
-                      <RecipeThumbnail
-                        imageUrl={imageUrl}
-                        alt={meal.name || meal.meal_name || 'Recept'}
-                      />
+                      <RecipeThumbnail imageUrl={imageUrl} alt={name} />
                     </TableCell>
                     <TableCell className="font-medium min-w-[180px]">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span>{meal.name || meal.meal_name}</span>
-                        {formatDietTypeName(meal.dietKey || meal.diet_key) && (
+                        <span>{name}</span>
+                        {formatDietTypeName(
+                          String(mealR.dietKey ?? mealR.diet_key ?? ''),
+                        ) && (
                           <Badge color="green" className="text-xs">
-                            {formatDietTypeName(meal.dietKey || meal.diet_key)}
+                            {formatDietTypeName(
+                              String(mealR.dietKey ?? mealR.diet_key ?? ''),
+                            )}
                           </Badge>
                         )}
                       </div>
                     </TableCell>
                     <TableCell className="capitalize whitespace-nowrap text-sm">
-                      {formatMealSlot(meal.mealSlot || meal.meal_slot)}
+                      {formatMealSlot(
+                        String(mealR.mealSlot ?? mealR.meal_slot ?? ''),
+                      )}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      {meal.mealData?.prepTime ? (
+                      {(mealR.mealData as Record<string, unknown> | undefined)
+                        ?.prepTime ? (
                         <div className="flex items-center gap-1">
                           <ClockIcon className="h-3.5 w-3.5 text-zinc-500" />
                           <span className="text-sm">
-                            {meal.mealData.prepTime} min
+                            {String(
+                              (mealR.mealData as Record<string, unknown>)
+                                .prepTime ?? '',
+                            )}{' '}
+                            min
                           </span>
                         </div>
                       ) : (
@@ -442,11 +469,15 @@ export function RecipesList({
                       )}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      {meal.mealData?.servings ? (
+                      {(mealR.mealData as Record<string, unknown> | undefined)
+                        ?.servings ? (
                         <div className="flex items-center gap-1">
                           <UserGroupIcon className="h-3.5 w-3.5 text-zinc-500" />
                           <span className="text-sm">
-                            {meal.mealData.servings}
+                            {String(
+                              (mealR.mealData as Record<string, unknown>)
+                                .servings ?? '',
+                            )}
                           </span>
                         </div>
                       ) : (
@@ -458,20 +489,20 @@ export function RecipesList({
                         <div className="flex items-center gap-1">
                           <CheckIcon className="h-3.5 w-3.5 text-green-600" />
                           <span className="text-sm">
-                            {meal.consumptionCount || 0}x
+                            {Number(mealR.consumptionCount ?? 0)}x
                           </span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1">
                           <CheckIcon className="h-3.5 w-3.5 text-green-600" />
                           <span className="text-sm">
-                            {meal.usage_count || 0}x
+                            {Number(mealR.usage_count ?? 0)}x
                           </span>
                         </div>
                       )}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      {meal.userRating || meal.user_rating ? (
+                      {(mealR.userRating ?? mealR.user_rating) != null ? (
                         <div className="flex items-center gap-0.5">
                           <div className="flex gap-0.5">
                             {[1, 2, 3, 4, 5].map((star) => (
@@ -479,7 +510,9 @@ export function RecipesList({
                                 key={star}
                                 className={`h-3.5 w-3.5 ${
                                   star <=
-                                  (meal.userRating || meal.user_rating || 0)
+                                  Number(
+                                    mealR.userRating ?? mealR.user_rating ?? 0,
+                                  )
                                     ? 'text-yellow-400 fill-yellow-400'
                                     : 'text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700'
                                 }`}
@@ -487,7 +520,7 @@ export function RecipesList({
                             ))}
                           </div>
                           <span className="text-xs text-zinc-600 dark:text-zinc-400 ml-0.5">
-                            {meal.userRating || meal.user_rating}/5
+                            {Number(mealR.userRating ?? mealR.user_rating)}/5
                           </span>
                         </div>
                       ) : (
@@ -495,9 +528,9 @@ export function RecipesList({
                       )}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      {complianceScores[meal.id] ? (
+                      {complianceScores[String(meal.id)] ? (
                         <ComplianceScoreBadge
-                          score={complianceScores[meal.id]}
+                          score={complianceScores[String(meal.id)]}
                         />
                       ) : (
                         <span className="text-zinc-400 text-sm">-</span>
@@ -628,9 +661,17 @@ export function RecipesList({
           }}
           onSelect={handleDietTypeSelected}
           currentDietTypeName={
-            selectedMeal.dietKey || selectedMeal.diet_key || null
+            String(
+              (selectedMeal as Record<string, unknown>).dietKey ??
+                (selectedMeal as Record<string, unknown>).diet_key ??
+                '',
+            ) || null
           }
-          mealName={selectedMeal.name || selectedMeal.meal_name}
+          mealName={String(
+            (selectedMeal as Record<string, unknown>).name ??
+              (selectedMeal as Record<string, unknown>).meal_name ??
+              '',
+          )}
         />
       )}
       <ConfirmDialog
@@ -641,7 +682,7 @@ export function RecipesList({
         }}
         onConfirm={handleDeleteConfirm}
         title="Recept verwijderen"
-        description={`Weet je zeker dat je het recept "${mealToDelete?.name || mealToDelete?.meal_name}" wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.`}
+        description={`Weet je zeker dat je het recept "${String((mealToDelete as Record<string, unknown> | null)?.name ?? (mealToDelete as Record<string, unknown> | null)?.meal_name ?? '')}" wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.`}
         confirmLabel="Verwijderen"
         cancelLabel="Annuleren"
         confirmColor="red"
@@ -654,12 +695,16 @@ export function RecipesList({
             setRatingDialogOpen(false);
             setMealToRate(null);
           }}
-          mealId={mealToRate.id}
+          mealId={String(mealToRate.id)}
           source={mealToRate.source}
-          mealName={mealToRate.name || mealToRate.meal_name}
+          mealName={String(
+            (mealToRate as Record<string, unknown>).name ??
+              (mealToRate as Record<string, unknown>).meal_name ??
+              '',
+          )}
           onRatingUpdated={(rating) => {
             if (onRatingUpdated) {
-              onRatingUpdated(mealToRate.id, mealToRate.source, rating);
+              onRatingUpdated(String(mealToRate.id), mealToRate.source, rating);
             }
           }}
         />

@@ -36,7 +36,7 @@ export type RecipeAdaptationRecord = {
   rewriteSteps: StepLine[];
   rewriteIntro: string | null;
   rewriteWhyThisWorks: string[];
-  nutritionEstimate: any | null;
+  nutritionEstimate: unknown | null;
   confidence: number | null;
   openQuestions: string[];
   /** Gekozen substituties (origineel → alternatief) voor leren bij volgende keer */
@@ -53,7 +53,7 @@ export type RecipeAdaptationRunRecord = {
   recipeAdaptationId: string;
   model: string | null;
   promptVersion: number;
-  inputSnapshot: any;
+  inputSnapshot: unknown;
   outputSnapshot: RecipeAdaptationDraft;
   validationReport: ValidationReport;
   outcome: 'success' | 'needs_retry' | 'failed';
@@ -82,7 +82,7 @@ export type CreateRecipeAdaptationRunInput = {
   recipeAdaptationId: string;
   model?: string | null;
   promptVersion?: number;
-  inputSnapshot: any;
+  inputSnapshot: unknown;
   outputSnapshot: RecipeAdaptationDraft;
   validationReport: ValidationReport;
   outcome: 'success' | 'needs_retry' | 'failed';
@@ -119,9 +119,9 @@ export class RecipeAdaptationDbService {
       status: input.status || 'draft',
       title: adaptation.rewrite.title,
       analysis_summary: adaptation.analysis.summary || null,
-      analysis_violations: adaptation.analysis.violations as any,
-      rewrite_ingredients: adaptation.rewrite.ingredients as any,
-      rewrite_steps: adaptation.rewrite.steps as any,
+      analysis_violations: adaptation.analysis.violations as unknown,
+      rewrite_ingredients: adaptation.rewrite.ingredients as unknown,
+      rewrite_steps: adaptation.rewrite.steps as unknown,
       nutrition_estimate: null, // Not in RecipeAdaptationDraft type yet
       confidence: adaptation.confidence || null,
       open_questions: adaptation.openQuestions || [],
@@ -130,14 +130,15 @@ export class RecipeAdaptationDbService {
           ({
             originalName: s.originalName,
             substituteName: s.substituteName,
-          }) as any,
+          }) as { originalName: string; substituteName: string },
       ),
     };
 
     const insertDataWithIntro = {
       ...baseData,
       rewrite_intro: adaptation.rewrite.intro ?? null,
-      rewrite_why_this_works: (adaptation.rewrite.whyThisWorks ?? []) as any,
+      rewrite_why_this_works: (adaptation.rewrite.whyThisWorks ??
+        []) as unknown,
     };
 
     const isSchemaCacheError = (err: { message?: string }) =>
@@ -155,7 +156,7 @@ export class RecipeAdaptationDbService {
       .eq('diet_id', input.dietId)
       .maybeSingle();
 
-    let result: any;
+    let result: { data: unknown } | { error: unknown };
     const tryUpsert = (
       data: typeof baseData & Partial<Record<string, unknown>>,
     ) => {
@@ -307,9 +308,9 @@ export class RecipeAdaptationDbService {
         recipe_adaptation_id: input.recipeAdaptationId,
         model: input.model || null,
         prompt_version: input.promptVersion || 1,
-        input_snapshot: input.inputSnapshot as any,
-        output_snapshot: input.outputSnapshot as any,
-        validation_report: input.validationReport as any,
+        input_snapshot: input.inputSnapshot as unknown,
+        output_snapshot: input.outputSnapshot as unknown,
+        validation_report: input.validationReport as unknown,
         outcome: input.outcome,
         tokens_in: input.tokensIn || null,
         tokens_out: input.tokensOut || null,
@@ -436,20 +437,21 @@ export class RecipeAdaptationDbService {
   /**
    * Map database row to RecipeAdaptationRecord
    */
-  private mapToRecord(row: any): RecipeAdaptationRecord {
+  private mapToRecord(row: Record<string, unknown>): RecipeAdaptationRecord {
     return {
-      id: row.id,
-      userId: row.user_id,
-      recipeId: row.recipe_id,
-      dietId: row.diet_id,
-      dietRulesetVersion: row.diet_ruleset_version,
-      status: row.status,
-      title: row.title,
-      analysisSummary: row.analysis_summary,
+      id: row.id as string,
+      userId: row.user_id as string,
+      recipeId: row.recipe_id as string,
+      dietId: row.diet_id as string,
+      dietRulesetVersion: row.diet_ruleset_version as number,
+      status: row.status as RecipeAdaptationStatus,
+      title: row.title as string,
+      analysisSummary: row.analysis_summary as string,
       analysisViolations: (row.analysis_violations || []) as ViolationDetail[],
       rewriteIngredients: (row.rewrite_ingredients || []) as IngredientLine[],
       rewriteSteps: (row.rewrite_steps || []) as StepLine[],
-      rewriteIntro: row.rewrite_intro ?? null,
+      rewriteIntro:
+        row.rewrite_intro != null ? String(row.rewrite_intro) : null,
       rewriteWhyThisWorks: Array.isArray(row.rewrite_why_this_works)
         ? (row.rewrite_why_this_works as string[])
         : [],
@@ -457,33 +459,39 @@ export class RecipeAdaptationDbService {
       confidence: row.confidence ? Number(row.confidence) : null,
       openQuestions: (row.open_questions || []) as string[],
       substitutionPairs: Array.isArray(row.substitution_pairs)
-        ? (row.substitution_pairs as any[]).map((p: any) => ({
-            originalName: p.originalName ?? p.original_name ?? '',
-            substituteName: p.substituteName ?? p.substitute_name ?? '',
-          }))
+        ? (row.substitution_pairs as Record<string, unknown>[]).map(
+            (p: Record<string, unknown>) => ({
+              originalName: String(p.originalName ?? p.original_name ?? ''),
+              substituteName: String(
+                p.substituteName ?? p.substitute_name ?? '',
+              ),
+            }),
+          )
         : undefined,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string,
     };
   }
 
   /**
    * Map database row to RecipeAdaptationRunRecord
    */
-  private mapRunToRecord(row: any): RecipeAdaptationRunRecord {
+  private mapRunToRecord(
+    row: Record<string, unknown>,
+  ): RecipeAdaptationRunRecord {
     return {
-      id: row.id,
-      recipeAdaptationId: row.recipe_adaptation_id,
-      model: row.model,
-      promptVersion: row.prompt_version,
+      id: row.id as string,
+      recipeAdaptationId: row.recipe_adaptation_id as string,
+      model: row.model as string,
+      promptVersion: Number(row.prompt_version),
       inputSnapshot: row.input_snapshot,
       outputSnapshot: row.output_snapshot as RecipeAdaptationDraft,
       validationReport: row.validation_report as ValidationReport,
-      outcome: row.outcome,
-      tokensIn: row.tokens_in,
-      tokensOut: row.tokens_out,
-      latencyMs: row.latency_ms,
-      createdAt: row.created_at,
+      outcome: row.outcome as 'success' | 'needs_retry' | 'failed',
+      tokensIn: row.tokens_in as number | null,
+      tokensOut: row.tokens_out as number | null,
+      latencyMs: row.latency_ms as number | null,
+      createdAt: row.created_at as string,
     };
   }
 }

@@ -77,7 +77,7 @@ export function HeadlessUserMenu() {
     router.refresh();
   }
 
-  const userEmail = user?.email || '';
+  const _userEmail = user?.email || '';
 
   return (
     <Menu as="div" className="relative">

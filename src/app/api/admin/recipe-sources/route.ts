@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache';
  * GET /api/admin/recipe-sources
  * Get all recipe sources (admin only)
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const userIsAdmin = await isAdmin();
     if (!userIsAdmin) {

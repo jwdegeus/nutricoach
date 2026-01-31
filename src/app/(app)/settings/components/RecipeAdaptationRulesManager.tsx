@@ -62,6 +62,7 @@ export function RecipeAdaptationRulesManager({
     if (expanded) {
       loadRules();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadRules stable, run when expanded or dietTypeId changes
   }, [expanded, dietTypeId]);
 
   async function loadRules() {
@@ -74,7 +75,7 @@ export function RecipeAdaptationRulesManager({
       } else if (result.data) {
         setRules(result.data);
       }
-    } catch (err) {
+    } catch (_err) {
       setError('Onverwachte fout bij laden regels');
     } finally {
       setIsLoading(false);
@@ -167,7 +168,7 @@ export function RecipeAdaptationRulesManager({
           await loadRules();
           cancelEdit();
         }
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij opslaan');
       }
     });
@@ -187,7 +188,7 @@ export function RecipeAdaptationRulesManager({
         }
         setShowDeleteDialog(false);
         setDeleteRuleId(null);
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij verwijderen');
       }
     });

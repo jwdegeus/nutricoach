@@ -6,7 +6,7 @@ import { Heading } from '@/components/catalyst/heading';
 import { Button } from '@/components/catalyst/button';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 import Link from 'next/link';
-import { MealDetail } from './MealDetail';
+import { MealDetail, type MealLike } from './MealDetail';
 import { getMealByIdAction } from '../../actions/meals.actions';
 
 type MealDetailPageClientProps = {
@@ -19,7 +19,7 @@ export function MealDetailPageClient({
   mealSource,
 }: MealDetailPageClientProps) {
   const router = useRouter();
-  const [meal, setMeal] = useState<any>(null);
+  const [meal, setMeal] = useState<MealLike | null>(null);
   const [nevoFoodNamesByCode, setNevoFoodNamesByCode] = useState<
     Record<string, string>
   >({});
@@ -54,11 +54,20 @@ export function MealDetailPageClient({
 
         // Build NEVO food names map
         const nevoCodes = new Set<string>();
-        const mealData = loadedMeal.mealData || loadedMeal.meal_data;
-        if (mealData?.ingredientRefs) {
-          for (const ref of mealData.ingredientRefs) {
-            nevoCodes.add(ref.nevoCode);
-          }
+        const mealData =
+          (loadedMeal as MealLike).mealData ??
+          (loadedMeal as MealLike).meal_data;
+        const refs =
+          mealData &&
+          typeof mealData === 'object' &&
+          Array.isArray(
+            (mealData as { ingredientRefs?: unknown[] }).ingredientRefs,
+          )
+            ? (mealData as { ingredientRefs: Array<{ nevoCode?: string }> })
+                .ingredientRefs
+            : [];
+        for (const ref of refs) {
+          if (ref.nevoCode != null) nevoCodes.add(String(ref.nevoCode));
         }
 
         const namesMap: Record<string, string> = {};
@@ -77,13 +86,11 @@ export function MealDetailPageClient({
           }
         }
 
-        // Try to get names from ingredientRefs displayName
-        if (mealData?.ingredientRefs) {
-          for (const ref of mealData.ingredientRefs) {
-            if (ref.displayName) {
-              namesMap[ref.nevoCode] = ref.displayName;
-            }
-          }
+        for (const ref of refs) {
+          const d = (ref as { displayName?: string; nevoCode?: string })
+            .displayName;
+          const code = (ref as { nevoCode?: string }).nevoCode;
+          if (d && code != null) namesMap[String(code)] = d;
         }
 
         if (!isMounted) return;
@@ -160,7 +167,7 @@ export function MealDetailPageClient({
       </div>
 
       <MealDetail
-        meal={meal}
+        meal={meal as MealLike}
         mealSource={mealSource}
         nevoFoodNamesByCode={nevoFoodNamesByCode}
       />

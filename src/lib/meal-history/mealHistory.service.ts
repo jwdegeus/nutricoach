@@ -73,7 +73,7 @@ export class MealHistoryService {
     plan: MealPlanResponse,
     dietKey: DietKey,
   ): Promise<void> {
-    const supabase = await createClient();
+    const _supabase = await createClient();
 
     // Extract all meals from plan
     const meals: Meal[] = [];
@@ -129,7 +129,7 @@ export class MealHistoryService {
       meal_name: meal.name,
       meal_slot: meal.slot,
       diet_key: dietKey,
-      meal_data: meal as any, // JSONB
+      meal_data: meal as Record<string, unknown>, // JSONB
       nutrition_score: nutritionScore,
       usage_count: 0,
       first_used_at: new Date().toISOString(),

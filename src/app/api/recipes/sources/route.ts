@@ -5,7 +5,7 @@ import { createClient } from '@/src/lib/supabase/server';
  * GET /api/recipes/sources
  * Get all recipe sources (system + user-created)
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient();
 

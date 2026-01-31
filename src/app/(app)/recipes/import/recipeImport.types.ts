@@ -44,10 +44,10 @@ export type RecipeImportJob = {
   sourceLocale: string | null;
   targetLocale: string | null;
   rawOcrText: string | null;
-  geminiRawJson: any | null;
-  extractedRecipeJson: any | null;
-  originalRecipeJson: any | null; // Original recipe in source language (before translation)
-  validationErrorsJson: any | null;
+  geminiRawJson: unknown | null;
+  extractedRecipeJson: unknown | null;
+  originalRecipeJson: unknown | null; // Original recipe in source language (before translation)
+  validationErrorsJson: unknown | null;
   confidenceOverall: number | null;
   createdAt: string;
   updatedAt: string;

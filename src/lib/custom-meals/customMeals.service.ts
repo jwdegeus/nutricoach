@@ -24,14 +24,14 @@ export type CustomMealRecord = {
   source: string | null;
   /** Originele receptpagina-URL (bij URL-import) */
   sourceUrl: string | null;
-  aiAnalysis: any | null;
+  aiAnalysis: Record<string, unknown> | null;
   originalLanguage: string | null;
-  translatedContent: any | null;
+  translatedContent: Record<string, unknown> | null;
   mealData: Meal;
   /** Vaste kopie van meal_data vóór eerste aanpassing (origineel recept) */
   mealDataOriginal: Meal | null;
   /** Vaste kopie van ai_analysis vóór eerste aanpassing (originele bereidingsinstructies) */
-  aiAnalysisOriginal: any | null;
+  aiAnalysisOriginal: Record<string, unknown> | null;
   consumptionCount: number;
   firstConsumedAt: string | null;
   lastConsumedAt: string | null;
@@ -51,9 +51,9 @@ export type CreateCustomMealInput = {
   sourceType: 'photo' | 'screenshot' | 'file' | 'gemini';
   sourceImageUrl?: string;
   sourceImagePath?: string;
-  aiAnalysis?: any;
+  aiAnalysis?: Record<string, unknown>;
   originalLanguage?: string;
-  translatedContent?: any;
+  translatedContent?: Record<string, unknown>;
   mealData: Meal;
 };
 
@@ -80,7 +80,7 @@ export class CustomMealsService {
         ai_analysis: input.aiAnalysis || null,
         original_language: input.originalLanguage || null,
         translated_content: input.translatedContent || null,
-        meal_data: input.mealData as any,
+        meal_data: input.mealData as Record<string, unknown>,
         consumption_count: 0,
       })
       .select()
@@ -224,30 +224,32 @@ export class CustomMealsService {
   /**
    * Map database row to CustomMealRecord
    */
-  private mapToRecord(row: any): CustomMealRecord {
+  private mapToRecord(row: Record<string, unknown>): CustomMealRecord {
     return {
-      id: row.id,
-      userId: row.user_id,
-      name: row.name,
-      mealSlot: row.meal_slot,
-      dietKey: row.diet_key,
-      sourceType: row.source_type,
-      sourceImageUrl: row.source_image_url,
-      sourceImagePath: row.source_image_path,
-      source: row.source || null,
-      sourceUrl: row.source_url || null,
-      aiAnalysis: row.ai_analysis,
-      originalLanguage: row.original_language,
-      translatedContent: row.translated_content,
+      id: row.id as string,
+      userId: row.user_id as string,
+      name: row.name as string,
+      mealSlot: row.meal_slot as MealSlot,
+      dietKey: (row.diet_key as DietKey | null) ?? null,
+      sourceType: row.source_type as CreateCustomMealInput['sourceType'],
+      sourceImageUrl: (row.source_image_url as string | null) ?? null,
+      sourceImagePath: (row.source_image_path as string | null) ?? null,
+      source: (row.source as string | null) ?? null,
+      sourceUrl: (row.source_url as string | null) ?? null,
+      aiAnalysis: (row.ai_analysis as Record<string, unknown> | null) ?? null,
+      originalLanguage: (row.original_language as string | null) ?? null,
+      translatedContent:
+        (row.translated_content as Record<string, unknown> | null) ?? null,
       mealData: row.meal_data as Meal,
-      mealDataOriginal: row.meal_data_original ?? null,
-      aiAnalysisOriginal: row.ai_analysis_original ?? null,
-      consumptionCount: row.consumption_count,
-      firstConsumedAt: row.first_consumed_at,
-      lastConsumedAt: row.last_consumed_at,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      notes: row.notes || null,
+      mealDataOriginal: (row.meal_data_original as Meal | null) ?? null,
+      aiAnalysisOriginal:
+        (row.ai_analysis_original as Record<string, unknown> | null) ?? null,
+      consumptionCount: row.consumption_count as number,
+      firstConsumedAt: (row.first_consumed_at as string | null) ?? null,
+      lastConsumedAt: (row.last_consumed_at as string | null) ?? null,
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string,
+      notes: (row.notes as string | null) ?? null,
     };
   }
 }

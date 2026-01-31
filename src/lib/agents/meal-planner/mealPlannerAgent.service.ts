@@ -44,11 +44,7 @@ import {
   mapMealPlanToGuardrailsTargets,
   getMealPlanIngredientsPerDay,
 } from '@/src/lib/guardrails-vnext/adapters/meal-planner';
-import type {
-  EvaluationContext,
-  GuardDecision,
-  GuardrailsRuleset,
-} from '@/src/lib/guardrails-vnext/types';
+import type { EvaluationContext } from '@/src/lib/guardrails-vnext/types';
 import { evaluateDietLogic } from '@/src/lib/diet-logic';
 import { AppError } from '@/src/lib/errors/app-error';
 

@@ -18,7 +18,6 @@ import {
 import { Text } from '@/components/catalyst/text';
 import { Textarea } from '@/components/catalyst/textarea';
 import { Checkbox, CheckboxField } from '@/components/catalyst/checkbox';
-import { RecipeAdaptationRulesManager } from '../../../components/RecipeAdaptationRulesManager';
 import { FirewallRulesCombined } from '../../../components/FirewallRulesCombined';
 import { GuardrailsPreviewPanel } from '../../../components/GuardrailsPreviewPanel';
 
@@ -85,7 +84,7 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
           setSuccess('Dieettype succesvol bijgewerkt');
           setDietType(result.data);
         }
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij opslaan');
       }
     });

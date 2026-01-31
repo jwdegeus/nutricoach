@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useTransition, Fragment } from 'react';
 import { Button } from '@/components/catalyst/button';
 import { Input } from '@/components/catalyst/input';
@@ -159,17 +160,19 @@ export function RecipeEditForm({
           {(sourceImageMeta?.savedImageUrl || sourceImageMeta?.imageUrl) && (
             <div>
               <Subheading level={4}>Afbeelding</Subheading>
-              <div className="mt-2">
-                <img
+              <div className="relative mt-2 min-h-[200px] w-full max-w-md aspect-video rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                <Image
                   src={
                     sourceImageMeta.savedImageUrl ||
                     sourceImageMeta.imageUrl ||
-                    undefined
+                    ''
                   }
                   alt={title}
-                  className="w-full max-w-md h-auto rounded-lg border border-zinc-200 dark:border-zinc-800 object-cover"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 448px"
+                  unoptimized
                   onError={(e) => {
-                    // Hide image if it fails to load
                     e.currentTarget.style.display = 'none';
                   }}
                 />

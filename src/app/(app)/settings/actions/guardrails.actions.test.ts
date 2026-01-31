@@ -186,10 +186,10 @@ async function cleanupTestData(dietTypeId: string) {
 
 describe('swapGuardRailRulePriorityAction', () => {
   let testDietTypeId: string;
-  let testAdminId: string;
+  let _testAdminId: string;
 
   beforeEach(async () => {
-    testAdminId = await createTestAdmin();
+    _testAdminId = await createTestAdmin();
     testDietTypeId = await createTestDietType(`test_diet_${Date.now()}`);
   });
 

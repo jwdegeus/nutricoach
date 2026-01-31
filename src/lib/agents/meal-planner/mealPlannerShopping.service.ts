@@ -28,14 +28,19 @@ import {
  * Key: nevoCode (string)
  * Value: { food, timestamp }
  */
-const nevoFoodCache = new Map<string, { food: any; timestamp: number }>();
+const nevoFoodCache = new Map<
+  string,
+  { food: Record<string, unknown>; timestamp: number }
+>();
 
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
  * Get NEVO food by code (with caching)
  */
-async function getNevoFoodCached(nevoCode: string): Promise<any | null> {
+async function getNevoFoodCached(
+  nevoCode: string,
+): Promise<Record<string, unknown> | null> {
   const cached = nevoFoodCache.get(nevoCode);
 
   // Check if cache is valid
@@ -65,11 +70,11 @@ async function getNevoFoodCached(nevoCode: string): Promise<any | null> {
 /**
  * Derive category from NEVO food data
  */
-function deriveCategory(food: any): string | undefined {
+function deriveCategory(food: Record<string, unknown>): string | undefined {
   // Try food_group_nl first
   if (food?.food_group_nl) {
     // Map common food groups to categories
-    const group = food.food_group_nl.toLowerCase();
+    const group = String(food.food_group_nl).toLowerCase();
 
     // Protein sources
     if (
@@ -116,7 +121,7 @@ function deriveCategory(food: any): string | undefined {
     }
 
     // Return original group name if no mapping found
-    return food.food_group_nl;
+    return food.food_group_nl != null ? String(food.food_group_nl) : undefined;
   }
 
   return undefined;
@@ -220,7 +225,9 @@ export class MealPlannerShoppingService {
         for (const ref of meal.ingredientRefs) {
           // Get NEVO food data (with caching)
           const food = await getNevoFoodCached(ref.nevoCode);
-          const name = food?.name_nl || food?.name_en || `NEVO ${ref.nevoCode}`;
+          const name = String(
+            food?.name_nl ?? food?.name_en ?? `NEVO ${ref.nevoCode}`,
+          );
           const tags = ref.tags || [];
 
           // Get pantry availability
@@ -340,8 +347,8 @@ export class MealPlannerShoppingService {
     for (const [nevoCode, data] of ingredientMap.entries()) {
       // Get NEVO food data (with caching)
       const food = await getNevoFoodCached(nevoCode);
-      const name = food?.name_nl || food?.name_en || `NEVO ${nevoCode}`;
-      const category = deriveCategory(food) || data.category || 'Overig';
+      const name = String(food?.name_nl ?? food?.name_en ?? `NEVO ${nevoCode}`);
+      const category = deriveCategory(food ?? {}) || data.category || 'Overig';
       const tags = data.tags || [];
 
       // Get pantry availability

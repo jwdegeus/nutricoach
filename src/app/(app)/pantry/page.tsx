@@ -38,7 +38,10 @@ export default async function PantryPage() {
         }
 
         const food = await getNevoFoodByCode(codeNum);
-        const name = food?.name_nl || food?.name_en || `Onbekend ingrediënt`;
+        const name =
+          String((food as Record<string, unknown>)?.name_nl ?? '').trim() ||
+          String((food as Record<string, unknown>)?.name_en ?? '').trim() ||
+          'Onbekend ingrediënt';
         const nutriscore = food ? calculateNutriScore(food) : null;
         return { ...item, name, nutriscore };
       } catch {

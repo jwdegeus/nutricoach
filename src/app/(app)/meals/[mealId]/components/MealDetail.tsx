@@ -3,10 +3,46 @@
 import { Badge } from '@/components/catalyst/badge';
 import { Text } from '@/components/catalyst/text';
 import { ClockIcon, UserGroupIcon } from '@heroicons/react/20/solid';
-import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
+import Image from 'next/image';
+import type { MealIngredientRef } from '@/src/lib/diets';
+
+/** Meal prop: supports both CustomMealRecord (camelCase) and API/DB (snake_case) */
+export type MealLike = Record<string, unknown> & {
+  mealData?: unknown;
+  meal_data?: unknown;
+  name?: string;
+  mealName?: string;
+  meal_name?: string;
+  mealSlot?: string;
+  meal_slot?: string;
+  sourceImageUrl?: string | null;
+  source_image_url?: string | null;
+  aiAnalysis?: unknown;
+  ai_analysis?: unknown;
+  consumptionCount?: number;
+  consumption_count?: number;
+  usageCount?: number;
+  usage_count?: number;
+  createdAt?: string;
+  created_at?: string;
+  firstConsumedAt?: string | null;
+  first_consumed_at?: string | null;
+  firstUsedAt?: string | null;
+  first_used_at?: string | null;
+  lastConsumedAt?: string | null;
+  last_consumed_at?: string | null;
+  lastUsedAt?: string | null;
+  last_used_at?: string | null;
+  userRating?: unknown;
+  user_rating?: unknown;
+  nutritionScore?: unknown;
+  nutrition_score?: unknown;
+  updatedAt?: string;
+  updated_at?: string;
+};
 
 type MealDetailProps = {
-  meal: CustomMealRecord | any;
+  meal: MealLike;
   mealSource: 'custom' | 'gemini';
   nevoFoodNamesByCode: Record<string, string>;
 };
@@ -38,11 +74,18 @@ export function MealDetail({
   };
 
   // Get meal data (handle both structures)
-  const mealData = meal.mealData || meal.meal_data;
-  const mealName = meal.name || meal.mealName || meal.meal_name;
-  const mealSlot = meal.mealSlot || meal.meal_slot;
-  const sourceImageUrl = meal.sourceImageUrl || meal.source_image_url;
-  const aiAnalysis = meal.aiAnalysis || meal.ai_analysis;
+  const mealData = (meal.mealData ?? meal.meal_data) as
+    | Record<string, unknown>
+    | undefined;
+  const mealName = String(meal.name ?? meal.mealName ?? meal.meal_name ?? '');
+  const mealSlot = String(meal.mealSlot ?? meal.meal_slot ?? '');
+  const sourceImageUrl = (meal.sourceImageUrl ?? meal.source_image_url) as
+    | string
+    | null
+    | undefined;
+  const aiAnalysis = (meal.aiAnalysis ?? meal.ai_analysis) as
+    | Record<string, unknown>
+    | undefined;
   const consumptionCount =
     meal.consumptionCount ||
     meal.consumption_count ||
@@ -76,40 +119,47 @@ export function MealDetail({
               <Badge color={mealSource === 'custom' ? 'blue' : 'zinc'}>
                 {mealSource === 'custom' ? 'Custom' : 'Gemini'}
               </Badge>
-              <Badge color="zinc">{formatMealSlot(mealSlot)}</Badge>
+              <Badge color="zinc">{formatMealSlot(mealSlot || '')}</Badge>
             </div>
           </div>
         </div>
 
         {/* Source Image */}
         {sourceImageUrl && (
-          <div className="mt-4">
-            <img
+          <div className="relative mt-4 min-h-[200px] max-h-96 w-full">
+            <Image
               src={sourceImageUrl}
               alt={mealName}
-              className="rounded-lg max-w-full h-auto max-h-96 object-contain"
+              fill
+              className="rounded-lg object-contain"
+              sizes="(max-width: 768px) 100vw, 512px"
+              unoptimized
             />
           </div>
         )}
 
         {/* Basic Info */}
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          {mealData?.prepTime && (
+          {(mealData as { prepTime?: number })?.prepTime != null && (
             <div className="flex items-center gap-2">
               <ClockIcon className="h-4 w-4 text-zinc-500" />
               <span className="text-zinc-600 dark:text-zinc-400">
                 Bereidingstijd:{' '}
-                <span className="font-medium">{mealData.prepTime} minuten</span>
+                <span className="font-medium">
+                  {(mealData as { prepTime?: number }).prepTime} minuten
+                </span>
               </span>
             </div>
           )}
 
-          {mealData?.servings && (
+          {(mealData as { servings?: number })?.servings != null && (
             <div className="flex items-center gap-2">
               <UserGroupIcon className="h-4 w-4 text-zinc-500" />
               <span className="text-zinc-600 dark:text-zinc-400">
                 Porties:{' '}
-                <span className="font-medium">{mealData.servings}</span>
+                <span className="font-medium">
+                  {(mealData as { servings?: number }).servings}
+                </span>
               </span>
             </div>
           )}
@@ -123,11 +173,11 @@ export function MealDetail({
             </div>
           )}
 
-          {userRating && (
+          {userRating != null && userRating !== '' && (
             <div className="flex items-center gap-2">
               <span className="text-zinc-600 dark:text-zinc-400">
                 Beoordeling:{' '}
-                <span className="font-medium">{userRating}/5 ⭐</span>
+                <span className="font-medium">{String(userRating)}/5 ⭐</span>
               </span>
             </div>
           )}
@@ -135,17 +185,17 @@ export function MealDetail({
 
         {/* Dates */}
         <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-400 space-y-1">
-          {createdAt && <div>Toegevoegd: {formatDate(createdAt)}</div>}
+          {createdAt && <div>Toegevoegd: {formatDate(String(createdAt))}</div>}
           {firstConsumedAt && (
             <div>
               Eerst {mealSource === 'custom' ? 'geconsumeerd' : 'gebruikt'}:{' '}
-              {formatDate(firstConsumedAt)}
+              {formatDate(String(firstConsumedAt))}
             </div>
           )}
           {lastConsumedAt && (
             <div>
               Laatst {mealSource === 'custom' ? 'geconsumeerd' : 'gebruikt'}:{' '}
-              {formatDate(lastConsumedAt)}
+              {formatDate(String(lastConsumedAt))}
             </div>
           )}
         </div>
@@ -157,138 +207,132 @@ export function MealDetail({
           <h3 className="text-lg font-semibold text-zinc-950 dark:text-white mb-4">
             Bereidingsinstructies
           </h3>
-          {aiAnalysis.instructions && Array.isArray(aiAnalysis.instructions) ? (
-            <ol className="space-y-2 list-decimal list-inside text-sm text-zinc-600 dark:text-zinc-400">
-              {aiAnalysis.instructions.map(
-                (instruction: string, idx: number) => (
-                  <li key={idx}>{instruction}</li>
-                ),
-              )}
-            </ol>
-          ) : aiAnalysis.instructions ? (
-            <Text className="text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-line">
-              {aiAnalysis.instructions}
-            </Text>
-          ) : (
-            <Text className="text-sm text-zinc-500 dark:text-zinc-400">
-              Geen instructies beschikbaar
-            </Text>
-          )}
+          {(() => {
+            const instr = (aiAnalysis as { instructions?: unknown })
+              .instructions;
+            return instr && Array.isArray(instr) ? (
+              <ol className="space-y-2 list-decimal list-inside text-sm text-zinc-600 dark:text-zinc-400">
+                {instr.map((instruction: unknown, idx: number) => (
+                  <li key={idx}>{String(instruction)}</li>
+                ))}
+              </ol>
+            ) : instr ? (
+              <Text className="text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-line">
+                {String(instr)}
+              </Text>
+            ) : (
+              <Text className="text-sm text-zinc-500 dark:text-zinc-400">
+                Geen instructies beschikbaar
+              </Text>
+            );
+          })()}
         </div>
       )}
 
       {/* Ingredients */}
-      {mealData?.ingredientRefs && mealData.ingredientRefs.length > 0 && (
-        <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-          <h3 className="text-lg font-semibold text-zinc-950 dark:text-white mb-4">
-            Ingrediënten
-          </h3>
-          <ul className="space-y-2 text-sm">
-            {mealData.ingredientRefs.map((ref: any, idx: number) => {
-              const name =
-                ref.displayName ||
-                nevoFoodNamesByCode[ref.nevoCode] ||
-                `NEVO ${ref.nevoCode}`;
-              return (
-                <li key={idx} className="text-zinc-600 dark:text-zinc-400">
-                  <span className="font-medium text-zinc-900 dark:text-white">
-                    {name}
-                  </span>
-                  : {ref.quantityG}g
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+      {(() => {
+        const refs = (mealData as { ingredientRefs?: MealIngredientRef[] })
+          ?.ingredientRefs;
+        return refs && refs.length > 0 ? (
+          <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+            <h3 className="text-lg font-semibold text-zinc-950 dark:text-white mb-4">
+              Ingrediënten
+            </h3>
+            <ul className="space-y-2 text-sm">
+              {refs.map((ref: MealIngredientRef, idx: number) => {
+                const name =
+                  ref.displayName ||
+                  nevoFoodNamesByCode[ref.nevoCode] ||
+                  `NEVO ${ref.nevoCode}`;
+                return (
+                  <li key={idx} className="text-zinc-600 dark:text-zinc-400">
+                    <span className="font-medium text-zinc-900 dark:text-white">
+                      {name}
+                    </span>
+                    : {ref.quantityG}g
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null;
+      })()}
 
       {/* Nutrition Info */}
-      {(mealData?.estimatedMacros || mealData?.nutrition) && (
-        <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-          <h3 className="text-lg font-semibold text-zinc-950 dark:text-white mb-4">
-            Voedingswaarden
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-            {(mealData.estimatedMacros || mealData.nutrition)?.calories !==
-              undefined && (
-              <div>
-                <span className="text-zinc-600 dark:text-zinc-400">
-                  Calorieën:
-                </span>{' '}
-                <span className="font-medium text-zinc-900 dark:text-white">
-                  {Math.round(
-                    (mealData.estimatedMacros || mealData.nutrition).calories,
-                  )}{' '}
-                  kcal
-                </span>
-              </div>
-            )}
-            {(mealData.estimatedMacros || mealData.nutrition)?.protein !==
-              undefined && (
-              <div>
-                <span className="text-zinc-600 dark:text-zinc-400">Eiwit:</span>{' '}
-                <span className="font-medium text-zinc-900 dark:text-white">
-                  {Math.round(
-                    (mealData.estimatedMacros || mealData.nutrition).protein,
-                  )}
-                  g
-                </span>
-              </div>
-            )}
-            {(mealData.estimatedMacros || mealData.nutrition)?.carbs !==
-              undefined && (
-              <div>
-                <span className="text-zinc-600 dark:text-zinc-400">
-                  Koolhydraten:
-                </span>{' '}
-                <span className="font-medium text-zinc-900 dark:text-white">
-                  {Math.round(
-                    (mealData.estimatedMacros || mealData.nutrition).carbs,
-                  )}
-                  g
-                </span>
-              </div>
-            )}
-            {(mealData.estimatedMacros || mealData.nutrition)?.fat !==
-              undefined && (
-              <div>
-                <span className="text-zinc-600 dark:text-zinc-400">Vet:</span>{' '}
-                <span className="font-medium text-zinc-900 dark:text-white">
-                  {Math.round(
-                    (mealData.estimatedMacros || mealData.nutrition).fat,
-                  )}
-                  g
-                </span>
-              </div>
-            )}
-            {(mealData.estimatedMacros || mealData.nutrition)?.saturatedFat !==
-              undefined && (
-              <div>
-                <span className="text-zinc-600 dark:text-zinc-400">
-                  Verzadigd vet:
-                </span>{' '}
-                <span className="font-medium text-zinc-900 dark:text-white">
-                  {Math.round(
-                    (mealData.estimatedMacros || mealData.nutrition)
-                      .saturatedFat,
-                  )}
-                  g
-                </span>
-              </div>
-            )}
-            {nutritionScore !== null && nutritionScore !== undefined && (
-              <div>
-                <span className="text-zinc-600 dark:text-zinc-400">
-                  Voedingsscore:
-                </span>{' '}
-                <span className="font-medium text-zinc-900 dark:text-white">
-                  {Math.round(nutritionScore)}/100
-                </span>
-              </div>
-            )}
+      {(() => {
+        const macros =
+          (mealData as { estimatedMacros?: Record<string, unknown> })
+            ?.estimatedMacros ??
+          (mealData as { nutrition?: Record<string, unknown> })?.nutrition;
+        if (!macros) return null;
+        return (
+          <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+            <h3 className="text-lg font-semibold text-zinc-950 dark:text-white mb-4">
+              Voedingswaarden
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+              {Number(macros.calories) > 0 && (
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">
+                    Calorieën:
+                  </span>{' '}
+                  <span className="font-medium text-zinc-900 dark:text-white">
+                    {Math.round(Number(macros.calories))} kcal
+                  </span>
+                </div>
+              )}
+              {Number(macros.protein) > 0 && (
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">
+                    Eiwit:
+                  </span>{' '}
+                  <span className="font-medium text-zinc-900 dark:text-white">
+                    {Math.round(Number(macros.protein))} g
+                  </span>
+                </div>
+              )}
+              {Number(macros.carbs) > 0 && (
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">
+                    Koolhydraten:
+                  </span>{' '}
+                  <span className="font-medium text-zinc-900 dark:text-white">
+                    {Math.round(Number(macros.carbs))} g
+                  </span>
+                </div>
+              )}
+              {Number(macros.fat) > 0 && (
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">Vet:</span>{' '}
+                  <span className="font-medium text-zinc-900 dark:text-white">
+                    {Math.round(Number(macros.fat))} g
+                  </span>
+                </div>
+              )}
+              {Number(macros.saturatedFat) > 0 && (
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">
+                    Verzadigd vet:
+                  </span>{' '}
+                  <span className="font-medium text-zinc-900 dark:text-white">
+                    {Math.round(Number(macros.saturatedFat))} g
+                  </span>
+                </div>
+              )}
+              {nutritionScore != null && (
+                <div>
+                  <span className="text-zinc-600 dark:text-zinc-400">
+                    Voedingsscore:
+                  </span>{' '}
+                  <span className="font-medium text-zinc-900 dark:text-white">
+                    {Math.round(Number(nutritionScore))}/100
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

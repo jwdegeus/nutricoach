@@ -8,7 +8,6 @@ import {
   createIngredientCategoryAction,
   updateIngredientCategoryAction,
   deleteIngredientCategoryAction,
-  deleteDietCategoryConstraintAction,
   getIngredientCategoryItemsAction,
   createIngredientCategoryItemAction,
   updateIngredientCategoryItemAction,
@@ -28,8 +27,6 @@ import { Textarea } from '@/components/catalyst/textarea';
 import { Badge } from '@/components/catalyst/badge';
 import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
 import {
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
   PlusIcon,
   PencilIcon,
   TrashIcon,
@@ -87,7 +84,7 @@ export function GuardRailsManager({
   onSaved,
 }: GuardRailsManagerProps) {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [constraints, setConstraints] = useState<Constraint[]>([]);
+  const [_constraints, setConstraints] = useState<Constraint[]>([]);
   // Firewall rules: track allow/block per category (kan beide hebben)
   const [selectedAllow, setSelectedAllow] = useState<Set<string>>(new Set());
   const [selectedBlock, setSelectedBlock] = useState<Set<string>>(new Set());
@@ -125,10 +122,10 @@ export function GuardRailsManager({
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
   const [showDeleteCategoryDialog, setShowDeleteCategoryDialog] =
     useState(false);
-  const [deleteConstraintId, setDeleteConstraintId] = useState<string | null>(
+  const [_deleteConstraintId, _setDeleteConstraintId] = useState<string | null>(
     null,
   );
-  const [showDeleteConstraintDialog, setShowDeleteConstraintDialog] =
+  const [_showDeleteConstraintDialog, _setShowDeleteConstraintDialog] =
     useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(),
@@ -163,6 +160,7 @@ export function GuardRailsManager({
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData stable, run when dietTypeId changes
   }, [dietTypeId]);
 
   async function loadData() {
@@ -234,7 +232,7 @@ export function GuardRailsManager({
       setSelectedForbidden(forbiddenSet); // Legacy
       setSelectedRequired(requiredSet); // Legacy
       setConstraintDetails(details);
-    } catch (err) {
+    } catch (_err) {
       setError('Onverwachte fout bij laden data');
     } finally {
       setIsLoading(false);
@@ -265,7 +263,7 @@ export function GuardRailsManager({
     setExpandedCategories(newExpanded);
   }
 
-  function handleForbiddenToggle(categoryId: string, checked: boolean) {
+  function _handleForbiddenToggle(categoryId: string, checked: boolean) {
     const newSet = new Set(selectedForbidden);
     if (checked) {
       newSet.add(categoryId);
@@ -291,7 +289,7 @@ export function GuardRailsManager({
     setSelectedForbidden(newSet);
   }
 
-  function handleRequiredToggle(categoryId: string, checked: boolean) {
+  function _handleRequiredToggle(categoryId: string, checked: boolean) {
     const newSet = new Set(selectedRequired);
     if (checked) {
       newSet.add(categoryId);
@@ -321,7 +319,7 @@ export function GuardRailsManager({
   function updateConstraintDetail(
     categoryId: string,
     field: keyof (typeof constraintDetails)[string],
-    value: any,
+    value: string | number | null | undefined,
   ) {
     setConstraintDetails({
       ...constraintDetails,
@@ -404,7 +402,7 @@ export function GuardRailsManager({
             onSaved();
           }
         }
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij opslaan');
       } finally {
         setIsSaving(false);
@@ -454,7 +452,7 @@ export function GuardRailsManager({
           setEditingCategoryId(null);
           await loadData();
         }
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij opslaan');
       }
     });
@@ -508,7 +506,7 @@ export function GuardRailsManager({
           await loadCategoryItems(categoryId);
           await loadData(); // Refresh counts
         }
-      } catch (err) {
+      } catch (_err) {
         setError('Onverwachte fout bij opslaan');
       }
     });
@@ -1292,7 +1290,7 @@ export function GuardRailsManager({
                 setSuccess('Categorie succesvol verwijderd');
                 await loadData();
               }
-            } catch (err) {
+            } catch (_err) {
               setError('Onverwachte fout bij verwijderen');
             } finally {
               setDeleteCategoryId(null);
@@ -1340,7 +1338,7 @@ export function GuardRailsManager({
                   await loadData();
                 }
               }
-            } catch (err) {
+            } catch (_err) {
               setError('Onverwachte fout bij verwijderen');
             } finally {
               setDeleteItemId(null);

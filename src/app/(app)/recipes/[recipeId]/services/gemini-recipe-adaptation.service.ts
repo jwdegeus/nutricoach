@@ -57,7 +57,7 @@ function extractJsonFromResponse(raw: string): string {
 }
 
 export type RecipeData = {
-  mealData: any;
+  mealData: Record<string, unknown>;
   mealName: string;
   steps: string[];
 };
@@ -159,7 +159,7 @@ export async function generateRecipeAdaptationWithGemini(
       `[GeminiRecipeAdaptation] Gemini API call completed in ${duration}ms`,
     );
 
-    let parsed: any;
+    let parsed: unknown;
     try {
       const jsonStr = extractJsonFromResponse(rawResponse);
       parsed = JSON.parse(jsonStr);
@@ -175,7 +175,22 @@ export async function generateRecipeAdaptationWithGemini(
       throw new Error('Invalid JSON response from Gemini');
     }
 
-    return convertGeminiResponseToDraft(parsed, recipe, violations);
+    type GeminiDraft = {
+      intro?: string;
+      adapted_ingredients?: Array<{
+        name: string;
+        amount: string;
+        unit: string;
+        note: string;
+      }>;
+      adapted_steps?: string[];
+      why_this_works?: string[];
+    };
+    return convertGeminiResponseToDraft(
+      parsed as GeminiDraft,
+      recipe,
+      violations,
+    );
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     const stack = error instanceof Error ? error.stack : undefined;
@@ -209,14 +224,30 @@ function buildAdaptationPrompt(
   dietName: string,
   ingredientsToRemove: string[],
 ): string {
-  const ingredients =
-    recipe.mealData?.ingredientRefs || recipe.mealData?.ingredients || [];
+  const ingredients = Array.isArray(recipe.mealData?.ingredientRefs)
+    ? recipe.mealData.ingredientRefs
+    : Array.isArray(recipe.mealData?.ingredients)
+      ? recipe.mealData.ingredients
+      : [];
+  type IngLike = {
+    displayName?: string;
+    name?: string;
+    original_line?: string;
+    quantityG?: unknown;
+    quantity?: unknown;
+    amount?: unknown;
+    unit?: string;
+  };
   const ingredientList = ingredients
-    .map((ing: any) => {
+    .filter((ing): ing is IngLike => ing != null)
+    .map((ing: IngLike) => {
       const name =
-        ing.displayName || ing.name || ing.original_line || String(ing);
-      const quantity = ing.quantityG || ing.quantity || ing.amount || '';
-      const unit = ing.unit || '';
+        ing?.displayName ||
+        ing?.name ||
+        ing?.original_line ||
+        String(ing ?? '');
+      const quantity = ing?.quantityG ?? ing?.quantity ?? ing?.amount ?? '';
+      const unit = ing?.unit ?? '';
       return `${quantity} ${unit} ${name}`.trim();
     })
     .join('\n');
@@ -343,18 +374,28 @@ export async function suggestViolationsWithAI(
   dietName: string,
 ): Promise<ViolationDetail[]> {
   const gemini = getGeminiClient();
-  const ingredients =
-    recipe.mealData?.ingredientRefs || recipe.mealData?.ingredients || [];
+  const ingredients = Array.isArray(recipe.mealData?.ingredientRefs)
+    ? recipe.mealData.ingredientRefs
+    : Array.isArray(recipe.mealData?.ingredients)
+      ? recipe.mealData.ingredients
+      : [];
   const ingredientLines = ingredients
-    .map((ing: any) => {
-      const parts = [
-        ing.displayName,
-        ing.name,
-        ing.original_line,
-        ing.note,
-      ].filter(Boolean);
-      return parts.join(' ').trim();
-    })
+    .map(
+      (ing: {
+        displayName?: string;
+        name?: string;
+        original_line?: string;
+        note?: string;
+      }) => {
+        const parts = [
+          ing.displayName,
+          ing.name,
+          ing.original_line,
+          ing.note,
+        ].filter(Boolean);
+        return parts.join(' ').trim();
+      },
+    )
     .filter(Boolean);
   const ruleSummary = [
     ...new Set(ruleset.forbidden.map((r) => r.ruleLabel)),

@@ -3,11 +3,12 @@
 import { useState, useCallback } from 'react';
 import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
 import { RecipesList } from './RecipesList';
+import type { MealItem } from './RecipesList';
 
 type RecipesPageClientProps = {
   initialMeals: {
     customMeals: CustomMealRecord[];
-    mealHistory: any[];
+    mealHistory: unknown[];
   };
 };
 
@@ -37,15 +38,16 @@ export function RecipesPageClient({ initialMeals }: RecipesPageClientProps) {
         } else {
           return {
             ...prev,
-            mealHistory: prev.mealHistory.map((meal) =>
-              meal.id === mealId
+            mealHistory: prev.mealHistory.map((meal: unknown) => {
+              const m = meal as Record<string, unknown>;
+              return m.id === mealId
                 ? {
-                    ...meal,
-                    usage_count: (meal.usage_count || 0) + 1,
+                    ...m,
+                    usage_count: (Number(m.usage_count) || 0) + 1,
                     last_used_at: new Date().toISOString(),
                   }
-                : meal,
-            ),
+                : meal;
+            }),
           };
         }
       });
@@ -53,9 +55,15 @@ export function RecipesPageClient({ initialMeals }: RecipesPageClientProps) {
     [],
   );
 
-  const allMeals = [
-    ...meals.customMeals.map((m) => ({ ...m, source: 'custom' as const })),
-    ...meals.mealHistory.map((m) => ({ ...m, source: 'gemini' as const })),
+  const allMeals: MealItem[] = [
+    ...meals.customMeals.map((m) => ({
+      ...m,
+      source: 'custom' as const,
+    })),
+    ...meals.mealHistory.map((m: unknown) => ({
+      ...(m as Record<string, unknown>),
+      source: 'gemini' as const,
+    })),
   ];
 
   return (

@@ -11,7 +11,6 @@ import type {
   GuardrailsRepo,
   LoadGuardrailsRulesetInput,
 } from './ruleset-loader';
-import type { GuardrailsRuleset } from './types';
 
 // Helper to create mock repository
 function createMockRepo(overrides?: Partial<GuardrailsRepo>): GuardrailsRepo {

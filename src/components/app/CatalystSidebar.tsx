@@ -10,7 +10,6 @@ import {
   SidebarSection,
 } from '@/components/catalyst/sidebar';
 import { navItems } from '@/src/lib/nav';
-import { ThemeSwitcher } from './theme-switcher';
 
 export function CatalystSidebar() {
   const pathname = usePathname();

@@ -29,7 +29,7 @@ export function RecipeDetailPageClient({
   const tCommon = useTranslations('common');
   const tNav = useTranslations('nav');
   const { showToast } = useToast();
-  const [meal, setMeal] = useState<any>(null);
+  const [meal, setMeal] = useState<Record<string, unknown> | null>(null);
   const [nevoFoodNamesByCode, setNevoFoodNamesByCode] = useState<
     Record<string, string>
   >({});
@@ -65,26 +65,33 @@ export function RecipeDetailPageClient({
 
         const loadedMeal = mealResult.data;
         setMeal(loadedMeal);
-
-        const mealData = loadedMeal.mealData || loadedMeal.meal_data;
+        const loaded = loadedMeal as Record<string, unknown>;
+        const mealData = (loaded.mealData ?? loaded.meal_data) as
+          | { ingredientRefs?: unknown[] }
+          | null
+          | undefined;
         const nevoCodesList: string[] = [];
         if (mealData?.ingredientRefs) {
           for (const ref of mealData.ingredientRefs) {
-            if (ref.nevoCode != null) nevoCodesList.push(String(ref.nevoCode));
+            const r = ref as { nevoCode?: string | number } | null;
+            if (r != null && r.nevoCode != null)
+              nevoCodesList.push(String(r.nevoCode));
           }
         }
         const customFoodIds = (mealData?.ingredientRefs ?? [])
+          .filter((ref: unknown) => ref != null)
           .map((ref: { customFoodId?: string }) => ref.customFoodId)
           .filter(
             (id: unknown): id is string =>
               typeof id === 'string' && id.length > 0,
           );
 
-        const base = loadedMeal.mealData ?? loadedMeal.meal_data ?? {};
+        const base = loaded.mealData ?? loaded.meal_data ?? {};
         const instructions =
-          loadedMeal.aiAnalysis?.instructions ??
-          (loadedMeal as { ai_analysis?: { instructions?: unknown } })
-            .ai_analysis?.instructions;
+          (loaded.aiAnalysis as { instructions?: unknown } | undefined)
+            ?.instructions ??
+          (loaded.ai_analysis as { instructions?: unknown } | undefined)
+            ?.instructions;
         const mealPayload =
           Array.isArray(instructions) && instructions.length > 0
             ? {
@@ -97,7 +104,11 @@ export function RecipeDetailPageClient({
         const [complianceResult, nevoNamesResult, customNamesResult] =
           await Promise.all([
             getRecipeComplianceScoresAction([
-              { id: loadedMeal.id, source: mealSource, mealData: mealPayload },
+              {
+                id: String(loadedMeal.id),
+                source: mealSource,
+                mealData: mealPayload,
+              },
             ]),
             nevoCodesList.length > 0
               ? getNevoFoodNamesByCodesAction(nevoCodesList)
@@ -113,19 +124,26 @@ export function RecipeDetailPageClient({
                 }),
           ]);
 
-        if (complianceResult.ok && complianceResult.data[loadedMeal.id]) {
-          setComplianceScore(complianceResult.data[loadedMeal.id]);
+        if (
+          complianceResult.ok &&
+          complianceResult.data[String(loadedMeal.id)]
+        ) {
+          setComplianceScore(complianceResult.data[String(loadedMeal.id)]);
         } else {
           setComplianceScore(null);
         }
 
         const nevoNamesMap = nevoNamesResult.ok ? nevoNamesResult.data : {};
+        const refs = mealData?.ingredientRefs ?? [];
         for (const code of nevoCodesList) {
-          if (!nevoNamesMap[code] && mealData?.ingredientRefs) {
-            const ref = mealData.ingredientRefs.find(
-              (r: { nevoCode?: string | number }) =>
-                String(r.nevoCode) === code,
-            );
+          if (!nevoNamesMap[code] && refs.length > 0) {
+            const ref = refs.find(
+              (r: unknown) =>
+                r != null &&
+                typeof r === 'object' &&
+                'nevoCode' in r &&
+                String((r as { nevoCode?: string | number }).nevoCode) === code,
+            ) as { displayName?: string } | undefined;
             if (ref?.displayName) nevoNamesMap[code] = ref.displayName;
           }
           if (!nevoNamesMap[code]) nevoNamesMap[code] = `NEVO ${code}`;
@@ -138,7 +156,9 @@ export function RecipeDetailPageClient({
 
         if (showLoadingSpinner) setLoading(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Onbekende fout');
+        setError(
+          err instanceof Error ? err.message : String(err ?? 'Onbekende fout'),
+        );
         if (showLoadingSpinner) setLoading(false);
       }
     },
@@ -233,11 +253,12 @@ export function RecipeDetailPageClient({
     { label: tCommon('home'), href: '/dashboard' },
     { label: tNav('recipes'), href: '/recipes' },
     {
-      label:
-        meal?.name ||
-        meal?.mealName ||
-        meal?.meal_name ||
-        (loading ? 'Laden...' : error ? 'Fout' : 'Recept'),
+      label: String(
+        (meal as Record<string, unknown> | null)?.name ??
+          (meal as Record<string, unknown> | null)?.mealName ??
+          (meal as Record<string, unknown> | null)?.meal_name ??
+          (loading ? 'Laden...' : error ? 'Fout' : 'Recept'),
+      ),
       href: pathname ?? `/recipes/${mealId}`,
     },
   ];
@@ -305,6 +326,7 @@ export function RecipeDetailPageClient({
             description: 'Het recept is bijgewerkt.',
           });
         }}
+        onSourceSaved={loadMealSilent}
       />
     </div>
   );

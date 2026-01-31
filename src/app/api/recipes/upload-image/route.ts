@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const mimeType = base64Match[1];
+    const _mimeType = base64Match[1];
     const base64Data = base64Match[2];
 
     // Use Blob when token is set (ensures uploads go to Vercel Blob in production/local)

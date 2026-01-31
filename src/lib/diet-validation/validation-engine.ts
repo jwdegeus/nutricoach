@@ -5,7 +5,6 @@
 
 import type {
   DietRule,
-  DietRuleType,
   ExcludeIngredientRule,
   RequireIngredientRule,
   MacroConstraintRule,

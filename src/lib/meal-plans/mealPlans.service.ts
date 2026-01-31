@@ -18,8 +18,10 @@ import type {
   DietKey,
   Meal,
   MealPlanDay,
+  DietRuleSet,
 } from '@/src/lib/diets';
 import { deriveDietRuleSet, mealPlanResponseSchema } from '@/src/lib/diets';
+import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner';
 import {
   translateMeals,
   translateEnrichment,
@@ -522,7 +524,10 @@ export class MealPlansService {
     }
 
     let planSnapshot = data.plan_snapshot as MealPlanResponse;
-    let enrichmentSnapshot = data.enrichment_snapshot as any;
+    let enrichmentSnapshot = data.enrichment_snapshot as Record<
+      string,
+      unknown
+    >;
 
     // Translate meals and enrichment to user's language if requested
     // NOTE: Translation is disabled by default to avoid blocking page loads and quota issues
@@ -574,7 +579,7 @@ export class MealPlansService {
         if (enrichmentSnapshot) {
           try {
             enrichmentSnapshot = await translateEnrichment(
-              enrichmentSnapshot,
+              enrichmentSnapshot as MealPlanEnrichmentResponse,
               userLanguage,
             );
           } catch (enrichmentTranslationError) {
@@ -617,9 +622,10 @@ export class MealPlansService {
       dateFrom: data.date_from,
       days: data.days,
       requestSnapshot: data.request_snapshot as MealPlanRequest,
-      rulesSnapshot: data.rules_snapshot as any,
+      rulesSnapshot: data.rules_snapshot as DietRuleSet,
       planSnapshot,
-      enrichmentSnapshot,
+      enrichmentSnapshot:
+        enrichmentSnapshot as MealPlanEnrichmentResponse | null,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     };
@@ -677,9 +683,10 @@ export class MealPlansService {
       dateFrom: row.date_from,
       days: row.days,
       requestSnapshot: row.request_snapshot as MealPlanRequest,
-      rulesSnapshot: row.rules_snapshot as any,
+      rulesSnapshot: row.rules_snapshot as DietRuleSet,
       planSnapshot: row.plan_snapshot as MealPlanResponse,
-      enrichmentSnapshot: row.enrichment_snapshot as any,
+      enrichmentSnapshot:
+        row.enrichment_snapshot as MealPlanEnrichmentResponse | null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));

@@ -12,7 +12,6 @@
 import type {
   DietLogicRuleset,
   DietLogicConstraint,
-  DietLogicIngredient,
   DietLogicTargets,
   DietLogicEvaluationResult,
   DietLogicPhaseResult,
@@ -83,7 +82,7 @@ export function evaluateDietLogic(
   const ingredients = targets.ingredients ?? [];
   const phaseResults: DietLogicPhaseResult[] = [];
   const allWarnings: string[] = [];
-  let failedPhase: 1 | 2 | 3 | 4 | null = null;
+  let _failedPhase: 1 | 2 | 3 | 4 | null = null;
   const summaryParts: string[] = [];
 
   // Alle regels op prioriteit (1=hoogst eerst) voor conflictresolutie
@@ -113,7 +112,7 @@ export function evaluateDietLogic(
   });
   if (dropWarnings.length) allWarnings.push(...dropWarnings);
   if (!phase1Ok) {
-    failedPhase = 1;
+    _failedPhase = 1;
     summaryParts.push(`Fase 1 DROP: ${dropViolations.length} overtreding(en).`);
     return {
       ok: false,
@@ -157,7 +156,7 @@ export function evaluateDietLogic(
     forceDeficits: phase2Ok ? undefined : forceDeficits,
   });
   if (!phase2Ok) {
-    failedPhase = 2;
+    _failedPhase = 2;
     summaryParts.push(
       `Fase 2 FORCE: quotum niet gehaald voor ${forceDeficits.length} categorie(ën).`,
     );
@@ -210,7 +209,7 @@ export function evaluateDietLogic(
     limitExcesses: limitExcesses.length > 0 ? limitExcesses : undefined,
   });
   if (!phase3Ok) {
-    failedPhase = 3;
+    _failedPhase = 3;
     summaryParts.push(
       `Fase 3 LIMIT: overschrijding voor ${limitViolations.length} categorie(ën).`,
     );

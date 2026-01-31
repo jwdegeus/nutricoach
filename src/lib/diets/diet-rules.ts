@@ -5,12 +5,7 @@
  * Each diet has its own builder function that creates the appropriate rule set.
  */
 
-import type {
-  DietProfile,
-  DietRuleSet,
-  DietKey,
-  ConstraintType,
-} from './diet.types';
+import type { DietProfile, DietRuleSet, ConstraintType } from './diet.types';
 
 /**
  * Derives a DietRuleSet from a DietProfile

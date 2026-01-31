@@ -147,7 +147,8 @@ const SUBSTRING_FALSE_POSITIVE_IF_CONTAINS: Record<string, string | string[]> =
       'kool bloem',
       'bloem kool',
     ],
-    ei: ['romeinse', 'romaine'],
+    // "ei" in "rijpe" (ripe), "romeinse" (Romaine), "avocado" = geen eieren
+    ei: ['romeinse', 'romaine', 'rijpe', 'rijp', 'avocado'],
     ijs: 'radijs',
     oca: 'avocado',
     // "rijst" in "bloemkoolrijst" = groente (cauliflower rice), geen graan/zuivel

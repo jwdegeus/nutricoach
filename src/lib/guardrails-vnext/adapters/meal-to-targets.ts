@@ -69,7 +69,14 @@ export function mapMealToGuardrailsTargets(
       }
     ).ingredient_refs;
   if (refs?.length) {
-    refs.forEach((ref: any, i: number) => {
+    type IngredientRef = {
+      displayName?: string;
+      display_name?: string;
+      nevoCode?: string;
+      nevo_code?: string;
+    };
+    refs.forEach((ref: IngredientRef, i: number) => {
+      if (ref == null) return;
       const text = (
         ref.displayName ??
         ref.display_name ??

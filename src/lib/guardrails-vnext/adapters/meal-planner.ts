@@ -6,7 +6,7 @@
  */
 
 import type { TextAtom } from '../types';
-import type { MealPlanResponse, MealPlanDay, Meal } from '@/src/lib/diets';
+import type { MealPlanResponse } from '@/src/lib/diets';
 
 /**
  * Map Meal Plan to GuardrailsEvaluateInput targets

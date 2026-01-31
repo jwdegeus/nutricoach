@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { mapMealPlanToGuardrailsTargets } from './meal-planner';
-import type { MealPlanResponse, MealPlanDay, Meal } from '@/src/lib/diets';
+import type { MealPlanResponse, Meal } from '@/src/lib/diets';
 
 // Helper to create a minimal meal plan
 function createMealPlan(

@@ -57,7 +57,7 @@ async function getNevoFoodName(nevoCode: string): Promise<string> {
   }
 
   const food = await getNevoFoodByCode(codeNum);
-  const name = food?.name_nl || food?.name_en || `NEVO ${nevoCode}`;
+  const name = String(food?.name_nl ?? food?.name_en ?? `NEVO ${nevoCode}`);
 
   // Cache it
   nevoFoodNameCache.set(nevoCode, {
@@ -277,7 +277,13 @@ export class MealPlannerEnrichmentService {
     options?: MealEnrichmentOptions;
     language?: 'nl' | 'en';
   }): Promise<EnrichedMeal> {
-    const { date, mealSlot, meal, options, language = 'nl' } = args;
+    const {
+      date: _date,
+      mealSlot: _mealSlot,
+      meal,
+      options,
+      language = 'nl',
+    } = args;
 
     // Step 1: Parse and apply defaults for options
     const enrichmentOptions: MealEnrichmentOptions =

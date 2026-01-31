@@ -72,7 +72,7 @@ export async function POST(req: Request) {
         },
       },
     );
-  } catch (error) {
+  } catch (_error) {
     // Handle unexpected errors (e.g., JSON parse failure)
     return NextResponse.json(
       {

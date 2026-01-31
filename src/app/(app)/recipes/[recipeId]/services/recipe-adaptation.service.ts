@@ -345,9 +345,11 @@ export class RecipeAdaptationService {
   /**
    * Load recipe for analysis-only (geen user-id in pad; gebruikt huidige user uit auth).
    */
-  private async loadRecipeForAnalysis(
-    recipeId: string,
-  ): Promise<{ mealData: any; mealName: string; steps: string[] } | null> {
+  private async loadRecipeForAnalysis(recipeId: string): Promise<{
+    mealData: Record<string, unknown>;
+    mealName: string;
+    steps: string[];
+  } | null> {
     const supabase = await createClient();
     const {
       data: { user },
@@ -436,8 +438,8 @@ export class RecipeAdaptationService {
             (constraint.constraint_type === 'forbidden' ? 'block' : 'allow');
 
           if (ruleAction === 'allow' && constraint.category) {
-            const category = constraint.category as any;
-            const items = category.items || [];
+            const category = constraint.category as Record<string, unknown>;
+            const items = Array.isArray(category.items) ? category.items : [];
 
             for (const item of items) {
               if (item.is_active === false) continue;
@@ -463,17 +465,16 @@ export class RecipeAdaptationService {
             (constraint.constraint_type === 'forbidden' ? 'block' : 'allow');
 
           if (ruleAction === 'block' && constraint.category) {
-            const category = constraint.category as any;
-            const items = category.items || [];
+            const category = constraint.category as Record<string, unknown>;
+            const items = Array.isArray(category.items) ? category.items : [];
 
             // Add each item from the category with its synonyms
             for (const item of items) {
-              if (item.is_active === false) continue;
+              const it = item as Record<string, unknown>;
+              if (it.is_active === false) continue;
 
-              const synonyms = Array.isArray(item.synonyms)
-                ? item.synonyms
-                : [];
-              const term = item.term?.toLowerCase() || '';
+              const synonyms = Array.isArray(it.synonyms) ? it.synonyms : [];
+              const term = (it.term as string | undefined)?.toLowerCase() || '';
               const categoryCode = (category as { code?: string }).code ?? '';
 
               // SubstitutionSuggestions: uit recipe_adaptation_rules (zelfde term/synonym) of fallback per categorie
@@ -1270,7 +1271,11 @@ export class RecipeAdaptationService {
   private async loadRecipe(
     recipeId: string,
     userId: string,
-  ): Promise<{ mealData: any; mealName: string; steps: string[] } | null> {
+  ): Promise<{
+    mealData: Record<string, unknown>;
+    mealName: string;
+    steps: string[];
+  } | null> {
     const supabase = await createClient();
 
     // Try custom_meals first
@@ -1293,22 +1298,24 @@ export class RecipeAdaptationService {
         if (Array.isArray(aiIng) && aiIng.length > 0) {
           mealData = {
             ...mealData,
-            ingredients: aiIng.map((item: any) => {
+            ingredients: aiIng.map((item: Record<string, unknown>) => {
               const qty = item.quantity ?? item.quantityG ?? item.amount ?? '';
               const amountNum = parseFloat(String(qty));
               return {
-                name:
+                name: String(
                   item.name ??
-                  item.original_line ??
-                  (typeof item === 'string' ? item : ''),
+                    item.original_line ??
+                    (typeof item === 'string' ? item : ''),
+                ),
                 quantity: String(qty),
                 amount: Number.isNaN(amountNum) ? 0 : amountNum,
-                unit: item.unit ?? '',
+                unit: String(item.unit ?? ''),
                 note: item.note ?? item.notes ?? null,
-                original_line:
+                original_line: String(
                   item.original_line ??
-                  item.name ??
-                  (typeof item === 'string' ? item : ''),
+                    item.name ??
+                    (typeof item === 'string' ? item : ''),
+                ),
               };
             }),
           };
@@ -1330,15 +1337,23 @@ export class RecipeAdaptationService {
         ingredientsCount: mealDataForLog.ingredients?.length || 0,
         hasAiAnalysis: !!customMeal.aiAnalysis,
         aiAnalysisInstructions:
-          customMeal.aiAnalysis?.instructions?.length || 0,
+          (Array.isArray(customMeal.aiAnalysis?.instructions)
+            ? customMeal.aiAnalysis!.instructions!.length
+            : 0) || 0,
       });
 
       return {
         mealData,
         mealName: customMeal.name,
         steps: Array.isArray(steps)
-          ? steps.map((s: any) =>
-              typeof s === 'string' ? s : s.text || s.step || String(s),
+          ? (steps as unknown[]).map((s: unknown) =>
+              typeof s === 'string'
+                ? s
+                : String(
+                    (s as Record<string, unknown>).text ??
+                      (s as Record<string, unknown>).step ??
+                      s,
+                  ),
             )
           : [],
       };
@@ -1353,11 +1368,19 @@ export class RecipeAdaptationService {
       .maybeSingle();
 
     if (mealHistory) {
+      const rawMealData =
+        (mealHistory.meal_data as Record<string, unknown>) || {};
       let mealData = {
-        ...((mealHistory.meal_data as Record<string, unknown>) || {}),
+        ...rawMealData,
+      } as Record<string, unknown> & {
+        ingredientRefs?: unknown[];
+        ingredients?: unknown[];
       };
-      const aiAnalysis = (mealHistory as any).ai_analysis;
-      const steps = aiAnalysis?.instructions || [];
+      const aiAnalysis = (mealHistory as Record<string, unknown>)
+        .ai_analysis as
+        | { instructions?: unknown[]; ingredients?: unknown[] }
+        | undefined;
+      const steps = aiAnalysis?.instructions ?? [];
 
       const hasRefs =
         Array.isArray(mealData.ingredientRefs) &&
@@ -1373,22 +1396,25 @@ export class RecipeAdaptationService {
         const aiIng = aiAnalysis.ingredients;
         mealData = {
           ...mealData,
-          ingredients: aiIng.map((item: any) => {
-            const qty = item.quantity ?? item.quantityG ?? item.amount ?? '';
+          ingredients: (aiIng as unknown[]).map((item: unknown) => {
+            const it = item as Record<string, unknown>;
+            const qty = it.quantity ?? it.quantityG ?? it.amount ?? '';
             const amountNum = parseFloat(String(qty));
             return {
-              name:
-                item.name ??
-                item.original_line ??
-                (typeof item === 'string' ? item : ''),
+              name: String(
+                it.name ??
+                  it.original_line ??
+                  (typeof item === 'string' ? item : ''),
+              ),
               quantity: String(qty),
               amount: Number.isNaN(amountNum) ? 0 : amountNum,
-              unit: item.unit ?? '',
-              note: item.note ?? item.notes ?? null,
-              original_line:
-                item.original_line ??
-                item.name ??
-                (typeof item === 'string' ? item : ''),
+              unit: String(it.unit ?? ''),
+              note: it.note ?? it.notes ?? null,
+              original_line: String(
+                it.original_line ??
+                  it.name ??
+                  (typeof item === 'string' ? item : ''),
+              ),
             };
           }),
         };
@@ -1415,8 +1441,14 @@ export class RecipeAdaptationService {
         mealData,
         mealName: mealHistory.meal_name,
         steps: Array.isArray(steps)
-          ? steps.map((s: any) =>
-              typeof s === 'string' ? s : s.text || s.step || String(s),
+          ? (steps as unknown[]).map((s: unknown) =>
+              typeof s === 'string'
+                ? s
+                : String(
+                    (s as Record<string, unknown>).text ??
+                      (s as Record<string, unknown>).step ??
+                      s,
+                  ),
             )
           : [],
       };
@@ -1433,15 +1465,29 @@ export class RecipeAdaptationService {
    * @returns Array of violations found
    */
   private analyzeRecipeForViolations(
-    recipe: { mealData: any; mealName: string; steps: string[] },
+    recipe: {
+      mealData: Record<string, unknown>;
+      mealName: string;
+      steps: string[];
+    },
     ruleset: DietRuleset,
   ): ViolationDetail[] {
     const violations: ViolationDetail[] = [];
     const foundIngredients = new Set<string>(); // Track to avoid duplicates
 
     // Analyze ingredients: gebruik ingredientRefs als die items heeft, anders legacy ingredients
-    const refs = recipe.mealData?.ingredientRefs ?? [];
-    const legacy = recipe.mealData?.ingredients ?? [];
+    const refsArr = Array.isArray(recipe.mealData?.ingredientRefs)
+      ? recipe.mealData.ingredientRefs
+      : [];
+    const legacyArr = Array.isArray(recipe.mealData?.ingredients)
+      ? recipe.mealData.ingredients
+      : [];
+    const refs = refsArr.filter(
+      (r: unknown): r is NonNullable<typeof r> => r != null,
+    );
+    const legacy = legacyArr.filter(
+      (r: unknown): r is NonNullable<typeof r> => r != null,
+    );
     const ingredients = refs.length > 0 ? refs : legacy;
 
     console.log(`[RecipeAdaptation] ========================================`);
@@ -1462,11 +1508,11 @@ export class RecipeAdaptationService {
     // Log all ingredient names for debugging
     console.log(
       `[RecipeAdaptation] ALL INGREDIENTS:`,
-      ingredients.map((ing: any) => ({
-        displayName: ing.displayName,
-        name: ing.name,
-        original_line: ing.original_line,
-        note: ing.note,
+      ingredients.map((ing: Record<string, unknown>) => ({
+        displayName: ing?.displayName,
+        name: ing?.name,
+        original_line: ing?.original_line,
+        note: ing?.note,
         full: ing,
       })),
     );
@@ -1474,15 +1520,17 @@ export class RecipeAdaptationService {
     console.log(`[RecipeAdaptation] ========================================`);
 
     for (const ing of ingredients) {
+      const ingR = ing as Record<string, unknown>;
       // Displaynaam voor in de UI (eerste niet-lege veld)
-      const ingredientName =
-        ing.displayName ||
-        ing.name ||
-        ing.original_line ||
-        (ing.nevoCode ? `NEVO ${ing.nevoCode}` : null) ||
-        String(ing);
+      const ingredientName = String(
+        ingR?.displayName ||
+          ingR?.name ||
+          ingR?.original_line ||
+          (ingR?.nevoCode != null ? `NEVO ${ingR.nevoCode}` : null) ||
+          (ing ?? ''),
+      );
 
-      if (!ingredientName || String(ingredientName).trim() === '') {
+      if (!ingredientName || ingredientName.trim() === '') {
         console.log(`[RecipeAdaptation] Skipping empty ingredient:`, ing);
         continue;
       }
@@ -1493,10 +1541,10 @@ export class RecipeAdaptationService {
       // Gecombineerde zoektekst: alle relevante velden in één string zodat
       // "verse mozzarella (in blokjes, of geitenkaas)" en "honing" in note ook matchen
       const searchParts = [
-        ing.displayName,
-        ing.name,
-        ing.original_line,
-        ing.note,
+        ingR?.displayName,
+        ingR?.name,
+        ingR?.original_line,
+        ingR?.note,
       ].filter((v) => v != null && String(v).trim() !== '');
       const searchText = searchParts.join(' ');
 
@@ -1721,7 +1769,11 @@ export class RecipeAdaptationService {
    * @returns Rewritten recipe
    */
   private generateRewrite(
-    recipe: { mealData: any; mealName: string; steps: string[] },
+    recipe: {
+      mealData: Record<string, unknown>;
+      mealName: string;
+      steps: string[];
+    },
     violations: ViolationDetail[],
     ruleset: DietRuleset,
     strict: boolean,
@@ -1865,8 +1917,18 @@ export class RecipeAdaptationService {
     };
 
     // Rewrite ingredients: gebruik ingredientRefs als die items heeft, anders legacy ingredients
-    const origRefs = recipe.mealData?.ingredientRefs ?? [];
-    const origLegacy = recipe.mealData?.ingredients ?? [];
+    const origRefsArr = Array.isArray(recipe.mealData?.ingredientRefs)
+      ? recipe.mealData.ingredientRefs
+      : [];
+    const origLegacyArr = Array.isArray(recipe.mealData?.ingredients)
+      ? recipe.mealData.ingredients
+      : [];
+    const origRefs = origRefsArr.filter(
+      (r: unknown): r is NonNullable<typeof r> => r != null,
+    );
+    const origLegacy = origLegacyArr.filter(
+      (r: unknown): r is NonNullable<typeof r> => r != null,
+    );
     const originalIngredients = origRefs.length > 0 ? origRefs : origLegacy;
 
     // Alleen focussen op foute ingredienten: als we geen bronlijst hebben maar wel violations,
@@ -1898,11 +1960,20 @@ export class RecipeAdaptationService {
     }
 
     for (const ing of originalIngredients) {
-      const ingredientName =
-        ing.displayName || ing.name || ing.original_line || String(ing);
-      const quantity = ing.quantityG || ing.quantity || ing.amount || '';
-      const unit = ing.unit || 'g';
-      const note = ing.note || ing.notes;
+      const ingR = ing as Record<string, unknown>;
+      const ingredientName = String(
+        ingR?.displayName || ingR?.name || ingR?.original_line || (ing ?? ''),
+      );
+      const quantity = ingR?.quantityG ?? ingR?.quantity ?? ingR?.amount ?? '';
+      const unit = String(ingR?.unit ?? 'g');
+      const noteRaw = ingR?.note ?? ingR?.notes;
+      const note =
+        noteRaw != null && noteRaw !== '' ? String(noteRaw) : undefined;
+      const sectionRaw = (ingR as { section?: string | null } | null)?.section;
+      const section =
+        sectionRaw != null && sectionRaw !== ''
+          ? String(sectionRaw)
+          : undefined;
 
       const lowerName = ingredientName.toLowerCase();
       const violationIdx = this.getViolationIndexForIngredient(
@@ -1948,13 +2019,14 @@ export class RecipeAdaptationService {
       }
 
       if (substitution) {
-        const substituteName =
-          substitution.charAt(0).toUpperCase() + substitution.slice(1);
+        const subStr = String(substitution);
+        const substituteName = subStr.charAt(0).toUpperCase() + subStr.slice(1);
         ingredients.push({
           name: substituteName,
           quantity: String(quantity),
-          unit: unit,
-          note: note || `vervanging voor ${ingredientName}`,
+          unit,
+          note: note ?? `vervanging voor ${ingredientName}`,
+          ...(section != null && section !== '' ? { section } : {}),
         });
         substitutions.push({
           originalName: ingredientName,
@@ -1964,8 +2036,9 @@ export class RecipeAdaptationService {
         ingredients.push({
           name: ingredientName,
           quantity: String(quantity),
-          unit: unit,
-          note: note,
+          unit,
+          note: note ?? undefined,
+          ...(section != null && section !== '' ? { section } : {}),
         });
       }
     }
@@ -2041,7 +2114,7 @@ export class RecipeAdaptationService {
       throw new Error('User not authenticated');
     }
 
-    const [recipe, ruleset, dietName] = await Promise.all([
+    const [recipe, ruleset, _dietName] = await Promise.all([
       this.loadRecipe(recipeId, user.id),
       this.loadDietRuleset(dietId),
       this.getDietName(dietId),
@@ -2054,34 +2127,52 @@ export class RecipeAdaptationService {
       throw new Error('Ruleset not found');
     }
 
+    const refsCount = Array.isArray(recipe.mealData?.ingredientRefs)
+      ? recipe.mealData.ingredientRefs.length
+      : 0;
+    const ingsCount = Array.isArray(recipe.mealData?.ingredients)
+      ? recipe.mealData.ingredients.length
+      : 0;
     console.log(`[RecipeAdaptation] Loaded recipe:`, {
       mealName: recipe.mealName,
       hasMealData: !!recipe.mealData,
-      ingredientRefsCount: recipe.mealData?.ingredientRefs?.length || 0,
-      ingredientsCount: recipe.mealData?.ingredients?.length || 0,
+      ingredientRefsCount: refsCount,
+      ingredientsCount: ingsCount,
       stepsCount: recipe.steps.length,
     });
 
     // Log ingredient structure for debugging
-    if (recipe.mealData?.ingredientRefs) {
+    const refsForLog = Array.isArray(recipe.mealData?.ingredientRefs)
+      ? recipe.mealData.ingredientRefs
+      : [];
+    if (refsForLog.length > 0) {
       console.log(
         `[RecipeAdaptation] IngredientRefs sample:`,
-        recipe.mealData.ingredientRefs.slice(0, 3).map((ing: any) => ({
-          displayName: ing.displayName,
-          nevoCode: ing.nevoCode,
-          quantityG: ing.quantityG,
-        })),
+        refsForLog
+          .filter((ing: unknown): ing is NonNullable<typeof ing> => ing != null)
+          .slice(0, 3)
+          .map((ing: Record<string, unknown>) => ({
+            displayName: ing?.displayName,
+            nevoCode: ing?.nevoCode,
+            quantityG: ing?.quantityG,
+          })),
       );
     }
-    if (recipe.mealData?.ingredients) {
+    const ingsForLog = Array.isArray(recipe.mealData?.ingredients)
+      ? recipe.mealData.ingredients
+      : [];
+    if (ingsForLog.length > 0) {
       console.log(
         `[RecipeAdaptation] Ingredients sample:`,
-        recipe.mealData.ingredients.slice(0, 3).map((ing: any) => ({
-          name: ing.name,
-          original_line: ing.original_line,
-          quantity: ing.quantity,
-          unit: ing.unit,
-        })),
+        ingsForLog
+          .filter((ing: unknown): ing is NonNullable<typeof ing> => ing != null)
+          .slice(0, 3)
+          .map((ing: Record<string, unknown>) => ({
+            name: ing?.name,
+            original_line: ing?.original_line,
+            quantity: ing?.quantity,
+            unit: ing?.unit,
+          })),
       );
     }
 
@@ -2157,29 +2248,48 @@ export class RecipeAdaptationService {
       // Geen afwijkingen: geen AI-call, alleen samenvatting
       const summary =
         'Geen afwijkingen gevonden! Dit recept past perfect bij jouw dieet.';
+      const noViolRefs = Array.isArray(recipe.mealData?.ingredientRefs)
+        ? recipe.mealData.ingredientRefs
+        : [];
+      const noViolIngs = Array.isArray(recipe.mealData?.ingredients)
+        ? recipe.mealData.ingredients
+        : [];
       draft = {
         analysis: { violations, summary },
         rewrite: {
           title: `Aangepast: ${recipe.mealName}`,
-          ingredients: recipe.mealData?.ingredientRefs?.length
-            ? (recipe.mealData.ingredientRefs as any[]).map((ing: any) => ({
-                name:
-                  ing.displayName ||
-                  ing.name ||
-                  ing.original_line ||
-                  String(ing),
-                quantity: String(
-                  ing.quantityG ?? ing.quantity ?? ing.amount ?? '',
-                ).trim(),
-                unit: (ing.unit ?? '').trim() || undefined,
-                note: ing.note ?? ing.notes ?? undefined,
-              }))
-            : (recipe.mealData?.ingredients ?? []).map((ing: any) => ({
-                name: ing.name || ing.original_line || String(ing),
-                quantity: String(ing.quantity ?? ing.amount ?? '').trim(),
-                unit: (ing.unit ?? '').trim() || undefined,
-                note: ing.note ?? ing.notes ?? undefined,
-              })),
+          ingredients:
+            noViolRefs.length > 0
+              ? (noViolRefs as (Record<string, unknown> | null)[])
+                  .filter((ing): ing is Record<string, unknown> => ing != null)
+                  .map((ing: Record<string, unknown>) => ({
+                    name: String(
+                      ing.displayName ?? ing.name ?? ing.original_line ?? ing,
+                    ),
+                    quantity: String(
+                      ing.quantityG ?? ing.quantity ?? ing.amount ?? '',
+                    ).trim(),
+                    unit: String(ing.unit ?? '').trim() || undefined,
+                    note:
+                      ing.note != null || ing.notes != null
+                        ? String(ing.note ?? ing.notes)
+                        : undefined,
+                    ...(ing.section != null && ing.section !== ''
+                      ? { section: String(ing.section) }
+                      : {}),
+                  }))
+              : noViolIngs.map((ing: Record<string, unknown>) => ({
+                  name: String(ing.name ?? ing.original_line ?? ing),
+                  quantity: String(ing.quantity ?? ing.amount ?? '').trim(),
+                  unit: String(ing.unit ?? '').trim() || undefined,
+                  note:
+                    ing.note != null || ing.notes != null
+                      ? String(ing.note ?? ing.notes)
+                      : undefined,
+                  ...(ing.section != null && ing.section !== ''
+                    ? { section: String(ing.section) }
+                    : {}),
+                })),
           steps: recipe.steps.map((step, index) => ({
             step: index + 1,
             text: typeof step === 'string' ? step : String(step),

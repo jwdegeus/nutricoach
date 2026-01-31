@@ -101,7 +101,7 @@ export async function processRecipeImportWithGeminiAction(
   console.log(
     '[processRecipeImportWithGeminiAction] Called with raw input:',
     typeof raw,
-    raw ? Object.keys(raw as any) : 'null',
+    raw ? Object.keys(raw as Record<string, unknown>) : 'null',
   );
 
   try {
@@ -251,11 +251,11 @@ export async function processRecipeImportWithGeminiAction(
 
     // Step 2: Process with Gemini (OCR + Extraction)
     let geminiResult: {
-      extracted: any;
+      extracted: unknown;
       rawResponse: string;
       ocrText?: string;
     };
-    let validationErrors: any = null;
+    let validationErrors: unknown = null;
 
     try {
       console.log(`[RecipeImport] Calling processRecipeImageWithGemini...`);
@@ -347,14 +347,15 @@ export async function processRecipeImportWithGeminiAction(
     // Step 3: Write results back to database
     try {
       // Parse raw response to JSON for storage (but keep original string for reference)
-      let geminiRawJson: any = null;
+      let geminiRawJson: unknown = null;
       try {
         geminiRawJson = JSON.parse(geminiResult.rawResponse);
         // Remove secrets if present
         if (typeof geminiRawJson === 'object' && geminiRawJson !== null) {
-          delete geminiRawJson.apiKey;
-          delete geminiRawJson.api_key;
-          delete geminiRawJson.key;
+          const raw = geminiRawJson as Record<string, unknown>;
+          delete raw.apiKey;
+          delete raw.api_key;
+          delete raw.key;
         }
       } catch {
         // If parse fails, store as string in an object
@@ -363,12 +364,23 @@ export async function processRecipeImportWithGeminiAction(
         }; // Limit size
       }
 
-      const updateData: any = {
+      const extracted = geminiResult.extracted as Record<string, unknown>;
+      const updateData: {
+        raw_ocr_text: string | null;
+        gemini_raw_json: unknown;
+        extracted_recipe_json: unknown;
+        original_recipe_json: unknown;
+        confidence_overall: unknown;
+        validation_errors_json: unknown;
+        updated_at: string;
+      } = {
         raw_ocr_text: geminiResult.ocrText || null,
         gemini_raw_json: geminiRawJson,
         extracted_recipe_json: geminiResult.extracted,
         original_recipe_json: geminiResult.extracted,
-        confidence_overall: geminiResult.extracted.confidence?.overall || null,
+        confidence_overall:
+          (extracted?.confidence as { overall?: unknown } | undefined)
+            ?.overall ?? null,
         validation_errors_json: validationErrors,
         updated_at: new Date().toISOString(),
       };

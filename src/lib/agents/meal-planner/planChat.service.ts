@@ -63,7 +63,7 @@ export class PlanChatService {
 
     // Step 3: Build context
     const request = plan.requestSnapshot;
-    const rules = deriveDietRuleSet(request.profile);
+    const _rules = deriveDietRuleSet(request.profile);
     const planSnapshot = plan.planSnapshot;
 
     // Extract available dates from plan
@@ -119,7 +119,9 @@ export class PlanChatService {
       pantryAvailability.map(async (item) => {
         const codeNum = parseInt(item.nevoCode, 10);
         const food = isNaN(codeNum) ? null : await getNevoFoodByCode(codeNum);
-        const name = food?.name_nl || food?.name_en || `NEVO ${item.nevoCode}`;
+        const name = String(
+          food?.name_nl ?? food?.name_en ?? `NEVO ${item.nevoCode}`,
+        );
         return {
           nevoCode: item.nevoCode,
           name,

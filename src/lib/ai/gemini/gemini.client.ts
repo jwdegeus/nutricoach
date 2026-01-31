@@ -321,7 +321,12 @@ class GeminiClient {
     parts.push({ text: analysisPrompt });
 
     try {
-      const config: any = {
+      const config: {
+        temperature: number;
+        maxOutputTokens: number;
+        responseMimeType?: string;
+        responseJsonSchema?: unknown;
+      } = {
         temperature,
         maxOutputTokens: this.maxOutputTokens,
       };

@@ -78,7 +78,7 @@ export function NotificationsIndicator() {
     }
   };
 
-  const getStatusLabel = (status: Notification['status']) => {
+  const _getStatusLabel = (status: Notification['status']) => {
     switch (status) {
       case 'running':
         return 'Bezig';

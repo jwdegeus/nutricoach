@@ -143,6 +143,8 @@ export type IngredientLine = {
   quantity: string;
   unit?: string;
   note?: string;
+  /** Sectie in de ingrediëntenlijst (bv. "Steak Marinade") – behouden bij aanpassing */
+  section?: string | null;
 };
 
 /**

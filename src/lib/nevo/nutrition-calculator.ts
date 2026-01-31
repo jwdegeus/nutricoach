@@ -499,7 +499,7 @@ const NEVO_SEARCH_COLS =
 export async function searchNevoFoods(
   searchTerm: string,
   limit: number = 20,
-): Promise<any[]> {
+): Promise<Record<string, unknown>[]> {
   const supabase = await createServerClient();
   const trimmed = searchTerm.trim();
   if (!trimmed) return [];
@@ -530,11 +530,12 @@ export async function searchNevoFoods(
   }
 
   const seen = new Set<number>();
-  const merged: any[] = [];
+  const merged: Record<string, unknown>[] = [];
   for (const row of [...(byNl.data ?? []), ...(byEn.data ?? [])]) {
-    if (seen.has(row.nevo_code)) continue;
-    seen.add(row.nevo_code);
-    merged.push(row);
+    const r = row as Record<string, unknown> & { nevo_code: number };
+    if (seen.has(r.nevo_code)) continue;
+    seen.add(r.nevo_code);
+    merged.push(r);
     if (merged.length >= limit) break;
   }
   return merged;
@@ -546,7 +547,9 @@ export async function searchNevoFoods(
  * @param nevoCode - NEVO food code
  * @returns NEVO food data or null
  */
-export async function getNevoFoodByCode(nevoCode: number): Promise<any | null> {
+export async function getNevoFoodByCode(
+  nevoCode: number,
+): Promise<Record<string, unknown> | null> {
   const supabase = await createServerClient();
 
   const { data, error } = await supabase
@@ -571,7 +574,7 @@ export async function getNevoFoodByCode(nevoCode: number): Promise<any | null> {
  */
 export async function getCustomFoodById(
   customFoodId: string,
-): Promise<any | null> {
+): Promise<Record<string, unknown> | null> {
   const supabase = await createServerClient();
 
   const { data, error } = await supabase
@@ -805,16 +808,18 @@ export type NutriScoreGrade = 'A' | 'B' | 'C' | 'D' | 'E';
  * @param food - NEVO food data (per 100g)
  * @returns NutriScore grade (A-E) or null if calculation not possible
  */
-export function calculateNutriScore(food: any): NutriScoreGrade | null {
+export function calculateNutriScore(
+  food: Record<string, unknown>,
+): NutriScoreGrade | null {
   if (!food) return null;
 
   // Get values per 100g (NEVO data is already per 100g)
-  const energyKcal = food.energy_kcal ?? 0;
-  const sugarsG = food.sugar_g ?? 0;
-  const saturatedFatG = food.saturated_fat_g ?? 0;
-  const sodiumMg = food.sodium_mg ?? 0;
-  const fiberG = food.fiber_g ?? 0;
-  const proteinG = food.protein_g ?? 0;
+  const energyKcal = Number(food.energy_kcal ?? 0);
+  const sugarsG = Number(food.sugar_g ?? 0);
+  const saturatedFatG = Number(food.saturated_fat_g ?? 0);
+  const sodiumMg = Number(food.sodium_mg ?? 0);
+  const fiberG = Number(food.fiber_g ?? 0);
+  const proteinG = Number(food.protein_g ?? 0);
 
   // Convert sodium from mg to g for calculation
   const saltG = (sodiumMg / 1000) * 2.5; // Sodium to salt conversion
@@ -879,7 +884,7 @@ export function calculateNutriScore(food: any): NutriScoreGrade | null {
 
   // Fruits/Vegetables/Nuts points (0-5)
   // Note: NEVO doesn't have a direct field for this, so we'll use food_group_nl as approximation
-  const foodGroup = (food.food_group_nl || '').toLowerCase();
+  const foodGroup = String(food.food_group_nl ?? '').toLowerCase();
   const isFruitVeg =
     foodGroup.includes('fruit') ||
     foodGroup.includes('groente') ||

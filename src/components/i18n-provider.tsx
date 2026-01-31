@@ -10,7 +10,7 @@ export function I18nProvider({
 }: {
   children: React.ReactNode;
   locale: string;
-  messages: any;
+  messages: Record<string, unknown>;
   timeZone?: string;
 }) {
   return (

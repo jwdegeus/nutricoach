@@ -13,7 +13,6 @@ import type {
   MealPlanDay,
 } from '@/src/lib/diets';
 import {
-  calcMealMacros,
   calcDayMacros,
   verifyNevoCode,
   adjustDayQuantitiesToTargets,
@@ -231,7 +230,7 @@ async function validateDayMacros(
   dayMeals: MealPlanResponse['days'][0]['meals'],
   dayIndex: number,
   rules: DietRuleSet,
-  request: MealPlanRequest,
+  _request: MealPlanRequest,
 ): Promise<ValidationIssue[]> {
   const issues: ValidationIssue[] = [];
 

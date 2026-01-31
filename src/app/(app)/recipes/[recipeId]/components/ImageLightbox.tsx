@@ -3,6 +3,7 @@
 import { Dialog, DialogBody } from '@/components/catalyst/dialog';
 import { XMarkIcon } from '@heroicons/react/20/solid';
 import { Button } from '@/components/catalyst/button';
+import Image from 'next/image';
 
 type ImageLightboxProps = {
   open: boolean;
@@ -20,11 +21,14 @@ export function ImageLightbox({
   return (
     <Dialog open={open} onClose={onClose} size="5xl">
       <DialogBody className="p-0 bg-zinc-900">
-        <div className="relative flex items-center justify-center min-h-[400px]">
-          <img
+        <div className="relative flex items-center justify-center min-h-[400px] w-full max-h-[90vh]">
+          <Image
             src={imageUrl}
             alt={alt}
-            className="max-w-full max-h-[90vh] object-contain"
+            fill
+            className="object-contain"
+            sizes="100vw"
+            unoptimized
           />
           <Button
             plain

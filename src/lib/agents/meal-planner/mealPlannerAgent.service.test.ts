@@ -5,13 +5,12 @@
  * These tests prove that the gate blocks plan output when HARD violations are detected.
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { AppError } from '@/src/lib/errors/app-error';
 import type {
   GuardDecision,
   GuardrailsRuleset,
-  EvaluationContext,
 } from '@/src/lib/guardrails-vnext/types';
 import type { MealPlanResponse } from '@/src/lib/diets';
 

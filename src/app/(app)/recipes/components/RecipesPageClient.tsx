@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { RecipesList } from './RecipesList';
+import type { MealItem } from './RecipesList';
 import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
 import type { DietKey } from '@/src/lib/diets';
 import { Link } from '@/components/catalyst/link';
@@ -11,7 +12,7 @@ import type { RecipeComplianceResult } from '../actions/recipe-compliance.action
 type RecipesPageClientProps = {
   initialMeals: {
     customMeals: CustomMealRecord[];
-    mealHistory: any[];
+    mealHistory: unknown[];
   };
   /** Compliance scores per meal id (0–100% volgens dieetregels) */
   initialComplianceScores?: Record<string, RecipeComplianceResult>;
@@ -53,15 +54,16 @@ export function RecipesPageClient({
         } else {
           return {
             ...prev,
-            mealHistory: prev.mealHistory.map((meal) =>
-              meal.id === mealId
+            mealHistory: prev.mealHistory.map((meal: unknown) => {
+              const m = meal as Record<string, unknown>;
+              return String(m.id) === mealId
                 ? {
-                    ...meal,
-                    usage_count: (meal.usage_count || 0) + 1,
+                    ...m,
+                    usage_count: (Number(m.usage_count) || 0) + 1,
                     last_used_at: new Date().toISOString(),
                   }
-                : meal,
-            ),
+                : meal;
+            }),
           };
         }
       });
@@ -92,14 +94,12 @@ export function RecipesPageClient({
         } else {
           return {
             ...prev,
-            mealHistory: prev.mealHistory.map((meal) =>
-              meal.id === mealId
-                ? {
-                    ...meal,
-                    diet_key: dietTypeName,
-                  }
-                : meal,
-            ),
+            mealHistory: prev.mealHistory.map((meal: unknown) => {
+              const m = meal as Record<string, unknown>;
+              return String(m.id) === mealId
+                ? { ...m, diet_key: dietTypeName }
+                : meal;
+            }),
           };
         }
       });
@@ -119,7 +119,10 @@ export function RecipesPageClient({
         } else {
           return {
             ...prev,
-            mealHistory: prev.mealHistory.filter((meal) => meal.id !== mealId),
+            mealHistory: prev.mealHistory.filter(
+              (meal: unknown) =>
+                String((meal as Record<string, unknown>).id) !== mealId,
+            ),
           };
         }
       });
@@ -146,14 +149,12 @@ export function RecipesPageClient({
         } else {
           return {
             ...prev,
-            mealHistory: prev.mealHistory.map((meal) =>
-              meal.id === mealId
-                ? {
-                    ...meal,
-                    user_rating: rating,
-                  }
-                : meal,
-            ),
+            mealHistory: prev.mealHistory.map((meal: unknown) => {
+              const m = meal as Record<string, unknown>;
+              return String(m.id) === mealId
+                ? { ...m, user_rating: rating }
+                : meal;
+            }),
           };
         }
       });
@@ -161,10 +162,13 @@ export function RecipesPageClient({
     [],
   );
 
-  const allMeals = useMemo(
+  const allMeals = useMemo<MealItem[]>(
     () => [
       ...meals.customMeals.map((m) => ({ ...m, source: 'custom' as const })),
-      ...meals.mealHistory.map((m) => ({ ...m, source: 'gemini' as const })),
+      ...meals.mealHistory.map((m: unknown) => ({
+        ...(m as Record<string, unknown>),
+        source: 'gemini' as const,
+      })),
     ],
     [meals],
   );

@@ -4,7 +4,7 @@ import { useState, useTransition, Fragment } from 'react';
 import { Button } from '@/components/catalyst/button';
 import { Input } from '@/components/catalyst/input';
 import { Textarea } from '@/components/catalyst/textarea';
-import { Field, Fieldset, Label } from '@/components/catalyst/fieldset';
+import { Fieldset, Label } from '@/components/catalyst/fieldset';
 import { Text } from '@/components/catalyst/text';
 import { PencilIcon, PlusIcon, TrashIcon } from '@heroicons/react/16/solid';
 import { updateRecipeContentAction } from '../../actions/meals.actions';
@@ -27,30 +27,51 @@ type RecipeContentEditorProps = {
   /** Huidige instructies (actieve versie) */
   instructions: InstructionRow[];
   onUpdated: () => void;
+  /** Alleen bereidingsinstructies tonen (voor gebruik in het instructieblok) */
+  instructionsOnly?: boolean;
+  /** Bij annuleren (bijv. sluit dialog) */
+  onCancel?: () => void;
 };
 
-function instructionsFromAi(ai: any): InstructionRow[] {
-  if (!ai?.instructions) return [];
-  const arr = Array.isArray(ai.instructions) ? ai.instructions : [];
-  return arr.map((item: any, i: number) => ({
-    step: typeof item?.step === 'number' ? item.step : i + 1,
-    text:
-      typeof item === 'string'
-        ? item
-        : (item?.text ?? item?.step ?? String(item ?? '')),
-  }));
+function instructionsFromAi(ai: unknown): InstructionRow[] {
+  const o = ai as Record<string, unknown>;
+  if (!o?.instructions) return [];
+  const arr = Array.isArray(o.instructions) ? o.instructions : [];
+  return arr.map((item: unknown, i: number) => {
+    const it = item as Record<string, unknown>;
+    return {
+      step: typeof it?.step === 'number' ? it.step : i + 1,
+      text:
+        typeof item === 'string'
+          ? item
+          : String(it?.text ?? it?.step ?? it ?? ''),
+    };
+  });
 }
 
-function ingredientsFromMealData(mealData: any): IngredientRow[] {
-  const ing = mealData?.ingredients;
+function ingredientsFromMealData(mealData: unknown): IngredientRow[] {
+  const o = mealData as Record<string, unknown>;
+  const ing = o?.ingredients;
   if (!Array.isArray(ing) || ing.length === 0) return [];
-  return ing.map((item: any) => ({
-    name: item.name ?? item.original_line ?? '',
-    quantity: item.quantity ?? item.amount ?? null,
-    unit: item.unit ?? null,
-    note: item.note ?? item.notes ?? null,
-    section: item.section ?? null,
-  }));
+  return ing.map((item: unknown) => {
+    const it = item as Record<string, unknown>;
+    const q = it.quantity ?? it.amount;
+    const u = it.unit;
+    const n = it.note ?? it.notes;
+    const s = it.section;
+    return {
+      name: String(it.name ?? it.original_line ?? ''),
+      quantity:
+        q != null
+          ? typeof q === 'number' || typeof q === 'string'
+            ? q
+            : null
+          : null,
+      unit: u != null ? String(u) : null,
+      note: n != null ? String(n) : null,
+      section: s != null ? String(s) : null,
+    };
+  });
 }
 
 export function RecipeContentEditor({
@@ -59,6 +80,8 @@ export function RecipeContentEditor({
   ingredients: initialIngredients,
   instructions: initialInstructions,
   onUpdated,
+  instructionsOnly = false,
+  onCancel: onCancelProp,
 }: RecipeContentEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -93,6 +116,7 @@ export function RecipeContentEditor({
   const handleCancel = () => {
     setIsEditing(false);
     setError(null);
+    onCancelProp?.();
   };
 
   const handleSave = () => {
@@ -102,7 +126,7 @@ export function RecipeContentEditor({
       .filter((i) => String(i.text ?? '').trim())
       .map((inst, idx) => ({ step: idx + 1, text: inst.text.trim() }));
 
-    if (cleanIng.length === 0) {
+    if (!instructionsOnly && cleanIng.length === 0) {
       setError('Minimaal één ingrediënt is verplicht');
       return;
     }
@@ -115,13 +139,21 @@ export function RecipeContentEditor({
       const result = await updateRecipeContentAction({
         mealId,
         source: mealSource,
-        ingredients: cleanIng.map((i) => ({
-          name: i.name.trim(),
-          quantity: i.quantity,
-          unit: i.unit,
-          note: i.note,
-          section: i.section ?? null,
-        })),
+        ingredients: instructionsOnly
+          ? initialIngredients.map((i) => ({
+              name: String(i.name ?? '').trim(),
+              quantity: i.quantity,
+              unit: i.unit ?? null,
+              note: i.note ?? null,
+              section: i.section ?? null,
+            }))
+          : cleanIng.map((i) => ({
+              name: i.name.trim(),
+              quantity: i.quantity,
+              unit: i.unit,
+              note: i.note,
+              section: i.section ?? null,
+            })),
         instructions: cleanInst,
       });
 
@@ -177,7 +209,7 @@ export function RecipeContentEditor({
     });
   };
 
-  if (!isEditing) {
+  if (!isEditing && !instructionsOnly) {
     return (
       <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4">
         <Button outline onClick={handleStartEdit}>
@@ -192,7 +224,7 @@ export function RecipeContentEditor({
     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-zinc-950 dark:text-white">
-          Bewerk recept
+          {instructionsOnly ? 'Bewerk bereidingsinstructies' : 'Bewerk recept'}
         </h3>
         <div className="flex gap-2">
           <Button outline onClick={handleCancel} disabled={isPending}>
@@ -212,155 +244,180 @@ export function RecipeContentEditor({
         </div>
       )}
 
-      <Fieldset>
-        <Label>Ingrediënten</Label>
-        <div className="space-y-3 mt-2">
-          {(() => {
-            const hasSections = ingredients.some(
-              (i) => i.section != null && String(i.section).trim() !== '',
-            );
-            if (!hasSections) {
-              return (
-                <>
-                  {ingredients.map((ing, idx) => (
-                    <div key={idx} className="flex flex-wrap items-start gap-2">
-                      <Input
-                        placeholder="Naam"
-                        value={ing.name ?? ''}
-                        onChange={(e) =>
-                          updateIngredient(idx, 'name', e.target.value)
-                        }
-                        className="flex-1 min-w-[120px]"
-                      />
-                      <Input
-                        placeholder="Hoeveelheid"
-                        value={ing.quantity ?? ''}
-                        onChange={(e) =>
-                          updateIngredient(
-                            idx,
-                            'quantity',
-                            e.target.value || null,
-                          )
-                        }
-                        className="w-24"
-                      />
-                      <Input
-                        placeholder="Eenheid"
-                        value={ing.unit ?? ''}
-                        onChange={(e) =>
-                          updateIngredient(idx, 'unit', e.target.value || null)
-                        }
-                        className="w-20"
-                      />
-                      <Input
-                        placeholder="Opmerking"
-                        value={ing.note ?? ''}
-                        onChange={(e) =>
-                          updateIngredient(idx, 'note', e.target.value || null)
-                        }
-                        className="flex-1 min-w-[100px]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeIngredient(idx)}
-                        className="p-2 text-zinc-500 hover:text-red-600"
-                        aria-label="Verwijderen"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </>
+      {!instructionsOnly && (
+        <Fieldset>
+          <Label>Ingrediënten</Label>
+          <div className="space-y-3 mt-2">
+            {(() => {
+              const hasSections = ingredients.some(
+                (i) => i.section != null && String(i.section).trim() !== '',
               );
-            }
-            const groups: { section: string | null; indices: number[] }[] = [];
-            let curSection: string | null = null;
-            let curIndices: number[] = [];
-            for (let i = 0; i < ingredients.length; i++) {
-              const s =
-                ingredients[i].section != null &&
-                String(ingredients[i].section).trim() !== ''
-                  ? String(ingredients[i].section).trim()
-                  : null;
-              if (s !== curSection) {
-                if (curIndices.length > 0)
-                  groups.push({ section: curSection, indices: curIndices });
-                curSection = s;
-                curIndices = [i];
-              } else {
-                curIndices.push(i);
-              }
-            }
-            if (curIndices.length > 0)
-              groups.push({ section: curSection, indices: curIndices });
-
-            return groups.map((group, gi) => (
-              <Fragment key={gi}>
-                {group.section && (
-                  <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300 pt-2 first:pt-0">
-                    {group.section}
-                  </div>
-                )}
-                {group.indices.map((idx) => {
-                  const ing = ingredients[idx];
-                  return (
-                    <div key={idx} className="flex flex-wrap items-start gap-2">
-                      <Input
-                        placeholder="Naam"
-                        value={ing.name ?? ''}
-                        onChange={(e) =>
-                          updateIngredient(idx, 'name', e.target.value)
-                        }
-                        className="flex-1 min-w-[120px]"
-                      />
-                      <Input
-                        placeholder="Hoeveelheid"
-                        value={ing.quantity ?? ''}
-                        onChange={(e) =>
-                          updateIngredient(
-                            idx,
-                            'quantity',
-                            e.target.value || null,
-                          )
-                        }
-                        className="w-24"
-                      />
-                      <Input
-                        placeholder="Eenheid"
-                        value={ing.unit ?? ''}
-                        onChange={(e) =>
-                          updateIngredient(idx, 'unit', e.target.value || null)
-                        }
-                        className="w-20"
-                      />
-                      <Input
-                        placeholder="Opmerking"
-                        value={ing.note ?? ''}
-                        onChange={(e) =>
-                          updateIngredient(idx, 'note', e.target.value || null)
-                        }
-                        className="flex-1 min-w-[100px]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeIngredient(idx)}
-                        className="p-2 text-zinc-500 hover:text-red-600"
-                        aria-label="Verwijderen"
+              if (!hasSections) {
+                return (
+                  <>
+                    {ingredients.map((ing, idx) => (
+                      <div
+                        key={idx}
+                        className="flex flex-wrap items-start gap-2"
                       >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                        <Input
+                          placeholder="Naam"
+                          value={ing.name ?? ''}
+                          onChange={(e) =>
+                            updateIngredient(idx, 'name', e.target.value)
+                          }
+                          className="flex-1 min-w-[120px]"
+                        />
+                        <Input
+                          placeholder="Hoeveelheid"
+                          value={ing.quantity ?? ''}
+                          onChange={(e) =>
+                            updateIngredient(
+                              idx,
+                              'quantity',
+                              e.target.value || null,
+                            )
+                          }
+                          className="w-24"
+                        />
+                        <Input
+                          placeholder="Eenheid"
+                          value={ing.unit ?? ''}
+                          onChange={(e) =>
+                            updateIngredient(
+                              idx,
+                              'unit',
+                              e.target.value || null,
+                            )
+                          }
+                          className="w-20"
+                        />
+                        <Input
+                          placeholder="Opmerking"
+                          value={ing.note ?? ''}
+                          onChange={(e) =>
+                            updateIngredient(
+                              idx,
+                              'note',
+                              e.target.value || null,
+                            )
+                          }
+                          className="flex-1 min-w-[100px]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeIngredient(idx)}
+                          className="p-2 text-zinc-500 hover:text-red-600"
+                          aria-label="Verwijderen"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                );
+              }
+              const groups: { section: string | null; indices: number[] }[] =
+                [];
+              let curSection: string | null = null;
+              let curIndices: number[] = [];
+              for (let i = 0; i < ingredients.length; i++) {
+                const s =
+                  ingredients[i].section != null &&
+                  String(ingredients[i].section).trim() !== ''
+                    ? String(ingredients[i].section).trim()
+                    : null;
+                if (s !== curSection) {
+                  if (curIndices.length > 0)
+                    groups.push({ section: curSection, indices: curIndices });
+                  curSection = s;
+                  curIndices = [i];
+                } else {
+                  curIndices.push(i);
+                }
+              }
+              if (curIndices.length > 0)
+                groups.push({ section: curSection, indices: curIndices });
+
+              return groups.map((group, gi) => (
+                <Fragment key={gi}>
+                  {group.section && (
+                    <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300 pt-2 first:pt-0">
+                      {group.section}
                     </div>
-                  );
-                })}
-              </Fragment>
-            ));
-          })()}
-          <Button outline onClick={addIngredient} className="mt-1">
-            <PlusIcon className="h-4 w-4 mr-1" />
-            Ingrediënt toevoegen
-          </Button>
-        </div>
-      </Fieldset>
+                  )}
+                  {group.indices.map((idx) => {
+                    const ing = ingredients[idx];
+                    return (
+                      <div
+                        key={idx}
+                        className="flex flex-wrap items-start gap-2"
+                      >
+                        <Input
+                          placeholder="Naam"
+                          value={ing.name ?? ''}
+                          onChange={(e) =>
+                            updateIngredient(idx, 'name', e.target.value)
+                          }
+                          className="flex-1 min-w-[120px]"
+                        />
+                        <Input
+                          placeholder="Hoeveelheid"
+                          value={ing.quantity ?? ''}
+                          onChange={(e) =>
+                            updateIngredient(
+                              idx,
+                              'quantity',
+                              e.target.value || null,
+                            )
+                          }
+                          className="w-24"
+                        />
+                        <Input
+                          placeholder="Eenheid"
+                          value={ing.unit ?? ''}
+                          onChange={(e) =>
+                            updateIngredient(
+                              idx,
+                              'unit',
+                              e.target.value || null,
+                            )
+                          }
+                          className="w-20"
+                        />
+                        <Input
+                          placeholder="Opmerking"
+                          value={ing.note ?? ''}
+                          onChange={(e) =>
+                            updateIngredient(
+                              idx,
+                              'note',
+                              e.target.value || null,
+                            )
+                          }
+                          className="flex-1 min-w-[100px]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeIngredient(idx)}
+                          className="p-2 text-zinc-500 hover:text-red-600"
+                          aria-label="Verwijderen"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </Fragment>
+              ));
+            })()}
+            <Button outline onClick={addIngredient} className="mt-1">
+              <PlusIcon className="h-4 w-4 mr-1" />
+              Ingrediënt toevoegen
+            </Button>
+          </div>
+        </Fieldset>
+      )}
 
       <Fieldset>
         <Label>Bereidingsinstructies</Label>
@@ -397,10 +454,12 @@ export function RecipeContentEditor({
   );
 }
 
-export function getIngredientsForEditor(mealData: any): IngredientRow[] {
+export function getIngredientsForEditor(mealData: unknown): IngredientRow[] {
   return ingredientsFromMealData(mealData);
 }
 
-export function getInstructionsForEditor(aiAnalysis: any): InstructionRow[] {
+export function getInstructionsForEditor(
+  aiAnalysis: unknown,
+): InstructionRow[] {
   return instructionsFromAi(aiAnalysis);
 }

@@ -1169,11 +1169,21 @@ export async function getRecipeNutritionSummaryAction(args: {
 
     const recipeIngredients: RecipeIngredient[] = [];
 
+    type IngredientRefLike = {
+      nevoCode?: unknown;
+      customFoodId?: string;
+      fdcId?: unknown;
+      quantityG?: unknown;
+      quantity_g?: unknown;
+      quantity?: unknown;
+      unit?: string;
+      custom_food_id?: string;
+    };
     const rawRefs = Array.isArray(mealData.ingredientRefs)
-      ? (mealData.ingredientRefs as any[])
+      ? (mealData.ingredientRefs as IngredientRefLike[])
       : [];
     const refs = rawRefs.filter(
-      (r: any) =>
+      (r: IngredientRefLike) =>
         r != null &&
         typeof r === 'object' &&
         (r.nevoCode != null || r.customFoodId != null || r.fdcId != null),
@@ -1192,32 +1202,33 @@ export async function getRecipeNutritionSummaryAction(args: {
         if (ref.customFoodId ?? ref.custom_food_id) {
           recipeIngredients.push({
             custom_food_id: ref.customFoodId ?? ref.custom_food_id,
-            amount_g: amountG,
+            amount_g: Number(amountG),
           });
         } else if (ref.fdcId != null) {
           recipeIngredients.push({
-            fndds_fdc_id: ref.fdcId,
-            amount_g: amountG,
+            fndds_fdc_id:
+              typeof ref.fdcId === 'number' ? ref.fdcId : Number(ref.fdcId),
+            amount_g: Number(amountG),
           });
         } else {
           const nevoCode =
             typeof ref.nevoCode === 'string'
               ? parseInt(ref.nevoCode, 10)
-              : ref.nevoCode;
+              : Number(ref.nevoCode);
           if (Number.isFinite(nevoCode) && nevoCode > 0) {
             recipeIngredients.push({
               nevo_food_id: nevoCode,
-              amount_g: amountG,
+              amount_g: Number(amountG),
             });
           }
         }
       }
     } else {
       const ingredients = Array.isArray(mealData.ingredients)
-        ? (mealData.ingredients as any[])
+        ? (mealData.ingredients as Record<string, unknown>[])
         : [];
       for (const ing of ingredients) {
-        const line = (ing.original_line ?? ing.name ?? '')?.trim() || '';
+        const line = String(ing.original_line ?? ing.name ?? '').trim() || '';
         if (!line) continue;
         const norm = normalizeIngredientText(line);
         const { data: match } = await supabase
@@ -1364,7 +1375,7 @@ export async function updateRecipeIngredientMatchAction(args: {
 
     const mealData = (current.meal_data as Record<string, unknown>) || {};
     const ingredients = Array.isArray(mealData.ingredients)
-      ? [...(mealData.ingredients as any[])]
+      ? [...(mealData.ingredients as Record<string, unknown>[])]
       : [];
     if (
       args.ingredientIndex < 0 ||
@@ -1392,12 +1403,12 @@ export async function updateRecipeIngredientMatchAction(args: {
             : 0
       ) as number;
       if (qtyG > 0) newRef.quantityG = qtyG;
-    } else if (
-      typeof args.quantity === 'number' &&
-      Number.isFinite(args.quantity) &&
-      args.unit
-    ) {
-      newRef.quantity = args.quantity;
+    } else if (args.unit) {
+      const qty =
+        typeof args.quantity === 'number' && Number.isFinite(args.quantity)
+          ? args.quantity
+          : 1;
+      newRef.quantity = qty;
       newRef.unit = args.unit;
     }
     if (!newRef.quantityG && newRef.quantity == null) {
@@ -1440,10 +1451,12 @@ export async function updateRecipeIngredientMatchAction(args: {
     }
 
     const existingRefs = Array.isArray(mealData.ingredientRefs)
-      ? (mealData.ingredientRefs as any[])
+      ? (mealData.ingredientRefs as Record<string, unknown>[])
       : [];
     // Parallel array: refs[i] hoort bij ingredients[i], zodat volgorde behouden blijft.
-    const ingredientRefs: any[] = Array(ingredients.length).fill(null);
+    const ingredientRefs: (Record<string, unknown> | null)[] = Array(
+      ingredients.length,
+    ).fill(null);
     if (existingRefs.length === ingredients.length) {
       // Al parallel-formaat: overnemen en nieuwe ref op juiste index zetten.
       for (let i = 0; i < ingredients.length; i++) {
@@ -1458,14 +1471,12 @@ export async function updateRecipeIngredientMatchAction(args: {
           continue;
         }
         const ingName =
-          (
-            ingredients[i]?.name ??
-            ingredients[i]?.original_line ??
-            ''
-          )?.trim() || '';
+          String(
+            ingredients[i]?.name ?? ingredients[i]?.original_line ?? '',
+          ).trim() || '';
         const normIng = normalizeIngredientText(ingName);
-        const existing = existingRefs.find((r: any) => {
-          const rName = (r?.displayName ?? '')?.trim() || '';
+        const existing = existingRefs.find((r: Record<string, unknown>) => {
+          const rName = (r?.displayName ?? '')?.toString().trim() || '';
           return normIng && normalizeIngredientText(rName) === normIng;
         });
         ingredientRefs[i] = existing ?? null;

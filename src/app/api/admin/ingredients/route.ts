@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
       | 'eigen'
       | 'all';
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-    const pageCustom = Math.max(
+    const _pageCustom = Math.max(
       1,
       parseInt(searchParams.get('pageCustom') || String(page), 10),
     );
