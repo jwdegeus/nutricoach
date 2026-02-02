@@ -18,6 +18,7 @@ import {
   type MealPlanDayResponse,
   type Meal,
   type MealResponse,
+  type MealSlot,
 } from '@/src/lib/diets';
 import {
   buildMealPlanPrompt,
@@ -29,17 +30,21 @@ import {
   validateHardConstraints,
   validateAndAdjustDayMacros,
   validateDayHardConstraints,
+  getExpandedAllergenTermsForExclusion,
 } from './mealPlannerAgent.validate';
 import {
   buildCandidatePool,
   type CandidatePool,
 } from './mealPlannerAgent.tools';
+import { getMealPlanResponseJsonSchemaForGemini } from './mealPlannerAgent.gemini-schema';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 // vNext guard rails (shadow mode + enforcement) + Diet Logic (Dieetregels)
 import {
   loadRulesetWithDietLogic,
   evaluateGuardrails,
+  compileConstraintsForAI,
 } from '@/src/lib/guardrails-vnext';
+import { loadGuardrailsRuleset } from '@/src/lib/guardrails-vnext/ruleset-loader';
 import {
   mapMealPlanToGuardrailsTargets,
   getMealPlanIngredientsPerDay,
@@ -47,6 +52,8 @@ import {
 import type { EvaluationContext } from '@/src/lib/guardrails-vnext/types';
 import { evaluateDietLogic } from '@/src/lib/diet-logic';
 import { AppError } from '@/src/lib/errors/app-error';
+import { getMealPlannerConfig } from '@/src/lib/meal-plans/mealPlans.config';
+import { getShakeSmoothieGuidance } from '@/src/lib/messages.server';
 
 /**
  * Simple in-memory cache for candidate pools
@@ -59,6 +66,210 @@ const candidatePoolCache = new Map<
 >();
 
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+/** Max output tokens for full meal plan JSON (avoids truncation → "Unterminated string"). */
+const MEAL_PLAN_JSON_MAX_TOKENS =
+  typeof process !== 'undefined' &&
+  process.env.GEMINI_MAX_OUTPUT_TOKENS_PLAN != null
+    ? parseInt(process.env.GEMINI_MAX_OUTPUT_TOKENS_PLAN, 10)
+    : 8192;
+
+/**
+ * Normalize raw JSON from the model: trim and strip markdown code block if present.
+ * Reduces parse failures from wrapped or stray whitespace.
+ */
+function normalizeJsonFromModel(raw: string): string {
+  let s = raw.trim();
+  const codeBlockMatch = s.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/);
+  if (codeBlockMatch) {
+    s = codeBlockMatch[1].trim();
+  }
+  return s;
+}
+
+/** Provenance counters for plan_snapshot (debugging/UX) */
+export type PlanProvenance = {
+  reusedRecipeCount: number;
+  generatedRecipeCount: number;
+};
+
+/** Options for generateMealPlan: optional prefilled meals from DB (e.g. meal_history) */
+export type GenerateMealPlanOptions = {
+  /** Meals by slot (breakfast/lunch/dinner) to prefer; ~80% of slots will be filled from these when possible */
+  prefilledBySlot?: Partial<Record<MealSlot, Meal[]>>;
+};
+
+/**
+ * Pick which (dayIndex, slotIndex) pairs to fill from existing recipes.
+ * Random sample within total slots; de-dupe per day (same meal id not twice on same day) is enforced when applying.
+ */
+function pickExistingRecipesForPlan(args: {
+  slots: MealSlot[];
+  numDays: number;
+  targetCount: number;
+}): { dayIndex: number; slotIndex: number }[] {
+  const { slots, numDays, targetCount } = args;
+  const total = numDays * slots.length;
+  if (total === 0 || targetCount <= 0) return [];
+
+  const indices: { dayIndex: number; slotIndex: number }[] = [];
+  for (let d = 0; d < numDays; d++) {
+    for (let s = 0; s < slots.length; s++) {
+      indices.push({ dayIndex: d, slotIndex: s });
+    }
+  }
+  // Fisher–Yates shuffle first `targetCount` into a sample
+  const count = Math.min(targetCount, indices.length);
+  for (let i = 0; i < count; i++) {
+    const j = i + Math.floor(Math.random() * (indices.length - i));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  return indices.slice(0, count);
+}
+
+/** Deep-clone plan for candidate validation (no extra DB; in-memory only). */
+function clonePlan(plan: MealPlanResponse): MealPlanResponse {
+  return JSON.parse(JSON.stringify(plan)) as MealPlanResponse;
+}
+
+/**
+ * Apply prefilled meals into plan for selected slots.
+ * - De-dupe per day (same meal id not twice on same day).
+ * - Avoid same meal on consecutive days (no identical breakfast/dinner two days in a row).
+ * - MVP: each replacement is validated; only applied if the plan still passes hard constraints.
+ * Returns number of meals actually replaced (provenance.reusedRecipeCount).
+ */
+async function applyPrefilledMeals(
+  plan: MealPlanResponse,
+  request: MealPlanRequest,
+  prefilledBySlot: Partial<Record<MealSlot, Meal[]>>,
+  slotIndices: { dayIndex: number; slotIndex: number }[],
+  rules: ReturnType<typeof deriveDietRuleSet>,
+): Promise<number> {
+  const slots = request.slots;
+  const startDate = new Date(request.dateRange.start);
+  const usedPerDay = new Map<number, Set<string>>();
+  /** Base meal ids placed per (day, slot) so we can avoid same meal on consecutive days */
+  const baseIdByDayAndSlot = new Map<string, string>();
+  let replaced = 0;
+
+  const sortedIndices = [...slotIndices].sort(
+    (a, b) => a.dayIndex - b.dayIndex || a.slotIndex - b.slotIndex,
+  );
+
+  for (const { dayIndex, slotIndex } of sortedIndices) {
+    if (dayIndex >= plan.days.length) continue;
+    const day = plan.days[dayIndex];
+    const slot = slots[slotIndex];
+    if (!slot || !day.meals[slotIndex]) continue;
+
+    const pool = prefilledBySlot[slot];
+    if (!pool || pool.length === 0) continue;
+
+    if (!usedPerDay.has(dayIndex)) {
+      const used = new Set<string>();
+      for (const m of day.meals) {
+        used.add(m.id);
+      }
+      usedPerDay.set(dayIndex, used);
+    }
+    const usedOnDay = usedPerDay.get(dayIndex)!;
+    const usedPrevDaySameSlot =
+      dayIndex > 0
+        ? baseIdByDayAndSlot.get(`${dayIndex - 1}-${slot}`)
+        : undefined;
+
+    const candidate = pool.find(
+      (m) =>
+        !usedOnDay.has(m.id) &&
+        (usedPrevDaySameSlot === undefined || m.id !== usedPrevDaySameSlot),
+    );
+    if (!candidate) continue;
+
+    const dateStr = (() => {
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + dayIndex);
+      return d.toISOString().split('T')[0];
+    })();
+
+    const replacedMeal: Meal = {
+      ...candidate,
+      date: dateStr,
+      id: `${candidate.id}-${dateStr}-${slot}`,
+    };
+
+    // MVP: only apply if plan with this replacement still passes hard constraints
+    const candidatePlan = clonePlan(plan);
+    candidatePlan.days[dayIndex].meals[slotIndex] = replacedMeal;
+    const issues = await validateHardConstraints({
+      plan: candidatePlan,
+      rules,
+      request,
+    });
+    if (issues.length > 0) continue;
+
+    day.meals[slotIndex] = replacedMeal;
+    usedOnDay.add(candidate.id);
+    baseIdByDayAndSlot.set(`${dayIndex}-${slot}`, candidate.id);
+    replaced++;
+  }
+
+  return replaced;
+}
+
+/**
+ * Apply prefilled meals (if options provided) and attach provenance to plan.metadata.
+ * Mutates plan in place; call before returning from generateMealPlan.
+ * Prefilled replacements are only applied when the resulting plan still passes hard constraints.
+ */
+async function applyPrefilledAndAttachProvenance(
+  plan: MealPlanResponse,
+  request: MealPlanRequest,
+  options: GenerateMealPlanOptions | undefined,
+  rules: ReturnType<typeof deriveDietRuleSet>,
+): Promise<void> {
+  const totalMeals = plan.days.reduce((s, d) => s + d.meals.length, 0);
+  let reusedRecipeCount: number;
+  let generatedRecipeCount: number;
+
+  if (
+    options?.prefilledBySlot &&
+    Object.keys(options.prefilledBySlot).length > 0
+  ) {
+    const targetCount = Math.round(
+      totalMeals * getMealPlannerConfig().targetReuseRatio,
+    );
+    const slotIndices = pickExistingRecipesForPlan({
+      slots: request.slots,
+      numDays: plan.days.length,
+      targetCount,
+    });
+    const replaced = await applyPrefilledMeals(
+      plan,
+      request,
+      options.prefilledBySlot,
+      slotIndices,
+      rules,
+    );
+    reusedRecipeCount = replaced;
+    generatedRecipeCount = totalMeals - replaced;
+  } else {
+    reusedRecipeCount = 0;
+    generatedRecipeCount = totalMeals;
+  }
+
+  const provenance: PlanProvenance = {
+    reusedRecipeCount,
+    generatedRecipeCount,
+  };
+  const meta = plan.metadata ?? {
+    generatedAt: new Date().toISOString(),
+    dietKey: request.profile.dietKey,
+    totalDays: plan.days.length,
+    totalMeals,
+  };
+  plan.metadata = { ...meta, provenance } as MealPlanResponse['metadata'];
+}
 
 /**
  * Get or build candidate pool (with caching)
@@ -87,6 +298,59 @@ async function getCandidatePool(
   return pool;
 }
 
+/** Result of getConstraintsText: prompt text + optional ruleset meta for run logging (no PII). */
+export type GuardrailsConstraintsResult = {
+  promptText?: string;
+  contentHash?: string | null;
+  version?: number | null;
+};
+
+/**
+ * Best-effort: load guardrails ruleset and compile constraint text for prompts.
+ * Returns promptText + contentHash/version for observability; no throw.
+ */
+async function getConstraintsText(args: {
+  dietId: string;
+  locale: 'nl' | 'en';
+  mode: 'meal_planner';
+}): Promise<GuardrailsConstraintsResult> {
+  try {
+    const ruleset = await loadGuardrailsRuleset({
+      dietId: args.dietId,
+      mode: args.mode,
+      locale: args.locale,
+    });
+    const { promptText } = await compileConstraintsForAI(ruleset, {
+      locale: args.locale,
+      mode: args.mode,
+      timestamp: new Date().toISOString(),
+    });
+    return {
+      promptText,
+      contentHash: ruleset.contentHash ?? null,
+      version: ruleset.version ?? null,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/** Attach guardrails meta to plan.metadata for run logging (no constraints text, no PII). */
+function attachGuardrailsMeta(
+  plan: MealPlanResponse,
+  constraintsInPrompt: boolean,
+  contentHash: string | null,
+  version: string | null,
+): void {
+  const meta = (plan.metadata ?? {}) as Record<string, unknown>;
+  meta.guardrails = {
+    constraintsInPrompt,
+    contentHash,
+    version,
+  };
+  plan.metadata = meta as MealPlanResponse['metadata'];
+}
+
 /**
  * Meal Planner Agent Service
  *
@@ -104,19 +368,19 @@ async function getCandidatePool(
  */
 export class MealPlannerAgentService {
   /**
-   * Generate a meal plan from raw input
-   *
-   * Validates input, builds prompt, calls Gemini API with schema,
-   * validates output, and attempts one repair if needed.
+   * Generate a meal plan from raw input.
+   * When options.prefilledBySlot is provided, ~80% of slots are filled from existing meals; rest from AI.
    *
    * @param raw - Raw input (will be validated against MealPlanRequestSchema)
    * @param language - User language preference ('nl' or 'en'), defaults to 'nl'
-   * @returns Validated MealPlanResponse
+   * @param options - Optional prefilled meals by slot (e.g. from meal_history) for ~80% reuse target
+   * @returns Validated MealPlanResponse with provenance in metadata
    * @throws Error if validation fails or API call fails after repair attempt
    */
   async generateMealPlan(
     raw: unknown,
     language: 'nl' | 'en' = 'nl',
+    options?: GenerateMealPlanOptions,
   ): Promise<MealPlanResponse> {
     // Step 1: Validate input request
     let request: MealPlanRequest;
@@ -132,9 +396,9 @@ export class MealPlannerAgentService {
     // We never trust dietRuleSet from input - always derive from profile to ensure consistency
     const rules = deriveDietRuleSet(request.profile);
 
-    // Step 3: Build candidate pool (with caching)
+    // Step 3: Build candidate pool (with caching); expand allergies so pool excludes yoghurt/melk when Lactose, etc.
     const excludeTerms = [
-      ...request.profile.allergies,
+      ...getExpandedAllergenTermsForExclusion(request.profile.allergies),
       ...request.profile.dislikes,
       ...(request.excludeIngredients || []),
     ];
@@ -143,21 +407,36 @@ export class MealPlannerAgentService {
       excludeTerms,
     );
 
-    // Step 4: Build original prompt with candidates
+    // Step 4: Guardrails constraint text for prompt (once per generate call)
+    const constraintsResult = await getConstraintsText({
+      dietId: request.profile.dietKey,
+      locale: language,
+      mode: 'meal_planner',
+    });
+    const guardrailsConstraintsText = constraintsResult.promptText;
+    const guardrailsMeta = {
+      contentHash: constraintsResult.contentHash ?? null,
+      version:
+        constraintsResult.version != null
+          ? String(constraintsResult.version)
+          : null,
+    };
+
+    // Step 5: Build original prompt with candidates (guidance from messages, no hardcoded text)
+    const shakeSmoothieGuidance = getShakeSmoothieGuidance(language);
     const originalPrompt = buildMealPlanPrompt({
       request,
       rules,
       candidates,
       language,
+      guardrailsConstraintsText,
+      shakeSmoothieGuidance,
     });
 
-    // Step 5: Convert Zod schema to JSON schema
-    const jsonSchema = zodToJsonSchema(mealPlanResponseSchema, {
-      name: 'MealPlanResponse',
-      target: 'openApi3',
-    });
+    // Step 6: Use flattened JSON schema (Gemini has a max nesting depth limit)
+    const jsonSchema = getMealPlanResponseJsonSchemaForGemini();
 
-    // Step 6: Generate attempt #1
+    // Step 7: Generate attempt #1
     const gemini = getGeminiClient();
     let rawJson: string;
     try {
@@ -166,6 +445,7 @@ export class MealPlannerAgentService {
         jsonSchema,
         temperature: 0.4,
         purpose: 'plan',
+        maxOutputTokens: MEAL_PLAN_JSON_MAX_TOKENS,
       });
     } catch (error) {
       throw new Error(
@@ -173,14 +453,14 @@ export class MealPlannerAgentService {
       );
     }
 
-    // Step 7: Try to parse and validate
+    // Step 8: Try to parse and validate
     const firstAttemptResult = await this.parseAndValidate(
       rawJson,
       request,
       rules,
     );
 
-    // Step 8: If successful, enforce vNext guard rails (if enabled). Bij FORCE-deficit: max 1 retry met deficit-hint in prompt.
+    // Step 9: If successful, enforce vNext guard rails (if enabled). Bij FORCE-deficit: max 1 retry met deficit-hint in prompt.
     if (firstAttemptResult.success) {
       const enforceVNext =
         process.env.ENFORCE_VNEXT_GUARDRAILS_MEAL_PLANNER === 'true';
@@ -205,6 +485,8 @@ export class MealPlannerAgentService {
               forceDeficitHint: {
                 categoryNames: forceDeficits.map((d) => d.categoryNameNl),
               },
+              guardrailsConstraintsText,
+              shakeSmoothieGuidance,
             });
             let retryRawJson: string;
             try {
@@ -213,6 +495,7 @@ export class MealPlannerAgentService {
                 jsonSchema,
                 temperature: 0.3,
                 purpose: 'plan',
+                maxOutputTokens: MEAL_PLAN_JSON_MAX_TOKENS,
               });
             } catch {
               throw guardError;
@@ -230,15 +513,36 @@ export class MealPlannerAgentService {
               request.profile.dietKey,
               language,
             );
-            return retryResult.response!;
+            const plan = retryResult.response!;
+            await applyPrefilledAndAttachProvenance(
+              plan,
+              request,
+              options,
+              rules,
+            );
+            attachGuardrailsMeta(
+              plan,
+              !!guardrailsConstraintsText?.trim(),
+              guardrailsMeta.contentHash,
+              guardrailsMeta.version,
+            );
+            return plan;
           }
           throw guardError;
         }
       }
-      return firstAttemptResult.response!;
+      const plan = firstAttemptResult.response!;
+      await applyPrefilledAndAttachProvenance(plan, request, options, rules);
+      attachGuardrailsMeta(
+        plan,
+        !!guardrailsConstraintsText?.trim(),
+        guardrailsMeta.contentHash,
+        guardrailsMeta.version,
+      );
+      return plan;
     }
 
-    // Step 9: Repair attempt (max 1 attempt)
+    // Step 10: Repair attempt (max 1 attempt)
     const issues = firstAttemptResult.issues.join('\n');
     const repairPrompt = buildRepairPrompt({
       originalPrompt,
@@ -255,6 +559,7 @@ export class MealPlannerAgentService {
         jsonSchema,
         temperature: 0.2, // Lower temperature for more deterministic repair
         purpose: 'repair',
+        maxOutputTokens: MEAL_PLAN_JSON_MAX_TOKENS,
       });
     } catch (error) {
       throw new Error(
@@ -262,14 +567,14 @@ export class MealPlannerAgentService {
       );
     }
 
-    // Step 10: Parse and validate repair attempt
+    // Step 11: Parse and validate repair attempt
     const repairResult = await this.parseAndValidate(
       repairRawJson,
       request,
       rules,
     );
 
-    // Step 11: If repair successful, enforce vNext guard rails (if enabled). Geen extra deficit-retry hier (max 1 deficit-retry per aanroep, die gebeurt na eerste poging).
+    // Step 12: If repair successful, enforce vNext guard rails (if enabled). Geen extra deficit-retry hier (max 1 deficit-retry per aanroep, die gebeurt na eerste poging).
     if (repairResult.success) {
       const enforceVNext =
         process.env.ENFORCE_VNEXT_GUARDRAILS_MEAL_PLANNER === 'true';
@@ -280,10 +585,18 @@ export class MealPlannerAgentService {
           language,
         );
       }
-      return repairResult.response!;
+      const plan = repairResult.response!;
+      await applyPrefilledAndAttachProvenance(plan, request, options, rules);
+      attachGuardrailsMeta(
+        plan,
+        !!guardrailsConstraintsText?.trim(),
+        guardrailsMeta.contentHash,
+        guardrailsMeta.version,
+      );
+      return plan;
     }
 
-    // Step 12: Repair failed - throw error
+    // Step 13: Repair failed - throw error
     throw new Error(
       `Meal plan generation failed after repair attempt: ${repairResult.issues.join('; ')}`,
     );
@@ -307,11 +620,12 @@ export class MealPlannerAgentService {
     issues: string[];
   }> {
     const issues: string[] = [];
+    const normalized = normalizeJsonFromModel(rawJson);
 
     // Try JSON parse
     let parsed: unknown;
     try {
-      parsed = JSON.parse(rawJson);
+      parsed = JSON.parse(normalized);
     } catch (error) {
       issues.push(
         `JSON parse error: ${error instanceof Error ? error.message : 'Unknown parse error'}`,
@@ -389,9 +703,9 @@ export class MealPlannerAgentService {
     // Step 1: Derive rules from profile
     const rules = deriveDietRuleSet(request.profile);
 
-    // Step 2: Build candidate pool
+    // Step 2: Build candidate pool (expand allergies so pool excludes yoghurt/melk when Lactose, etc.)
     const excludeTerms = [
-      ...request.profile.allergies,
+      ...getExpandedAllergenTermsForExclusion(request.profile.allergies),
       ...request.profile.dislikes,
       ...(request.excludeIngredients || []),
     ];
@@ -400,7 +714,15 @@ export class MealPlannerAgentService {
       excludeTerms,
     );
 
+    const constraintsResult = await getConstraintsText({
+      dietId: request.profile.dietKey,
+      locale: language,
+      mode: 'meal_planner',
+    });
+    const guardrailsConstraintsText = constraintsResult.promptText;
+
     // Step 3: Build day prompt with minimal-change instructions if existingDay provided
+    const dayShakeGuidance = getShakeSmoothieGuidance(language);
     const dayPrompt = buildMealPlanDayPrompt({
       date,
       request,
@@ -408,6 +730,8 @@ export class MealPlannerAgentService {
       candidates,
       existingDay,
       language,
+      guardrailsConstraintsText,
+      shakeSmoothieGuidance: dayShakeGuidance,
     });
 
     // Step 4: Convert Zod schema to JSON schema for single day
@@ -435,7 +759,7 @@ export class MealPlannerAgentService {
     // Step 6: Parse JSON
     let day: MealPlanDay;
     try {
-      const parsed = JSON.parse(rawJson);
+      const parsed = JSON.parse(normalizeJsonFromModel(rawJson));
       const dayResponse: MealPlanDayResponse =
         mealPlanDayResponseSchema.parse(parsed);
       day = {
@@ -497,7 +821,7 @@ export class MealPlannerAgentService {
 
       // Parse repair attempt
       try {
-        const parsed = JSON.parse(repairRawJson);
+        const parsed = JSON.parse(normalizeJsonFromModel(repairRawJson));
         const dayResponse: MealPlanDayResponse =
           mealPlanDayResponseSchema.parse(parsed);
         day = {
@@ -588,7 +912,7 @@ export class MealPlannerAgentService {
 
     // Step 2: Build candidate pool
     const excludeTerms = [
-      ...request.profile.allergies,
+      ...getExpandedAllergenTermsForExclusion(request.profile.allergies),
       ...request.profile.dislikes,
       ...(request.excludeIngredients || []),
       ...(constraints?.avoidIngredients || []),
@@ -598,7 +922,15 @@ export class MealPlannerAgentService {
       excludeTerms,
     );
 
+    const constraintsResult = await getConstraintsText({
+      dietId: request.profile.dietKey,
+      locale: language,
+      mode: 'meal_planner',
+    });
+    const guardrailsConstraintsText = constraintsResult.promptText;
+
     // Step 3: Build meal prompt
+    const mealShakeGuidance = getShakeSmoothieGuidance(language);
     const mealPrompt = buildMealPrompt({
       date,
       mealSlot,
@@ -608,6 +940,8 @@ export class MealPlannerAgentService {
       existingMeal,
       constraints,
       language,
+      guardrailsConstraintsText,
+      shakeSmoothieGuidance: mealShakeGuidance,
     });
 
     // Step 4: Convert Zod schema to JSON schema for single meal
@@ -635,7 +969,7 @@ export class MealPlannerAgentService {
     // Step 6: Parse JSON
     let mealResponse: MealResponse;
     try {
-      const parsed = JSON.parse(rawJson);
+      const parsed = JSON.parse(normalizeJsonFromModel(rawJson));
       mealResponse = mealResponseSchema.parse(parsed);
     } catch (error) {
       throw new Error(
@@ -750,7 +1084,7 @@ export class MealPlannerAgentService {
 
       // Parse repair attempt
       try {
-        const parsed = JSON.parse(repairRawJson);
+        const parsed = JSON.parse(normalizeJsonFromModel(repairRawJson));
         mealResponse = mealResponseSchema.parse(parsed);
         meal = mealResponse.meal;
       } catch (error) {

@@ -20,12 +20,15 @@ import {
   enrichedMealSchema,
 } from './mealPlannerEnrichment.schemas';
 import {
+  getMealPlanEnrichmentResponseJsonSchemaForGemini,
+  getEnrichedMealJsonSchemaForGemini,
+} from './mealPlannerEnrichment.gemini-schema';
+import {
   buildMealEnrichmentPrompt,
   buildEnrichmentRepairPrompt,
   buildSingleMealEnrichmentPrompt,
 } from './mealPlannerEnrichment.prompts';
 import { validateEnrichment } from './mealPlannerEnrichment.validate';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 
 /**
  * In-memory cache for NEVO food lookups
@@ -140,11 +143,8 @@ export class MealPlannerEnrichmentService {
       language,
     });
 
-    // Step 5: Convert Zod schema to JSON schema
-    const jsonSchema = zodToJsonSchema(mealPlanEnrichmentResponseSchema, {
-      name: 'MealPlanEnrichmentResponse',
-      target: 'openApi3',
-    });
+    // Step 5: Use flattened JSON schema (Gemini has a max nesting depth limit)
+    const jsonSchema = getMealPlanEnrichmentResponseJsonSchemaForGemini();
 
     // Step 6: Generate attempt #1
     const gemini = getGeminiClient();
@@ -314,11 +314,8 @@ export class MealPlannerEnrichmentService {
       language,
     });
 
-    // Step 4: Convert Zod schema to JSON schema for single meal
-    const jsonSchema = zodToJsonSchema(enrichedMealSchema, {
-      name: 'EnrichedMeal',
-      target: 'openApi3',
-    });
+    // Step 4: Use flattened JSON schema (Gemini max nesting depth limit)
+    const jsonSchema = getEnrichedMealJsonSchemaForGemini();
 
     // Step 5: Generate attempt #1
     const gemini = getGeminiClient();

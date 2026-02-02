@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { MealPlanActions } from './MealPlanActions';
 import type { MealPlanResponse } from '@/src/lib/diets';
+import type { MealPlanStatus } from '@/src/lib/meal-plans/mealPlans.types';
 
 type GuardrailsViolationState = {
   reasonCodes: string[];
@@ -14,17 +15,32 @@ type GuardrailsViolationState = {
  * Client-only wrapper for MealPlanActions to prevent hydration mismatches
  * Headless UI generates random IDs that differ between server and client.
  * This component ensures the actions only render on the client side after hydration.
+ * Guardrails violation state is communicated to MealPlanPageWrapper via custom events (no callback from Server Component).
  */
 export function MealPlanActionsClient({
   planId,
   plan,
-  onGuardrailsViolation,
+  planStatus,
 }: {
   planId: string;
   plan: MealPlanResponse;
-  onGuardrailsViolation?: (violation: GuardrailsViolationState | null) => void;
+  planStatus?: MealPlanStatus;
 }) {
   const [mounted, setMounted] = useState(false);
+
+  const onGuardrailsViolation = useCallback(
+    (violation: GuardrailsViolationState | null) => {
+      if (typeof window === 'undefined') return;
+      if (violation) {
+        window.dispatchEvent(
+          new CustomEvent('guardrails-violation', { detail: violation }),
+        );
+      } else {
+        window.dispatchEvent(new CustomEvent('guardrails-violation-cleared'));
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     queueMicrotask(() => setMounted(true));
@@ -53,6 +69,7 @@ export function MealPlanActionsClient({
     <MealPlanActions
       planId={planId}
       plan={plan}
+      planStatus={planStatus}
       onGuardrailsViolation={onGuardrailsViolation}
     />
   );

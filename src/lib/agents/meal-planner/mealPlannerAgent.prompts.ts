@@ -191,6 +191,10 @@ export function buildMealPlanPrompt(input: {
   language?: 'nl' | 'en';
   /** Bij retry na FORCE-quotum-fout: zorg dat elke dag voldoende uit deze groepen bevat */
   forceDeficitHint?: ForceDeficitHint;
+  /** Compiled guardrails block rules (output of compileConstraintsForAI); when present, injects DIET CONSTRAINTS (MUST FOLLOW) section */
+  guardrailsConstraintsText?: string;
+  /** Shake/smoothie guidance text (from messages); when provided and user has shake/smoothie preference, injected in prompt */
+  shakeSmoothieGuidance?: string;
 }): string {
   const {
     request,
@@ -198,6 +202,8 @@ export function buildMealPlanPrompt(input: {
     candidates,
     language = 'nl',
     forceDeficitHint,
+    guardrailsConstraintsText,
+    shakeSmoothieGuidance: shakeSmoothieGuidanceOverride,
   } = input;
 
   const dateRange = formatDateRange(
@@ -258,6 +264,24 @@ export function buildMealPlanPrompt(input: {
           .join('\n')
       : '';
 
+  const hasShakeSmoothiePreference = (() => {
+    const all = [
+      ...(mealPrefs?.breakfast ?? []),
+      ...(mealPrefs?.lunch ?? []),
+      ...(mealPrefs?.dinner ?? []),
+    ];
+    const lower = all.join(' ').toLowerCase();
+    return (
+      lower.includes('shake') ||
+      lower.includes('smoothie') ||
+      lower.includes('eiwit shake')
+    );
+  })();
+  const shakeSmoothieGuidance =
+    hasShakeSmoothiePreference && shakeSmoothieGuidanceOverride
+      ? shakeSmoothieGuidanceOverride
+      : '';
+
   // Diet-specific rules summary
   const constraintSummary = buildConstraintSummary(rules);
 
@@ -281,8 +305,23 @@ CALORIE & MACRO TARGETS:
 ${calorieInfo ? `- ${calorieInfo}` : '- No specific calorie target'}
 ${prepTimeInfo ? `- ${prepTimeInfo}` : ''}
 
+${
+  (request.profile.allergies?.length ?? 0) > 0
+    ? `ALLERGIES (HARD – MUST NOT USE – food safety):
+- The user has allergies. You MUST NOT use these ingredients in ANY meal: ${request.profile.allergies.join(', ')}.
+- Do not use any ingredient that contains or matches these terms.\n`
+    : ''
+}
+${
+  (request.profile.dislikes?.length ?? 0) > 0
+    ? `DISLIKES (SOFT – avoid when possible):
+- The user prefers to avoid: ${request.profile.dislikes.join(', ')}.
+- Prefer meals without these ingredients.\n`
+    : ''
+}
+
 DIET RULES & CONSTRAINTS:
-${constraintSummary}
+${constraintSummary}${guardrailsConstraintsText !== undefined ? `\n\nDIET CONSTRAINTS (MUST FOLLOW):\n${guardrailsConstraintsText.trim() ? guardrailsConstraintsText.trim() : '(none)'}` : ''}
 ${
   forceDeficitHint && forceDeficitHint.categoryNames.length > 0
     ? `\nCRITICAL - DAG-QUOTUM (vorige poging afgekeurd): Zorg dat ELKE dag voldoende ingrediënten bevat uit deze groepen: ${forceDeficitHint.categoryNames.join(', ')}. Het dag-quotum voor deze groepen moet op elke afzonderlijke dag gehaald worden.\n`
@@ -292,8 +331,15 @@ ${
 ${additionalExclusions ? `\n${additionalExclusions}` : ''}
 ${preferredIngredients ? `\n${preferredIngredients}` : ''}
 ${mealPreferencesInfo ? `\nMEAL PREFERENCES (REQUIRED):\nThe user has REQUIRED preferences for meal types. You MUST generate meals that match these preferences:\n${mealPreferencesInfo}\n\nIMPORTANT: For each meal slot, the generated meal MUST match at least one of the specified preferences. For example, if breakfast preference is "eiwit shake", the breakfast meal MUST be an eiwit shake (protein shake), not eggs or other breakfast items.\n` : ''}
+${shakeSmoothieGuidance}
 
 ${candidates ? `\nAVAILABLE INGREDIENTS (CANDIDATE POOL):\nYou MUST choose ingredients ONLY from this list. Use the exact nevoCode values provided.\n${formatCandidatePool(candidates)}\n` : ''}
+
+VARIETY (HARD – no repetition on consecutive days):
+- Do NOT use the same meal (same name/same recipe) on two consecutive days for the same slot. Each day must have a different breakfast, different lunch, and different dinner than the previous day.
+
+LUNCH (SOFT – normal meals):
+- Lunch should normally be a proper meal (salad, soup, sandwich, warm dish, leftovers), not only a vegetable smoothie. Raw broccoli or vegetable-only smoothies for lunch are unusual unless the user explicitly prefers smoothies for lunch.
 
 CRITICAL REQUIREMENTS:
 1. Output MUST be exactly ONE valid JSON object conforming to the provided schema
@@ -343,6 +389,10 @@ export function buildMealPlanDayPrompt(input: {
   candidates?: CandidatePool;
   existingDay?: MealPlanResponse['days'][number];
   language?: 'nl' | 'en';
+  /** Compiled guardrails block rules (output of compileConstraintsForAI); when present, injects DIET CONSTRAINTS (MUST FOLLOW) section */
+  guardrailsConstraintsText?: string;
+  /** Shake/smoothie guidance (from messages); when provided and user has preference, injected in prompt */
+  shakeSmoothieGuidance?: string;
 }): string {
   const {
     date,
@@ -351,6 +401,8 @@ export function buildMealPlanDayPrompt(input: {
     candidates,
     existingDay,
     language = 'nl',
+    guardrailsConstraintsText,
+    shakeSmoothieGuidance: _shakeGuidance,
   } = input;
 
   const slots = formatMealSlots(request.slots);
@@ -406,6 +458,22 @@ export function buildMealPlanDayPrompt(input: {
           .filter(Boolean)
           .join('\n')
       : '';
+
+  const hasShakeSmoothiePreferenceDay = (() => {
+    const all = [
+      ...(mealPrefs?.breakfast ?? []),
+      ...(mealPrefs?.lunch ?? []),
+      ...(mealPrefs?.dinner ?? []),
+    ];
+    const lower = all.join(' ').toLowerCase();
+    return (
+      lower.includes('shake') ||
+      lower.includes('smoothie') ||
+      lower.includes('eiwit shake')
+    );
+  })();
+  const shakeSmoothieGuidanceDay =
+    hasShakeSmoothiePreferenceDay && _shakeGuidance ? _shakeGuidance : '';
 
   // Diet-specific rules summary
   const constraintSummary = buildConstraintSummary(rules);
@@ -463,12 +531,21 @@ CALORIE & MACRO TARGETS:
 ${calorieInfo ? `- ${calorieInfo}` : '- No specific calorie target'}
 ${prepTimeInfo ? `- ${prepTimeInfo}` : ''}
 
+${
+  (request.profile.allergies?.length ?? 0) > 0
+    ? `ALLERGIES (HARD – MUST NOT USE – food safety):
+- The user has allergies. You MUST NOT use these ingredients: ${request.profile.allergies.join(', ')}.\n`
+    : ''
+}
+${(request.profile.dislikes?.length ?? 0) > 0 ? `DISLIKES (SOFT – avoid): The user prefers to avoid: ${request.profile.dislikes.join(', ')}.\n` : ''}
+
 DIET RULES & CONSTRAINTS:
-${constraintSummary}
+${constraintSummary}${guardrailsConstraintsText !== undefined ? `\n\nDIET CONSTRAINTS (MUST FOLLOW):\n${guardrailsConstraintsText.trim() ? guardrailsConstraintsText.trim() : '(none)'}` : ''}
 
 ${additionalExclusions ? `\n${additionalExclusions}` : ''}
 ${preferredIngredients ? `\n${preferredIngredients}` : ''}
 ${mealPreferencesInfo ? `\nMEAL PREFERENCES (REQUIRED - HARD CONSTRAINT):\nThe user has REQUIRED preferences for meal types. You MUST generate meals that match these preferences:\n${mealPreferencesInfo}\n\nCRITICAL: For each meal slot, the generated meal MUST match at least one of the specified preferences. The meal name and ingredients MUST clearly reflect the preference.\n` : ''}
+${shakeSmoothieGuidanceDay}
 
 ${candidates ? `\nAVAILABLE INGREDIENTS (CANDIDATE POOL):\nYou MUST choose ingredients ONLY from this list. Use the exact nevoCode values provided.\n${formatCandidatePool(candidates)}\n` : ''}
 
@@ -529,6 +606,10 @@ export function buildMealPrompt(input: {
     avoidIngredients?: string[];
   };
   language?: 'nl' | 'en';
+  /** Compiled guardrails block rules (output of compileConstraintsForAI); when present, injects DIET CONSTRAINTS (MUST FOLLOW) section */
+  guardrailsConstraintsText?: string;
+  /** Shake/smoothie guidance (from messages); when provided and user has preference, injected in prompt */
+  shakeSmoothieGuidance?: string;
 }): string {
   const {
     date,
@@ -539,6 +620,8 @@ export function buildMealPrompt(input: {
     existingMeal,
     constraints,
     language = 'nl',
+    guardrailsConstraintsText,
+    shakeSmoothieGuidance: shakeGuidanceMeal,
   } = input;
 
   // Calorie target
@@ -595,6 +678,17 @@ export function buildMealPrompt(input: {
     mealPreferenceForSlot && mealPreferenceForSlot.length > 0
       ? `REQUIRED MEAL PREFERENCE for ${mealSlot}: ${mealPreferenceForSlot.join(', ')}. The generated meal MUST match this preference. For example, if the preference is "eiwit shake", the meal MUST be an eiwit shake (protein shake) with protein powder ingredients, not eggs, toast, or other items. The meal name and ingredients MUST clearly reflect the preference.`
       : '';
+
+  const hasShakeSmoothieForSlot = (() => {
+    const lower = (mealPreferenceForSlot ?? []).join(' ').toLowerCase();
+    return (
+      lower.includes('shake') ||
+      lower.includes('smoothie') ||
+      lower.includes('eiwit shake')
+    );
+  })();
+  const shakeSmoothieGuidanceMeal =
+    hasShakeSmoothieForSlot && shakeGuidanceMeal ? shakeGuidanceMeal : '';
 
   // Constraint overrides
   const constraintOverrides: string[] = [];
@@ -662,11 +756,12 @@ ${calorieInfo ? `- ${calorieInfo}` : '- No specific calorie target for this meal
 ${prepTimeInfo ? `- ${prepTimeInfo}` : ''}
 
 DIET RULES & CONSTRAINTS:
-${constraintSummary}
+${constraintSummary}${guardrailsConstraintsText !== undefined ? `\n\nDIET CONSTRAINTS (MUST FOLLOW):\n${guardrailsConstraintsText.trim() ? guardrailsConstraintsText.trim() : '(none)'}` : ''}
 
 ${exclusionsInfo ? `\n${exclusionsInfo}` : ''}
 ${preferredIngredients ? `\n${preferredIngredients}` : ''}
 ${mealPreferenceInfo ? `\n${mealPreferenceInfo}` : ''}
+${shakeSmoothieGuidanceMeal}
 ${constraintOverrides.length > 0 ? `\nCONSTRAINT OVERRIDES:\n${constraintOverrides.map((c) => `- ${c}`).join('\n')}` : ''}
 
 ${candidates ? `\nAVAILABLE INGREDIENTS (CANDIDATE POOL):\nYou MUST choose ingredients ONLY from this list. Use the exact nevoCode values provided.\n${formatCandidatePool(candidates)}\n` : ''}

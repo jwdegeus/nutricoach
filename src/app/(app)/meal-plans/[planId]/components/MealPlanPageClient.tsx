@@ -2,6 +2,7 @@
 
 import type { MealPlanResponse } from '@/src/lib/diets';
 import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
+import type { MealPlanStatus } from '@/src/lib/meal-plans/mealPlans.types';
 import { MealPlanCards } from './MealPlanCards';
 
 type MealPlanPageClientProps = {
@@ -9,6 +10,7 @@ type MealPlanPageClientProps = {
   plan: MealPlanResponse;
   enrichment?: MealPlanEnrichmentResponse | null;
   nevoFoodNamesByCode: Record<string, string>;
+  planStatus?: MealPlanStatus;
 };
 
 export function MealPlanPageClient({
@@ -16,6 +18,7 @@ export function MealPlanPageClient({
   plan,
   enrichment,
   nevoFoodNamesByCode,
+  planStatus,
 }: MealPlanPageClientProps) {
   return (
     <MealPlanCards
@@ -23,6 +26,7 @@ export function MealPlanPageClient({
       plan={plan}
       enrichment={enrichment}
       nevoFoodNamesByCode={nevoFoodNamesByCode}
+      planStatus={planStatus}
     />
   );
 }

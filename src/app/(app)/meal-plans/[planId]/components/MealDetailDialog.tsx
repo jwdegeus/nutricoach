@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -8,12 +9,20 @@ import {
   DialogActions,
 } from '@/components/catalyst/dialog';
 import { Button } from '@/components/catalyst/button';
-import { Clock, UtensilsCrossed, ChefHat } from 'lucide-react';
+import {
+  Clock,
+  UtensilsCrossed,
+  ChefHat,
+  BookMarked,
+  Loader2,
+} from 'lucide-react';
 import type { MealPlanResponse } from '@/src/lib/diets';
 import type {
   EnrichedMeal,
   CookPlanDay,
 } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
+import { useToast } from '@/src/components/app/ToastContext';
+import { addMealToRecipesAction } from '../actions/addMealToRecipes.actions';
 
 type MealDetailDialogProps = {
   open: boolean;
@@ -22,6 +31,8 @@ type MealDetailDialogProps = {
   enrichedMeal?: EnrichedMeal;
   cookPlanDay?: CookPlanDay;
   nevoFoodNamesByCode: Record<string, string>;
+  /** When set, shows "Toevoegen aan recepten" to save this meal to the recipes database */
+  planId?: string;
 };
 
 export function MealDetailDialog({
@@ -31,7 +42,11 @@ export function MealDetailDialog({
   enrichedMeal,
   cookPlanDay,
   nevoFoodNamesByCode,
+  planId,
 }: MealDetailDialogProps) {
+  const { showToast } = useToast();
+  const [addingToRecipes, setAddingToRecipes] = useState(false);
+  const [addedRecipeId, setAddedRecipeId] = useState<string | null>(null);
   const formatMealSlot = (slot: string) => {
     const slotMap: Record<string, string> = {
       breakfast: 'Ontbijt',
@@ -51,6 +66,32 @@ export function MealDetailDialog({
       month: 'long',
       day: 'numeric',
     });
+  };
+
+  const handleAddToRecipes = async () => {
+    if (!planId) return;
+    setAddingToRecipes(true);
+    setAddedRecipeId(null);
+    try {
+      const result = await addMealToRecipesAction({
+        planId,
+        meal,
+        enrichedMeal: enrichedMeal ?? null,
+        nevoFoodNamesByCode,
+      });
+      if (result.ok) {
+        setAddedRecipeId(result.recipeId);
+        showToast({
+          type: 'success',
+          title: 'Recept toegevoegd',
+          description: 'Het recept staat nu in je receptenoverzicht.',
+        });
+      } else {
+        showToast({ type: 'error', title: result.error.message });
+      }
+    } finally {
+      setAddingToRecipes(false);
+    }
   };
 
   return (
@@ -262,6 +303,29 @@ export function MealDetailDialog({
       </DialogBody>
 
       <DialogActions>
+        {planId && (
+          <>
+            {addedRecipeId ? (
+              <Button color="green" href={`/recipes/${addedRecipeId}`}>
+                <BookMarked className="h-4 w-4" />
+                Naar recept
+              </Button>
+            ) : (
+              <Button
+                plain
+                onClick={handleAddToRecipes}
+                disabled={addingToRecipes}
+              >
+                {addingToRecipes ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <BookMarked className="h-4 w-4" />
+                )}
+                Toevoegen aan recepten
+              </Button>
+            )}
+          </>
+        )}
         <Button onClick={onClose}>Sluiten</Button>
       </DialogActions>
     </Dialog>

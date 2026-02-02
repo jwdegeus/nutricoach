@@ -31,7 +31,7 @@ export default async function CalendarPage() {
           Maaltijd Kalender
         </h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Bekijk alle maaltijden per dag uit al je meal plans
+          Bekijk alle maaltijden per dag uit al je weekmenu&apos;s
         </p>
       </div>
 

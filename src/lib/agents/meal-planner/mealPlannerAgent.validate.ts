@@ -17,6 +17,8 @@ import {
   verifyNevoCode,
   adjustDayQuantitiesToTargets,
 } from './mealPlannerAgent.tools';
+import { getMealPlannerConfig } from '@/src/lib/meal-plans/mealPlans.config';
+import { getIngredientCategories } from '@/src/lib/diet-validation/ingredient-categorizer';
 
 /**
  * Validation issue found in the meal plan
@@ -25,6 +27,7 @@ export type ValidationIssue = {
   path: string; // e.g., "days[0].meals[0].ingredients[2]"
   code:
     | 'FORBIDDEN_INGREDIENT'
+    | 'FORBIDDEN_IN_SHAKE_SMOOTHIE'
     | 'ALLERGEN_PRESENT'
     | 'DISLIKED_INGREDIENT'
     | 'MISSING_REQUIRED_CATEGORY'
@@ -34,6 +37,37 @@ export type ValidationIssue = {
     | 'MEAL_PREFERENCE_MISS';
   message: string;
 };
+
+/** Strip invisible/Unicode space so "[]" and "[]\u200b" both normalize to "[]". */
+function normalizePreferenceString(s: string): string {
+  return s.replace(/[\u200b\u200c\u200d\ufeff]/g, '').trim();
+}
+
+/** Treat empty JSON-like strings as "no preference" so we skip MEAL_PREFERENCE_MISS. */
+function isEmptyJsonLike(s: string): boolean {
+  if (!s || typeof s !== 'string') return false;
+  const t = normalizePreferenceString(s);
+  if (t.length < 2) return false;
+  if (t === '[]' || t === '{}') return true;
+  if (/^\s*\[\s*\]\s*$/.test(t) || /^\s*\{\s*\}\s*$/.test(t)) return true;
+  try {
+    const x = JSON.parse(t);
+    if (Array.isArray(x)) {
+      if (x.length === 0) return true;
+      if (
+        x.every(
+          (el) =>
+            typeof el === 'string' &&
+            isEmptyJsonLike(normalizePreferenceString(el)),
+        )
+      )
+        return true;
+    }
+    return typeof x === 'object' && x !== null && Object.keys(x).length === 0;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Case-insensitive substring match
@@ -46,7 +80,8 @@ function matchesIngredient(
 }
 
 /**
- * Check if an ingredient matches any forbidden items or categories
+ * Check if an ingredient matches any forbidden items or categories.
+ * Uses both constraint items, tags, and name-based category detection (grains, dairy, legumes, etc.).
  */
 function isForbiddenIngredient(
   ingredientName: string,
@@ -58,7 +93,7 @@ function isForbiddenIngredient(
     if (constraint.constraintType !== 'hard') continue;
     if (constraint.type !== 'forbidden') continue;
 
-    // Check items
+    // Check items (e.g. user allergies as forbidden items)
     if (constraint.items.length > 0) {
       for (const item of constraint.items) {
         if (matchesIngredient(ingredientName, item)) {
@@ -67,10 +102,20 @@ function isForbiddenIngredient(
       }
     }
 
-    // Check categories via tags
+    // Check categories via tags (e.g. NEVO food_group_nl)
     if (constraint.categories && tags) {
       for (const category of constraint.categories) {
         if (tags.some((tag) => matchesIngredient(tag, category))) {
+          return true;
+        }
+      }
+    }
+
+    // Check categories via ingredient name (e.g. "Melk magere" -> dairy, "Rijst" -> grains)
+    if (constraint.categories?.length && ingredientName?.trim()) {
+      const nameCategories = getIngredientCategories(ingredientName);
+      for (const category of constraint.categories) {
+        if (nameCategories.includes(category)) {
           return true;
         }
       }
@@ -81,24 +126,166 @@ function isForbiddenIngredient(
 }
 
 /**
- * Check if an ingredient matches user allergies
+ * Allergen -> ingredient terms that indicate that allergen (Dutch + English).
+ * Used so "Eieren" matches "eiwit", "kippenei", "ei"; "Lactose" matches "melk", "yoghurt", etc.
+ */
+const ALLERGEN_INGREDIENT_TERMS: Record<string, string[]> = {
+  eieren: ['ei', 'eieren', 'eiwit', 'kippenei', 'eidooier', 'egg'],
+  lactose: [
+    'lactose',
+    'melk',
+    'yoghurt',
+    'kwark',
+    'kaas',
+    'room',
+    'boter',
+    'zuivel',
+    'milk',
+    'cheese',
+    'yogurt',
+  ],
+  gluten: [
+    'gluten',
+    'tarwe',
+    'rogge',
+    'gerst',
+    'brood',
+    'pasta',
+    'wheat',
+    'bread',
+  ],
+  peulvruchten: [
+    'peulvruchten',
+    'linzen',
+    'bonen',
+    'kikkererwten',
+    'erwten',
+    'pinda',
+    'lentils',
+    'beans',
+    'chickpeas',
+    'peanuts',
+  ],
+  nachtschades: [
+    'nachtschades',
+    'tomaat',
+    'paprika',
+    'aardappel',
+    'aubergine',
+    'tomato',
+    'potato',
+    'eggplant',
+    'bell_pepper',
+  ],
+  noten: [
+    'noten',
+    'amandel',
+    'cashew',
+    'walnoot',
+    'hazelnoot',
+    'nuts',
+    'almond',
+    'walnut',
+  ],
+  pinda: ['pinda', "pinda's", 'peanut'],
+  vis: ['vis', 'zalm', 'tonijn', 'fish', 'salmon', 'tuna'],
+  schaal: [
+    'garnalen',
+    'kreeft',
+    'krab',
+    'schelpdieren',
+    'shellfish',
+    'shrimp',
+    'lobster',
+    'crab',
+  ],
+  soja: ['soja', 'sojamelk', 'tofu', 'tempeh', 'soy'],
+  'schaal- en schelpdieren': [
+    'garnalen',
+    'kreeft',
+    'krab',
+    'schelpdieren',
+    'shellfish',
+    'shrimp',
+    'lobster',
+    'crab',
+  ],
+};
+
+function getAllergenTerms(allergen: string): string[] {
+  const key = allergen.toLowerCase().trim();
+  const expanded = ALLERGEN_INGREDIENT_TERMS[key];
+  return expanded ? [key, ...expanded] : [key];
+}
+
+/**
+ * Returns all ingredient terms to exclude from the candidate pool when user has these allergies.
+ * Used so the pool does not contain yoghurt/melk when user has Lactose, etc.
+ */
+export function getExpandedAllergenTermsForExclusion(
+  allergies: string[],
+): string[] {
+  const set = new Set<string>();
+  for (const a of allergies) {
+    for (const t of getAllergenTerms(a)) {
+      if (t?.trim()) set.add(t.toLowerCase().trim());
+    }
+  }
+  return Array.from(set);
+}
+
+/** Terms to skip when matching tags only (avoid false positives: "eiwit"/"ei" in tags = protein, not egg). */
+const EGG_TAG_EXCLUDED_TERMS = new Set(['eiwit', 'ei']);
+
+/** Whether character is a letter (a-z). */
+function isLetter(c: string): boolean {
+  return /^[a-z]$/.test(c);
+}
+
+/**
+ * Check if text contains term, optionally with word-boundary for short terms
+ * so "ei" matches "eiwit"/"kippenei" but not "verrijkt"/"bereid".
+ */
+function textContainsAllergenTerm(text: string, term: string): boolean {
+  const lower = text.toLowerCase();
+  const len = term.length;
+  if (len === 0) return false;
+  let idx = lower.indexOf(term);
+  while (idx !== -1) {
+    const beforeOk = idx === 0 || !isLetter(lower[idx - 1] ?? '');
+    const afterOk =
+      idx + len >= lower.length || !isLetter(lower[idx + len] ?? '');
+    if (beforeOk || afterOk) return true;
+    idx = lower.indexOf(term, idx + 1);
+  }
+  return false;
+}
+
+/**
+ * Check if an ingredient matches user allergies.
+ * Uses allergen name and expanded ingredient terms (e.g. Eieren -> ei, kippenei, eiwit).
+ * Short terms (e.g. "ei") match only at word boundaries to avoid false positives (verrijkt, bereid).
+ * For tags we skip "eiwit" for Eieren allergy to avoid matching NEVO/tag "eiwit" (protein content).
  */
 function isAllergen(
   ingredientName: string,
   tags: string[] | undefined,
   allergies: string[],
 ): boolean {
+  const nameLower = ingredientName.toLowerCase();
   for (const allergen of allergies) {
-    if (matchesIngredient(ingredientName, allergen)) {
-      return true;
+    const key = allergen.toLowerCase().trim();
+    const terms = getAllergenTerms(allergen);
+    const termsForTags =
+      key === 'eieren'
+        ? terms.filter((t) => !EGG_TAG_EXCLUDED_TERMS.has(t.toLowerCase()))
+        : terms;
+    for (const term of terms) {
+      if (textContainsAllergenTerm(nameLower, term)) return true;
     }
-    // Also check tags
-    if (tags) {
-      for (const tag of tags) {
-        if (matchesIngredient(tag, allergen)) {
-          return true;
-        }
-      }
+    for (const term of termsForTags) {
+      if (tags?.some((t) => textContainsAllergenTerm(t.toLowerCase(), term)))
+        return true;
     }
   }
   return false;
@@ -123,6 +310,81 @@ function isDisliked(
           return true;
         }
       }
+    }
+  }
+  return false;
+}
+
+function isForbiddenInShakeSmoothie(displayName: string): boolean {
+  if (!displayName || !displayName.trim()) return false;
+  const patterns = getMealPlannerConfig().forbiddenPatternsInShakeSmoothie;
+  if (!patterns.length) return false;
+  const lower = displayName.toLowerCase();
+  return patterns.some(
+    (p) => p?.trim() && lower.includes(p.trim().toLowerCase()),
+  );
+}
+
+function isShakeOrSmoothieMeal(meal: {
+  name?: string;
+  slot?: string;
+  title?: string;
+}): boolean {
+  const name = ((meal.name ?? '') + ' ' + (meal.title ?? '')).toLowerCase();
+  return (
+    name.includes('shake') ||
+    name.includes('smoothie') ||
+    name.includes('eiwitshake')
+  );
+}
+
+/** Terms that indicate meat/chicken/fish (NL + EN); matched with word boundaries. */
+const MEAT_FISH_TERMS = [
+  'kip',
+  'kipfilet',
+  'kalkoen',
+  'rund',
+  'gehakt',
+  'varken',
+  'speklap',
+  'vis',
+  'zalm',
+  'tonijn',
+  'chicken',
+  'turkey',
+  'beef',
+  'pork',
+  'fish',
+  'salmon',
+  'tuna',
+];
+
+const MEAT_FISH_REGEX = new RegExp(`\\b(${MEAT_FISH_TERMS.join('|')})\\b`, 'i');
+
+/** Exclude "vis" match when text is about vitamins (vitamine/vitamines) to avoid false positive. */
+function isVitaminContext(text: string): boolean {
+  const lower = text.toLowerCase();
+  return lower.includes('vitamine') || lower.includes('vitamin');
+}
+
+/**
+ * Check if an ingredient is meat/chicken/fish (by name or tags).
+ * Uses word-boundary regex to limit false positives.
+ * Excludes "vis" when the text is about vitamins (vitamines).
+ */
+function isMeatFishIngredient(
+  name: string | undefined,
+  tags: string[] | undefined,
+): boolean {
+  const check = (t: string): boolean => {
+    if (!t?.trim()) return false;
+    if (isVitaminContext(t) && /\bvis\b/i.test(t)) return false;
+    return MEAT_FISH_REGEX.test(t);
+  };
+  if (name && check(name)) return true;
+  if (tags?.length) {
+    for (const tag of tags) {
+      if (typeof tag === 'string' && check(tag)) return true;
     }
   }
   return false;
@@ -351,12 +613,20 @@ export async function validateHardConstraints(args: {
       const meal = day.meals[mealIndex];
       const mealPath = `days[${dayIndex}].meals[${mealIndex}]`;
 
-      // Validate meal preferences (hard constraint)
+      // Validate meal preferences (hard constraint) – only when slot has real preferences
       const mealPreferences = request.profile.mealPreferences;
       if (mealPreferences) {
-        const slotPreferences =
-          mealPreferences[meal.slot as keyof typeof mealPreferences];
-        if (slotPreferences && slotPreferences.length > 0) {
+        const raw = mealPreferences[meal.slot as keyof typeof mealPreferences];
+        const slotPreferences = Array.isArray(raw)
+          ? (raw as string[])
+              .filter(
+                (p): p is string =>
+                  typeof p === 'string' &&
+                  normalizePreferenceString(p).length > 0,
+              )
+              .filter((p) => !isEmptyJsonLike(normalizePreferenceString(p)))
+          : [];
+        if (slotPreferences.length > 0) {
           const { mealMatchesPreferences } =
             await import('@/src/lib/meal-history/mealPreferenceMatcher');
           const matches = mealMatchesPreferences(
@@ -412,6 +682,30 @@ export async function validateHardConstraints(args: {
               message: `Ingredient "${ingredient.name}" is forbidden by diet rules`,
             });
           }
+
+          // Food safety: raw chicken egg in shakes/smoothies is forbidden
+          if (
+            isShakeOrSmoothieMeal(meal) &&
+            isForbiddenInShakeSmoothie(ingredient.name ?? '')
+          ) {
+            issues.push({
+              path,
+              code: 'FORBIDDEN_INGREDIENT',
+              message: `Ei (rauw of gebakken) mag niet in een shake/smoothie. Gebruik yoghurt, melk, kwark of eiwitpoeder voor eiwit.`,
+            });
+          }
+
+          // Hard constraint: no meat/chicken/fish in shake/smoothie
+          if (
+            isShakeOrSmoothieMeal(meal) &&
+            isMeatFishIngredient(ingredient.name, ingredient.tags)
+          ) {
+            issues.push({
+              path,
+              code: 'FORBIDDEN_IN_SHAKE_SMOOTHIE',
+              message: `Shake/smoothie mag geen vlees/kip/vis bevatten.`,
+            });
+          }
         }
       }
 
@@ -450,6 +744,41 @@ export async function validateHardConstraints(args: {
                 message: `Ingredient "${ref.displayName}" (nevoCode: ${ref.nevoCode}) is forbidden by diet rules`,
               });
             }
+
+            // Food safety: raw chicken egg in shakes/smoothies is forbidden
+            if (
+              isShakeOrSmoothieMeal(meal) &&
+              isForbiddenInShakeSmoothie(ref.displayName ?? '')
+            ) {
+              issues.push({
+                path,
+                code: 'FORBIDDEN_INGREDIENT',
+                message: `Ei (rauw of gebakken) mag niet in een shake/smoothie. Gebruik yoghurt, melk, kwark of eiwitpoeder voor eiwit.`,
+              });
+            }
+
+            // Hard constraint: no meat/chicken/fish in shake/smoothie
+            if (
+              isShakeOrSmoothieMeal(meal) &&
+              isMeatFishIngredient(ref.displayName, ref.tags)
+            ) {
+              issues.push({
+                path,
+                code: 'FORBIDDEN_IN_SHAKE_SMOOTHIE',
+                message: `Shake/smoothie mag geen vlees/kip/vis bevatten.`,
+              });
+            }
+          } else if (
+            isShakeOrSmoothieMeal(meal) &&
+            ref.tags?.length &&
+            isMeatFishIngredient(undefined, ref.tags)
+          ) {
+            // No displayName but tags present: still check tags for meat/fish
+            issues.push({
+              path,
+              code: 'FORBIDDEN_IN_SHAKE_SMOOTHIE',
+              message: `Shake/smoothie mag geen vlees/kip/vis bevatten.`,
+            });
           }
         }
       }
@@ -503,12 +832,20 @@ export async function validateDayHardConstraints(args: {
     const meal = day.meals[mealIndex];
     const mealPath = `days[${dayIndex}].meals[${mealIndex}]`;
 
-    // Validate meal preferences (hard constraint)
+    // Validate meal preferences (hard constraint) – only when slot has real preferences
     const mealPreferences = request.profile.mealPreferences;
     if (mealPreferences) {
-      const slotPreferences =
-        mealPreferences[meal.slot as keyof typeof mealPreferences];
-      if (slotPreferences && slotPreferences.length > 0) {
+      const raw = mealPreferences[meal.slot as keyof typeof mealPreferences];
+      const slotPreferences = Array.isArray(raw)
+        ? (raw as string[])
+            .filter(
+              (p): p is string =>
+                typeof p === 'string' &&
+                normalizePreferenceString(p).length > 0,
+            )
+            .filter((p) => !isEmptyJsonLike(normalizePreferenceString(p)))
+        : [];
+      if (slotPreferences.length > 0) {
         const { mealMatchesPreferences } =
           await import('@/src/lib/meal-history/mealPreferenceMatcher');
         const matches = mealMatchesPreferences(
@@ -564,6 +901,30 @@ export async function validateDayHardConstraints(args: {
             message: `Ingredient "${ingredient.name}" is forbidden by diet rules`,
           });
         }
+
+        // Food safety: raw chicken egg in shakes/smoothies is forbidden
+        if (
+          isShakeOrSmoothieMeal(meal) &&
+          isForbiddenInShakeSmoothie(ingredient.name ?? '')
+        ) {
+          issues.push({
+            path,
+            code: 'FORBIDDEN_INGREDIENT',
+            message: `Ei (rauw of gebakken) mag niet in een shake/smoothie. Gebruik yoghurt, melk, kwark of eiwitpoeder voor eiwit.`,
+          });
+        }
+
+        // Hard constraint: no meat/chicken/fish in shake/smoothie
+        if (
+          isShakeOrSmoothieMeal(meal) &&
+          isMeatFishIngredient(ingredient.name, ingredient.tags)
+        ) {
+          issues.push({
+            path,
+            code: 'FORBIDDEN_IN_SHAKE_SMOOTHIE',
+            message: `Shake/smoothie mag geen vlees/kip/vis bevatten.`,
+          });
+        }
       }
     }
 
@@ -602,6 +963,40 @@ export async function validateDayHardConstraints(args: {
               message: `Ingredient "${ref.displayName}" (nevoCode: ${ref.nevoCode}) is forbidden by diet rules`,
             });
           }
+
+          // Food safety: raw chicken egg in shakes/smoothies is forbidden
+          if (
+            isShakeOrSmoothieMeal(meal) &&
+            isForbiddenInShakeSmoothie(ref.displayName ?? '')
+          ) {
+            issues.push({
+              path,
+              code: 'FORBIDDEN_INGREDIENT',
+              message: `Ei (rauw of gebakken) mag niet in een shake/smoothie. Gebruik yoghurt, melk, kwark of eiwitpoeder voor eiwit.`,
+            });
+          }
+
+          // Hard constraint: no meat/chicken/fish in shake/smoothie
+          if (
+            isShakeOrSmoothieMeal(meal) &&
+            isMeatFishIngredient(ref.displayName, ref.tags)
+          ) {
+            issues.push({
+              path,
+              code: 'FORBIDDEN_IN_SHAKE_SMOOTHIE',
+              message: `Shake/smoothie mag geen vlees/kip/vis bevatten.`,
+            });
+          }
+        } else if (
+          isShakeOrSmoothieMeal(meal) &&
+          ref.tags?.length &&
+          isMeatFishIngredient(undefined, ref.tags)
+        ) {
+          issues.push({
+            path,
+            code: 'FORBIDDEN_IN_SHAKE_SMOOTHIE',
+            message: `Shake/smoothie mag geen vlees/kip/vis bevatten.`,
+          });
         }
 
         // Verify NEVO code exists

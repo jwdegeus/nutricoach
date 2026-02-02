@@ -3,6 +3,7 @@
 import { createClient } from '@/src/lib/supabase/server';
 import { MealPlansService } from '@/src/lib/meal-plans/mealPlans.service';
 import { AppError } from '@/src/lib/errors/app-error';
+import { createInboxNotificationAction } from '@/src/app/(app)/inbox/actions/inboxNotifications.actions';
 import type {
   CreateMealPlanInput,
   RegenerateMealPlanInput,
@@ -96,43 +97,46 @@ export async function createMealPlanAction(
       data: result,
     };
   } catch (error) {
-    // Handle AppError directly
+    type ErrorPayload = NonNullable<
+      Extract<ActionResult<{ planId: string }>, { ok: false }>['error']
+    >;
+    let err: ErrorPayload;
     if (error instanceof AppError) {
-      return {
-        ok: false,
-        error: {
-          code: error.code,
-          message: error.safeMessage,
-          ...(error.guardrailsDetails && { details: error.guardrailsDetails }),
-        },
+      err = {
+        code: error.code,
+        message: error.safeMessage,
+        ...(error.guardrailsDetails && { details: error.guardrailsDetails }),
       };
+    } else {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      let code: 'VALIDATION_ERROR' | 'DB_ERROR' | 'AGENT_ERROR' = 'DB_ERROR';
+      if (
+        errorMessage.includes('validation') ||
+        errorMessage.includes('Invalid')
+      ) {
+        code = 'VALIDATION_ERROR';
+      } else if (
+        errorMessage.includes('Gemini') ||
+        errorMessage.includes('agent')
+      ) {
+        code = 'AGENT_ERROR';
+      }
+      err = { code, message: errorMessage };
     }
 
-    // Fallback for other errors
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-
-    // Determine error code
-    let code: 'VALIDATION_ERROR' | 'DB_ERROR' | 'AGENT_ERROR' = 'DB_ERROR';
-    if (
-      errorMessage.includes('validation') ||
-      errorMessage.includes('Invalid')
-    ) {
-      code = 'VALIDATION_ERROR';
-    } else if (
-      errorMessage.includes('Gemini') ||
-      errorMessage.includes('agent')
-    ) {
-      code = 'AGENT_ERROR';
+    try {
+      await createInboxNotificationAction({
+        type: 'meal_plan_generation_failed',
+        title: 'Weekmenu generatie mislukt',
+        message: 'Open het weekmenu en probeer opnieuw.',
+        details: { errorCode: err.code },
+      });
+    } catch {
+      // Non-blocking: keep original error response
     }
 
-    return {
-      ok: false,
-      error: {
-        code,
-        message: errorMessage,
-      },
-    };
+    return { ok: false, error: err };
   }
 }
 

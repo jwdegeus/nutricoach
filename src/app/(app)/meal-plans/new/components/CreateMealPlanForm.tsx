@@ -91,7 +91,7 @@ export function CreateMealPlanForm() {
         if (elapsed < 5000) {
           setProgress('Profiel laden...');
         } else if (elapsed < 15000) {
-          setProgress('Meal plan genereren...');
+          setProgress('Weekmenu genereren...');
         } else if (elapsed < 25000) {
           setProgress('Plan valideren...');
         } else if (elapsed < 35000) {
@@ -202,7 +202,7 @@ export function CreateMealPlanForm() {
         }
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : 'Fout bij aanmaken meal plan',
+          err instanceof Error ? err.message : 'Fout bij aanmaken weekmenu',
         );
         setHasSubmitted(false);
         if (typeof window !== 'undefined') {
@@ -279,7 +279,7 @@ export function CreateMealPlanForm() {
         }
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : 'Fout bij aanmaken meal plan',
+          err instanceof Error ? err.message : 'Fout bij aanmaken weekmenu',
         );
         setHasSubmitted(false);
         if (typeof window !== 'undefined') {
@@ -295,7 +295,7 @@ export function CreateMealPlanForm() {
   if (guardrailsViolation) {
     return (
       <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        <Heading>Plan Instellingen</Heading>
+        <Heading>Weekmenu-instellingen</Heading>
         <div className="mt-4">
           <GuardrailsViolationEmptyState
             reasonCodes={guardrailsViolation.reasonCodes}
@@ -313,7 +313,7 @@ export function CreateMealPlanForm() {
 
   return (
     <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-      <Heading>Plan Instellingen</Heading>
+      <Heading>Weekmenu-instellingen</Heading>
       <div className="mt-4">
         <form
           onSubmit={handleSubmit}
@@ -334,7 +334,7 @@ export function CreateMealPlanForm() {
               disabled={isPending}
               required
             />
-            <Description>De eerste dag van je meal plan</Description>
+            <Description>De eerste dag van je weekmenu</Description>
           </Field>
 
           <Field>
@@ -348,7 +348,7 @@ export function CreateMealPlanForm() {
               disabled={isPending}
               required
             />
-            <Description>Aantal dagen voor het meal plan (1-30)</Description>
+            <Description>Aantal dagen voor het weekmenu (1-30)</Description>
           </Field>
 
           {error && (
@@ -402,7 +402,7 @@ export function CreateMealPlanForm() {
               ) : (
                 <>
                   <Calendar className="h-4 w-4 mr-2" />
-                  Genereer Meal Plan
+                  Genereer weekmenu
                 </>
               )}
             </Button>

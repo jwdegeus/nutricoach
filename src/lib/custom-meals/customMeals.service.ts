@@ -18,7 +18,7 @@ export type CustomMealRecord = {
   name: string;
   mealSlot: MealSlot;
   dietKey: DietKey | null;
-  sourceType: 'photo' | 'screenshot' | 'file' | 'gemini';
+  sourceType: 'photo' | 'screenshot' | 'file' | 'gemini' | 'meal_plan';
   sourceImageUrl: string | null;
   sourceImagePath: string | null;
   source: string | null;
@@ -48,7 +48,7 @@ export type CreateCustomMealInput = {
   name: string;
   mealSlot: MealSlot;
   dietKey?: DietKey;
-  sourceType: 'photo' | 'screenshot' | 'file' | 'gemini';
+  sourceType: 'photo' | 'screenshot' | 'file' | 'gemini' | 'meal_plan';
   sourceImageUrl?: string;
   sourceImagePath?: string;
   aiAnalysis?: Record<string, unknown>;

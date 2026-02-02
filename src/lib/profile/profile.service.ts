@@ -6,6 +6,7 @@
  */
 
 import 'server-only';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/src/lib/supabase/server';
 import type { DietProfile } from '@/src/lib/diets';
 import { dietProfileSchema } from '@/src/lib/diets';
@@ -20,17 +21,19 @@ import {
  */
 export class ProfileService {
   /**
-   * Load DietProfile for a user
-   *
-   * Combines data from user_preferences and user_diet_profiles tables
-   * to build a complete DietProfile.
+   * Load DietProfile for a user.
+   * When supabaseAdmin is provided (e.g. system/cron path), uses that client.
    *
    * @param userId - User ID
+   * @param supabaseAdmin - Optional; when provided uses this client instead of createClient()
    * @returns DietProfile
    * @throws Error if profile not found or incomplete
    */
-  async loadDietProfileForUser(userId: string): Promise<DietProfile> {
-    const supabase = await createClient();
+  async loadDietProfileForUser(
+    userId: string,
+    supabaseAdmin?: SupabaseClient,
+  ): Promise<DietProfile> {
+    const supabase = supabaseAdmin ?? (await createClient());
 
     // Load user preferences
     const { data: preferences, error: prefsError } = await supabase
@@ -155,13 +158,18 @@ export class ProfileService {
   }
 
   /**
-   * Get user language preference
+   * Get user language preference.
+   * When supabaseAdmin is provided (e.g. system/cron path), uses that client.
    *
    * @param userId - User ID
+   * @param supabaseAdmin - Optional; when provided uses this client
    * @returns Language code ('nl' or 'en'), defaults to 'nl'
    */
-  async getUserLanguage(userId: string): Promise<'nl' | 'en'> {
-    const supabase = await createClient();
+  async getUserLanguage(
+    userId: string,
+    supabaseAdmin?: SupabaseClient,
+  ): Promise<'nl' | 'en'> {
+    const supabase = supabaseAdmin ?? (await createClient());
 
     const { data: preferences, error } = await supabase
       .from('user_preferences')

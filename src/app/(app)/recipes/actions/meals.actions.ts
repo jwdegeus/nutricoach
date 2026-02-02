@@ -743,7 +743,8 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
         quantity?: number;
       };
       updatedMealData.ingredientRefs = updatedMealData.ingredientRefs.map(
-        (ref: RefLike) => {
+        (ref: RefLike | null | undefined) => {
+          if (ref == null || typeof ref !== 'object') return ref;
           const next: Record<string, unknown> = { ...ref };
           const currentG = ref.quantityG ?? ref.quantity_g;
           if (typeof currentG === 'number' && currentG > 0) {
@@ -1247,15 +1248,8 @@ export async function getMealByIdAction(
         ...meal,
         userRating: ratingData?.user_rating || null,
         notes,
+        source_image_url: meal.sourceImageUrl ?? null,
       };
-
-      // Debug logging for image URL
-      console.log('[getMealByIdAction] Custom meal loaded:', {
-        id: meal.id,
-        name: meal.name,
-        sourceImageUrl: meal.sourceImageUrl,
-        sourceImagePath: meal.sourceImagePath,
-      });
 
       return {
         ok: true,
@@ -1290,6 +1284,18 @@ export async function getMealByIdAction(
         };
       }
 
+      // meal_history has no image columns; use image from meal_data if present (e.g. from import)
+      const mealData = (data.meal_data as Record<string, unknown> | null) ?? {};
+      const imageFromMealData =
+        (mealData.sourceImageUrl as string | null | undefined) ??
+        (mealData.source_image_url as string | null | undefined) ??
+        (mealData.imageUrl as string | null | undefined) ??
+        (mealData.image_url as string | null | undefined);
+      const resolvedImageUrl =
+        typeof imageFromMealData === 'string' && imageFromMealData.trim()
+          ? imageFromMealData.trim()
+          : null;
+
       return {
         ok: true,
         data: {
@@ -1311,7 +1317,8 @@ export async function getMealByIdAction(
           updatedAt: data.updated_at,
           notes: data.notes || null,
           source: data.source || null,
-          sourceImageUrl: null, // meal_history doesn't have source images
+          sourceImageUrl: resolvedImageUrl,
+          source_image_url: resolvedImageUrl,
           sourceImagePath: null,
         },
       };

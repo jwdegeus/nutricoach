@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/catalyst/button';
 import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
 import { Text } from '@/components/catalyst/text';
-import { PhotoIcon, TrashIcon } from '@heroicons/react/20/solid';
+import { PhotoIcon, TrashIcon, SparklesIcon } from '@heroicons/react/20/solid';
 import { ImageLightbox } from './ImageLightbox';
 
 type RecipeImageUploadProps = {
@@ -15,6 +15,10 @@ type RecipeImageUploadProps = {
   onImageUploaded: (imageUrl: string) => void;
   onImageRemoved?: () => void;
   onImageClick?: () => void;
+  /** Optional recipe context for AI image generation (name + short summary). */
+  recipeContext?: { name: string; summary?: string };
+  /** When true, render as hero image (full width, larger) with overlay buttons. Use at top of recipe card. */
+  renderHero?: boolean;
 };
 
 export function RecipeImageUpload({
@@ -24,9 +28,12 @@ export function RecipeImageUpload({
   onImageUploaded,
   onImageRemoved,
   onImageClick,
+  recipeContext,
+  renderHero = false,
 }: RecipeImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentImageUrl);
   const [imageLoadError, setImageLoadError] = useState(false);
@@ -251,8 +258,81 @@ export function RecipeImageUpload({
     }
   };
 
+  const handleGenerateImage = async () => {
+    setIsGenerating(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/recipes/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mealId,
+          source,
+          recipeName: recipeContext?.name ?? '',
+          recipeSummary: recipeContext?.summary ?? '',
+        }),
+      });
+      const result = await response.json();
+      if (!result.ok) {
+        throw new Error(result.error?.message ?? 'Genereren mislukt');
+      }
+      setPreviewUrl(result.data.url);
+      setImageLoadError(false);
+      onImageUploaded(result.data.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Genereren mislukt');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const isBusy = isUploading || isDeleting || isGenerating;
+
+  const overlayButtons = (
+    <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1.5 flex-wrap justify-end">
+      <Button
+        plain
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleGenerateImage();
+        }}
+        disabled={isBusy}
+        className="text-xs bg-white/95 dark:bg-zinc-900/95 hover:bg-white dark:hover:bg-zinc-800 shadow-md py-2 px-2.5 rounded-md text-blue-600 dark:text-blue-400 border border-zinc-200/80 dark:border-zinc-700/80"
+      >
+        <SparklesIcon className="h-4 w-4 mr-1.5" />
+        {isGenerating ? 'Bezig…' : 'Genereer met AI'}
+      </Button>
+      <Button
+        plain
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          fileInputRef.current?.click();
+        }}
+        disabled={isBusy}
+        className="text-xs bg-white/95 dark:bg-zinc-900/95 hover:bg-white dark:hover:bg-zinc-800 shadow-md py-2 px-2.5 rounded-md border border-zinc-200/80 dark:border-zinc-700/80"
+      >
+        Vervangen
+      </Button>
+      <Button
+        plain
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleDeleteClick();
+        }}
+        disabled={isBusy}
+        className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 bg-white/95 dark:bg-zinc-900/95 hover:bg-white dark:hover:bg-zinc-800 shadow-md py-2 px-2.5 rounded-md border border-zinc-200/80 dark:border-zinc-700/80"
+      >
+        <TrashIcon className="h-4 w-4 mr-1" />
+        Verwijderen
+      </Button>
+    </div>
+  );
+
   return (
-    <div className="mt-4 min-w-0 max-w-full">
+    <div className={renderHero ? 'min-w-0 w-full' : 'mt-4 min-w-0 max-w-full'}>
       <input
         ref={fileInputRef}
         type="file"
@@ -261,99 +341,140 @@ export function RecipeImageUpload({
         className="hidden"
       />
 
-      {previewUrl ? (
-        <div>
-          <button
-            onClick={handleClick}
-            className="block cursor-pointer hover:opacity-90 transition-opacity"
-            disabled={isUploading || isDeleting}
-          >
-            {!imageLoadError ? (
-              <span className="relative block max-h-48 w-full min-h-[120px]">
-                <Image
-                  src={previewUrl}
-                  alt="Recept foto"
-                  fill
-                  className="rounded-lg object-contain shadow-sm hover:shadow-md transition-shadow"
-                  sizes="(max-width: 768px) 100vw, 320px"
-                  unoptimized
-                  onError={() => setImageLoadError(true)}
-                />
-              </span>
-            ) : (
-              <div className="rounded-lg max-w-full h-48 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center border-2 border-dashed border-zinc-300 dark:border-zinc-700">
-                <div className="text-center p-4">
-                  <PhotoIcon className="h-12 w-12 text-zinc-400 dark:text-zinc-500 mx-auto mb-2" />
-                  <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                    Afbeelding kon niet worden geladen
-                  </Text>
-                  {previewUrl && (
-                    <Text className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 break-all">
-                      {previewUrl.length > 50
-                        ? `${previewUrl.substring(0, 50)}...`
-                        : previewUrl}
-                    </Text>
-                  )}
-                </div>
-              </div>
-            )}
-          </button>
-          <div className="mt-2 flex items-center gap-2">
-            <Button
-              plain
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading || isDeleting}
-              className="text-sm"
+      {renderHero && previewUrl && !imageLoadError ? (
+        <>
+          <div className="relative block w-full aspect-[4/1] min-h-[100px] max-h-[220px] bg-zinc-100 dark:bg-zinc-800 overflow-hidden rounded-t-lg">
+            <button
+              type="button"
+              onClick={handleClick}
+              className="block w-full h-full cursor-pointer hover:opacity-95 transition-opacity"
+              disabled={isBusy}
+              aria-label="Receptafbeelding vergroten"
             >
-              Vervangen
-            </Button>
-            <Button
-              plain
-              onClick={handleDeleteClick}
-              disabled={isUploading || isDeleting}
-              className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-            >
-              <TrashIcon className="h-4 w-4 mr-1" />
-              Verwijderen
-            </Button>
-            {error && (
-              <span className="text-sm text-red-600 dark:text-red-400">
-                {error}
-              </span>
-            )}
+              <Image
+                src={previewUrl}
+                alt="Recept foto"
+                fill
+                className="object-cover rounded-t-lg"
+                sizes="(max-width: 768px) 100vw, 800px"
+                unoptimized
+                onError={() => setImageLoadError(true)}
+              />
+            </button>
+            {overlayButtons}
           </div>
-          {!imageLoadError && previewUrl && (
-            <ImageLightbox
-              open={lightboxOpen}
-              onClose={() => setLightboxOpen(false)}
-              imageUrl={previewUrl}
-              alt="Recept foto"
-            />
+          {error && (
+            <span className="mt-1.5 block text-sm text-red-600 dark:text-red-400">
+              {error}
+            </span>
           )}
-          <ConfirmDialog
-            open={deleteDialogOpen}
-            onClose={() => setDeleteDialogOpen(false)}
-            onConfirm={handleDeleteConfirm}
-            title="Afbeelding verwijderen"
-            description="Weet je zeker dat je deze afbeelding wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt."
-            confirmLabel="Verwijderen"
-            cancelLabel="Annuleren"
-            confirmColor="red"
-            isLoading={isDeleting}
-          />
-        </div>
-      ) : (
-        <div>
+        </>
+      ) : renderHero && !previewUrl ? (
+        <div className="relative border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-t-lg p-8 sm:p-10 flex flex-col items-center justify-center gap-3 min-h-[140px] bg-zinc-50 dark:bg-zinc-900/50">
           <button
+            type="button"
             onClick={handleClick}
-            disabled={isUploading}
-            className="w-full min-w-0 border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg p-6 sm:p-8 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors flex flex-col items-center justify-center gap-2 disabled:opacity-50 box-border"
+            disabled={isBusy}
+            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 disabled:opacity-50"
           >
             <PhotoIcon className="h-12 w-12 shrink-0 text-zinc-400 dark:text-zinc-500" />
-            <span className="text-sm text-zinc-600 dark:text-zinc-400 text-center break-words">
+            <span className="text-sm text-zinc-600 dark:text-zinc-400 text-center">
               {isUploading ? 'Uploaden...' : 'Upload foto van eindresultaat'}
             </span>
           </button>
+          {recipeContext && (
+            <Button
+              plain
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleGenerateImage();
+              }}
+              disabled={isBusy}
+              className="relative z-10 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              <SparklesIcon className="h-4 w-4 mr-1.5 inline" />
+              {isGenerating ? 'Bezig…' : 'Genereer foto met AI'}
+            </Button>
+          )}
+        </div>
+      ) : previewUrl && !renderHero ? (
+        <div>
+          <div className="relative block w-full min-h-[80px] max-h-[192px] rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+            <button
+              type="button"
+              onClick={handleClick}
+              className="block w-full h-full cursor-pointer hover:opacity-90 transition-opacity min-h-[80px] max-h-[192px]"
+              disabled={isBusy}
+            >
+              {!imageLoadError ? (
+                <span className="relative block w-full h-full min-h-[80px] max-h-[192px]">
+                  <Image
+                    src={previewUrl}
+                    alt="Recept foto"
+                    fill
+                    className="rounded-lg object-contain shadow-sm hover:shadow-md transition-shadow"
+                    sizes="(max-width: 768px) 100vw, 320px"
+                    unoptimized
+                    onError={() => setImageLoadError(true)}
+                  />
+                </span>
+              ) : (
+                <div className="rounded-lg w-full h-full min-h-[80px] max-h-[192px] flex items-center justify-center border-2 border-dashed border-zinc-300 dark:border-zinc-700">
+                  <div className="text-center p-4">
+                    <PhotoIcon className="h-10 w-10 text-zinc-400 dark:text-zinc-500 mx-auto mb-2" />
+                    <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                      Afbeelding kon niet worden geladen
+                    </Text>
+                    {previewUrl && (
+                      <Text className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 break-all">
+                        {previewUrl.length > 50
+                          ? `${previewUrl.substring(0, 50)}...`
+                          : previewUrl}
+                      </Text>
+                    )}
+                  </div>
+                </div>
+              )}
+            </button>
+            {overlayButtons}
+          </div>
+          {error && (
+            <span className="mt-1.5 block text-sm text-red-600 dark:text-red-400">
+              {error}
+            </span>
+          )}
+        </div>
+      ) : (
+        <div>
+          <div className="relative border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg p-6 sm:p-8 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors flex flex-col items-center justify-center gap-3 min-h-[120px]">
+            <button
+              type="button"
+              onClick={handleClick}
+              disabled={isUploading || isGenerating}
+              className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 disabled:opacity-50 box-border rounded-lg"
+            >
+              <PhotoIcon className="h-10 w-10 shrink-0 text-zinc-400 dark:text-zinc-500" />
+              <span className="text-sm text-zinc-600 dark:text-zinc-400 text-center break-words">
+                {isUploading ? 'Uploaden...' : 'Upload foto van eindresultaat'}
+              </span>
+            </button>
+            {recipeContext && (
+              <Button
+                plain
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleGenerateImage();
+                }}
+                disabled={isUploading || isGenerating}
+                className="relative z-10 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                <SparklesIcon className="h-4 w-4 mr-1.5 inline" />
+                {isGenerating ? 'Bezig…' : 'Genereer foto met AI'}
+              </Button>
+            )}
+          </div>
           {error && (
             <p className="mt-2 text-sm text-red-600 dark:text-red-400">
               {error}
@@ -361,6 +482,26 @@ export function RecipeImageUpload({
           )}
         </div>
       )}
+
+      {previewUrl && !imageLoadError && (
+        <ImageLightbox
+          open={lightboxOpen}
+          onClose={() => setLightboxOpen(false)}
+          imageUrl={previewUrl}
+          alt="Recept foto"
+        />
+      )}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Afbeelding verwijderen"
+        description="Weet je zeker dat je deze afbeelding wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt."
+        confirmLabel="Verwijderen"
+        cancelLabel="Annuleren"
+        confirmColor="red"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

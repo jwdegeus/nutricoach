@@ -20,6 +20,7 @@ import {
 import { Text } from '@/components/catalyst/text';
 import { useTranslations } from 'next-intl';
 import { importRecipeFromUrlAction } from '@/src/app/(app)/recipes/import/actions/recipeImport.actions';
+import { useToast } from '@/src/components/app/ToastContext';
 import { SparklesIcon } from '@heroicons/react/20/solid';
 
 type RecipeImportModalProps = {
@@ -35,6 +36,7 @@ export function RecipeImportModal({ open, onClose }: RecipeImportModalProps) {
   const [internalOpen, setInternalOpen] = useState(open);
   const t = useTranslations('common');
   const tImport = useTranslations('recipeImport');
+  const { showToast } = useToast();
 
   // Sync internal state with prop, but don't close if there's an error or pending
   React.useEffect(() => {
@@ -133,16 +135,16 @@ export function RecipeImportModal({ open, onClose }: RecipeImportModalProps) {
             }, 100);
           }
         } else {
-          // Show error message
-          console.error(
-            '[RecipeImportModal] Import failed:',
-            result.errorCode,
-            result.message,
-          );
+          // Show error in modal and as toast so user always sees it (also in production)
           const errorMessage =
             result.message || 'Er is een fout opgetreden bij het importeren';
           setError(errorMessage);
           setInternalOpen(true); // Keep modal open on error
+          showToast({
+            type: 'error',
+            title: tImport('urlImportErrorTitle'),
+            description: errorMessage,
+          });
         }
       } catch (err) {
         console.error('[RecipeImportModal] Unexpected error:', err);
@@ -154,6 +156,11 @@ export function RecipeImportModal({ open, onClose }: RecipeImportModalProps) {
             ? err.message
             : 'Er is een onverwachte fout opgetreden bij het importeren';
         setError(errorMessage);
+        showToast({
+          type: 'error',
+          title: tImport('urlImportErrorTitle'),
+          description: errorMessage,
+        });
       }
     });
   };
@@ -230,13 +237,23 @@ export function RecipeImportModal({ open, onClose }: RecipeImportModalProps) {
             </div>
           ) : error ? (
             <div className="space-y-4">
-              <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4">
+              <div
+                className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4"
+                role="alert"
+              >
                 <Text className="text-red-600 dark:text-red-400 font-medium mb-2">
-                  Fout bij importeren
+                  {tImport('urlImportErrorTitle')}
                 </Text>
                 <Text className="text-sm text-red-600 dark:text-red-400">
                   {error}
                 </Text>
+                {(error.toLowerCase().includes('blokkeert') ||
+                  error.toLowerCase().includes('access denied') ||
+                  error.toLowerCase().includes('toegang')) && (
+                  <Text className="mt-3 text-sm text-red-600/90 dark:text-red-400/90">
+                    {tImport('urlImportErrorAccessDeniedHint')}
+                  </Text>
+                )}
               </div>
               <Field>
                 <Label htmlFor="recipe-url">Recept URL</Label>

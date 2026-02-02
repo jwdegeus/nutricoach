@@ -28,9 +28,9 @@ export default async function RunsPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-4">Meal Plan Runs</h1>
+      <h1 className="text-2xl font-bold mb-4">Weekmenu runs</h1>
       <p className="text-muted-foreground mb-6">
-        Overzicht van alle meal plan generaties en regeneraties. Laatste 50
+        Overzicht van alle weekmenu-generaties en -regeneraties. Laatste 50
         runs.
       </p>
       <RunsTable runs={result.data} />

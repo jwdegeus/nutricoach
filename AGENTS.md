@@ -154,7 +154,14 @@ import { Plus } from 'lucide-react';
 - Shadcn-specific dependencies have been removed
 - All UI components should now use Catalyst exclusively
 
-#### 11. Documentation References
+#### 11. User feedback (notifications)
+
+- **ALWAYS** show success and error feedback as **global notifications** (toasts), not as inline banners or page reloads.
+- Use the global toast API: `useToast()` from `@/src/components/app/ToastContext` → `showToast({ type: 'success' | 'error', title: string, description?: string })`.
+- Notifications are rendered by `ToastProvider` in the app layout; no page reload. Style reference: [Tailwind UI Notifications](https://tailwindcss.com/plus/ui-blocks/application-ui/overlays/notifications).
+- **NEVER** rely on `revalidatePath` or full-page navigation as the only way to show "saved" or error feedback; always call `showToast` after server actions for user-visible outcomes.
+
+#### 12. Documentation References
 
 When implementing UI components:
 
@@ -163,7 +170,7 @@ When implementing UI components:
 3. Follow Catalyst's API patterns and prop structures
 4. Maintain Catalyst's accessibility standards (keyboard navigation, screen readers)
 
-#### 12. Enforcement
+#### 13. Enforcement
 
 - **Code reviews**: Reject any PRs that introduce Shadcn or alternative UI libraries
 - **Linting**: Consider adding ESLint rules to prevent imports from `@/components/ui` or Shadcn packages
@@ -236,14 +243,20 @@ To avoid theme drift across breakpoints (especially mobile), prefer **semantic t
 
 **Exception**: If the Catalyst component source already uses specific palette utilities, match that existing pattern instead of inventing a new one.
 
-### 2.4 States and accessibility are required
+### 2.4 User feedback as notifications (no page reload)
+
+- **ALWAYS** show success/error feedback via the **global notification** system: `useToast()` from `@/src/components/app/ToastContext` → `showToast({ type, title, description? })`.
+- **NEVER** use only inline banners or page reload/revalidate as the primary way to confirm saves or show errors; always trigger a toast so feedback is visible app-wide without navigation.
+- Reference: [Tailwind UI Notifications](https://tailwindcss.com/plus/ui-blocks/application-ui/overlays/notifications).
+
+### 2.5 States and accessibility are required
 
 Any interactive UI must account for:
 
 - **States**: `loading`, `empty`, `error`, and `success` where relevant.
 - **A11y**: labels, focus styles, keyboard navigation, and `aria-*` attributes where applicable.
 
-### 2.5 No new UI libraries
+### 2.6 No new UI libraries
 
 Do not add or introduce:
 
@@ -388,8 +401,10 @@ import { Plus } from 'lucide-react';
 - ✅ Use: Catalyst components from `/components/catalyst/`
 - ✅ Use: TailwindCSS Plus layout conventions
 - ✅ Use: theme tokens over hard-coded palette utilities
+- ✅ Use: global notifications (`useToast()` from `ToastContext`) for all success/error feedback; no page reload
 - ❌ Never use: Shadcn UI
 - ❌ Never use: Radix primitives directly
 - ❌ Never add: other UI component libraries
+- ❌ Never use only inline banners or revalidate as the sole feedback for saves/errors
 
 When in doubt: consult Catalyst docs and mirror patterns already present in the codebase.

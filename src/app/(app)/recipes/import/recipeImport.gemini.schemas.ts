@@ -15,11 +15,13 @@ export const geminiIngredientSchema = z.object({
     .describe('Original ingredient line as it appears in the image'),
   quantity: z
     .number()
-    .nullable()
+    .nullish()
+    .transform((v) => v ?? null)
     .describe('Numeric quantity if extractable, null otherwise'),
   unit: z
     .string()
-    .nullable()
+    .nullish()
+    .transform((v) => v ?? null)
     .describe(
       "Unit of measurement if extractable (e.g., 'g', 'ml', 'cups'), null otherwise",
     ),
@@ -80,6 +82,7 @@ export const geminiTimesSchema = z.object({
 
 /**
  * Confidence schema from Gemini
+ * overall is optional so we accept responses that omit it (e.g. empty {} or only fields).
  */
 export const geminiConfidenceSchema = z.object({
   overall: z
@@ -87,6 +90,8 @@ export const geminiConfidenceSchema = z.object({
     .min(0)
     .max(100)
     .nullable()
+    .optional()
+    .default(null)
     .describe('Overall confidence score (0-100)'),
   fields: z
     .record(z.string(), z.number().min(0).max(100))

@@ -19,6 +19,52 @@ function extractNumberedLines(response: string): string[] {
     .map((line) => line.replace(/^\d+\.?\s*/, '').trim());
 }
 
+/**
+ * If the model returned verbose translation-with-options text (e.g. "Here's the translation... Option 1... Option 2... Explanation..."),
+ * extract a single clean instruction. Otherwise return the text as-is.
+ */
+function cleanTranslatedInstructionText(text: string): string {
+  const t = text.trim();
+  if (!t) return t;
+
+  // First quoted string after "Option 1" / "**Option 1" is usually the actual translation
+  const option1Quoted = t.match(
+    /\*\*Option\s*1\s*\([^)]*\)\s*:\s*\*\*\s*"([^"]+)"/i,
+  );
+  if (option1Quoted?.[1]) return option1Quoted[1].trim();
+
+  const option1QuotedAlt = t.match(/Option\s*1\s*\([^)]*\)\s*:\s*"([^"]+)"/i);
+  if (option1QuotedAlt?.[1]) return option1QuotedAlt[1].trim();
+
+  // "Option 1 (Most straightforward):" "Bereid de pasta..." (quoted on next segment)
+  const option1ThenQuote = t.match(
+    /Option\s*1\s*\([^)]*\)\s*:\s*\s*"([^"]+)"/i,
+  );
+  if (option1ThenQuote?.[1]) return option1ThenQuote[1].trim();
+
+  // Any first quoted sentence that looks like a recipe step (min length)
+  const firstQuoted = t.match(/"([^"]{30,})"/);
+  if (firstQuoted?.[1]) return firstQuoted[1].trim();
+
+  // Strip known meta-preamble and take first substantial line
+  const noPreamble = t
+    .replace(/^(Here'?s the translation[^.]*\.?|Vertaal(ing)?[^.]*\.?)\s*/i, '')
+    .replace(/\*\*Explanation of choices[^*]*\*\*/gi, '')
+    .replace(/Explanation of choices[^.]*\./gi, '')
+    .replace(/Choose the option[^.]*\./gi, '')
+    .trim();
+  const firstLine = noPreamble.split(/\n+/)[0]?.trim();
+  if (
+    firstLine &&
+    firstLine.length > 20 &&
+    !/^(Option\s*\d|Here'?s the|\*\*Option)/i.test(firstLine)
+  ) {
+    return firstLine.replace(/^["']|["']$/g, '').trim();
+  }
+
+  return t;
+}
+
 function looksLikeEnglish(
   text: string | undefined,
   original: string | undefined,
@@ -597,18 +643,30 @@ Reply (numbered list only):`;
 
       const instructionsPrompt =
         targetLocale === 'nl'
-          ? `Vertaal de volgende bereidingsinstructies naar het Nederlands. Je antwoord moet ALLEEN in het Nederlands zijn (geen Engels). Gebruik natuurlijke Nederlandse zinnen. Geef ALLEEN een genummerde lijst: regel 1 begint met "1. ", regel 2 met "2. ", enz. Geen introductie, geen uitleg, geen andere tekst.
+          ? `Vertaal de volgende bereidingsinstructies naar het Nederlands.
+
+REGELS:
+- Antwoord ALLEEN met een genummerde lijst. Geen inleiding, geen "Option 1/Option 2", geen uitleg, geen "Explanation of choices".
+- Regel 1: "1. [eerste zin in het Nederlands]"
+- Regel 2: "2. [tweede zin in het Nederlands]"
+- Enzovoort. Alleen cijfer, punt, spatie, dan de zin. Niets anders.
 
 Instructions:
 ${instructionsText}
 
-Antwoord (alleen genummerde lijst, Nederlands):`
-          : `Translate the following cooking instructions to English. Reply with ONLY a numbered list: line 1 must start with "1. ", line 2 with "2. ", etc. No introduction, no explanation, no other text.
+Antwoord:`
+          : `Translate the following cooking instructions to English.
+
+RULES:
+- Reply with ONLY a numbered list. No introduction, no "Option 1/Option 2", no explanation.
+- Line 1: "1. [first sentence in English]"
+- Line 2: "2. [second sentence in English]"
+- etc. Only number, period, space, then the sentence. Nothing else.
 
 Instructions:
 ${instructionsText}
 
-Reply (numbered list only):`;
+Reply:`;
 
       try {
         const instructionsResponse = await gemini.generateText({
@@ -623,7 +681,8 @@ Reply (numbered list only):`;
         translated.instructions = await Promise.all(
           extracted.instructions.map(async (inst, idx) => {
             const translatedInst = { ...inst };
-            const translatedText = translatedLines[idx] || inst.text;
+            let translatedText = translatedLines[idx] || inst.text;
+            translatedText = cleanTranslatedInstructionText(translatedText);
             translatedInst.text = translatedText;
             if (
               targetLocale === 'nl' &&
@@ -636,11 +695,12 @@ Reply (numbered list only):`;
                   temperature: 0.2,
                   purpose: 'translate',
                 });
+                const raw = textResponse
+                  .trim()
+                  .replace(/^["']|["']$/g, '')
+                  .trim();
                 translatedInst.text =
-                  textResponse
-                    .trim()
-                    .replace(/^["']|["']$/g, '')
-                    .trim() || inst.text;
+                  cleanTranslatedInstructionText(raw) || inst.text;
               } catch {
                 translatedInst.text = inst.text;
               }
@@ -698,8 +758,9 @@ Reply (numbered list only):`;
                 temperature: 0.3,
                 purpose: 'translate',
               });
+              const raw = textResponse.trim().replace(/^["']|["']$/g, '');
               translatedInst.text =
-                textResponse.trim().replace(/^["']|["']$/g, '') || inst.text;
+                cleanTranslatedInstructionText(raw) || inst.text;
             } catch {
               translatedInst.text = inst.text;
             }

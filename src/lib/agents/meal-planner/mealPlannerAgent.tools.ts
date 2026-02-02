@@ -128,6 +128,8 @@ export type CandidatePool = {
   fruits: NevoFoodCandidate[];
   fats: NevoFoodCandidate[];
   carbs: NevoFoodCandidate[];
+  /** Ingredients suitable for shakes/smoothies: milk, yoghurt, fruit, etc. */
+  dairy_liquids: NevoFoodCandidate[];
   [key: string]: NevoFoodCandidate[]; // Allow additional categories
 };
 
@@ -168,12 +170,33 @@ export async function buildCandidatePool(
       'ui',
       'knoflook',
     ],
-    fruits: ['appel', 'banaan', 'bessen', 'sinaasappel', 'druiven', 'peer'],
+    fruits: [
+      'appel',
+      'banaan',
+      'blauwe bessen',
+      'bessen',
+      'sinaasappel',
+      'druiven',
+      'aardbei',
+      'peer',
+    ],
     fats: ['olijfolie', 'avocado', 'noten', 'zaden', 'kokosolie'],
     carbs:
       dietKey === 'keto' || dietKey === 'wahls_paleo_plus'
         ? [] // Keto and Wahls don't use traditional carbs
         : ['rijst', 'aardappel', 'pasta', 'haver', 'quinoa', 'brood'],
+    // Shake/smoothie-friendly: liquid base; Wahls Paleo forbids dairy so no cow milk/yoghurt in pool
+    dairy_liquids:
+      dietKey === 'wahls_paleo_plus'
+        ? ['amandelmelk', 'kokosmelk', 'eiwitpoeder'] // non-dairy liquids only
+        : [
+            'melk',
+            'yoghurt',
+            'kwark',
+            'amandelmelk',
+            'sojamelk',
+            'eiwitpoeder',
+          ],
   };
 
   // Build candidate pool in parallel
@@ -183,7 +206,16 @@ export async function buildCandidatePool(
     fruits: [],
     fats: [],
     carbs: [],
+    dairy_liquids: [],
   };
+
+  const filterExcluded = (candidates: NevoFoodCandidate[]) =>
+    candidates.filter((candidate) => {
+      const candidateName = candidate.name.toLowerCase();
+      return !excludeTerms.some((exclude) =>
+        candidateName.includes(exclude.toLowerCase()),
+      );
+    });
 
   // Search each category
   const searchPromises: Promise<void>[] = [];
@@ -195,19 +227,30 @@ export async function buildCandidatePool(
     const searchTerm = terms[0];
     const promise = searchNevoFoodCandidates(searchTerm, 20).then(
       (candidates) => {
-        // Filter out excluded terms
-        const filtered = candidates.filter((candidate) => {
-          const candidateName = candidate.name.toLowerCase();
-          return !excludeTerms.some((exclude) =>
-            candidateName.includes(exclude.toLowerCase()),
-          );
-        });
-        pool[category] = filtered;
+        pool[category] = filterExcluded(candidates);
       },
     );
 
     searchPromises.push(promise);
   }
+
+  // dairy_liquids: search multiple terms and merge (dedupe by nevoCode) so we get melk, yoghurt, kwark, amandelmelk, etc.
+  const dairyTerms = searchTerms.dairy_liquids;
+  const dairyPromise = Promise.all(
+    dairyTerms.map((term) => searchNevoFoodCandidates(term, 15)),
+  ).then((results) => {
+    const seen = new Set<string>();
+    const merged: NevoFoodCandidate[] = [];
+    for (const list of results) {
+      for (const c of filterExcluded(list)) {
+        if (seen.has(c.nevoCode)) continue;
+        seen.add(c.nevoCode);
+        merged.push(c);
+      }
+    }
+    pool.dairy_liquids = merged;
+  });
+  searchPromises.push(dairyPromise);
 
   // Wait for all searches to complete
   await Promise.all(searchPromises);

@@ -1,6 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, Fragment, useRef } from 'react';
+import {
+  useState,
+  useEffect,
+  useCallback,
+  Fragment,
+  useRef,
+  useMemo,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/catalyst/badge';
 import { Text } from '@/components/catalyst/text';
@@ -19,6 +26,7 @@ import { RecipeNotesEditor } from './RecipeNotesEditor';
 import { ImageLightbox } from './ImageLightbox';
 import { RecipeImageUpload } from './RecipeImageUpload';
 import { RecipeSourceEditor } from './RecipeSourceEditor';
+import { RecipeEditableTag } from './RecipeEditableTag';
 import { RecipeAIMagician } from './RecipeAIMagician';
 import { RecipePrepTimeAndServingsEditor } from './RecipePrepTimeAndServingsEditor';
 import {
@@ -28,6 +36,8 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/catalyst/dialog';
+import { Select } from '@/components/catalyst/select';
+import { Field, Label } from '@/components/catalyst/fieldset';
 import {
   RecipeContentEditor,
   getIngredientsForEditor,
@@ -220,6 +230,11 @@ export function MealDetail({
   const removeNotificationTimeoutRef = useRef<ReturnType<
     typeof setTimeout
   > | null>(null);
+  /** Tag-edit dialogen */
+  const [mealSlotDialogOpen, setMealSlotDialogOpen] = useState(false);
+  const [sourceTagDialogOpen, setSourceTagDialogOpen] = useState(false);
+  const [savingMealSlot, setSavingMealSlot] = useState(false);
+  const [mealSlotEditValue, setMealSlotEditValue] = useState<string>('dinner');
 
   const router = useRouter();
 
@@ -287,37 +302,56 @@ export function MealDetail({
     (Boolean(advisoryIntro?.trim()) ||
       (Array.isArray(advisoryWhyThisWorks) && advisoryWhyThisWorks.length > 0));
 
-  // Get initial image URL from meal data
-  const initialImageUrl = meal.sourceImageUrl || meal.source_image_url || null;
-  const [imageUrl, setImageUrl] = useState<string | null>(initialImageUrl);
+  // Get image URL: top-level first, then fallback to meal_data (for meal_history or older imports)
+  const getMealImageUrl = useCallback((m: MealLike): string | null => {
+    const top =
+      (m.sourceImageUrl as string | null | undefined) ??
+      (m.source_image_url as string | null | undefined) ??
+      null;
+    if (top && typeof top === 'string' && top.trim()) return top.trim();
+    const data = (m.mealData ?? m.meal_data) as
+      | Record<string, unknown>
+      | null
+      | undefined;
+    if (data && typeof data === 'object') {
+      const fromData =
+        (data.sourceImageUrl as string | undefined) ??
+        (data.source_image_url as string | undefined) ??
+        (data.imageUrl as string | undefined) ??
+        (data.image_url as string | undefined) ??
+        (data.image as string | undefined);
+      if (fromData && typeof fromData === 'string' && fromData.trim())
+        return fromData.trim();
+    }
+    return null;
+  }, []);
+
+  const resolvedImageUrl = useMemo(
+    () => getMealImageUrl(meal as MealLike),
+    [meal, getMealImageUrl],
+  );
+  const [imageUrlOverride, setImageUrlOverride] = useState<
+    string | null | undefined
+  >(undefined);
+  const imageUrl =
+    imageUrlOverride !== undefined ? imageUrlOverride : resolvedImageUrl;
+
+  // Reset override when switching to another meal
+  useEffect(() => {
+    setImageUrlOverride(undefined);
+  }, [mealId]);
+
   const [recipeSource, setRecipeSource] = useState<string | null>(
     (meal as MealLike & { source?: string }).source ?? null,
   );
 
-  // Update image URL when meal data changes
-  useEffect(() => {
-    const newImageUrl = meal.sourceImageUrl || meal.source_image_url || null;
-    if (newImageUrl !== imageUrl) {
-      console.log('[MealDetail] Image URL changed:', {
-        old: imageUrl,
-        new: newImageUrl,
-        mealId,
-        sourceImageUrl: meal.sourceImageUrl,
-        source_image_url: meal.source_image_url,
-        mealKeys: Object.keys(meal),
-      });
-      queueMicrotask(() => setImageUrl(newImageUrl));
-    }
-  }, [meal.sourceImageUrl, meal.source_image_url, imageUrl, meal.id]); // eslint-disable-line react-hooks/exhaustive-deps -- depend on specific meal fields only
-
   // Sync displayed source from meal when parent refetches (e.g. after saving source).
   const mealSourceProp = (meal as MealLike & { source?: string }).source;
-  /* eslint-disable react-hooks/set-state-in-effect -- sync derived state from prop */
+
   useEffect(() => {
     const newSource = mealSourceProp ?? null;
     setRecipeSource(newSource);
   }, [mealSourceProp]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const formatMealSlot = (slot: string) => {
     const slotMap: Record<string, string> = {
@@ -392,7 +426,7 @@ export function MealDetail({
   const hasIngredientsForNutrition =
     (mealData?.ingredientRefs?.length ?? 0) > 0 ||
     (mealData?.ingredients?.length ?? 0) > 0;
-  /* eslint-disable react-hooks/set-state-in-effect -- async fetch, setState in callbacks */
+
   useEffect(() => {
     if (!meal?.id || !mealSource || !hasIngredientsForNutrition) {
       setRecipeNutritionSummary(null);
@@ -420,12 +454,11 @@ export function MealDetail({
       cancelled = true;
     };
   }, [meal?.id, mealId, mealSource, hasIngredientsForNutrition, mealUpdatedAt]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Laad opgeslagen matches voor legacy-ingrediënten (recipe_ingredient_matches) zodat alleen twijfelgevallen het waarschuwingsicoon tonen.
   // Ook doen wanneer er naast legacy ingredients al refs zijn (bijv. na AI-toevoegen van één ingrediënt), anders raken andere matches uit beeld.
   const hasLegacyIngredients = (displayMealData?.ingredients?.length ?? 0) > 0;
-  /* eslint-disable react-hooks/set-state-in-effect -- async fetch, setState in callbacks */
+
   useEffect(() => {
     if (!meal?.id || !hasLegacyIngredients || !displayMealData?.ingredients) {
       setResolvedLegacyMatches(null);
@@ -470,7 +503,6 @@ export function MealDetail({
       cancelled = true;
     };
   }, [meal?.id, hasLegacyIngredients, displayMealData?.ingredients]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleLegacyIngredientConfirmed = useCallback(() => {
     if (onIngredientMatched) {
@@ -583,269 +615,449 @@ export function MealDetail({
   return (
     <div className="space-y-6">
       {/* Header Info */}
-      <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10 overflow-hidden">
-        <div className="flex flex-col gap-6 mb-4 md:flex-row md:items-start">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-2xl font-bold text-zinc-950 dark:text-white mb-2">
-              {mealName}
-            </h2>
-            <div className="flex items-center gap-3 mb-2 flex-wrap">
-              <Badge color={mealSource === 'custom' ? 'blue' : 'zinc'}>
-                {mealSource === 'custom' ? 'Custom' : 'Gemini'}
-              </Badge>
-              <Badge color="zinc">{formatMealSlot(mealSlot)}</Badge>
-              {formatDietTypeName(
-                dietKey != null ? String(dietKey) : undefined,
-              ) && (
-                <Badge color="green" className="text-xs">
-                  {formatDietTypeName(
-                    dietKey != null ? String(dietKey) : undefined,
-                  )}
+      <div className="rounded-lg bg-white shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10 overflow-hidden">
+        {/* Receptafbeelding bovenaan met knoppen (Vervangen, Verwijderen, Genereer met AI) */}
+        <RecipeImageUpload
+          mealId={mealId}
+          source={mealSource}
+          currentImageUrl={imageUrl ?? null}
+          onImageUploaded={(url) => {
+            setImageUrlOverride(url);
+            window.location.reload();
+          }}
+          onImageRemoved={() => {
+            setImageUrlOverride(null);
+            window.location.reload();
+          }}
+          onImageClick={() => setLightboxOpen(true)}
+          recipeContext={{
+            name: mealName,
+            summary:
+              Array.isArray(displayMealData?.ingredients) &&
+              displayMealData.ingredients.length > 0
+                ? `Ingrediënten: ${(
+                    displayMealData.ingredients as { name?: string }[]
+                  )
+                    .slice(0, 5)
+                    .map((i) => i.name ?? '')
+                    .filter(Boolean)
+                    .join(
+                      ', ',
+                    )}${(displayMealData.ingredients as unknown[]).length > 5 ? '…' : ''}`
+                : Array.isArray(displayAiAnalysis?.instructions) &&
+                    displayAiAnalysis.instructions.length > 0
+                  ? `Bereiding: ${String(
+                      (
+                        displayAiAnalysis.instructions as {
+                          text?: string;
+                          step?: string;
+                        }[]
+                      )[0]?.text ??
+                        (displayAiAnalysis.instructions as string[])[0] ??
+                        '',
+                    ).slice(0, 120)}…`
+                  : undefined,
+          }}
+          renderHero
+        />
+        <div className="p-6">
+          <div className="flex flex-col gap-6 mb-4">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-2xl font-bold text-zinc-950 dark:text-white mb-2">
+                {mealName}
+              </h2>
+              <div className="flex items-center gap-3 mb-2 flex-wrap">
+                <Badge color={mealSource === 'custom' ? 'blue' : 'zinc'}>
+                  {mealSource === 'custom' ? 'Custom' : 'Gemini'}
                 </Badge>
-              )}
-              {complianceScore != null && (
-                <Badge
-                  color={
-                    complianceScore.noRulesConfigured
-                      ? 'zinc'
-                      : complianceScore.scorePercent >= 80
-                        ? 'green'
-                        : complianceScore.scorePercent >= 50
-                          ? 'amber'
-                          : 'red'
-                  }
-                  className={
-                    complianceScore.noRulesConfigured
-                      ? 'text-xs'
-                      : 'font-mono text-xs'
-                  }
-                  title={
-                    complianceScore.noRulesConfigured
-                      ? 'Geen dieetregels geconfigureerd voor dit dieet'
-                      : complianceScore.ok
-                        ? 'Voldoet aan dieetregels'
-                        : complianceScore.violatingCount != null &&
-                            complianceScore.violatingCount > 0
-                          ? `${complianceScore.violatingCount} ingrediënt of bereidingsstap wijkt af (verboden term in recept of stappen)`
-                          : 'Schendt één of meer dieetregels'
-                  }
-                >
-                  Compliance{' '}
-                  {complianceScore.noRulesConfigured
-                    ? 'N.v.t.'
-                    : `${complianceScore.scorePercent}%`}
-                </Badge>
-              )}
-              {recipeSource && (
-                <Badge color="purple" className="text-xs">
-                  {recipeSource}
-                </Badge>
-              )}
-            </div>
-
-            {/* Source Editor */}
-            <div className="mt-3">
-              <RecipeSourceEditor
-                currentSource={recipeSource}
-                mealId={mealId}
-                source={mealSource}
-                onSourceUpdated={(newSource) => {
-                  setRecipeSource(newSource);
-                  showToast({
-                    type: 'success',
-                    title: 'Bron opgeslagen',
-                    description: newSource
-                      ? `Receptbron is bijgewerkt naar "${newSource}".`
-                      : 'Receptbron is verwijderd.',
-                  });
-                  onSourceSaved?.();
-                }}
-              />
-            </div>
-
-            {/* AI Magician + Waarom dit werkt toggle */}
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Button onClick={() => setAiMagicianOpen(true)}>
-                <SparklesIcon data-slot="icon" />
-                AI Magician
-              </Button>
-              {hasAdvisoryContent && (
-                <Button
-                  outline
-                  onClick={() => setAdvisoryPanelOpen((open) => !open)}
-                  aria-expanded={advisoryPanelOpen}
-                  aria-controls="advisory-panel"
-                >
-                  <LightBulbIcon data-slot="icon" />
-                  Waarom dit werkt voor jouw dieet
-                  {advisoryPanelOpen ? (
-                    <ChevronUpIcon className="ml-1 h-4 w-4" />
-                  ) : (
-                    <ChevronDownIcon className="ml-1 h-4 w-4" />
-                  )}
-                </Button>
-              )}
-            </div>
-
-            {/* Uitklapmenu: maaltijdadvies direct onder de toggle */}
-            {hasAdvisoryContent && advisoryPanelOpen && (
-              <div
-                id="advisory-panel"
-                role="region"
-                aria-label="Waarom dit werkt voor jouw dieet"
-                className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/80 dark:bg-emerald-950/30 p-4"
-              >
-                <Text className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mb-3">
-                  Waarom dit werkt voor jouw dieet
-                </Text>
-                {advisoryIntro?.trim() && (
-                  <Text className="text-sm text-emerald-800 dark:text-emerald-200 mb-3 whitespace-pre-wrap">
-                    {advisoryIntro}
-                  </Text>
+                <RecipeEditableTag
+                  label={formatMealSlot(mealSlot)}
+                  color="zinc"
+                  editable
+                  onEdit={() => {
+                    setMealSlotEditValue(mealSlot);
+                    setMealSlotDialogOpen(true);
+                  }}
+                  onRemove={async () => {
+                    const res = await fetch('/api/recipes/update-meal-slot', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        mealId,
+                        source: mealSource,
+                        mealSlot: 'dinner',
+                      }),
+                    });
+                    const data = await res.json();
+                    if (data.ok) window.location.reload();
+                    else
+                      showToast({
+                        type: 'error',
+                        title: data.error?.message ?? 'Bijwerken mislukt',
+                      });
+                  }}
+                />
+                {formatDietTypeName(
+                  dietKey != null ? String(dietKey) : undefined,
+                ) && (
+                  <Badge color="green" className="text-xs">
+                    {formatDietTypeName(
+                      dietKey != null ? String(dietKey) : undefined,
+                    )}
+                  </Badge>
                 )}
-                {Array.isArray(advisoryWhyThisWorks) &&
-                  advisoryWhyThisWorks.length > 0 && (
-                    <ul className="space-y-1.5">
-                      {advisoryWhyThisWorks.map((bullet, idx) => (
-                        <li
-                          key={idx}
-                          className="text-sm text-emerald-800 dark:text-emerald-200 flex items-start gap-2"
-                        >
-                          <span className="text-emerald-500 dark:text-emerald-400 mt-0.5">
-                            •
-                          </span>
-                          <span>{bullet}</span>
-                        </li>
-                      ))}
-                    </ul>
+                {complianceScore != null && (
+                  <Badge
+                    color={
+                      complianceScore.noRulesConfigured
+                        ? 'zinc'
+                        : complianceScore.scorePercent >= 80
+                          ? 'green'
+                          : complianceScore.scorePercent >= 50
+                            ? 'amber'
+                            : 'red'
+                    }
+                    className={
+                      complianceScore.noRulesConfigured
+                        ? 'text-xs'
+                        : 'font-mono text-xs'
+                    }
+                    title={
+                      complianceScore.noRulesConfigured
+                        ? 'Geen dieetregels geconfigureerd voor dit dieet'
+                        : complianceScore.ok
+                          ? 'Voldoet aan dieetregels'
+                          : complianceScore.violatingCount != null &&
+                              complianceScore.violatingCount > 0
+                            ? `${complianceScore.violatingCount} ingrediënt of bereidingsstap wijkt af (verboden term in recept of stappen)`
+                            : 'Schendt één of meer dieetregels'
+                    }
+                  >
+                    Compliance{' '}
+                    {complianceScore.noRulesConfigured
+                      ? 'N.v.t.'
+                      : `${complianceScore.scorePercent}%`}
+                  </Badge>
+                )}
+                <RecipeEditableTag
+                  label={recipeSource ?? 'Geen bron'}
+                  color="purple"
+                  className="text-xs"
+                  editable
+                  onEdit={() => setSourceTagDialogOpen(true)}
+                  onRemove={
+                    recipeSource
+                      ? async () => {
+                          const response = await fetch(
+                            '/api/recipes/update-source',
+                            {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                mealId,
+                                source: mealSource,
+                                recipeSource: null,
+                              }),
+                            },
+                          );
+                          const result = await response.json();
+                          if (result.ok) {
+                            setRecipeSource(null);
+                            showToast({
+                              type: 'success',
+                              title: 'Bron verwijderd',
+                              description: 'Receptbron is verwijderd.',
+                            });
+                            setSourceTagDialogOpen(false);
+                            onSourceSaved?.();
+                          } else {
+                            showToast({
+                              type: 'error',
+                              title:
+                                result.error?.message ?? 'Verwijderen mislukt',
+                            });
+                          }
+                        }
+                      : undefined
+                  }
+                />
+              </div>
+
+              {/* Meal slot edit dialog */}
+              <Dialog
+                open={mealSlotDialogOpen}
+                onClose={() => setMealSlotDialogOpen(false)}
+              >
+                <DialogTitle>Maaltijdmoment wijzigen</DialogTitle>
+                <DialogBody>
+                  <DialogDescription>
+                    Kies het moment van de dag voor dit recept.
+                  </DialogDescription>
+                  <Field className="mt-3">
+                    <Label>Maaltijdmoment</Label>
+                    <Select
+                      value={mealSlotEditValue}
+                      onChange={(e) => setMealSlotEditValue(e.target.value)}
+                      disabled={savingMealSlot}
+                    >
+                      <option value="breakfast">Ontbijt</option>
+                      <option value="lunch">Lunch</option>
+                      <option value="dinner">Diner</option>
+                      <option value="snack">Snack</option>
+                    </Select>
+                  </Field>
+                </DialogBody>
+                <DialogActions>
+                  <Button
+                    plain
+                    onClick={() => setMealSlotDialogOpen(false)}
+                    disabled={savingMealSlot}
+                  >
+                    Annuleren
+                  </Button>
+                  <Button
+                    color="primary"
+                    disabled={savingMealSlot}
+                    onClick={async () => {
+                      setSavingMealSlot(true);
+                      try {
+                        const res = await fetch(
+                          '/api/recipes/update-meal-slot',
+                          {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              mealId,
+                              source: mealSource,
+                              mealSlot: mealSlotEditValue,
+                            }),
+                          },
+                        );
+                        const data = await res.json();
+                        if (data.ok) {
+                          showToast({
+                            type: 'success',
+                            title: 'Maaltijdmoment opgeslagen',
+                          });
+                          setMealSlotDialogOpen(false);
+                          window.location.reload();
+                        } else {
+                          showToast({
+                            type: 'error',
+                            title: data.error?.message ?? 'Opslaan mislukt',
+                          });
+                        }
+                      } finally {
+                        setSavingMealSlot(false);
+                      }
+                    }}
+                  >
+                    {savingMealSlot ? 'Opslaan…' : 'Opslaan'}
+                  </Button>
+                </DialogActions>
+              </Dialog>
+
+              {/* Source tag edit dialog */}
+              <Dialog
+                open={sourceTagDialogOpen}
+                onClose={() => setSourceTagDialogOpen(false)}
+              >
+                <DialogTitle>Bron wijzigen</DialogTitle>
+                <DialogBody>
+                  <DialogDescription>
+                    Wijzig of verwijder de receptbron (bijv. website of boek).
+                  </DialogDescription>
+                  <div className="mt-3">
+                    <RecipeSourceEditor
+                      currentSource={recipeSource}
+                      mealId={mealId}
+                      source={mealSource}
+                      onSourceUpdated={(newSource) => {
+                        setRecipeSource(newSource);
+                        showToast({
+                          type: 'success',
+                          title: 'Bron opgeslagen',
+                          description: newSource
+                            ? `Receptbron is bijgewerkt naar "${newSource}".`
+                            : 'Receptbron is verwijderd.',
+                        });
+                        onSourceSaved?.();
+                        setSourceTagDialogOpen(false);
+                      }}
+                    />
+                  </div>
+                </DialogBody>
+                <DialogActions>
+                  <Button plain onClick={() => setSourceTagDialogOpen(false)}>
+                    Sluiten
+                  </Button>
+                </DialogActions>
+              </Dialog>
+
+              {/* AI Magician + Waarom dit werkt toggle */}
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Button onClick={() => setAiMagicianOpen(true)}>
+                  <SparklesIcon data-slot="icon" />
+                  AI Magician
+                </Button>
+                {hasAdvisoryContent && (
+                  <Button
+                    outline
+                    onClick={() => setAdvisoryPanelOpen((open) => !open)}
+                    aria-expanded={advisoryPanelOpen}
+                    aria-controls="advisory-panel"
+                  >
+                    <LightBulbIcon data-slot="icon" />
+                    Waarom dit werkt voor jouw dieet
+                    {advisoryPanelOpen ? (
+                      <ChevronUpIcon className="ml-1 h-4 w-4" />
+                    ) : (
+                      <ChevronDownIcon className="ml-1 h-4 w-4" />
+                    )}
+                  </Button>
+                )}
+              </div>
+
+              {/* Uitklapmenu: maaltijdadvies direct onder de toggle */}
+              {hasAdvisoryContent && advisoryPanelOpen && (
+                <div
+                  id="advisory-panel"
+                  role="region"
+                  aria-label="Waarom dit werkt voor jouw dieet"
+                  className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/80 dark:bg-emerald-950/30 p-4"
+                >
+                  <Text className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mb-3">
+                    Waarom dit werkt voor jouw dieet
+                  </Text>
+                  {advisoryIntro?.trim() && (
+                    <Text className="text-sm text-emerald-800 dark:text-emerald-200 mb-3 whitespace-pre-wrap">
+                      {advisoryIntro}
+                    </Text>
                   )}
+                  {Array.isArray(advisoryWhyThisWorks) &&
+                    advisoryWhyThisWorks.length > 0 && (
+                      <ul className="space-y-1.5">
+                        {advisoryWhyThisWorks.map((bullet, idx) => (
+                          <li
+                            key={idx}
+                            className="text-sm text-emerald-800 dark:text-emerald-200 flex items-start gap-2"
+                          >
+                            <span className="text-emerald-500 dark:text-emerald-400 mt-0.5">
+                              •
+                            </span>
+                            <span>{bullet}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                </div>
+              )}
+            </div>
+          </div>
+          {imageUrl && (
+            <ImageLightbox
+              open={lightboxOpen}
+              onClose={() => setLightboxOpen(false)}
+              imageUrl={imageUrl}
+              alt={mealName}
+            />
+          )}
+
+          {/* Prep Time and Servings Editor */}
+          <div className="mt-4">
+            <RecipePrepTimeAndServingsEditor
+              currentPrepTime={
+                typeof mealData?.prepTime === 'number'
+                  ? mealData.prepTime
+                  : typeof mealData?.prepTime === 'string'
+                    ? parseFloat(mealData.prepTime) || null
+                    : null
+              }
+              currentServings={
+                typeof mealData?.servings === 'number'
+                  ? mealData.servings
+                  : typeof mealData?.servings === 'string'
+                    ? parseFloat(mealData.servings) || null
+                    : null
+              }
+              mealId={mealId}
+              source={mealSource}
+              onUpdated={() => {
+                // Refresh the page to show updated data
+                window.location.reload();
+              }}
+            />
+          </div>
+
+          {/* Basic Info */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            {consumptionCount > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-600 dark:text-zinc-400">
+                  {mealSource === 'custom' ? 'Geconsumeerd' : 'Gebruikt'}:{' '}
+                  <span className="font-medium">{consumptionCount}x</span>
+                </span>
+              </div>
+            )}
+
+            {userRating != null && (
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-600 dark:text-zinc-400">
+                  Beoordeling:
+                </span>
+                <div className="flex items-center gap-1">
+                  <div className="flex gap-0.5">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <StarIcon
+                        key={star}
+                        className={`h-4 w-4 ${
+                          star <= Number(userRating)
+                            ? 'text-yellow-400 fill-yellow-400'
+                            : 'text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="font-medium text-zinc-900 dark:text-white ml-1">
+                    {Number(userRating)}/5
+                  </span>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Source Image Upload/Display - Right on desktop, below on mobile */}
-          <div className="flex-shrink-0 w-full md:w-auto min-w-0 max-w-full">
-            <RecipeImageUpload
-              mealId={mealId}
-              source={mealSource}
-              currentImageUrl={imageUrl}
-              onImageUploaded={(url) => {
-                setImageUrl(url);
-                // Refresh the page to show the new image
-                window.location.reload();
-              }}
-              onImageRemoved={() => {
-                setImageUrl(null);
-                // Refresh the page to remove the image
-                window.location.reload();
-              }}
-              onImageClick={() => setLightboxOpen(true)}
-            />
-          </div>
-        </div>
-        {imageUrl && (
-          <ImageLightbox
-            open={lightboxOpen}
-            onClose={() => setLightboxOpen(false)}
-            imageUrl={imageUrl}
-            alt={mealName}
-          />
-        )}
-
-        {/* Prep Time and Servings Editor */}
-        <div className="mt-4">
-          <RecipePrepTimeAndServingsEditor
-            currentPrepTime={
-              typeof mealData?.prepTime === 'number'
-                ? mealData.prepTime
-                : typeof mealData?.prepTime === 'string'
-                  ? parseFloat(mealData.prepTime) || null
-                  : null
-            }
-            currentServings={
-              typeof mealData?.servings === 'number'
-                ? mealData.servings
-                : typeof mealData?.servings === 'string'
-                  ? parseFloat(mealData.servings) || null
-                  : null
-            }
-            mealId={mealId}
-            source={mealSource}
-            onUpdated={() => {
-              // Refresh the page to show updated data
-              window.location.reload();
-            }}
-          />
-        </div>
-
-        {/* Basic Info */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          {consumptionCount > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-zinc-600 dark:text-zinc-400">
-                {mealSource === 'custom' ? 'Geconsumeerd' : 'Gebruikt'}:{' '}
-                <span className="font-medium">{consumptionCount}x</span>
-              </span>
-            </div>
-          )}
-
-          {userRating != null && (
-            <div className="flex items-center gap-2">
-              <span className="text-zinc-600 dark:text-zinc-400">
-                Beoordeling:
-              </span>
-              <div className="flex items-center gap-1">
-                <div className="flex gap-0.5">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <StarIcon
-                      key={star}
-                      className={`h-4 w-4 ${
-                        star <= Number(userRating)
-                          ? 'text-yellow-400 fill-yellow-400'
-                          : 'text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <span className="font-medium text-zinc-900 dark:text-white ml-1">
-                  {Number(userRating)}/5
-                </span>
+          {/* Dates */}
+          <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-400 space-y-1">
+            {createdAt && <div>Toegevoegd: {formatDate(createdAt)}</div>}
+            {firstConsumedAt && (
+              <div>
+                Eerst {mealSource === 'custom' ? 'geconsumeerd' : 'gebruikt'}:{' '}
+                {formatDate(firstConsumedAt)}
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Dates */}
-        <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-400 space-y-1">
-          {createdAt && <div>Toegevoegd: {formatDate(createdAt)}</div>}
-          {firstConsumedAt && (
-            <div>
-              Eerst {mealSource === 'custom' ? 'geconsumeerd' : 'gebruikt'}:{' '}
-              {formatDate(firstConsumedAt)}
-            </div>
-          )}
-          {lastConsumedAt && (
-            <div>
-              Laatst {mealSource === 'custom' ? 'geconsumeerd' : 'gebruikt'}:{' '}
-              {formatDate(lastConsumedAt)}
-            </div>
-          )}
-        </div>
-
-        {/* Bron-URL (originele receptpagina) */}
-        {sourceUrl && (
-          <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 text-sm">
-            <a
-              href={sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              <LinkIcon className="h-4 w-4 flex-shrink-0" />
-              Bron: originele receptpagina
-            </a>
+            )}
+            {lastConsumedAt && (
+              <div>
+                Laatst {mealSource === 'custom' ? 'geconsumeerd' : 'gebruikt'}:{' '}
+                {formatDate(lastConsumedAt)}
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Bron-URL (originele receptpagina) */}
+          {sourceUrl && (
+            <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 text-sm">
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                <LinkIcon className="h-4 w-4 flex-shrink-0" />
+                Bron: originele receptpagina
+              </a>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Bekijk origineel / aangepaste versie toggle – alleen als er een aangepaste versie is (server-check) */}

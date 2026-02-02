@@ -2,11 +2,13 @@ import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
   Users,
+  Sparkles,
   UtensilsCrossed,
   Calendar,
   Settings,
   FileText,
   ShoppingBasket,
+  ShoppingCart,
   Activity,
 } from 'lucide-react';
 
@@ -38,10 +40,16 @@ export const baseNavItems: NavItem[] = [
     translationKey: 'clients',
   },
   {
-    label: 'Meal Plans',
+    label: 'Generator',
     href: '/meal-plans',
-    icon: UtensilsCrossed,
-    translationKey: 'mealPlans',
+    icon: Sparkles,
+    translationKey: 'generator',
+  },
+  {
+    label: 'Boodschappenlijst',
+    href: '/meal-plans/shopping',
+    icon: ShoppingCart,
+    translationKey: 'shoppingList',
   },
   {
     label: 'Recepten',
@@ -126,6 +134,10 @@ export function getPageTitle(
   if (pathname === '/settings' || pathname.startsWith('/settings')) {
     return t ? t('nav.settings') : 'Instellingen';
   }
+  // Meal plan shopping sub-route: /meal-plans/[planId]/shopping
+  if (/^\/meal-plans\/[^/]+\/shopping$/.test(pathname)) {
+    return t ? t('nav.shoppingList') : 'Boodschappenlijst';
+  }
 
   return t ? t('nav.dashboard') : 'Dashboard';
 }
@@ -172,6 +184,27 @@ export function getBreadcrumbs(
       : 'Recepten';
     breadcrumbs.push({ label: recipesLabel, href: '/recipes' });
     breadcrumbs.push({ label: 'Recept', href: pathname });
+    return breadcrumbs;
+  }
+
+  // Meal plan detail / shopping: Home > Generator [> Boodschappenlijst]
+  if (pathname.startsWith('/meal-plans/') && pathname !== '/meal-plans') {
+    const generatorItem = baseNavItems.find((i) => i.href === '/meal-plans');
+    const generatorLabel =
+      t && generatorItem?.translationKey
+        ? t(`nav.${generatorItem.translationKey}`)
+        : 'Generator';
+    breadcrumbs.push({ label: generatorLabel, href: '/meal-plans' });
+    if (pathname.endsWith('/shopping')) {
+      const shoppingItem = baseNavItems.find(
+        (i) => i.href === '/meal-plans/shopping',
+      );
+      const shoppingLabel =
+        t && shoppingItem?.translationKey
+          ? t(`nav.${shoppingItem.translationKey}`)
+          : 'Boodschappenlijst';
+      breadcrumbs.push({ label: shoppingLabel, href: pathname });
+    }
     return breadcrumbs;
   }
 

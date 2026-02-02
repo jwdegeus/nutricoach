@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { MealPlanResponse } from '@/src/lib/diets';
 import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
+import type { MealPlanStatus } from '@/src/lib/meal-plans/mealPlans.types';
 import { MealPlanPageClient } from './MealPlanPageClient';
 import { GuardrailsViolationEmptyState } from './GuardrailsViolationEmptyState';
 import { getCurrentDietIdAction } from '@/src/app/(app)/recipes/[recipeId]/actions/recipe-ai.persist.actions';
@@ -26,6 +27,7 @@ type MealPlanPageWrapperProps = {
   plan: MealPlanResponse;
   enrichment?: MealPlanEnrichmentResponse | null;
   nevoFoodNamesByCode: Record<string, string>;
+  planStatus?: MealPlanStatus;
 };
 
 export function MealPlanPageWrapper({
@@ -33,6 +35,7 @@ export function MealPlanPageWrapper({
   plan,
   enrichment,
   nevoFoodNamesByCode,
+  planStatus,
 }: MealPlanPageWrapperProps) {
   const router = useRouter();
   const [guardrailsViolation, setGuardrailsViolation] =
@@ -136,6 +139,7 @@ export function MealPlanPageWrapper({
           plan={plan}
           enrichment={enrichment}
           nevoFoodNamesByCode={nevoFoodNamesByCode}
+          planStatus={planStatus}
         />
       )}
     </>

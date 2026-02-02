@@ -2,6 +2,10 @@
 
 import { createClient } from '@/src/lib/supabase/server';
 
+/** Explicit columns for meal_plan_runs list/detail — only fields used by UI and MealPlanRunRecord */
+const MEAL_PLAN_RUN_COLUMNS =
+  'id,user_id,meal_plan_id,run_type,model,status,duration_ms,error_code,error_message,created_at,constraints_in_prompt,guardrails_content_hash,guardrails_version';
+
 /**
  * Meal plan run record (from database)
  */
@@ -16,6 +20,9 @@ export type MealPlanRunRecord = {
   errorCode: string | null;
   errorMessage: string | null;
   createdAt: string;
+  constraintsInPrompt: boolean;
+  guardrailsContentHash: string | null;
+  guardrailsVersion: string | null;
 };
 
 /**
@@ -57,7 +64,7 @@ export async function listRunsAction(
     // Query runs
     const { data, error } = await supabase
       .from('meal_plan_runs')
-      .select('*')
+      .select(MEAL_PLAN_RUN_COLUMNS)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -72,19 +79,31 @@ export async function listRunsAction(
       };
     }
 
-    // Map snake_case to camelCase
-    const runs: MealPlanRunRecord[] = (data || []).map((row) => ({
-      id: row.id,
-      userId: row.user_id,
-      mealPlanId: row.meal_plan_id,
-      runType: row.run_type,
-      model: row.model,
-      status: row.status,
-      durationMs: row.duration_ms,
-      errorCode: row.error_code,
-      errorMessage: row.error_message,
-      createdAt: row.created_at,
-    }));
+    // Map snake_case to camelCase (guardrails meta: defensively handle missing columns)
+    const runs: MealPlanRunRecord[] = (data || []).map((row) => {
+      const r = row as Record<string, unknown>;
+      return {
+        id: row.id,
+        userId: row.user_id,
+        mealPlanId: row.meal_plan_id,
+        runType: row.run_type,
+        model: row.model,
+        status: row.status,
+        durationMs: row.duration_ms,
+        errorCode: row.error_code,
+        errorMessage: row.error_message,
+        createdAt: row.created_at,
+        constraintsInPrompt: r.constraints_in_prompt === true,
+        guardrailsContentHash:
+          typeof r.guardrails_content_hash === 'string'
+            ? r.guardrails_content_hash
+            : null,
+        guardrailsVersion:
+          typeof r.guardrails_version === 'string'
+            ? r.guardrails_version
+            : null,
+      };
+    });
 
     return {
       ok: true,
@@ -128,7 +147,7 @@ export async function getLatestRunningRunAction(): Promise<
     // Query latest running run
     const { data, error } = await supabase
       .from('meal_plan_runs')
-      .select('*')
+      .select(MEAL_PLAN_RUN_COLUMNS)
       .eq('user_id', user.id)
       .eq('status', 'running')
       .in('run_type', ['generate', 'regenerate'])
@@ -153,7 +172,8 @@ export async function getLatestRunningRunAction(): Promise<
       };
     }
 
-    // Map snake_case to camelCase
+    // Map snake_case to camelCase (guardrails meta: defensively handle missing columns)
+    const r = data as Record<string, unknown>;
     const run: MealPlanRunRecord = {
       id: data.id,
       userId: data.user_id,
@@ -165,6 +185,13 @@ export async function getLatestRunningRunAction(): Promise<
       errorCode: data.error_code,
       errorMessage: data.error_message,
       createdAt: data.created_at,
+      constraintsInPrompt: r.constraints_in_prompt === true,
+      guardrailsContentHash:
+        typeof r.guardrails_content_hash === 'string'
+          ? r.guardrails_content_hash
+          : null,
+      guardrailsVersion:
+        typeof r.guardrails_version === 'string' ? r.guardrails_version : null,
     };
 
     return {

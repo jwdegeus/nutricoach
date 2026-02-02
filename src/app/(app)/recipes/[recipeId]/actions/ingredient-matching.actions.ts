@@ -726,6 +726,12 @@ function sortCandidatesByRelevance(
   const q = query.trim().toLowerCase();
   if (!q) return candidates;
   const qNorm = normalizeForMatch(q);
+  // Laatste significante woord (vaak het kernwoord, bijv. "tijm" in "gedroogde tijm") hoger laten scoren
+  const queryWords = q
+    .split(/\s+/)
+    .filter((w) => w.length >= 2 && !UNIT_AND_STOP.has(w) && !/^\d+$/.test(w));
+  const lastSignificantWord =
+    queryWords.length > 0 ? queryWords[queryWords.length - 1] : '';
 
   const score = (name: string): number => {
     const n = (name ?? '').toLowerCase();
@@ -742,6 +748,16 @@ function sortCandidatesByRelevance(
     );
     if (wordBoundary.test(n)) return 3;
     if (n.includes(q)) return 4;
+    // NEVO "Tijm, gedroogd" bij zoekterm "gedroogde tijm": naam bevat kernwoord "tijm" → hoger dan alleen "gedroogde" matches
+    if (
+      lastSignificantWord &&
+      (n.includes(lastSignificantWord) ||
+        new RegExp(
+          `\\b${lastSignificantWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`,
+          'i',
+        ).test(n))
+    )
+      return 4.5;
     return 5;
   };
 
@@ -791,6 +807,16 @@ export async function searchIngredientCandidatesAction(
     for (const t of getExtraSearchTerms(searchTerm)) {
       if (t && !searchTerms.includes(t)) searchTerms.push(t);
     }
+    // Elk significant woord apart zoeken (bijv. "gedroogde tijm" → ook "tijm") zodat NEVO "Tijm, gedroogd" matcht
+    const words = searchTerm
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(
+        (w) => w.length >= 2 && !UNIT_AND_STOP.has(w) && !/^\d+$/.test(w),
+      );
+    for (const w of words) {
+      if (!searchTerms.includes(w)) searchTerms.push(w);
+    }
     if (
       raw.length > searchTerm.length + 5 &&
       !searchTerms.includes(raw.slice(0, 40).trim())
@@ -829,21 +855,9 @@ export async function searchIngredientCandidatesAction(
     const customCols =
       'id, name_nl, name_en, food_group_nl, energy_kcal, protein_g, fat_g, carbs_g, fiber_g, created_by';
 
+    // Zoek voor élke term (niet stoppen bij limit), zodat bv. "tijm" resultaten niet worden weggelaten
+    // doordat "gedroogde" al 15 treffers gaf. Daarna sorteren we op relevantie en nemen we de top.
     for (const q of searchTerms) {
-      if (
-        nevoCandidates.length +
-          customCandidates.length +
-          fnddsCandidates.length >=
-        limit
-      )
-        break;
-      const remaining =
-        limit -
-        nevoCandidates.length -
-        customCandidates.length -
-        fnddsCandidates.length;
-      if (remaining <= 0) break;
-
       const pattern = `%${q.replace(/'/g, "''")}%`;
 
       // NEVO: inline queries zodat we fouten kunnen doorgeven (searchNevoFoods geeft [] bij error)
@@ -859,33 +873,33 @@ export async function searchIngredientCandidatesAction(
           .from('nevo_foods')
           .select(nevoCols)
           .ilike('name_nl', pattern)
-          .limit(remaining),
+          .limit(limit),
         supabase
           .from('nevo_foods')
           .select(nevoCols)
           .ilike('name_en', pattern)
-          .limit(remaining),
+          .limit(limit),
         supabase
           .from('custom_foods')
           .select(customCols)
           .ilike('name_nl', pattern)
-          .limit(remaining),
+          .limit(limit),
         supabase
           .from('custom_foods')
           .select(customCols)
           .ilike('name_en', pattern)
-          .limit(remaining),
+          .limit(limit),
         supabase
           .from('fndds_survey_foods')
           .select('fdc_id, description')
           .ilike('description', pattern)
-          .limit(remaining),
+          .limit(limit),
         supabase
           .from('fndds_survey_food_translations')
           .select('fdc_id, display_name')
           .eq('locale', 'nl-NL')
           .ilike('display_name', pattern)
-          .limit(remaining),
+          .limit(limit),
       ]);
 
       if (nevoByNl.error) {
@@ -1011,12 +1025,10 @@ export async function searchIngredientCandidatesAction(
       }
     }
 
-    let combined = [
-      ...nevoCandidates,
-      ...customCandidates,
-      ...fnddsCandidates,
-    ].slice(0, limit);
-    combined = sortCandidatesByRelevance(combined, raw);
+    const combined = sortCandidatesByRelevance(
+      [...nevoCandidates, ...customCandidates, ...fnddsCandidates],
+      raw,
+    ).slice(0, limit);
     return { ok: true, data: combined };
   } catch (e) {
     return {

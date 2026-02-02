@@ -140,7 +140,7 @@ export function PlanChatClient({
             {messages.length === 0 && (
               <div className="text-center text-zinc-500 dark:text-zinc-400 py-8">
                 <Text>
-                  Stel een vraag of vraag om een aanpassing aan je meal plan.
+                  Stel een vraag of vraag om een aanpassing aan je weekmenu.
                 </Text>
                 <Text className="text-sm mt-2">
                   Bijvoorbeeld: &quot;Maak maandag gezonder&quot; of

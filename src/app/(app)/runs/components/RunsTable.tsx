@@ -104,6 +104,29 @@ function RunRow({
           )}
         </TableCell>
         <TableCell>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge color={run.constraintsInPrompt ? 'green' : 'zinc'}>
+              Constraints: {run.constraintsInPrompt ? 'ja' : 'nee'}
+            </Badge>
+            {run.guardrailsContentHash && (
+              <Text className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
+                hash:{' '}
+                {run.guardrailsContentHash.length > 8
+                  ? `${run.guardrailsContentHash.slice(0, 8)}…`
+                  : run.guardrailsContentHash}
+              </Text>
+            )}
+            {run.guardrailsVersion != null && run.guardrailsVersion !== '' && (
+              <Text className="text-xs text-zinc-500 dark:text-zinc-400">
+                v:{' '}
+                {run.guardrailsVersion.length > 12
+                  ? `${run.guardrailsVersion.slice(0, 12)}…`
+                  : run.guardrailsVersion}
+              </Text>
+            )}
+          </div>
+        </TableCell>
+        <TableCell>
           <div className="flex items-center gap-2">
             {(run.errorMessage || run.status === 'running' || stuck) && (
               <Button
@@ -137,7 +160,7 @@ function RunRow({
       </TableRow>
       {expanded && (
         <TableRow>
-          <TableCell colSpan={7} className="bg-zinc-50 dark:bg-zinc-900/50">
+          <TableCell colSpan={8} className="bg-zinc-50 dark:bg-zinc-900/50">
             <div className="space-y-2 py-2">
               {run.status === 'running' && runningDuration !== null && (
                 <div>
@@ -179,7 +202,7 @@ function RunRow({
               {run.mealPlanId && (
                 <div>
                   <Text className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    Meal Plan ID:
+                    Weekmenu ID:
                   </Text>
                   <Text className="text-xs text-zinc-600 dark:text-zinc-400 ml-2 font-mono">
                     {run.mealPlanId}
@@ -265,10 +288,10 @@ export function RunsTable({ runs }: RunsTableProps) {
   if (runs.length === 0) {
     return (
       <div className="rounded-lg bg-white p-6 shadow-xs dark:bg-zinc-900">
-        <Heading>Meal Plan Runs</Heading>
+        <Heading>Weekmenu runs</Heading>
         <div className="mt-4">
           <Text className="text-sm text-zinc-500 dark:text-zinc-400">
-            Geen runs gevonden. Genereer een meal plan om runs te zien.
+            Geen runs gevonden. Genereer een weekmenu om runs te zien.
           </Text>
         </div>
       </div>
@@ -373,7 +396,7 @@ export function RunsTable({ runs }: RunsTableProps) {
         isLoading={isPending}
       />
       <div className="rounded-lg bg-white p-6 shadow-xs dark:bg-zinc-900">
-        <Heading>Meal Plan Runs ({runs.length})</Heading>
+        <Heading>Weekmenu runs ({runs.length})</Heading>
         <div className="mt-4">
           <Table className="[--gutter:--spacing(6)] sm:[--gutter:--spacing(8)]">
             <TableHead>
@@ -384,6 +407,7 @@ export function RunsTable({ runs }: RunsTableProps) {
                 <TableHeader>Model</TableHeader>
                 <TableHeader>Duur</TableHeader>
                 <TableHeader>Error Code</TableHeader>
+                <TableHeader>Guardrails</TableHeader>
                 <TableHeader>Acties</TableHeader>
               </TableRow>
             </TableHead>

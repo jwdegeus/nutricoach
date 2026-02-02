@@ -8,7 +8,7 @@ import { Text } from '@/components/catalyst/text';
 
 export const metadata: Metadata = {
   title: 'Plan Chat | NutriCoach',
-  description: 'Chat met je meal plan om aanpassingen te maken',
+  description: 'Chat met je weekmenu om aanpassingen te maken',
 };
 
 type PageProps = {
@@ -46,7 +46,7 @@ export default async function PlanChatPage({ params }: PageProps) {
       <div>
         <Heading level={1}>Plan Chat</Heading>
         <Text className="mt-2 text-zinc-500 dark:text-zinc-400">
-          Pas je meal plan aan via chat
+          Pas je weekmenu aan via chat
         </Text>
       </div>
 

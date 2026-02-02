@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/src/lib/supabase/server';
 import { isAdmin } from '@/src/lib/auth/roles';
-import { SettingsForm } from './settings-form';
-import { AdminLinks } from './components/AdminLinks';
+import { getMealPlanSchedulePreferencesAction } from './actions/meal-plan-schedule-preferences.actions';
+import { SettingsPageContent } from './SettingsPageContent';
 
 export const metadata: Metadata = {
   title: 'Instellingen | NutriCoach',
@@ -21,21 +21,16 @@ export default async function SettingsPage() {
   }
 
   const admin = await isAdmin();
+  const schedulePrefsResult = await getMealPlanSchedulePreferencesAction();
+  const schedulePrefs = schedulePrefsResult.ok
+    ? schedulePrefsResult.data
+    : null;
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white">
-          Instellingen
-        </h1>
-        <p className="mt-2 text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
-          Beheer je applicatie voorkeuren en instellingen
-        </p>
-      </div>
-
-      <SettingsForm user={user} />
-
-      {admin && <AdminLinks />}
-    </div>
+    <SettingsPageContent
+      user={user}
+      schedulePrefs={schedulePrefs}
+      isAdmin={!!admin}
+    />
   );
 }

@@ -15,6 +15,7 @@ import {
   addNevoIngredientToCategoryAction,
   deduplicateCategoryItemsAction,
 } from '@/src/app/(app)/settings/actions/ingredient-categories-admin.actions';
+import { useToast } from '@/src/components/app/ToastContext';
 import {
   ArrowLeftIcon,
   PlusIcon,
@@ -66,6 +67,7 @@ export function IngredientGroupDetailPageClient({
 }: {
   groupId: string;
 }) {
+  const { showToast } = useToast();
   const [category, setCategory] = useState<Category | null>(null);
   const [nevoGroups, setNevoGroups] = useState<NevoFoodGroup[]>([]);
   const [items, setItems] = useState<CategoryItem[]>([]);
@@ -389,11 +391,28 @@ export function IngredientGroupDetailPageClient({
         const result = await deleteIngredientCategoryItemAction(itemId);
         if (!result.ok) {
           setAddError(result.error.message);
+          showToast({
+            type: 'error',
+            title: result.error.message,
+          });
           return;
         }
-        refreshItems();
+        setAddError(null);
+        showToast({
+          type: 'success',
+          title: 'Ingrediënt verwijderd',
+        });
+        setItems((prev) => prev.filter((i) => i.id !== itemId));
+        setItemsTotalCount((c) => Math.max(0, c - 1));
+        internalItemsRef.current = internalItemsRef.current.filter(
+          (i) => i.id !== itemId,
+        );
       } catch {
         setAddError('Onverwachte fout bij verwijderen');
+        showToast({
+          type: 'error',
+          title: 'Onverwachte fout bij verwijderen',
+        });
       }
     });
   };
@@ -470,16 +489,35 @@ export function IngredientGroupDetailPageClient({
     const ids = Array.from(selectedItemIds);
     setAddError(null);
     startTransition(async () => {
+      const deletedIds = new Set<string>();
       let failed = 0;
       for (const id of ids) {
         const result = await deleteIngredientCategoryItemAction(id);
-        if (!result.ok) failed++;
+        if (result.ok) deletedIds.add(id);
+        else failed++;
       }
       setSelectedItemIds(new Set());
       if (failed > 0) {
         setAddError(`${failed} van ${ids.length} verwijderen mislukt`);
+        showToast({
+          type: 'error',
+          title: `${failed} van ${ids.length} verwijderen mislukt`,
+        });
       }
-      refreshItems();
+      if (deletedIds.size > 0) {
+        showToast({
+          type: 'success',
+          title:
+            deletedIds.size === 1
+              ? 'Ingrediënt verwijderd'
+              : `${deletedIds.size} ingrediënten verwijderd`,
+        });
+        setItems((prev) => prev.filter((i) => !deletedIds.has(i.id)));
+        setItemsTotalCount((c) => Math.max(0, c - deletedIds.size));
+        internalItemsRef.current = internalItemsRef.current.filter(
+          (i) => !deletedIds.has(i.id),
+        );
+      }
     });
   };
 

@@ -11,7 +11,7 @@ import { Text } from '@/components/catalyst/text';
 export const metadata: Metadata = {
   title: 'Wekelijkse Boodschappen | NutriCoach',
   description:
-    'Bekijk je wekelijkse boodschappenlijst op basis van je meal plan',
+    'Bekijk je wekelijkse boodschappenlijst op basis van je weekmenu',
 };
 
 type PageProps = {

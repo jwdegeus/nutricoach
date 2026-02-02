@@ -1,0 +1,16 @@
+{
+  "targetReuseRatio": 0.8,
+  "prefillFetchLimitMax": 20,
+  "forbiddenPatternsInShakeSmoothie": [
+    "kippenei rauw",
+    "eiwit kippenei rauw",
+    "rauw kippenei",
+    "raw chicken egg",
+    "raw egg white",
+    "gebakken ei",
+    "ei gebakken",
+    "gekookt ei",
+    "ei gekookt",
+    "kippenei"
+  ]
+}

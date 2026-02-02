@@ -7,15 +7,20 @@
  * Comprehensive ingredient category mapping
  */
 export const INGREDIENT_CATEGORY_MAP: Record<string, string[]> = {
-  // Grains
+  // Grains (English + Dutch for NEVO/UI names)
   grains: [
     'wheat',
     'rice',
+    'rijst',
     'oats',
+    'haver',
     'barley',
+    'gerst',
     'rye',
+    'rogge',
     'quinoa',
     'corn',
+    'maïs',
     'buckwheat',
     'millet',
     'spelt',
@@ -28,36 +33,52 @@ export const INGREDIENT_CATEGORY_MAP: Record<string, string[]> = {
     'farro',
     'freekeh',
     'wheat_berries',
+    'pasta',
+    'brood',
+    'tarwe',
   ],
 
-  // Dairy
+  // Dairy (English + Dutch)
   dairy: [
     'milk',
+    'melk',
     'cheese',
+    'kaas',
     'yogurt',
+    'yoghurt',
     'butter',
+    'boter',
     'cream',
+    'room',
     'sour_cream',
     'kefir',
     'ghee',
     'buttermilk',
+    'kwark',
     'cottage_cheese',
     'ricotta',
     'mozzarella',
     'cream_cheese',
     'mascarpone',
+    'zuivel',
   ],
 
-  // Legumes
+  // Legumes (English + Dutch)
   legumes: [
     'beans',
+    'bonen',
     'lentils',
+    'linzen',
     'chickpeas',
+    'kikkererwten',
     'peas',
+    'erwten',
     'soy',
+    'soja',
     'tofu',
     'tempeh',
     'peanuts',
+    'pinda',
     'black_beans',
     'kidney_beans',
     'pinto_beans',
@@ -67,13 +88,17 @@ export const INGREDIENT_CATEGORY_MAP: Record<string, string[]> = {
     'edamame',
     'mung_beans',
     'adzuki_beans',
+    'peulvruchten',
   ],
 
-  // Nightshades
+  // Nightshades (English + Dutch)
   nightshades: [
     'tomato',
+    'tomaat',
     'potato',
+    'aardappel',
     'eggplant',
+    'aubergine',
     'bell_pepper',
     'chili_pepper',
     'paprika',
@@ -82,11 +107,13 @@ export const INGREDIENT_CATEGORY_MAP: Record<string, string[]> = {
     'tomatillo',
     'ground_cherry',
     'pepino',
+    'nachtschades',
   ],
 
-  // Processed sugar
+  // Processed sugar (English + Dutch)
   processed_sugar: [
     'sugar',
+    'suiker',
     'sucrose',
     'fructose',
     'high_fructose_corn_syrup',

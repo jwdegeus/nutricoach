@@ -5,15 +5,26 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/catalyst/button';
 import { Heading } from '@/components/catalyst/heading';
 import { Text } from '@/components/catalyst/text';
-import { ArrowLeftRight, Trash2, Clock, Loader2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogBody,
+  DialogDescription,
+  DialogActions,
+} from '@/components/catalyst/dialog';
+import { Field, Label } from '@/components/catalyst/fieldset';
+import { Input } from '@/components/catalyst/input';
+import { ArrowLeftRight, Trash2, Clock, Loader2, Replace } from 'lucide-react';
 import type { MealPlanResponse } from '@/src/lib/diets';
 import type {
   EnrichedMeal,
   CookPlanDay,
 } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
+import type { MealPlanStatus } from '@/src/lib/meal-plans/mealPlans.types';
 import { MealRating } from './MealRating';
 import { MealDetailDialog } from './MealDetailDialog';
 import { applyDirectPlanEditAction } from '../actions/planEdit.actions';
+import { updateMealPlanDraftSlotAction } from '../actions/planReview.actions';
 import type { PlanEdit } from '@/src/lib/agents/meal-planner/planEdit.types';
 
 type MealCardProps = {
@@ -30,6 +41,7 @@ type MealCardProps = {
   enrichedMeal?: EnrichedMeal;
   cookPlanDay?: CookPlanDay;
   nevoFoodNamesByCode: Record<string, string>;
+  planStatus?: MealPlanStatus;
 };
 
 export function MealCard({
@@ -46,12 +58,97 @@ export function MealCard({
   enrichedMeal,
   cookPlanDay,
   nevoFoodNamesByCode,
+  planStatus,
 }: MealCardProps) {
-  const _router = useRouter();
+  const router = useRouter();
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [showSwapDialog, setShowSwapDialog] = useState(false);
+  const [swapForm, setSwapForm] = useState({
+    name: '',
+    nevoCode: '',
+    quantityG: 100,
+  });
+  const [isSavingSwap, setIsSavingSwap] = useState(false);
+  const [swapError, setSwapError] = useState<string | null>(null);
+  const [swapErrorCode, setSwapErrorCode] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  const handleOpenSwapDialog = () => {
+    setSwapForm({
+      name: meal.name || '',
+      nevoCode: meal.ingredientRefs?.[0]?.nevoCode?.toString() ?? '',
+      quantityG: meal.ingredientRefs?.[0]?.quantityG ?? 100,
+    });
+    setSwapError(null);
+    setSwapErrorCode(null);
+    setShowSwapDialog(true);
+  };
+
+  const handleSaveSwap = async () => {
+    const name = swapForm.name.trim();
+    const nevoCode = swapForm.nevoCode.trim();
+    const quantityG = Number(swapForm.quantityG);
+
+    if (!name) {
+      setSwapError('Vul een maaltijdnaam in');
+      return;
+    }
+    if (!nevoCode) {
+      setSwapError('Vul een NEVO-code in');
+      return;
+    }
+    if (!Number.isFinite(quantityG) || quantityG < 1) {
+      setSwapError('Gram moet minimaal 1 zijn');
+      return;
+    }
+
+    setIsSavingSwap(true);
+    setSwapError(null);
+    setSwapErrorCode(null);
+
+    try {
+      const mealIdNew =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `swap-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+      const result = await updateMealPlanDraftSlotAction({
+        planId,
+        date,
+        mealSlot: mealSlot as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+        meal: {
+          id: mealIdNew,
+          name,
+          slot: mealSlot as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+          date,
+          ingredientRefs: [
+            {
+              nevoCode,
+              quantityG,
+              displayName: undefined,
+              tags: undefined,
+            },
+          ],
+        },
+      });
+
+      if (result.ok) {
+        setShowSwapDialog(false);
+        router.refresh();
+      } else {
+        setSwapErrorCode(result.error.code);
+        setSwapError(result.error.message);
+      }
+    } catch (err) {
+      setSwapError(
+        err instanceof Error ? err.message : 'Fout bij vervangen maaltijd',
+      );
+    } finally {
+      setIsSavingSwap(false);
+    }
+  };
 
   const handleSwap = () => {
     setError(null);
@@ -225,19 +322,31 @@ export function MealCard({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex gap-2">
-            <Button
-              outline
-              onClick={handleSwap}
-              disabled={isPending}
-              className="flex-1"
-            >
-              {isPending ? (
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-              ) : (
-                <ArrowLeftRight className="h-3 w-3 mr-1" />
-              )}
-              Wissel
-            </Button>
+            {planStatus === 'draft' ? (
+              <Button
+                outline
+                onClick={handleOpenSwapDialog}
+                disabled={isPending}
+                className="flex-1"
+              >
+                <Replace className="h-3 w-3 mr-1" />
+                Swap
+              </Button>
+            ) : (
+              <Button
+                outline
+                onClick={handleSwap}
+                disabled={isPending}
+                className="flex-1"
+              >
+                {isPending ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <ArrowLeftRight className="h-3 w-3 mr-1" />
+                )}
+                Wissel
+              </Button>
+            )}
             <Button
               outline
               onClick={handleRemove}
@@ -268,7 +377,96 @@ export function MealCard({
         enrichedMeal={enrichedMeal}
         cookPlanDay={cookPlanDay}
         nevoFoodNamesByCode={nevoFoodNamesByCode}
+        planId={planId}
       />
+
+      {/* Swap (draft) Dialog */}
+      <Dialog
+        open={showSwapDialog}
+        onClose={() => !isSavingSwap && setShowSwapDialog(false)}
+        size="md"
+      >
+        <DialogTitle>Maaltijd vervangen</DialogTitle>
+        <DialogDescription>
+          Vervang deze maaltijd in de draft. Na opslaan wordt de draft
+          gecontroleerd op dieetregels.
+        </DialogDescription>
+        <DialogBody>
+          <div className="space-y-4">
+            <Field>
+              <Label>Nieuwe maaltijdnaam</Label>
+              <Input
+                type="text"
+                value={swapForm.name}
+                onChange={(e) =>
+                  setSwapForm((prev) => ({ ...prev, name: e.target.value }))
+                }
+                placeholder="bijv. Griekse salade"
+                disabled={isSavingSwap}
+              />
+            </Field>
+            <Field>
+              <Label>Ingrediënt (NEVO-code)</Label>
+              <Input
+                type="text"
+                value={swapForm.nevoCode}
+                onChange={(e) =>
+                  setSwapForm((prev) => ({ ...prev, nevoCode: e.target.value }))
+                }
+                placeholder="bijv. 1234"
+                disabled={isSavingSwap}
+              />
+            </Field>
+            <Field>
+              <Label>Gram</Label>
+              <Input
+                type="number"
+                min={1}
+                value={swapForm.quantityG}
+                onChange={(e) =>
+                  setSwapForm((prev) => ({
+                    ...prev,
+                    quantityG: parseInt(e.target.value, 10) || 0,
+                  }))
+                }
+                disabled={isSavingSwap}
+              />
+            </Field>
+            {swapError && (
+              <div
+                className="p-3 rounded-lg border border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/30 text-red-800 dark:text-red-200 text-sm"
+                role="alert"
+              >
+                <p className="font-medium">
+                  {swapErrorCode === 'GUARDRAILS_VIOLATION'
+                    ? 'Draft schendt dieetregels'
+                    : 'Fout'}
+                </p>
+                <p className="mt-1">{swapError}</p>
+              </div>
+            )}
+          </div>
+        </DialogBody>
+        <DialogActions>
+          <Button
+            plain
+            onClick={() => !isSavingSwap && setShowSwapDialog(false)}
+            disabled={isSavingSwap}
+          >
+            Annuleren
+          </Button>
+          <Button onClick={handleSaveSwap} disabled={isSavingSwap}>
+            {isSavingSwap ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Opslaan...
+              </>
+            ) : (
+              'Opslaan'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

@@ -2,6 +2,7 @@
 
 import type { MealPlanResponse, MealPlanDay } from '@/src/lib/diets';
 import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
+import type { MealPlanStatus } from '@/src/lib/meal-plans/mealPlans.types';
 import { MealCard } from './MealCard';
 import { QuickEditBar } from './QuickEditBar';
 import { Heading } from '@/components/catalyst/heading';
@@ -11,6 +12,7 @@ type MealPlanCardsProps = {
   plan: MealPlanResponse;
   enrichment?: MealPlanEnrichmentResponse | null;
   nevoFoodNamesByCode: Record<string, string>;
+  planStatus?: MealPlanStatus;
 };
 
 export function MealPlanCards({
@@ -18,6 +20,7 @@ export function MealPlanCards({
   plan,
   enrichment,
   nevoFoodNamesByCode,
+  planStatus,
 }: MealPlanCardsProps) {
   // Create enrichment map for quick lookup
   const enrichmentMap = new Map<
@@ -110,6 +113,7 @@ export function MealPlanCards({
                   enrichedMeal={enriched}
                   cookPlanDay={cookPlan}
                   nevoFoodNamesByCode={nevoFoodNamesByCode}
+                  planStatus={planStatus}
                 />
               );
             })}

@@ -4,8 +4,8 @@ import { createClient } from '@/src/lib/supabase/server';
 import { CreateMealPlanForm } from './components/CreateMealPlanForm';
 
 export const metadata: Metadata = {
-  title: 'Nieuw Meal Plan | NutriCoach',
-  description: 'Maak een nieuw meal plan aan',
+  title: 'Nieuw weekmenu | NutriCoach',
+  description: 'Maak een nieuw weekmenu aan',
 };
 
 /**
@@ -25,9 +25,9 @@ export default async function NewMealPlanPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Nieuw Meal Plan</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Nieuw weekmenu</h1>
         <p className="text-muted-foreground">
-          Genereer een nieuw meal plan op basis van je dieetprofiel
+          Genereer een nieuw weekmenu op basis van je dieetprofiel
         </p>
       </div>
 

@@ -52,7 +52,6 @@ import {
   ArrowDownTrayIcon,
 } from '@heroicons/react/20/solid';
 import { ThemeSwitcher } from './theme-switcher';
-import { PlanEditStatusIndicator } from './PlanEditStatusIndicator';
 import { useTranslations } from 'next-intl';
 import { RecipeImportModal } from '@/src/components/recipes/RecipeImportModal';
 import { ToastProvider } from './ToastContext';
@@ -225,7 +224,6 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
               <NavbarItem href="/search" aria-label={t('search')}>
                 <MagnifyingGlassIcon />
               </NavbarItem>
-              <PlanEditStatusIndicator />
               <NavbarItem href="/inbox" aria-label={t('inbox')}>
                 <InboxIcon />
               </NavbarItem>

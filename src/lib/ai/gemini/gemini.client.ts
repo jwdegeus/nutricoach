@@ -13,6 +13,10 @@
  *   GEMINI_MODEL_VISION      - Vision/OCR (recipe photo import, image analysis)
  *   GEMINI_MAX_OUTPUT_TOKENS - Max tokens per response (default 2048)
  *
+ * Recipe image generation (Gemini 2.5 Flash Image) uses a separate client; see gemini-image.client.ts:
+ *   GEMINI_IMAGE_API_KEY     - Optional; API key for image generation (falls back to GEMINI_API_KEY)
+ *   GEMINI_MODEL_IMAGE       - Optional; default gemini-2.5-flash-image (https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash-image)
+ *
  * Example .env.local:
  *   GEMINI_API_KEY=your-key
  *   GEMINI_MODEL=gemini-1.5-flash

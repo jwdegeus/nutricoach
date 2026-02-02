@@ -22,14 +22,14 @@ export function MealPlansTable({ plans }: MealPlansTableProps) {
   if (plans.length === 0) {
     return (
       <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        <Heading>Meal Plans</Heading>
+        <Heading>Weekmenu&apos;s</Heading>
         <div className="mt-4 space-y-4">
           <Text className="text-sm text-zinc-500 dark:text-zinc-400">
-            Je hebt nog geen meal plans. Genereer er een om te beginnen.
+            Je hebt nog geen weekmenu&apos;s. Genereer er een om te beginnen.
           </Text>
           <Button href="/meal-plans/new">
             <Calendar className="h-4 w-4 mr-2" />
-            Nieuw Meal Plan
+            Nieuw weekmenu
           </Button>
         </div>
       </div>
@@ -38,7 +38,7 @@ export function MealPlansTable({ plans }: MealPlansTableProps) {
 
   return (
     <div className="rounded-lg bg-white p-6 shadow-xs dark:bg-zinc-900">
-      <Heading>Meal Plans ({plans.length})</Heading>
+      <Heading>Weekmenu&apos;s ({plans.length})</Heading>
       <div className="mt-4">
         <Table className="[--gutter:--spacing(6)] sm:[--gutter:--spacing(8)]">
           <TableHead>
