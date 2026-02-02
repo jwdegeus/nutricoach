@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { Search, User, Settings, LogOut } from 'lucide-react';
 import { getPageTitle, getBreadcrumbs } from '@/src/lib/nav';
 import { Input } from '@/components/catalyst/input';
@@ -18,9 +18,13 @@ import { useTranslations } from 'next-intl';
 
 export function Topbar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tab = searchParams.get('tab') ?? undefined;
   const t = useTranslations();
   const pageTitle = getPageTitle(pathname, (key: string) => t(key));
-  const breadcrumbs = getBreadcrumbs(pathname, (key: string) => t(key));
+  const breadcrumbs = getBreadcrumbs(pathname, (key: string) => t(key), {
+    tab,
+  });
   const tCommon = useTranslations('common');
   const tMenu = useTranslations('menu');
 

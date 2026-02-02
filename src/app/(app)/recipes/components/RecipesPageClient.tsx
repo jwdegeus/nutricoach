@@ -8,27 +8,55 @@ import type { DietKey } from '@/src/lib/diets';
 import { Link } from '@/components/catalyst/link';
 import { Text } from '@/components/catalyst/text';
 import type { RecipeComplianceResult } from '../actions/recipe-compliance.actions';
+import {
+  getRecipeComplianceScoresAction,
+  type RecipeComplianceInputItem,
+} from '../actions/recipe-compliance.actions';
 
 type RecipesPageClientProps = {
   initialMeals: {
     customMeals: CustomMealRecord[];
     mealHistory: unknown[];
   };
-  /** Compliance scores per meal id (0–100% volgens dieetregels) */
-  initialComplianceScores?: Record<string, RecipeComplianceResult>;
   /** Bij "recepten voor ontbrekende categorieën": toon banner en gefilterde lijst */
   categoryFilter?: { categoryNames: string[] };
 };
 
 const ITEMS_PER_PAGE = 15;
 
+function buildComplianceItems(meals: MealItem[]): RecipeComplianceInputItem[] {
+  return meals.map((meal) => {
+    if (meal.source === 'custom') {
+      const m = meal as CustomMealRecord & { source: 'custom' };
+      const base = m.mealData ?? {};
+      const instructions = m.aiAnalysis?.instructions;
+      const mealData =
+        Array.isArray(instructions) && instructions.length > 0
+          ? { ...base, instructions }
+          : base;
+      return { id: m.id, source: 'custom' as const, mealData };
+    }
+    const m = meal as Record<string, unknown> & { source: 'gemini' };
+    const base = (m.meal_data ?? {}) as Record<string, unknown>;
+    const aiAnalysis = m.ai_analysis as { instructions?: unknown } | undefined;
+    const instructions = aiAnalysis?.instructions;
+    const meal_data =
+      Array.isArray(instructions) && instructions.length > 0
+        ? { ...base, instructions }
+        : base;
+    return { id: String(m.id), source: 'gemini' as const, meal_data };
+  });
+}
+
 export function RecipesPageClient({
   initialMeals,
-  initialComplianceScores = {},
   categoryFilter,
 }: RecipesPageClientProps) {
   const [meals, setMeals] = useState(initialMeals);
-  const [complianceScores] = useState(initialComplianceScores);
+  const [complianceScores, setComplianceScores] = useState<
+    Record<string, RecipeComplianceResult>
+  >({});
+  const [complianceLoading, setComplianceLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Handle consumption logged - update local state optimistically
@@ -188,6 +216,39 @@ export function RecipesPageClient({
   const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const paginatedMeals = allMeals.slice(startIndex, endIndex);
+  const pageIdsKey = useMemo(
+    () =>
+      paginatedMeals
+        .map((m) => String(m.id))
+        .sort()
+        .join(','),
+    [paginatedMeals],
+  );
+
+  // Fetch compliance scores for the current page only (deferred from server for faster first paint)
+  useEffect(() => {
+    if (paginatedMeals.length === 0) return;
+    const ids = paginatedMeals.map((m) => String(m.id));
+    const alreadyLoaded = ids.every((id) => id in complianceScores);
+    if (alreadyLoaded) return;
+
+    let cancelled = false;
+    setComplianceLoading(true);
+    const items = buildComplianceItems(paginatedMeals);
+    getRecipeComplianceScoresAction(items)
+      .then((result) => {
+        if (cancelled) return;
+        if (result.ok) {
+          setComplianceScores((prev) => ({ ...prev, ...result.data }));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setComplianceLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pageIdsKey, complianceScores]);
 
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
@@ -221,6 +282,7 @@ export function RecipesPageClient({
         totalPages={totalPages}
         itemsPerPage={ITEMS_PER_PAGE}
         complianceScores={complianceScores}
+        complianceLoading={complianceLoading}
         onPageChange={handlePageChange}
         onConsumptionLogged={handleConsumptionLogged}
         onDietTypeUpdated={handleDietTypeUpdated}

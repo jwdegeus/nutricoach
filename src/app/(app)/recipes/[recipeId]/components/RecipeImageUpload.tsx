@@ -5,7 +5,12 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/catalyst/button';
 import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
 import { Text } from '@/components/catalyst/text';
-import { PhotoIcon, TrashIcon, SparklesIcon } from '@heroicons/react/20/solid';
+import {
+  PhotoIcon,
+  TrashIcon,
+  SparklesIcon,
+  ArrowPathIcon,
+} from '@heroicons/react/20/solid';
 import { ImageLightbox } from './ImageLightbox';
 
 type RecipeImageUploadProps = {
@@ -288,8 +293,13 @@ export function RecipeImageUpload({
 
   const isBusy = isUploading || isDeleting || isGenerating;
 
+  const iconButtonClass =
+    'p-2 rounded-lg shadow-md border border-zinc-200/80 dark:border-zinc-700/80 transition-[background-color,box-shadow] duration-150 ' +
+    'focus:outline-none focus-visible:outline-none [&[data-focus]]:!outline-none [&[data-focus]]:!outline-offset-0 [&[data-focus]]:!ring-0 [&[data-focus]]:!ring-offset-0 ' +
+    'hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:shadow-sm [&[data-focus]]:shadow-sm [&[data-focus]]:bg-zinc-100 dark:[&[data-focus]]:bg-zinc-800';
+
   const overlayButtons = (
-    <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1.5 flex-wrap justify-end">
+    <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1.5 justify-end">
       <Button
         plain
         onClick={(e) => {
@@ -298,10 +308,11 @@ export function RecipeImageUpload({
           handleGenerateImage();
         }}
         disabled={isBusy}
-        className="text-xs bg-white/95 dark:bg-zinc-900/95 hover:bg-white dark:hover:bg-zinc-800 shadow-md py-2 px-2.5 rounded-md text-blue-600 dark:text-blue-400 border border-zinc-200/80 dark:border-zinc-700/80"
+        title={isGenerating ? 'Bezig…' : 'Genereer met AI'}
+        aria-label={isGenerating ? 'Bezig…' : 'Genereer met AI'}
+        className={`${iconButtonClass} bg-white/95 dark:bg-zinc-900/95 text-blue-600 dark:text-blue-400`}
       >
-        <SparklesIcon className="h-4 w-4 mr-1.5" />
-        {isGenerating ? 'Bezig…' : 'Genereer met AI'}
+        <SparklesIcon className="h-5 w-5" aria-hidden />
       </Button>
       <Button
         plain
@@ -311,9 +322,14 @@ export function RecipeImageUpload({
           fileInputRef.current?.click();
         }}
         disabled={isBusy}
-        className="text-xs bg-white/95 dark:bg-zinc-900/95 hover:bg-white dark:hover:bg-zinc-800 shadow-md py-2 px-2.5 rounded-md border border-zinc-200/80 dark:border-zinc-700/80"
+        title="Vervangen"
+        aria-label="Vervangen"
+        className={
+          iconButtonClass +
+          ' bg-white/95 dark:bg-zinc-900/95 text-zinc-600 dark:text-zinc-400'
+        }
       >
-        Vervangen
+        <ArrowPathIcon className="h-5 w-5" aria-hidden />
       </Button>
       <Button
         plain
@@ -323,10 +339,11 @@ export function RecipeImageUpload({
           handleDeleteClick();
         }}
         disabled={isBusy}
-        className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 bg-white/95 dark:bg-zinc-900/95 hover:bg-white dark:hover:bg-zinc-800 shadow-md py-2 px-2.5 rounded-md border border-zinc-200/80 dark:border-zinc-700/80"
+        title="Verwijderen"
+        aria-label="Verwijderen"
+        className={`${iconButtonClass} text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 bg-white/95 dark:bg-zinc-900/95`}
       >
-        <TrashIcon className="h-4 w-4 mr-1" />
-        Verwijderen
+        <TrashIcon className="h-5 w-5" aria-hidden />
       </Button>
     </div>
   );

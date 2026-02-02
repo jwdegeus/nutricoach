@@ -150,10 +150,14 @@ const ADMIN_BREADCRUMB_SEGMENTS: Array<{ path: string; label: string }> = [
   { path: '/admin/diet-types', label: 'Dieettypes' },
 ];
 
+/** Optional query for tab-specific breadcrumbs (e.g. Receptenbeheer > Recept keukens). */
+export type BreadcrumbOptions = { tab?: string };
+
 // Helper function to get breadcrumbs from route
 export function getBreadcrumbs(
   pathname: string,
   t?: (key: string) => string,
+  options?: BreadcrumbOptions,
 ): Array<{ label: string; href: string }> {
   const homeLabel = t ? t('common.home') : 'Home';
   const breadcrumbs = [{ label: homeLabel, href: '/dashboard' }];
@@ -162,13 +166,20 @@ export function getBreadcrumbs(
     return breadcrumbs;
   }
 
-  // Admin routes: Home > Admin > [sub-route]
+  // Admin routes: Home > Admin > [sub-route] [> tab]
   if (pathname.startsWith('/admin')) {
     breadcrumbs.push({ label: 'Admin', href: '/admin' });
     if (pathname === '/admin') return breadcrumbs;
     for (const { path, label } of ADMIN_BREADCRUMB_SEGMENTS) {
       if (pathname === path || pathname.startsWith(path + '/')) {
         breadcrumbs.push({ label, href: path });
+        // Receptenbeheer tab: extra crumb voor Recept keukens
+        if (path === '/admin/receptenbeheer' && options?.tab === 'keukens') {
+          breadcrumbs.push({
+            label: 'Recept keukens',
+            href: '/admin/receptenbeheer?tab=keukens',
+          });
+        }
         break;
       }
     }

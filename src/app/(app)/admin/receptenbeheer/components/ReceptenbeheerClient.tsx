@@ -4,26 +4,31 @@ import { useState } from 'react';
 import { Heading } from '@/components/catalyst/heading';
 import { Text } from '@/components/catalyst/text';
 import { RecipeSourcesAdminClient } from '@/src/app/(app)/admin/recipe-sources/components/RecipeSourcesAdminClient';
+import { CatalogAdminClient } from '@/src/app/(app)/admin/catalog/components/CatalogAdminClient';
 
-type TabId = 'bronnen' | 'categorieen' | 'tags' | 'keukens' | 'boeken';
+type TabId = 'bronnen' | 'keukens';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'bronnen', label: 'Recept bronnen' },
-  { id: 'categorieen', label: 'Recept categorieën' },
-  { id: 'tags', label: 'Recept tags' },
   { id: 'keukens', label: 'Recept keukens' },
-  { id: 'boeken', label: 'Recept boeken' },
 ];
 
-export function ReceptenbeheerClient() {
-  const [activeTab, setActiveTab] = useState<TabId>('bronnen');
+type ReceptenbeheerClientProps = {
+  /** Initial tab from URL (e.g. ?tab=keukens). */
+  initialTab?: TabId;
+};
+
+export function ReceptenbeheerClient({
+  initialTab,
+}: ReceptenbeheerClientProps) {
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'bronnen');
 
   return (
     <div className="space-y-6 p-6">
       <div>
         <Heading level={1}>Receptenbeheer</Heading>
         <Text className="mt-2 text-zinc-500 dark:text-zinc-400">
-          Beheer recept bronnen, categorieën, tags, keukens en boeken.
+          Beheer recept bronnen en catalog opties (keuken, proteïne-type).
         </Text>
       </div>
 
@@ -68,72 +73,13 @@ export function ReceptenbeheerClient() {
       </div>
 
       <div
-        id="panel-categorieen"
-        role="tabpanel"
-        aria-labelledby="tab-categorieen"
-        hidden={activeTab !== 'categorieen'}
-        className="rounded-lg border border-zinc-200 bg-zinc-50 p-8 dark:border-zinc-700 dark:bg-zinc-900/50"
-      >
-        {activeTab === 'categorieen' && (
-          <div className="text-center">
-            <Text className="text-zinc-500 dark:text-zinc-400">
-              Recept categorieën – binnenkort beschikbaar. Hier kun je straks
-              categorieën beheren (bijv. ontbijt, hoofdgerecht, dessert).
-            </Text>
-          </div>
-        )}
-      </div>
-
-      <div
-        id="panel-tags"
-        role="tabpanel"
-        aria-labelledby="tab-tags"
-        hidden={activeTab !== 'tags'}
-        className="rounded-lg border border-zinc-200 bg-zinc-50 p-8 dark:border-zinc-700 dark:bg-zinc-900/50"
-      >
-        {activeTab === 'tags' && (
-          <div className="text-center">
-            <Text className="text-zinc-500 dark:text-zinc-400">
-              Recept tags – binnenkort beschikbaar. Hier kun je straks tags
-              beheren om recepten te labelen en filteren.
-            </Text>
-          </div>
-        )}
-      </div>
-
-      <div
         id="panel-keukens"
         role="tabpanel"
         aria-labelledby="tab-keukens"
         hidden={activeTab !== 'keukens'}
-        className="rounded-lg border border-zinc-200 bg-zinc-50 p-8 dark:border-zinc-700 dark:bg-zinc-900/50"
+        className="focus:outline-none"
       >
-        {activeTab === 'keukens' && (
-          <div className="text-center">
-            <Text className="text-zinc-500 dark:text-zinc-400">
-              Recept keukens – binnenkort beschikbaar. Hier kun je straks
-              keukens beheren (bijv. Indiaas, Japans, Italiaans, Mexicaans).
-            </Text>
-          </div>
-        )}
-      </div>
-
-      <div
-        id="panel-boeken"
-        role="tabpanel"
-        aria-labelledby="tab-boeken"
-        hidden={activeTab !== 'boeken'}
-        className="rounded-lg border border-zinc-200 bg-zinc-50 p-8 dark:border-zinc-700 dark:bg-zinc-900/50"
-      >
-        {activeTab === 'boeken' && (
-          <div className="text-center">
-            <Text className="text-zinc-500 dark:text-zinc-400">
-              Recept boeken – binnenkort beschikbaar. Hier kun je straks
-              receptenboeken beheren om recepten te groeperen (bijv. per
-              kookboek of bron).
-            </Text>
-          </div>
-        )}
+        {activeTab === 'keukens' && <CatalogAdminClient />}
       </div>
     </div>
   );

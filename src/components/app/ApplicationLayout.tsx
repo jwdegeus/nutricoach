@@ -30,7 +30,7 @@ import { Avatar } from '@/components/catalyst/avatar';
 import { Breadcrumbs } from '@/components/catalyst/breadcrumbs';
 import { getBreadcrumbs } from '@/src/lib/nav';
 import { useTranslatedNavItems } from '@/src/lib/nav-hooks';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/src/lib/supabase/client';
 import { useEffect, useState } from 'react';
 import { useIsMounted } from '@/src/lib/hooks/use-is-mounted';
@@ -192,15 +192,21 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
     router.refresh();
   }
 
+  const searchParams = useSearchParams();
+  const tab = searchParams.get('tab') ?? undefined;
   const navItems = useTranslatedNavItems();
   const mainItems = navItems.filter((item) => !item.group);
   const secondaryItems = navItems.filter((item) => item.group === 'secondary');
   const tCommon = useTranslations('common');
-  const breadcrumbs = getBreadcrumbs(pathname, (key: string) => {
-    if (key.startsWith('common.')) return tCommon(key.slice(7));
-    if (key.startsWith('nav.')) return tNav(key.slice(4));
-    return key;
-  });
+  const breadcrumbs = getBreadcrumbs(
+    pathname,
+    (key: string) => {
+      if (key.startsWith('common.')) return tCommon(key.slice(7));
+      if (key.startsWith('nav.')) return tNav(key.slice(4));
+      return key;
+    },
+    { tab },
+  );
 
   return (
     <ToastProvider>

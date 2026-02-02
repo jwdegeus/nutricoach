@@ -98,6 +98,8 @@ type RecipesListProps = {
   itemsPerPage?: number;
   /** Compliance scores per meal id (0–100% volgens dieetregels) */
   complianceScores?: Record<string, RecipeComplianceResult>;
+  /** True while compliance scores for the current page are being fetched */
+  complianceLoading?: boolean;
   onPageChange?: (page: number) => void;
   onConsumptionLogged?: (mealId: string, source: 'custom' | 'gemini') => void;
   onDietTypeUpdated?: (
@@ -191,6 +193,7 @@ export function RecipesList({
   totalPages = 1,
   itemsPerPage: _itemsPerPage = 15,
   complianceScores = {},
+  complianceLoading = false,
   onPageChange,
   onConsumptionLogged,
   onDietTypeUpdated,
@@ -532,6 +535,8 @@ export function RecipesList({
                         <ComplianceScoreBadge
                           score={complianceScores[String(meal.id)]}
                         />
+                      ) : complianceLoading ? (
+                        <span className="text-zinc-400 text-sm">...</span>
                       ) : (
                         <span className="text-zinc-400 text-sm">-</span>
                       )}

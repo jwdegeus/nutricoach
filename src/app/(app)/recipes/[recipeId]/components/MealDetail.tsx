@@ -25,10 +25,13 @@ import { PencilIcon } from '@heroicons/react/16/solid';
 import { RecipeNotesEditor } from './RecipeNotesEditor';
 import { ImageLightbox } from './ImageLightbox';
 import { RecipeImageUpload } from './RecipeImageUpload';
-import { RecipeSourceEditor } from './RecipeSourceEditor';
-import { RecipeEditableTag } from './RecipeEditableTag';
 import { RecipeAIMagician } from './RecipeAIMagician';
 import { RecipePrepTimeAndServingsEditor } from './RecipePrepTimeAndServingsEditor';
+import {
+  RecipeClassificationDialog,
+  type RecipeClassificationDraft,
+  type MealSlotValue,
+} from './RecipeClassificationDialog';
 import {
   Dialog,
   DialogActions,
@@ -36,8 +39,6 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/catalyst/dialog';
-import { Select } from '@/components/catalyst/select';
-import { Field, Label } from '@/components/catalyst/fieldset';
 import {
   RecipeContentEditor,
   getIngredientsForEditor,
@@ -63,6 +64,15 @@ import {
   getHasAppliedAdaptationAction,
   removeRecipeAdaptationAction,
 } from '../actions/recipe-ai.persist.actions';
+import {
+  loadMealClassificationAction,
+  saveMealClassificationAction,
+  type MealClassificationData,
+} from '../actions/meal-classification.actions';
+import {
+  getCatalogOptionsForPickerAction,
+  createUserCatalogOptionAction,
+} from '../../actions/catalog-options.actions';
 import { useToast } from '@/src/components/app/ToastContext';
 
 /** Ingrediënten die meestal "naar smaak" zijn; geen hoeveelheid tonen/meerekenen als niet bekend. */
@@ -231,12 +241,277 @@ export function MealDetail({
     typeof setTimeout
   > | null>(null);
   /** Tag-edit dialogen */
-  const [mealSlotDialogOpen, setMealSlotDialogOpen] = useState(false);
-  const [sourceTagDialogOpen, setSourceTagDialogOpen] = useState(false);
-  const [savingMealSlot, setSavingMealSlot] = useState(false);
-  const [mealSlotEditValue, setMealSlotEditValue] = useState<string>('dinner');
+  /** Classificeren modal: overlay na load/save (chips in header); draft = form state in dialog */
+  const [classificationDialogOpen, setClassificationDialogOpen] =
+    useState(false);
+  const [classificationOverlay, setClassificationOverlay] =
+    useState<RecipeClassificationDraft | null>(null);
+  const [classificationDraft, setClassificationDraft] =
+    useState<RecipeClassificationDraft>(() => ({
+      mealSlot: 'dinner',
+      mealSlotOptionId: null,
+      totalMinutes: null,
+      servings: null,
+      sourceName: '',
+      sourceUrl: '',
+      recipeBookOptionId: null,
+      cuisineOptionId: null,
+      proteinTypeOptionId: null,
+      tags: [],
+    }));
+  /** Load state for classification (custom_meals only). */
+  const [classificationLoadState, setClassificationLoadState] = useState<
+    'idle' | 'loading' | 'ready' | 'error'
+  >('idle');
+  const [classificationLoadError, setClassificationLoadError] = useState<
+    string | null
+  >(null);
+  /** Save state (controlled by handleSaveClassification). */
+  const [classificationSaving, setClassificationSaving] = useState(false);
+  const [classificationSaveError, setClassificationSaveError] = useState<
+    string | null
+  >(null);
+  /** Catalog options for Classificeren dialog (meal_slot, cuisine, protein_type, recipe_book). */
+  const [mealSlotOptions, setMealSlotOptions] = useState<
+    { id: string; label: string; isActive?: boolean; key?: string | null }[]
+  >([]);
+  const [cuisineOptions, setCuisineOptions] = useState<
+    { id: string; label: string; isActive: boolean }[]
+  >([]);
+  const [proteinTypeOptions, setProteinTypeOptions] = useState<
+    { id: string; label: string; isActive: boolean }[]
+  >([]);
+  const [recipeBookOptions, setRecipeBookOptions] = useState<
+    { id: string; label: string; isActive: boolean }[]
+  >([]);
+  const [catalogOptionsLoading, setCatalogOptionsLoading] = useState(false);
 
   const router = useRouter();
+
+  /** Build initial classification draft from meal (UI-only, no DB). Defined early so useEffect can depend on it. */
+  const buildInitialClassificationDraft =
+    useCallback((): RecipeClassificationDraft => {
+      const data = (meal.mealData ?? meal.meal_data) as
+        | MealDataLike
+        | null
+        | undefined;
+      const prepTime = data?.prepTime;
+      const totalMinutes =
+        typeof prepTime === 'number'
+          ? prepTime
+          : typeof prepTime === 'string'
+            ? parseFloat(prepTime) || null
+            : null;
+      const serv = data?.servings;
+      const servings =
+        typeof serv === 'number'
+          ? serv
+          : typeof serv === 'string'
+            ? parseFloat(String(serv)) || null
+            : null;
+      const slot = String(meal.mealSlot ?? meal.meal_slot ?? 'dinner');
+      const mealSlot: MealSlotValue = [
+        'breakfast',
+        'lunch',
+        'dinner',
+        'snack',
+        'other',
+      ].includes(slot)
+        ? (slot as MealSlotValue)
+        : 'other';
+      const source = (meal as MealLike & { source?: string }).source ?? null;
+      const sourceName = typeof source === 'string' ? source : '';
+      const sourceUrl =
+        ((meal.sourceUrl ?? meal.source_url) as string | undefined) ?? '';
+      return {
+        mealSlot,
+        mealSlotOptionId: null,
+        totalMinutes,
+        servings,
+        sourceName,
+        sourceUrl: sourceUrl ?? '',
+        recipeBookOptionId: null,
+        cuisineOptionId: null,
+        proteinTypeOptionId: null,
+        tags: [],
+      };
+    }, [meal]);
+
+  const mealId = meal?.id != null ? String(meal.id) : '';
+
+  /** Map action response to UI overlay/draft shape (sourceName/sourceUrl read-only). */
+  const mealClassificationDataToDraft = useCallback(
+    (data: MealClassificationData): RecipeClassificationDraft => ({
+      mealSlot: data.mealSlot,
+      mealSlotLabel: data.mealSlotLabel ?? null,
+      mealSlotOptionId: data.mealSlotOptionId ?? null,
+      totalMinutes: data.totalMinutes,
+      servings: data.servings,
+      sourceName: data.sourceName ?? '',
+      sourceUrl: data.sourceUrl ?? '',
+      recipeBookOptionId: data.recipeBookOptionId ?? null,
+      cuisineOptionId: data.cuisineOptionId ?? null,
+      proteinTypeOptionId: data.proteinTypeOptionId ?? null,
+      tags: data.tags ?? [],
+    }),
+    [],
+  );
+
+  // Load classification when custom meal is shown (1x per mealId; no waterfall)
+  useEffect(() => {
+    if (mealSource !== 'custom' || !mealId) {
+      setClassificationLoadState('idle');
+      setClassificationLoadError(null);
+      return;
+    }
+    let cancelled = false;
+    setClassificationLoadState('loading');
+    setClassificationLoadError(null);
+    loadMealClassificationAction({ mealId }).then((result) => {
+      if (cancelled) return;
+      if (!result.ok) {
+        setClassificationLoadError(result.error.message);
+        setClassificationLoadState('error');
+        return;
+      }
+      setClassificationLoadState('ready');
+      if (result.data != null) {
+        setClassificationOverlay(mealClassificationDataToDraft(result.data));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mealId, mealSource, mealClassificationDataToDraft]);
+
+  // Sync classification draft when opening Classificeren dialog (overlay ?? meal); reset save error
+  useEffect(() => {
+    if (classificationDialogOpen) {
+      setClassificationDraft(
+        classificationOverlay ?? buildInitialClassificationDraft(),
+      );
+      setClassificationSaveError(null);
+    }
+  }, [
+    classificationDialogOpen,
+    classificationOverlay,
+    buildInitialClassificationDraft,
+  ]);
+
+  // Load catalog options when Classificeren dialog opens (meal_slot, cuisine, protein_type, recipe_book); include selected even if inactive; resolve mealSlot -> mealSlotOptionId when options load
+  useEffect(() => {
+    if (!classificationDialogOpen) return;
+    let cancelled = false;
+    setCatalogOptionsLoading(true);
+    const mealSlotSelected = classificationDraft.mealSlotOptionId ?? undefined;
+    const cuisineSelected = classificationDraft.cuisineOptionId ?? undefined;
+    const proteinSelected =
+      classificationDraft.proteinTypeOptionId ?? undefined;
+    const recipeBookSelected =
+      classificationDraft.recipeBookOptionId ?? undefined;
+    Promise.all([
+      getCatalogOptionsForPickerAction({
+        dimension: 'meal_slot',
+        selectedId: mealSlotSelected,
+      }),
+      getCatalogOptionsForPickerAction({
+        dimension: 'cuisine',
+        selectedId: cuisineSelected,
+      }),
+      getCatalogOptionsForPickerAction({
+        dimension: 'protein_type',
+        selectedId: proteinSelected,
+      }),
+      getCatalogOptionsForPickerAction({
+        dimension: 'recipe_book',
+        selectedId: recipeBookSelected,
+        sortBy: 'label_az',
+      }),
+    ]).then(([mealSlotRes, cuisineRes, proteinRes, recipeBookRes]) => {
+      if (cancelled) return;
+      setCatalogOptionsLoading(false);
+      if (mealSlotRes.ok) {
+        setMealSlotOptions(mealSlotRes.data);
+        setClassificationDraft((prev) => {
+          if (prev.mealSlotOptionId) return prev;
+          const opt = mealSlotRes.data.find((o) => o.key === prev.mealSlot);
+          return opt ? { ...prev, mealSlotOptionId: opt.id } : prev;
+        });
+      }
+      if (cuisineRes.ok) {
+        setCuisineOptions(cuisineRes.data);
+      }
+      if (proteinRes.ok) {
+        setProteinTypeOptions(proteinRes.data);
+      }
+      if (recipeBookRes.ok) {
+        setRecipeBookOptions(recipeBookRes.data);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    classificationDialogOpen,
+    classificationDraft.mealSlotOptionId,
+    classificationDraft.mealSlot,
+    classificationDraft.cuisineOptionId,
+    classificationDraft.proteinTypeOptionId,
+    classificationDraft.recipeBookOptionId,
+  ]);
+
+  const retryLoadClassification = useCallback(() => {
+    if (mealSource !== 'custom' || !mealId) return;
+    setClassificationLoadError(null);
+    setClassificationLoadState('loading');
+    loadMealClassificationAction({ mealId }).then((result) => {
+      if (!result.ok) {
+        setClassificationLoadError(result.error.message);
+        setClassificationLoadState('error');
+        return;
+      }
+      setClassificationLoadState('ready');
+      if (result.data != null) {
+        setClassificationOverlay(mealClassificationDataToDraft(result.data));
+      }
+    });
+  }, [mealId, mealSource, mealClassificationDataToDraft]);
+
+  const handleSaveClassification = useCallback(
+    async (draft: RecipeClassificationDraft) => {
+      if (!mealId) return;
+      setClassificationSaving(true);
+      setClassificationSaveError(null);
+      const result = await saveMealClassificationAction({
+        mealId,
+        classification: {
+          mealSlot: draft.mealSlot,
+          mealSlotOptionId: draft.mealSlotOptionId,
+          totalMinutes: draft.totalMinutes,
+          servings: draft.servings,
+          cuisineOptionId: draft.cuisineOptionId,
+          proteinTypeOptionId: draft.proteinTypeOptionId,
+          recipeBookOptionId: draft.recipeBookOptionId,
+          tags: draft.tags,
+        },
+      });
+      setClassificationSaving(false);
+      if (!result.ok) {
+        setClassificationSaveError(result.error.message);
+        return;
+      }
+      if (result.data != null) {
+        setClassificationOverlay(mealClassificationDataToDraft(result.data));
+        setClassificationDialogOpen(false);
+        showToast({
+          type: 'success',
+          title: 'Classificatie opgeslagen',
+          description: 'De waarden staan nu in de header.',
+        });
+      }
+    },
+    [mealId, mealClassificationDataToDraft, showToast],
+  );
 
   useEffect(() => {
     if (!removeIngredientNotification) return;
@@ -252,7 +527,6 @@ export function MealDetail({
     };
   }, [removeIngredientNotification]);
 
-  const mealId = meal?.id != null ? String(meal.id) : '';
   const handleRemoveIngredient = useCallback(
     async (index: number, displayName: string) => {
       if (!mealId) return;
@@ -360,6 +634,7 @@ export function MealDetail({
       dinner: 'Diner',
       snack: 'Snack',
       smoothie: 'Smoothie',
+      other: 'Overig',
     };
     return slotMap[slot] || slot;
   };
@@ -670,33 +945,10 @@ export function MealDetail({
                 <Badge color={mealSource === 'custom' ? 'blue' : 'zinc'}>
                   {mealSource === 'custom' ? 'Custom' : 'Gemini'}
                 </Badge>
-                <RecipeEditableTag
-                  label={formatMealSlot(mealSlot)}
-                  color="zinc"
-                  editable
-                  onEdit={() => {
-                    setMealSlotEditValue(mealSlot);
-                    setMealSlotDialogOpen(true);
-                  }}
-                  onRemove={async () => {
-                    const res = await fetch('/api/recipes/update-meal-slot', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        mealId,
-                        source: mealSource,
-                        mealSlot: 'dinner',
-                      }),
-                    });
-                    const data = await res.json();
-                    if (data.ok) window.location.reload();
-                    else
-                      showToast({
-                        type: 'error',
-                        title: data.error?.message ?? 'Bijwerken mislukt',
-                      });
-                  }}
-                />
+                <Badge color="zinc">
+                  {classificationOverlay?.mealSlotLabel ??
+                    formatMealSlot(classificationOverlay?.mealSlot ?? mealSlot)}
+                </Badge>
                 {formatDietTypeName(
                   dietKey != null ? String(dietKey) : undefined,
                 ) && (
@@ -739,163 +991,62 @@ export function MealDetail({
                       : `${complianceScore.scorePercent}%`}
                   </Badge>
                 )}
-                <RecipeEditableTag
-                  label={recipeSource ?? 'Geen bron'}
-                  color="purple"
-                  className="text-xs"
-                  editable
-                  onEdit={() => setSourceTagDialogOpen(true)}
-                  onRemove={
-                    recipeSource
-                      ? async () => {
-                          const response = await fetch(
-                            '/api/recipes/update-source',
-                            {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                mealId,
-                                source: mealSource,
-                                recipeSource: null,
-                              }),
-                            },
-                          );
-                          const result = await response.json();
-                          if (result.ok) {
-                            setRecipeSource(null);
-                            showToast({
-                              type: 'success',
-                              title: 'Bron verwijderd',
-                              description: 'Receptbron is verwijderd.',
-                            });
-                            setSourceTagDialogOpen(false);
-                            onSourceSaved?.();
-                          } else {
-                            showToast({
-                              type: 'error',
-                              title:
-                                result.error?.message ?? 'Verwijderen mislukt',
-                            });
-                          }
-                        }
-                      : undefined
-                  }
-                />
+                <Badge color="purple" className="text-xs">
+                  {classificationOverlay
+                    ? classificationOverlay.sourceName ||
+                      classificationOverlay.sourceUrl ||
+                      'Geen bron'
+                    : (recipeSource ?? 'Geen bron')}
+                </Badge>
+                {classificationOverlay && (
+                  <>
+                    {classificationOverlay.totalMinutes != null &&
+                      classificationOverlay.totalMinutes > 0 && (
+                        <Badge color="zinc" className="text-xs">
+                          {classificationOverlay.totalMinutes} min
+                        </Badge>
+                      )}
+                    {/* Porties niet als badge: alleen in RecipePrepTimeAndServingsEditor (bewerkbaar, met berekening) */}
+                    {classificationOverlay.tags.length > 0 &&
+                      classificationOverlay.tags.map((tag, idx) => (
+                        <Badge
+                          key={`${tag}-${idx}`}
+                          color="zinc"
+                          className="text-xs"
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                  </>
+                )}
               </div>
 
-              {/* Meal slot edit dialog */}
-              <Dialog
-                open={mealSlotDialogOpen}
-                onClose={() => setMealSlotDialogOpen(false)}
-              >
-                <DialogTitle>Maaltijdmoment wijzigen</DialogTitle>
-                <DialogBody>
-                  <DialogDescription>
-                    Kies het moment van de dag voor dit recept.
-                  </DialogDescription>
-                  <Field className="mt-3">
-                    <Label>Maaltijdmoment</Label>
-                    <Select
-                      value={mealSlotEditValue}
-                      onChange={(e) => setMealSlotEditValue(e.target.value)}
-                      disabled={savingMealSlot}
+              {/* Load error: classificatie ophalen mislukt (alleen custom) */}
+              {mealSource === 'custom' &&
+                classificationLoadState === 'error' &&
+                classificationLoadError && (
+                  <div className="mt-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-3 flex items-center justify-between gap-3">
+                    <Text className="text-sm text-amber-800 dark:text-amber-200">
+                      Classificatie laden mislukt: {classificationLoadError}
+                    </Text>
+                    <Button
+                      outline
+                      onClick={retryLoadClassification}
+                      className="flex-shrink-0"
                     >
-                      <option value="breakfast">Ontbijt</option>
-                      <option value="lunch">Lunch</option>
-                      <option value="dinner">Diner</option>
-                      <option value="snack">Snack</option>
-                    </Select>
-                  </Field>
-                </DialogBody>
-                <DialogActions>
-                  <Button
-                    plain
-                    onClick={() => setMealSlotDialogOpen(false)}
-                    disabled={savingMealSlot}
-                  >
-                    Annuleren
-                  </Button>
-                  <Button
-                    color="primary"
-                    disabled={savingMealSlot}
-                    onClick={async () => {
-                      setSavingMealSlot(true);
-                      try {
-                        const res = await fetch(
-                          '/api/recipes/update-meal-slot',
-                          {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              mealId,
-                              source: mealSource,
-                              mealSlot: mealSlotEditValue,
-                            }),
-                          },
-                        );
-                        const data = await res.json();
-                        if (data.ok) {
-                          showToast({
-                            type: 'success',
-                            title: 'Maaltijdmoment opgeslagen',
-                          });
-                          setMealSlotDialogOpen(false);
-                          window.location.reload();
-                        } else {
-                          showToast({
-                            type: 'error',
-                            title: data.error?.message ?? 'Opslaan mislukt',
-                          });
-                        }
-                      } finally {
-                        setSavingMealSlot(false);
-                      }
-                    }}
-                  >
-                    {savingMealSlot ? 'Opslaan…' : 'Opslaan'}
-                  </Button>
-                </DialogActions>
-              </Dialog>
-
-              {/* Source tag edit dialog */}
-              <Dialog
-                open={sourceTagDialogOpen}
-                onClose={() => setSourceTagDialogOpen(false)}
-              >
-                <DialogTitle>Bron wijzigen</DialogTitle>
-                <DialogBody>
-                  <DialogDescription>
-                    Wijzig of verwijder de receptbron (bijv. website of boek).
-                  </DialogDescription>
-                  <div className="mt-3">
-                    <RecipeSourceEditor
-                      currentSource={recipeSource}
-                      mealId={mealId}
-                      source={mealSource}
-                      onSourceUpdated={(newSource) => {
-                        setRecipeSource(newSource);
-                        showToast({
-                          type: 'success',
-                          title: 'Bron opgeslagen',
-                          description: newSource
-                            ? `Receptbron is bijgewerkt naar "${newSource}".`
-                            : 'Receptbron is verwijderd.',
-                        });
-                        onSourceSaved?.();
-                        setSourceTagDialogOpen(false);
-                      }}
-                    />
+                      Opnieuw proberen
+                    </Button>
                   </div>
-                </DialogBody>
-                <DialogActions>
-                  <Button plain onClick={() => setSourceTagDialogOpen(false)}>
-                    Sluiten
-                  </Button>
-                </DialogActions>
-              </Dialog>
+                )}
 
-              {/* AI Magician + Waarom dit werkt toggle */}
+              {/* Classificeren + AI Magician + Waarom dit werkt toggle */}
               <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Button
+                  outline
+                  onClick={() => setClassificationDialogOpen(true)}
+                >
+                  Classificeren
+                </Button>
                 <Button onClick={() => setAiMagicianOpen(true)}>
                   <SparklesIcon data-slot="icon" />
                   AI Magician
@@ -963,28 +1114,35 @@ export function MealDetail({
             />
           )}
 
-          {/* Prep Time and Servings Editor */}
+          {/* Prep Time and Servings Editor — prefer classificationOverlay after save so Porties/Prep update without reload */}
           <div className="mt-4">
             <RecipePrepTimeAndServingsEditor
               currentPrepTime={
-                typeof mealData?.prepTime === 'number'
-                  ? mealData.prepTime
-                  : typeof mealData?.prepTime === 'string'
-                    ? parseFloat(mealData.prepTime) || null
-                    : null
+                classificationOverlay?.totalMinutes != null
+                  ? classificationOverlay.totalMinutes
+                  : typeof mealData?.prepTime === 'number'
+                    ? mealData.prepTime
+                    : typeof mealData?.prepTime === 'string'
+                      ? parseFloat(mealData.prepTime) || null
+                      : null
               }
               currentServings={
-                typeof mealData?.servings === 'number'
-                  ? mealData.servings
-                  : typeof mealData?.servings === 'string'
-                    ? parseFloat(mealData.servings) || null
-                    : null
+                classificationOverlay?.servings != null
+                  ? typeof classificationOverlay.servings === 'number'
+                    ? classificationOverlay.servings
+                    : typeof classificationOverlay.servings === 'string'
+                      ? parseFloat(classificationOverlay.servings) || null
+                      : null
+                  : typeof mealData?.servings === 'number'
+                    ? mealData.servings
+                    : typeof mealData?.servings === 'string'
+                      ? parseFloat(mealData.servings) || null
+                      : null
               }
               mealId={mealId}
               source={mealSource}
               onUpdated={() => {
-                // Refresh the page to show updated data
-                window.location.reload();
+                router.refresh();
               }}
             />
           </div>
@@ -1875,6 +2033,70 @@ export function MealDetail({
         recipeId={mealId}
         recipeName={mealName}
         onApplied={onRecipeApplied}
+      />
+
+      {/* Classificeren Dialog (load/save via actions; overlay from response) */}
+      <RecipeClassificationDialog
+        value={classificationDraft}
+        onChange={setClassificationDraft}
+        open={classificationDialogOpen}
+        onClose={() => setClassificationDialogOpen(false)}
+        onSave={handleSaveClassification}
+        errorMessage={classificationSaveError}
+        isSaving={classificationSaving}
+        mealSlotOptions={mealSlotOptions}
+        cuisineOptions={cuisineOptions}
+        proteinTypeOptions={proteinTypeOptions}
+        recipeBookOptions={recipeBookOptions}
+        optionsLoading={catalogOptionsLoading}
+        onCreateCuisineOption={async (label) => {
+          const result = await createUserCatalogOptionAction({
+            dimension: 'cuisine',
+            label,
+          });
+          if (!result.ok) return { error: result.error.message };
+          setCuisineOptions((prev) => [
+            ...prev,
+            { id: result.data.id, label: result.data.label, isActive: true },
+          ]);
+          setClassificationDraft((prev) => ({
+            ...prev,
+            cuisineOptionId: result.data.id,
+          }));
+          return { id: result.data.id, label: result.data.label };
+        }}
+        onCreateProteinTypeOption={async (label) => {
+          const result = await createUserCatalogOptionAction({
+            dimension: 'protein_type',
+            label,
+          });
+          if (!result.ok) return { error: result.error.message };
+          setProteinTypeOptions((prev) => [
+            ...prev,
+            { id: result.data.id, label: result.data.label, isActive: true },
+          ]);
+          setClassificationDraft((prev) => ({
+            ...prev,
+            proteinTypeOptionId: result.data.id,
+          }));
+          return { id: result.data.id, label: result.data.label };
+        }}
+        onCreateRecipeBookOption={async (label) => {
+          const result = await createUserCatalogOptionAction({
+            dimension: 'recipe_book',
+            label,
+          });
+          if (!result.ok) return { error: result.error.message };
+          setRecipeBookOptions((prev) => [
+            ...prev,
+            { id: result.data.id, label: result.data.label, isActive: true },
+          ]);
+          setClassificationDraft((prev) => ({
+            ...prev,
+            recipeBookOptionId: result.data.id,
+          }));
+          return { id: result.data.id, label: result.data.label };
+        }}
       />
 
       {/* Notification toast na verwijderen ingrediënt */}

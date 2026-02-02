@@ -17,6 +17,12 @@ import {
   DialogActions,
 } from '@/components/catalyst/dialog';
 import {
+  Field,
+  Label,
+  Description,
+  ErrorMessage,
+} from '@/components/catalyst/fieldset';
+import {
   PhotoIcon,
   CameraIcon,
   ClipboardDocumentIcon,
@@ -27,11 +33,13 @@ import {
   ExclamationTriangleIcon,
   SparklesIcon,
 } from '@heroicons/react/24/solid';
+import { useToast } from '@/src/components/app/ToastContext';
 import { ImportStatusPanel } from './components/ImportStatusPanel';
 import { RecipeEditForm } from './components/RecipeEditForm';
 import {
   createRecipeImportAction,
   loadRecipeImportAction,
+  importRecipeFromUrlAction,
 } from './actions/recipeImport.actions';
 import { processRecipeImportWithGeminiAction } from './actions/recipeImport.process.actions';
 import { finalizeRecipeImportAction } from './actions/recipeImport.finalize.actions';
@@ -184,6 +192,7 @@ export function RecipeImportClient({
   const locale = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { showToast } = useToast();
   const [isPending, _startTransition] = useTransition();
 
   // Local file state (for preview)
@@ -191,6 +200,11 @@ export function RecipeImportClient({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+
+  // URL import (inline block)
+  const [urlImportValue, setUrlImportValue] = useState('');
+  const [urlImportError, setUrlImportError] = useState<string | null>(null);
+  const [isUrlImportPending, startUrlImportTransition] = useTransition();
 
   // Camera state
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -929,6 +943,89 @@ export function RecipeImportClient({
     router.push('/recipes/import');
   }, [router]);
 
+  // URL import submit (inline block)
+  const handleUrlImportSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (isUrlImportPending) return;
+      setUrlImportError(null);
+      const raw = urlImportValue.trim();
+      if (!raw) {
+        setUrlImportError(
+          locale === 'nl' ? 'Voer een URL in' : 'Please enter a URL',
+        );
+        return;
+      }
+      let url = raw;
+      if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
+        url = `https://${raw}`;
+      }
+      try {
+        new URL(url);
+      } catch {
+        setUrlImportError(locale === 'nl' ? 'Ongeldige URL' : 'Invalid URL');
+        return;
+      }
+      startUrlImportTransition(async () => {
+        try {
+          const result = await importRecipeFromUrlAction({ url });
+          if (!result) {
+            setUrlImportError(
+              locale === 'nl'
+                ? 'Geen resultaat van de server. Probeer het opnieuw.'
+                : 'No response from server. Please try again.',
+            );
+            return;
+          }
+          if (result.ok && result.jobId) {
+            if (result.job && typeof window !== 'undefined') {
+              try {
+                sessionStorage.setItem(
+                  `recipe-import-job-${result.jobId}`,
+                  JSON.stringify(result.job),
+                );
+              } catch {
+                // ignore
+              }
+            }
+            setUrlImportValue('');
+            setUrlImportError(null);
+            router.push(`/recipes/import?jobId=${result.jobId}`);
+          } else {
+            const msg =
+              (result && 'message' in result && result.message) ||
+              (locale === 'nl'
+                ? 'Importeren mislukt. Probeer een andere URL.'
+                : 'Import failed. Try another URL.');
+            setUrlImportError(msg);
+            showToast({
+              type: 'error',
+              title: t('urlImportErrorTitle'),
+              description: msg,
+            });
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Import failed';
+          setUrlImportError(msg);
+          showToast({
+            type: 'error',
+            title: t('urlImportErrorTitle'),
+            description: msg,
+          });
+        }
+      });
+    },
+    [
+      urlImportValue,
+      isUrlImportPending,
+      locale,
+      router,
+      showToast,
+      t,
+      startUrlImportTransition,
+    ],
+  );
+
   // Translation happens automatically - no manual trigger needed
 
   // Handle finalize recipe import
@@ -1142,6 +1239,72 @@ export function RecipeImportClient({
               <Text className="text-sm text-zinc-500 dark:text-zinc-400">
                 {t('fileTypes')}
               </Text>
+            </div>
+          </div>
+
+          {/* URL import block – same width as upload area */}
+          <div className="pt-6 border-t border-zinc-200 dark:border-zinc-700">
+            <div className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/80 dark:bg-zinc-800/40 p-6 shadow-sm">
+              <form
+                onSubmit={handleUrlImportSubmit}
+                className="flex flex-col items-center text-center space-y-4"
+              >
+                <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  {t('importViaUrlOr')}
+                </Text>
+                <Field className="w-full text-left">
+                  <Label htmlFor="recipe-url-inline">
+                    {t('recipeUrlLabel')}
+                  </Label>
+                  <div className="mt-2">
+                    <div className="flex items-center rounded-md bg-white dark:bg-zinc-800/80 pl-3 shadow-sm ring-1 ring-zinc-950/10 dark:ring-white/10 focus-within:ring-2 focus-within:ring-primary-500 dark:focus-within:ring-primary-400 focus-within:ring-offset-0">
+                      <span className="shrink-0 text-base text-zinc-500 dark:text-zinc-400 select-none sm:text-sm/6">
+                        https://
+                      </span>
+                      <input
+                        id="recipe-url-inline"
+                        type="text"
+                        name="recipe-url"
+                        value={urlImportValue}
+                        onChange={(e) => setUrlImportValue(e.target.value)}
+                        placeholder={t('recipeUrlPlaceholder')}
+                        disabled={isUrlImportPending || isPending}
+                        className="block min-w-0 grow py-2.5 pr-3 pl-2 text-base text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 dark:placeholder:text-zinc-400 bg-transparent border-0 outline-none focus:ring-0 rounded-r-md sm:text-sm/6"
+                        aria-invalid={urlImportError ? 'true' : 'false'}
+                        aria-describedby={
+                          urlImportError
+                            ? 'recipe-url-inline-error'
+                            : 'recipe-url-inline-hint'
+                        }
+                      />
+                    </div>
+                  </div>
+                  {urlImportError ? (
+                    <ErrorMessage id="recipe-url-inline-error" className="mt-2">
+                      {urlImportError}
+                    </ErrorMessage>
+                  ) : (
+                    <Description id="recipe-url-inline-hint" className="mt-2">
+                      {t('urlImportHint')}
+                    </Description>
+                  )}
+                </Field>
+                <Button
+                  type="submit"
+                  color="primary"
+                  disabled={isUrlImportPending || isPending}
+                  className="w-full sm:w-auto min-w-[8rem]"
+                >
+                  {isUrlImportPending ? (
+                    <>
+                      <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                      {t('processing')}
+                    </>
+                  ) : (
+                    t('urlImportButton')
+                  )}
+                </Button>
+              </form>
             </div>
           </div>
         </div>

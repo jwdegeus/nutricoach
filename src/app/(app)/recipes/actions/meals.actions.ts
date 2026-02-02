@@ -862,6 +862,8 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
       meal_data: Record<string, unknown>;
       updated_at: string;
       ai_analysis?: unknown;
+      total_minutes?: number | null;
+      servings?: number | null;
     } = {
       meal_data: updatedMealData,
       updated_at: new Date().toISOString(),
@@ -870,6 +872,18 @@ export async function updateRecipePrepTimeAndServingsAction(args: {
     // Only update ai_analysis if it was modified
     if (servingsChanged) {
       updateData.ai_analysis = updatedAiAnalysis;
+    }
+
+    // Keep custom_meals columns in sync so classification/list views stay correct
+    if (tableName === 'custom_meals') {
+      updateData.total_minutes =
+        args.prepTime !== undefined
+          ? args.prepTime
+          : ((updatedMealData.prepTime as number | null) ?? null);
+      updateData.servings =
+        args.servings !== undefined
+          ? args.servings
+          : ((updatedMealData.servings as number | null) ?? null);
     }
 
     const { error: updateError } = await supabase

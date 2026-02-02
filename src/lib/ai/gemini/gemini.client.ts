@@ -120,66 +120,77 @@ class GeminiClient {
     const modelName = this.getModelName(purpose);
     const maxTokens = maxTokensOverride ?? this.maxOutputTokens;
 
-    try {
-      const response = await this.ai.models.generateContent({
-        model: modelName,
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseJsonSchema: jsonSchema,
-          temperature,
-          maxOutputTokens: maxTokens,
-        },
-      });
+    const maxRetries = 3;
+    const baseDelayMs = 2000;
+    let lastError: Error | null = null;
 
-      // Extract text from response
-      const text = response.text;
-      if (!text) {
-        throw new Error('Empty response from Gemini API');
-      }
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await this.ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            responseJsonSchema: jsonSchema,
+            temperature,
+            maxOutputTokens: maxTokens,
+          },
+        });
 
-      return text;
-    } catch (error) {
-      // Handle quota/rate limit errors (429) with better messaging
-      if (error instanceof Error) {
-        const errorMessage = error.message;
+        const text = response.text;
+        if (!text) {
+          throw new Error('Empty response from Gemini API');
+        }
 
-        // Check for quota exceeded errors
-        if (
+        return text;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        const errorMessage = lastError.message;
+
+        const isRateLimit =
           errorMessage.includes('429') ||
           errorMessage.includes('RESOURCE_EXHAUSTED') ||
-          errorMessage.includes('quota')
-        ) {
-          // Try to extract retry delay from error message
-          const retryMatch =
-            errorMessage.match(/retry.*?(\d+)\s*s/i) ||
-            errorMessage.match(/(\d+)\s*second/i);
-          const retrySeconds = retryMatch ? parseInt(retryMatch[1], 10) : null;
+          errorMessage.includes('quota') ||
+          errorMessage.includes('rate limit') ||
+          errorMessage.includes('RPM');
 
-          const retryInfo = retrySeconds
-            ? ` Please retry in ${retrySeconds} seconds.`
-            : ' Please wait a moment and try again.';
+        if (isRateLimit && attempt < maxRetries) {
+          const delayMs = baseDelayMs * Math.pow(2, attempt);
+          console.warn(
+            `[GeminiClient] generateJson rate limit (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delayMs}ms...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          continue;
+        }
 
+        if (!isRateLimit) {
+          console.error('[GeminiClient] generateJson error:', errorMessage);
+          if (lastError.stack)
+            console.error('[GeminiClient] Stack:', lastError.stack);
           throw new Error(
-            `Gemini API quota exceeded (rate limit).${retryInfo} ` +
-              "This usually means you've hit the free tier limits. " +
-              'Consider upgrading to a paid plan or waiting for the quota to reset. ' +
-              'For more info: https://ai.google.dev/gemini-api/docs/rate-limits',
+            `Gemini API error: ${errorMessage}. ` +
+              'Check your API key and model configuration.',
           );
         }
 
-        // Log raw error voor debugging
-        console.error('[GeminiClient] generateJson error:', errorMessage);
-        if (error.stack) console.error('[GeminiClient] Stack:', error.stack);
+        const retryMatch =
+          errorMessage.match(/retry.*?(\d+)\s*s/i) ||
+          errorMessage.match(/(\d+)\s*second/i);
+        const retrySeconds = retryMatch ? parseInt(retryMatch[1], 10) : null;
+        const retryInfo = retrySeconds
+          ? ` Please retry in ${retrySeconds} seconds.`
+          : ' Please wait a moment and try again.';
 
-        // Re-throw with more context (but don't expose API key or full prompt)
         throw new Error(
-          `Gemini API error: ${errorMessage}. ` +
-            'Check your API key and model configuration.',
+          `Gemini API quota exceeded (rate limit).${retryInfo} ` +
+            "This usually means you've hit the free tier limits. " +
+            'Consider upgrading to a paid plan or waiting for the quota to reset. ' +
+            'For more info: https://ai.google.dev/gemini-api/docs/rate-limits',
         );
       }
-      throw new Error('Unknown error from Gemini API');
     }
+
+    throw lastError || new Error('Unknown error from Gemini API');
   }
 
   /**
@@ -201,64 +212,75 @@ class GeminiClient {
     // Select model based on purpose
     const modelName = this.getModelName(purpose);
 
-    try {
-      const response = await this.ai.models.generateContent({
-        model: modelName,
-        contents: prompt,
-        config: {
-          temperature,
-          maxOutputTokens: this.maxOutputTokens,
-        },
-      });
+    const maxRetries = 3;
+    const baseDelayMs = 2000;
+    let lastError: Error | null = null;
 
-      // Extract text from response
-      const text = response.text;
-      if (!text) {
-        throw new Error('Empty response from Gemini API');
-      }
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await this.ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            temperature,
+            maxOutputTokens: this.maxOutputTokens,
+          },
+        });
 
-      return text;
-    } catch (error) {
-      // Handle quota/rate limit errors (429) with better messaging
-      if (error instanceof Error) {
-        const errorMessage = error.message;
+        const text = response.text;
+        if (!text) {
+          throw new Error('Empty response from Gemini API');
+        }
 
-        // Check for quota exceeded errors
-        if (
+        return text;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        const errorMessage = lastError.message;
+
+        const isRateLimit =
           errorMessage.includes('429') ||
           errorMessage.includes('RESOURCE_EXHAUSTED') ||
-          errorMessage.includes('quota')
-        ) {
-          // Try to extract retry delay from error message
-          const retryMatch =
-            errorMessage.match(/retry.*?(\d+)\s*s/i) ||
-            errorMessage.match(/(\d+)\s*second/i);
-          const retrySeconds = retryMatch ? parseInt(retryMatch[1], 10) : null;
+          errorMessage.includes('quota') ||
+          errorMessage.includes('rate limit') ||
+          errorMessage.includes('RPM');
 
-          const retryInfo = retrySeconds
-            ? ` Please retry in ${retrySeconds} seconds.`
-            : ' Please wait a moment and try again.';
+        if (isRateLimit && attempt < maxRetries) {
+          const delayMs = baseDelayMs * Math.pow(2, attempt);
+          console.warn(
+            `[GeminiClient] generateText rate limit (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delayMs}ms...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          continue;
+        }
 
+        if (!isRateLimit) {
+          console.error('[GeminiClient] generateText error:', errorMessage);
+          if (lastError.stack)
+            console.error('[GeminiClient] Stack:', lastError.stack);
           throw new Error(
-            `Gemini API quota exceeded (rate limit).${retryInfo} ` +
-              "This usually means you've hit the free tier limits. " +
-              'Consider upgrading to a paid plan or waiting for the quota to reset. ' +
-              'For more info: https://ai.google.dev/gemini-api/docs/rate-limits',
+            `Gemini API error: ${errorMessage}. ` +
+              'Check your API key and model configuration.',
           );
         }
 
-        // Log raw error voor debugging
-        console.error('[GeminiClient] generateText error:', errorMessage);
-        if (error.stack) console.error('[GeminiClient] Stack:', error.stack);
+        const retryMatch =
+          errorMessage.match(/retry.*?(\d+)\s*s/i) ||
+          errorMessage.match(/(\d+)\s*second/i);
+        const retrySeconds = retryMatch ? parseInt(retryMatch[1], 10) : null;
+        const retryInfo = retrySeconds
+          ? ` Please retry in ${retrySeconds} seconds.`
+          : ' Please wait a moment and try again.';
 
-        // Re-throw with more context (but don't expose API key or full prompt)
         throw new Error(
-          `Gemini API error: ${errorMessage}. ` +
-            'Check your API key and model configuration.',
+          `Gemini API quota exceeded (rate limit).${retryInfo} ` +
+            "This usually means you've hit the free tier limits. " +
+            'Consider upgrading to a paid plan or waiting for the quota to reset. ' +
+            'For more info: https://ai.google.dev/gemini-api/docs/rate-limits',
         );
       }
-      throw new Error('Unknown error from Gemini API');
     }
+
+    throw lastError || new Error('Unknown error from Gemini API');
   }
 
   /**
