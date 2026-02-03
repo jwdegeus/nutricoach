@@ -11,6 +11,7 @@ import { getRecipeComplianceScoresAction } from '../../actions/recipe-compliance
 import {
   getCustomFoodNamesByIdsAction,
   getNevoFoodNamesByCodesAction,
+  type OptimisticMatchPayload,
 } from '../actions/ingredient-matching.actions';
 import type { RecipeComplianceResult } from '../../actions/recipe-compliance.actions';
 import { useToast } from '@/src/components/app/ToastContext';
@@ -318,7 +319,66 @@ export function RecipeDetailPageClient({
         customFoodNamesById={customFoodNamesById}
         complianceScore={complianceScore}
         onRecipeApplied={loadMeal}
-        onIngredientMatched={() => {
+        onIngredientMatched={(payload?: OptimisticMatchPayload) => {
+          if (payload && meal) {
+            // Optimistische update: geen paginareload, direct state bijwerken
+            const mealKey =
+              (meal as Record<string, unknown>).mealData !== undefined
+                ? 'mealData'
+                : 'meal_data';
+            const base = (meal as Record<string, unknown>)[mealKey] as Record<
+              string,
+              unknown
+            >;
+            const ingredients = Array.isArray(base?.ingredients)
+              ? base.ingredients
+              : [];
+            const existingRefs = Array.isArray(base?.ingredientRefs)
+              ? [...(base.ingredientRefs as Record<string, unknown>[])]
+              : [];
+            const refs: (Record<string, unknown> | null)[] = Array(
+              ingredients.length,
+            )
+              .fill(null)
+              .map((_, i) => existingRefs[i] ?? null);
+            const newRef: Record<string, unknown> = {
+              displayName: payload.ref.displayName,
+            };
+            if (payload.ref.nevoCode != null)
+              newRef.nevoCode = String(payload.ref.nevoCode);
+            if (payload.ref.customFoodId)
+              newRef.customFoodId = payload.ref.customFoodId;
+            if (payload.ref.fdcId != null) newRef.fdcId = payload.ref.fdcId;
+            if (payload.ref.quantityG != null)
+              newRef.quantityG = payload.ref.quantityG;
+            if (payload.ref.quantity != null)
+              newRef.quantity = payload.ref.quantity;
+            if (payload.ref.unit) newRef.unit = payload.ref.unit;
+            refs[payload.ingredientIndex] = newRef;
+            const updatedMeal = {
+              ...meal,
+              [mealKey]: { ...base, ingredientRefs: refs },
+            };
+            setMeal(updatedMeal);
+            if (payload.ref.nevoCode != null) {
+              setNevoFoodNamesByCode((prev) => ({
+                ...prev,
+                [String(payload.ref.nevoCode)]: payload.ref.displayName,
+              }));
+            }
+            if (payload.ref.customFoodId) {
+              setCustomFoodNamesById((prev) => ({
+                ...prev,
+                [payload.ref.customFoodId!]: payload.ref.displayName,
+              }));
+            }
+            showToast({
+              type: 'success',
+              title: 'Ingrediënt gekoppeld',
+              description: 'Het recept is bijgewerkt.',
+            });
+            return;
+          }
           loadMealSilent();
           showToast({
             type: 'success',

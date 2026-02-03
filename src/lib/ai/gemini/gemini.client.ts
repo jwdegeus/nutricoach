@@ -284,60 +284,74 @@ class GeminiClient {
   }
 
   /**
-   * Analyze an image (photo, screenshot) and extract recipe/meal information
+   * Normalize image input to base64 + mimeType (strip data URL prefix if present)
+   */
+  private normalizeImageData(imageData: string): {
+    base64Data: string;
+    mimeType: string;
+  } {
+    let base64Data = imageData;
+    let mimeType = 'image/jpeg';
+    if (imageData.startsWith('data:')) {
+      const match = imageData.match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        mimeType = match[1];
+        base64Data = match[2];
+      } else {
+        throw new Error('Invalid data URL format');
+      }
+    }
+    return { base64Data, mimeType };
+  }
+
+  /**
+   * Analyze one or more images (photo, screenshot) and extract recipe/meal information.
+   * For multiple images, they are sent in order as e.g. page 1, page 2 of the same recipe.
    *
-   * @param args - Configuration for image analysis
-   * @param args.imageData - Base64 encoded image data or image URL
-   * @param args.mimeType - MIME type of the image (e.g., 'image/jpeg', 'image/png')
-   * @param args.prompt - Optional additional prompt for analysis
-   * @param args.jsonSchema - Optional JSON schema for structured output
-   * @param args.temperature - Temperature for generation (0.0-1.0, default: 0.4)
-   * @returns Analysis result (JSON string if schema provided, otherwise plain text)
+   * @param args.imageData - Single image: base64 or data URL (use with mimeType)
+   * @param args.mimeType - Single image MIME type
+   * @param args.images - Multiple images: array of { imageData, mimeType }. When set, imageData/mimeType are ignored.
    */
   async analyzeImage(args: {
-    imageData: string; // Base64 string or data URL
-    mimeType: string; // e.g., 'image/jpeg', 'image/png'
+    imageData?: string;
+    mimeType?: string;
+    images?: Array<{ imageData: string; mimeType: string }>;
     prompt?: string;
     jsonSchema?: object;
     temperature?: number;
-    purpose?: ModelPurpose; // Optional purpose override
+    purpose?: ModelPurpose;
   }): Promise<string> {
     const {
       imageData,
       mimeType,
+      images: imagesArg,
       prompt,
       jsonSchema,
       temperature = 0.4,
       purpose = 'vision',
     } = args;
-    // Use getModelName to support configurable vision model via GEMINI_MODEL_VISION env var
-    // Defaults to GEMINI_MODEL if not set, but can be overridden to gemini-3-flash-preview or other models
     const modelName = this.getModelName(purpose);
 
-    // Build content parts
     const parts: Array<{
       inlineData?: { data: string; mimeType: string };
       text?: string;
     }> = [];
 
-    // Add image
-    // Handle data URL format (data:image/jpeg;base64,...)
-    let base64Data = imageData;
-    if (imageData.startsWith('data:')) {
-      const base64Match = imageData.match(/^data:[^;]+;base64,(.+)$/);
-      if (base64Match) {
-        base64Data = base64Match[1];
-      } else {
-        throw new Error('Invalid data URL format');
+    if (imagesArg && imagesArg.length > 0) {
+      for (let i = 0; i < imagesArg.length; i++) {
+        const { base64Data, mimeType: mt } = this.normalizeImageData(
+          imagesArg[i].imageData,
+        );
+        parts.push({ inlineData: { data: base64Data, mimeType: mt } });
       }
+    } else if (imageData && mimeType) {
+      const { base64Data, mimeType: mt } = this.normalizeImageData(imageData);
+      parts.push({ inlineData: { data: base64Data, mimeType: mt } });
+    } else {
+      throw new Error(
+        'Either imageData+mimeType or images array must be provided',
+      );
     }
-
-    parts.push({
-      inlineData: {
-        data: base64Data,
-        mimeType,
-      },
-    });
 
     // Add prompt if provided
     const analysisPrompt =

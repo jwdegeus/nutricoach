@@ -7,7 +7,9 @@
 
 import 'server-only';
 import { createClient } from '@/src/lib/supabase/server';
-import type { MealSlot } from '@/src/lib/diets';
+
+/** meal_slot value for custom_meals (DB CHECK: breakfast, lunch, dinner, snack, other) */
+type MealSlotValue = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'other';
 
 /**
  * Finalize recipe import by calling Postgres RPC function
@@ -21,7 +23,7 @@ import type { MealSlot } from '@/src/lib/diets';
 export async function finalizeRecipeImport(args: {
   userId: string;
   jobId: string;
-  mealSlot?: MealSlot;
+  mealSlot?: MealSlotValue;
 }): Promise<{ recipeId: string }> {
   const supabase = await createClient();
   const { jobId, mealSlot = 'dinner' } = args;

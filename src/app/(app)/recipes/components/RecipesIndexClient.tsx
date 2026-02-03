@@ -1271,15 +1271,17 @@ function FilterTagsPanel({
 function MealCardThumbnail({
   imageUrl,
   alt,
+  children,
 }: {
   imageUrl: string | null;
   alt: string;
+  children?: React.ReactNode;
 }) {
   const [imageError, setImageError] = useState(false);
   const showImage = imageUrl && !imageError;
 
   return (
-    <div className="relative h-36 w-full shrink-0 overflow-hidden rounded-sm bg-zinc-100 dark:bg-zinc-800">
+    <div className="relative h-36 w-full shrink-0 overflow-hidden rounded-t-lg rounded-b-sm bg-zinc-100 dark:bg-zinc-800">
       {showImage ? (
         <Image
           src={imageUrl}
@@ -1297,6 +1299,9 @@ function MealCardThumbnail({
             aria-hidden
           />
         </div>
+      )}
+      {children && (
+        <div className="absolute right-2 top-2 z-10">{children}</div>
       )}
     </div>
   );
@@ -1327,25 +1332,26 @@ function MealCard({
         <MealCardThumbnail
           imageUrl={item.imageUrl}
           alt={item.title || 'Recept'}
-        />
-        <Button
-          type="button"
-          plain
-          className="absolute right-2 top-2 z-10 rounded-full p-1.5 text-zinc-500 hover:text-amber-500 dark:text-zinc-400 dark:hover:text-amber-400"
-          onClick={handleFavoriteClick}
-          disabled={isSaving}
-          aria-label={isFavorited ? 'Verwijder uit opgeslagen' : 'Opslaan'}
-          title={isFavorited ? 'Verwijder uit opgeslagen' : 'Opslaan'}
         >
-          {isFavorited ? (
-            <BookmarkIconSolid
-              className="h-5 w-5 text-amber-500 dark:text-amber-400"
-              aria-hidden
-            />
-          ) : (
-            <BookmarkIconOutline className="h-5 w-5" aria-hidden />
-          )}
-        </Button>
+          <Button
+            type="button"
+            plain
+            className="rounded-full p-1.5 text-zinc-400 hover:text-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200"
+            onClick={handleFavoriteClick}
+            disabled={isSaving}
+            aria-label={isFavorited ? 'Verwijder uit opgeslagen' : 'Opslaan'}
+            title={isFavorited ? 'Verwijder uit opgeslagen' : 'Opslaan'}
+          >
+            {isFavorited ? (
+              <BookmarkIconSolid
+                className="h-5 w-5 text-amber-400 dark:text-amber-300"
+                aria-hidden
+              />
+            ) : (
+              <BookmarkIconOutline className="h-5 w-5" aria-hidden />
+            )}
+          </Button>
+        </MealCardThumbnail>
         <div className="flex min-h-0 flex-1 flex-col p-4">
           <h3 className="truncate font-semibold text-zinc-950 dark:text-white pr-8">
             {item.title || 'Zonder titel'}

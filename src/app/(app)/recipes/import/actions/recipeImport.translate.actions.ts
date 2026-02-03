@@ -9,14 +9,28 @@ import type { GeminiExtractedRecipe } from '../recipeImport.gemini.schemas';
 const ENGLISH_RECIPE_MARKERS =
   /\b(tomatoes|cucumbers|scallions|peppers|place|add|stir|mix|slice|chop|cup|tablespoon|teaspoon|ounces|recipe|salad)\b/i;
 
-/** Extract only numbered list lines from Gemini response (skip preamble like "Here are the translated...") */
+/**
+ * Extract numbered list lines from Gemini response (skip preamble).
+ * Handles multi-line steps: lines that don't start with a number are merged into the previous step.
+ */
 function extractNumberedLines(response: string): string[] {
-  return response
+  const lines = response
     .trim()
     .split(/\n+/)
-    .map((line) => line.trim())
-    .filter((line) => /^\d+\.?\s*/.test(line))
-    .map((line) => line.replace(/^\d+\.?\s*/, '').trim());
+    .map((line) => line.trim());
+  const result: string[] = [];
+  let current = '';
+  for (const line of lines) {
+    const numberedMatch = line.match(/^(\d+)[.)]\s*([\s\S]*)/);
+    if (numberedMatch) {
+      if (current) result.push(current);
+      current = numberedMatch[2]?.trim() ?? '';
+    } else if (line && current) {
+      current = `${current} ${line}`.trim();
+    }
+  }
+  if (current) result.push(current);
+  return result;
 }
 
 /**
@@ -646,10 +660,11 @@ Reply (numbered list only):`;
           ? `Vertaal de volgende bereidingsinstructies naar het Nederlands.
 
 REGELS:
-- Antwoord ALLEEN met een genummerde lijst. Geen inleiding, geen "Option 1/Option 2", geen uitleg, geen "Explanation of choices".
-- Regel 1: "1. [eerste zin in het Nederlands]"
-- Regel 2: "2. [tweede zin in het Nederlands]"
-- Enzovoort. Alleen cijfer, punt, spatie, dan de zin. Niets anders.
+- Antwoord ALLEEN met een genummerde lijst. Geen inleiding, geen uitleg.
+- Elke stap kan een hele alinea zijn (titel + uitleg). Vertaal de VOLLEDIGE tekst van elke stap, niet alleen de titel.
+- Regel 1: "1. [volledige eerste stap in het Nederlands]"
+- Regel 2: "2. [volledige tweede stap in het Nederlands]"
+- Enzovoort. Cijfer, punt, spatie, dan de volledige vertaalde stap. Niets anders.
 
 Instructions:
 ${instructionsText}
@@ -658,10 +673,11 @@ Antwoord:`
           : `Translate the following cooking instructions to English.
 
 RULES:
-- Reply with ONLY a numbered list. No introduction, no "Option 1/Option 2", no explanation.
-- Line 1: "1. [first sentence in English]"
-- Line 2: "2. [second sentence in English]"
-- etc. Only number, period, space, then the sentence. Nothing else.
+- Reply with ONLY a numbered list. No introduction, no explanation.
+- Each step can be a full paragraph (title + body). Translate the COMPLETE text of each step, not just the title.
+- Line 1: "1. [full first step in English]"
+- Line 2: "2. [full second step in English]"
+- etc. Number, period, space, then the full translated step. Nothing else.
 
 Instructions:
 ${instructionsText}

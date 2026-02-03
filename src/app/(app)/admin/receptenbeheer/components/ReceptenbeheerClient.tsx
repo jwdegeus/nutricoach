@@ -10,7 +10,7 @@ type TabId = 'bronnen' | 'keukens';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'bronnen', label: 'Recept bronnen' },
-  { id: 'keukens', label: 'Recept keukens' },
+  { id: 'keukens', label: 'Classificatie beheer' },
 ];
 
 type ReceptenbeheerClientProps = {

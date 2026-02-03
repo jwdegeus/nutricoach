@@ -115,7 +115,7 @@ export function CatalogAdminClient() {
               onClick={() => setDimension(opt.value)}
               className={
                 dimension === opt.value
-                  ? 'border-b-2 border-zinc-950 dark:border-white px-3 py-2 text-sm font-medium text-zinc-950 dark:text-white'
+                  ? 'border-b-2 border-primary-500 px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400'
                   : 'border-b-2 border-transparent px-3 py-2 text-sm font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
               }
             >

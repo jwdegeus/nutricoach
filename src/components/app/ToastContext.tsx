@@ -3,6 +3,7 @@
 import React, { createContext, useCallback, useContext, useState } from 'react';
 import { CheckCircleIcon, XMarkIcon } from '@heroicons/react/20/solid';
 import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
+import { Link } from '@/components/catalyst/link';
 
 export type ToastType = 'success' | 'error';
 
@@ -11,6 +12,10 @@ export type ToastMessage = {
   type: ToastType;
   title: string;
   description?: string;
+  action?: {
+    label: string;
+    href: string;
+  };
 };
 
 type ToastContextValue = {
@@ -18,6 +23,10 @@ type ToastContextValue = {
     type: ToastType;
     title: string;
     description?: string;
+    action?: {
+      label: string;
+      href: string;
+    };
   }) => void;
 };
 
@@ -34,7 +43,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const showToast = useCallback(
-    (options: { type: ToastType; title: string; description?: string }) => {
+    (options: {
+      type: ToastType;
+      title: string;
+      description?: string;
+      action?: { label: string; href: string };
+    }) => {
       const id = Date.now();
       setToasts((prev) => [...prev, { id, ...options }]);
       setTimeout(() => {
@@ -60,10 +74,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           {toasts.map((toast) => (
             <div
               key={toast.id}
-              className="pointer-events-auto w-full max-w-sm overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-zinc-950/10 transition duration-300 ease-out dark:bg-zinc-900 dark:ring-white/10 sm:translate-x-0"
+              className="pointer-events-auto w-full max-w-sm rounded-lg bg-white shadow-lg ring-1 ring-zinc-950/10 transition duration-300 ease-out dark:bg-zinc-900 dark:ring-white/10 sm:translate-x-0"
             >
               <div className="p-4">
-                <div className="flex items-start">
+                <div className="flex items-start gap-3">
                   <div className="shrink-0">
                     {toast.type === 'success' ? (
                       <CheckCircleIcon
@@ -77,13 +91,23 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                       />
                     )}
                   </div>
-                  <div className="ml-3 w-0 flex-1 pt-0.5">
+                  <div className="min-w-0 flex-1 pt-0.5">
                     <p className="text-sm font-medium text-zinc-950 dark:text-white">
                       {toast.title}
                     </p>
                     {toast.description && (
                       <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
                         {toast.description}
+                      </p>
+                    )}
+                    {toast.action && (
+                      <p className="mt-3">
+                        <Link
+                          href={toast.action.href}
+                          className="inline-flex items-center rounded-lg border border-transparent bg-[var(--color-primary-600)] px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[var(--color-primary-500)] focus:outline-2 focus:outline-offset-2 focus:outline-primary-500"
+                        >
+                          {toast.action.label}
+                        </Link>
                       </p>
                     )}
                   </div>

@@ -267,13 +267,27 @@
     "minutes": "minutes",
     "original": "Original",
     "noExtractedData": "No extracted data available. Please try again.",
+    "takePhoto": "Take photo",
+    "pasteImage": "Paste image",
+    "cameraTitle": "Take photo",
+    "capturePhoto": "Take photo",
+    "errorCameraAccess": "Could not access camera. Check your browser settings.",
+    "noImageInClipboard": "No image found in clipboard",
+    "pasteHint": "Use Ctrl+V (or Cmd+V) to paste an image, or take a screenshot and paste it here",
     "translateToDutch": "Translate to Dutch",
     "translating": "Translating...",
     "translateFailed": "Translation failed. Please try again.",
     "warningCookMinutesMissing": "Cook time is missing",
     "warningRestingTimeNotIncluded": "Resting time is not included in total time",
     "warningPrepMinutesMissing": "Prep time is missing",
-    "warningTotalMinutesMissing": "Total time is missing"
+    "warningTotalMinutesMissing": "Total time is missing",
+    "pagePreview": "Page preview",
+    "pagesPreview": "{count} pages",
+    "pageNumber": "Page {number}",
+    "removePage": "Remove page",
+    "addAnotherPage": "Recipe spans multiple pages? Add the next page here.",
+    "maxPagesHint": "Maximum 5 pages per recipe.",
+    "errorMaxPages": "Maximum 5 pages. Remove a page to add another."
   },
   "mealPlan": {
     "slotStylePromptLabels": {

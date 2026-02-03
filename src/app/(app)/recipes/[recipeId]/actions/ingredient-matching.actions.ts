@@ -710,6 +710,21 @@ export type IngredientCandidate = {
   fiber_g?: number | null;
 };
 
+/** Payload voor optimistische UI-update na het koppelen van een ingrediënt (zonder paginareload). */
+export type OptimisticMatchPayload = {
+  ingredientIndex: number;
+  ref: {
+    source: 'nevo' | 'custom' | 'fndds';
+    nevoCode?: number;
+    customFoodId?: string;
+    fdcId?: number;
+    displayName: string;
+    quantity?: number;
+    unit?: string;
+    quantityG?: number;
+  };
+};
+
 /** Normaliseer voor vergelijking: lowercase, spaties en komma's verwijderen (NEVO: "Olijf, olie" → "olijfolie"). */
 function normalizeForMatch(s: string): string {
   return (s ?? '').toLowerCase().replace(/[,\s]+/g, '');
@@ -807,12 +822,13 @@ export async function searchIngredientCandidatesAction(
     for (const t of getExtraSearchTerms(searchTerm)) {
       if (t && !searchTerms.includes(t)) searchTerms.push(t);
     }
-    // Elk significant woord apart zoeken (bijv. "gedroogde tijm" → ook "tijm") zodat NEVO "Tijm, gedroogd" matcht
+    // Elk significant woord apart zoeken (bijv. "gedroogde tijm" → ook "tijm") zodat NEVO "Tijm, gedroogd" matcht.
+    // Woorden van 1–2 tekens overslaan: "%ui%" matcht ook "beschuit"/"biscuit", "%ro%" te veel ruis.
     const words = searchTerm
       .toLowerCase()
       .split(/\s+/)
       .filter(
-        (w) => w.length >= 2 && !UNIT_AND_STOP.has(w) && !/^\d+$/.test(w),
+        (w) => w.length >= 3 && !UNIT_AND_STOP.has(w) && !/^\d+$/.test(w),
       );
     for (const w of words) {
       if (!searchTerms.includes(w)) searchTerms.push(w);

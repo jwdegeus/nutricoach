@@ -91,12 +91,15 @@ export type ImportRecipeFromUrlInput = {
 /**
  * Import recipe from URL result (success)
  * job: full job with translated extracted_recipe_json, so client can show it without refetch
+ * diagnostics: only when RECIPE_IMPORT_DEBUG=true (Gemini path only)
  */
 export type ImportRecipeFromUrlSuccess = {
   ok: true;
   jobId?: string;
   recipeId?: string;
   job?: RecipeImportJob;
+  /** Present only when RECIPE_IMPORT_DEBUG=true; no PII or full HTML. */
+  diagnostics?: import('./services/geminiRecipeUrlImport.service').GeminiUrlImportDiagnostics;
 };
 
 /**
@@ -104,8 +107,22 @@ export type ImportRecipeFromUrlSuccess = {
  */
 export type ImportRecipeFromUrlError = {
   ok: false;
-  errorCode: 'INVALID_URL' | 'UNAUTHORIZED' | 'INTERNAL';
+  errorCode:
+    | 'INVALID_URL'
+    | 'UNAUTHORIZED'
+    | 'INTERNAL'
+    | 'AI_EXTRACTION_FAILED'
+    | 'DUPLICATE_URL';
   message: string;
+  /** Optional structured error for UI mapping. */
+  error?: {
+    code: 'AI_EXTRACTION_FAILED';
+    message: string;
+  };
+  recipeId?: string;
+  recipeName?: string;
+  /** Present only when RECIPE_IMPORT_DEBUG=true; no PII or full HTML. */
+  diagnostics?: import('./services/geminiRecipeUrlImport.service').GeminiUrlImportDiagnostics;
 };
 
 /**

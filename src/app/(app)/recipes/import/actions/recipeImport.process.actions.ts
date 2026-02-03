@@ -5,7 +5,10 @@ import {
   loadRecipeImportAction,
   updateRecipeImportStatusAction,
 } from './recipeImport.actions';
-import { processRecipeImageWithGemini } from '../services/geminiRecipeImport.service';
+import {
+  processRecipeImageWithGemini,
+  processRecipeImagesWithGemini,
+} from '../services/geminiRecipeImport.service';
 import { z } from 'zod';
 
 /**
@@ -28,25 +31,31 @@ type ActionResult<T> =
     };
 
 /**
- * Process recipe import input schema
+ * Process recipe import input schema.
+ * Accepts either single image (imageDataUrl or imagePublicUrl) or multiple images (imageDataUrls).
  */
 const processRecipeImportInputSchema = z
   .object({
     jobId: z.string().uuid('jobId must be a valid UUID'),
     imageDataUrl: z.string().optional(),
     imagePublicUrl: z.string().url().optional(),
+    imageDataUrls: z.array(z.string()).min(1).max(5).optional(),
     sourceLocale: z.string().nullable().optional(),
     targetLocale: z.string().nullable().optional(),
   })
   .refine(
     (data) => {
-      // Exactly one image input must be present
-      const hasDataUrl = !!data.imageDataUrl;
+      const hasSingleDataUrl = !!data.imageDataUrl;
       const hasPublicUrl = !!data.imagePublicUrl;
-      return hasDataUrl !== hasPublicUrl; // XOR: exactly one must be true
+      const hasMulti = !!data.imageDataUrls?.length;
+      if (hasMulti) {
+        return !hasSingleDataUrl && !hasPublicUrl;
+      }
+      return hasSingleDataUrl !== hasPublicUrl;
     },
     {
-      message: 'Exactly one of imageDataUrl or imagePublicUrl must be provided',
+      message:
+        'Provide either imageDataUrl, imagePublicUrl, or imageDataUrls (1–5 items), not mixed',
       path: ['imageDataUrl'],
     },
   );
@@ -179,25 +188,52 @@ export async function processRecipeImportWithGeminiAction(
       };
     }
 
-    // Extract image data
-    let imageData: string;
-    let mimeType: string;
+    type ImageInput =
+      | { kind: 'single'; imageData: string; mimeType: string }
+      | {
+          kind: 'multi';
+          images: Array<{ imageData: string; mimeType: string }>;
+        };
 
-    if (input.imageDataUrl) {
+    let imageInput: ImageInput;
+
+    if (input.imageDataUrls && input.imageDataUrls.length > 0) {
+      const images: Array<{ imageData: string; mimeType: string }> = [];
+      for (let i = 0; i < input.imageDataUrls.length; i++) {
+        try {
+          const extracted = extractImageFromDataUrl(input.imageDataUrls[i]);
+          images.push({
+            imageData: input.imageDataUrls[i],
+            mimeType: extracted.mimeType,
+          });
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error
+              ? error.message
+              : `Ongeldig image data URL op pagina ${i + 1}`;
+          return {
+            ok: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: errorMessage,
+            },
+          };
+        }
+      }
+      imageInput = { kind: 'multi', images };
+    } else if (input.imageDataUrl) {
       try {
         const extracted = extractImageFromDataUrl(input.imageDataUrl);
-        // Use full data URL for Gemini (it handles data URLs)
-        imageData = input.imageDataUrl;
-        mimeType = extracted.mimeType;
+        imageInput = {
+          kind: 'single',
+          imageData: input.imageDataUrl,
+          mimeType: extracted.mimeType,
+        };
       } catch (error) {
         const errorMessage =
           error instanceof Error
             ? error.message
             : 'Ongeldig image data URL formaat';
-
-        // Check if it's IMAGE_TOO_LARGE error (reserved for future use)
-        const _isImageTooLarge = errorMessage.includes('IMAGE_TOO_LARGE');
-
         return {
           ok: false,
           error: {
@@ -207,18 +243,15 @@ export async function processRecipeImportWithGeminiAction(
         };
       }
     } else if (input.imagePublicUrl) {
-      // For public URLs, we'd need to fetch and convert to base64
-      // For now, this is a placeholder - in real implementation, fetch from storage
       return {
         ok: false,
         error: {
           code: 'VALIDATION_ERROR',
           message:
-            'imagePublicUrl wordt nog niet ondersteund. Gebruik imageDataUrl.',
+            'imagePublicUrl wordt nog niet ondersteund. Gebruik imageDataUrl of imageDataUrls.',
         },
       };
     } else {
-      // This should not happen due to schema validation, but handle it anyway
       return {
         ok: false,
         error: {
@@ -258,13 +291,7 @@ export async function processRecipeImportWithGeminiAction(
     let validationErrors: unknown = null;
 
     try {
-      console.log(`[RecipeImport] Calling processRecipeImageWithGemini...`);
-      console.log(
-        `[RecipeImport] Image data size: ${imageData.length} chars, mimeType: ${mimeType}`,
-      );
       const startTime = Date.now();
-
-      // Add timeout for Gemini call (max 45 seconds)
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           reject(
@@ -273,13 +300,26 @@ export async function processRecipeImportWithGeminiAction(
         }, 45000);
       });
 
-      geminiResult = await Promise.race([
-        processRecipeImageWithGemini({
-          imageData,
-          mimeType,
-        }),
-        timeoutPromise,
-      ]);
+      if (imageInput.kind === 'single') {
+        console.log(
+          `[RecipeImport] Calling processRecipeImageWithGemini (single image), size: ${imageInput.imageData.length} chars`,
+        );
+        geminiResult = await Promise.race([
+          processRecipeImageWithGemini({
+            imageData: imageInput.imageData,
+            mimeType: imageInput.mimeType,
+          }),
+          timeoutPromise,
+        ]);
+      } else {
+        console.log(
+          `[RecipeImport] Calling processRecipeImagesWithGemini (${imageInput.images.length} pages)`,
+        );
+        geminiResult = await Promise.race([
+          processRecipeImagesWithGemini({ images: imageInput.images }),
+          timeoutPromise,
+        ]);
+      }
 
       const duration = Date.now() - startTime;
       console.log(

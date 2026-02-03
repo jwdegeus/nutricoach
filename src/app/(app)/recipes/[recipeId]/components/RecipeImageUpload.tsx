@@ -24,6 +24,8 @@ type RecipeImageUploadProps = {
   recipeContext?: { name: string; summary?: string };
   /** When true, render as hero image (full width, larger) with overlay buttons. Use at top of recipe card. */
   renderHero?: boolean;
+  /** When true, render as a square image card with overlay buttons. */
+  square?: boolean;
 };
 
 export function RecipeImageUpload({
@@ -35,6 +37,7 @@ export function RecipeImageUpload({
   onImageClick,
   recipeContext,
   renderHero = false,
+  square = false,
 }: RecipeImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -348,8 +351,14 @@ export function RecipeImageUpload({
     </div>
   );
 
+  const wrapperClass = renderHero
+    ? 'min-w-0 w-full'
+    : square
+      ? 'min-w-0 w-full'
+      : 'mt-4 min-w-0 max-w-full';
+
   return (
-    <div className={renderHero ? 'min-w-0 w-full' : 'mt-4 min-w-0 max-w-full'}>
+    <div className={wrapperClass}>
       <input
         ref={fileInputRef}
         type="file"
@@ -358,7 +367,64 @@ export function RecipeImageUpload({
         className="hidden"
       />
 
-      {renderHero && previewUrl && !imageLoadError ? (
+      {square && previewUrl && !imageLoadError ? (
+        <>
+          <div className="relative block w-full aspect-square bg-zinc-100 dark:bg-zinc-800 overflow-hidden rounded-lg">
+            <button
+              type="button"
+              onClick={handleClick}
+              className="block w-full h-full cursor-pointer hover:opacity-95 transition-opacity"
+              disabled={isBusy}
+              aria-label="Receptafbeelding vergroten"
+            >
+              <Image
+                src={previewUrl}
+                alt="Recept foto"
+                fill
+                className="object-cover rounded-lg"
+                sizes="(max-width: 1024px) 100vw, 360px"
+                unoptimized
+                onError={() => setImageLoadError(true)}
+              />
+            </button>
+            {overlayButtons}
+          </div>
+          {error && (
+            <span className="mt-1.5 block text-sm text-red-600 dark:text-red-400">
+              {error}
+            </span>
+          )}
+        </>
+      ) : square && !previewUrl ? (
+        <div className="relative border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg p-8 flex flex-col items-center justify-center gap-3 aspect-square bg-zinc-50 dark:bg-zinc-900/50">
+          <button
+            type="button"
+            onClick={handleClick}
+            disabled={isBusy}
+            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <PhotoIcon className="h-12 w-12 shrink-0 text-zinc-400 dark:text-zinc-500" />
+            <span className="text-sm text-zinc-600 dark:text-zinc-400 text-center">
+              {isUploading ? 'Uploaden...' : 'Upload foto van eindresultaat'}
+            </span>
+          </button>
+          {recipeContext && (
+            <Button
+              plain
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleGenerateImage();
+              }}
+              disabled={isBusy}
+              className="relative z-10 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              <SparklesIcon className="h-4 w-4 mr-1.5 inline" />
+              {isGenerating ? 'Bezig…' : 'Genereer foto met AI'}
+            </Button>
+          )}
+        </div>
+      ) : renderHero && previewUrl && !imageLoadError ? (
         <>
           <div className="relative block w-full aspect-[4/1] min-h-[100px] max-h-[220px] bg-zinc-100 dark:bg-zinc-800 overflow-hidden rounded-t-lg">
             <button

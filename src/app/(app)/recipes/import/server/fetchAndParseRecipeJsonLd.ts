@@ -11,6 +11,7 @@ import type {
   RecipeDraft,
   RecipeExtractionDiagnostics,
 } from '../recipeDraft.types';
+import { mergeInstructionsIntoParagraphs } from '../recipeInstructionUtils';
 
 /**
  * Result type for fetch and parse operation
@@ -40,8 +41,8 @@ const FETCH_TIMEOUT_MS =
     ? parseInt(process.env.RECIPE_FETCH_TIMEOUT_MS, 10)
     : 35_000; // 35s standaard; veel receptensites zijn traag (DNS + TTFB)
 const MAX_RESPONSE_SIZE = 3 * 1024 * 1024; // 3MB
-/** Stop met body lezen na deze grootte; recept staat meestal in het begin van de HTML */
-const MAX_BODY_READ_SIZE = 1.5 * 1024 * 1024; // 1.5MB
+/** Stop met body lezen na deze grootte. Verhoogd zodat JSON-LD (vaak in footer bij WordPress/WPRM) niet wordt afgekapt. */
+const MAX_BODY_READ_SIZE = 2.5 * 1024 * 1024; // 2.5MB
 const MAX_REDIRECTS = 5; // Increased for sites with multiple redirects
 const ALLOWED_CONTENT_TYPES = [
   'text/html',
@@ -445,6 +446,179 @@ function stripHtml(raw: string): string {
     .trim();
 }
 
+function extractMetaContent(
+  html: string,
+  attrName: 'property' | 'name',
+  attrValue: string,
+): string | undefined {
+  const patterns = [
+    new RegExp(
+      `<meta[^>]*\\b${attrName}=["']${attrValue}["'][^>]*\\bcontent=["']([^"']+)["'][^>]*>`,
+      'i',
+    ),
+    new RegExp(
+      `<meta[^>]*\\bcontent=["']([^"']+)["'][^>]*\\b${attrName}=["']${attrValue}["'][^>]*>`,
+      'i',
+    ),
+  ];
+  for (const re of patterns) {
+    const match = re.exec(html);
+    if (match && match[1]) return match[1].trim();
+  }
+  return undefined;
+}
+
+function extractOgImageUrl(
+  html: string,
+  sourceUrl: string,
+): {
+  imageUrl?: string;
+  source: 'og:image' | 'og:image:url' | 'twitter:image' | null;
+} {
+  const candidates: {
+    attrName: 'property' | 'name';
+    attrValue: 'og:image' | 'og:image:url' | 'twitter:image';
+  }[] = [
+    { attrName: 'property', attrValue: 'og:image' },
+    { attrName: 'property', attrValue: 'og:image:url' },
+    { attrName: 'name', attrValue: 'twitter:image' },
+  ];
+
+  for (const candidate of candidates) {
+    const content = extractMetaContent(
+      html,
+      candidate.attrName,
+      candidate.attrValue,
+    );
+    if (!content) continue;
+    try {
+      let resolved: string;
+      if (content.startsWith('//')) {
+        resolved = `https:${content}`;
+      } else {
+        resolved = new URL(content, sourceUrl).toString();
+      }
+      return { imageUrl: resolved, source: candidate.attrValue };
+    } catch {
+      continue;
+    }
+  }
+
+  return { imageUrl: undefined, source: null };
+}
+
+/**
+ * Heuristic: extract ingredients/instructions from headings + lists in plain HTML.
+ * Looks for h2/h3/h4 headings containing "Ingredients" or "Instructions"
+ * and grabs the first <ul>/<ol> list that follows.
+ */
+export function extractRecipeFromHtmlHeadings(
+  html: string,
+  sourceUrl: string,
+): {
+  title?: string;
+  ingredients: string[];
+  instructions: string[];
+  imageUrl?: string;
+} | null {
+  const titleMatch = /<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(html);
+  const title = titleMatch ? stripHtml(titleMatch[1]) : undefined;
+
+  const INGREDIENT_HEADING_TOKENS = [
+    'ingredients',
+    'what you need',
+    'components',
+  ];
+  const INSTRUCTION_HEADING_TOKENS = [
+    'instructions',
+    'directions',
+    'method',
+    'preparation',
+    'steps',
+    'bereiding',
+    'bereidingswijze',
+    'instructies',
+    'stappen',
+  ];
+
+  const normalizeHeading = (raw: string): string =>
+    raw
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .replace(/[\s:–-]+$/g, '')
+      .trim();
+
+  const matchHeadingToken = (
+    headingText: string,
+    tokens: string[],
+  ): string | null => {
+    for (const token of tokens) {
+      if (headingText.includes(token)) return token;
+    }
+    return null;
+  };
+
+  const findListAfterHeading = (
+    headingTokens: string[],
+    maxDistance: number = 8000,
+  ): { items: string[]; matchedToken: string | null } => {
+    const headingRegex = /<h[234][^>]*>([\s\S]*?)<\/h[234]\s*>/gi;
+    let match: RegExpExecArray | null;
+    while ((match = headingRegex.exec(html)) !== null) {
+      const headingText = normalizeHeading(stripHtml(match[1]));
+      const matchedToken = matchHeadingToken(headingText, headingTokens);
+      if (!matchedToken) continue;
+      const afterHeading = html.slice(
+        match.index + match[0].length,
+        match.index + match[0].length + maxDistance,
+      );
+      const listMatch = /<(ul|ol)[^>]*>([\s\S]*?)<\/\1>/i.exec(afterHeading);
+      if (!listMatch || !listMatch[2]) continue;
+      const liBlocks = listMatch[2].match(/<li[^>]*>[\s\S]*?<\/li>/gi);
+      if (!liBlocks || liBlocks.length === 0) continue;
+      const items = liBlocks
+        .map((li) => stripHtml(li))
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0);
+      if (items.length > 0) return { items, matchedToken };
+    }
+    return { items: [], matchedToken: null };
+  };
+
+  const ingredientsResult = findListAfterHeading(INGREDIENT_HEADING_TOKENS);
+  const instructionsResult = findListAfterHeading(INSTRUCTION_HEADING_TOKENS);
+  const ingredients = ingredientsResult.items;
+  const instructions = instructionsResult.items;
+
+  if (ingredients.length < 3 || instructions.length < 2) {
+    return null;
+  }
+
+  const ogImage = extractOgImageUrl(html, sourceUrl);
+
+  const debugEnabled =
+    typeof process !== 'undefined' &&
+    process.env.RECIPE_IMPORT_DEBUG === 'true';
+  if (debugEnabled) {
+    console.log(
+      '[extractRecipeFromHtmlHeadings] heading match',
+      JSON.stringify({
+        ingredientHeadingMatched: ingredientsResult.matchedToken,
+        instructionHeadingMatched: instructionsResult.matchedToken,
+        ogImageFound: !!ogImage.imageUrl,
+        ogImageSource: ogImage.source,
+      }),
+    );
+  }
+
+  return {
+    title,
+    ingredients,
+    instructions,
+    imageUrl: ogImage.imageUrl,
+  };
+}
+
 /**
  * Extract ingredient section headings and counts from HTML (for JSON-LD imports that have flat ingredients).
  * Looks for WP Recipe Maker (.wprm-recipe-ingredient-group) or generic h3/h4 + ul.
@@ -507,6 +681,77 @@ export function extractIngredientSectionsFromHtml(
   }
 
   return sections;
+}
+
+/**
+ * Extract instruction steps from HTML (fallback when JSON-LD recipeInstructions are missing or truncated).
+ * Prefer full <li> content (title + body); avoid .wprm-recipe-instruction-text alone as it often contains only the step title.
+ */
+export function extractInstructionsFromHtml(html: string): { text: string }[] {
+  const steps: { text: string }[] = [];
+  let m: RegExpExecArray | null;
+
+  // 1) WPRM: full <li> with wprm-recipe-instruction (gets title + body; instruction-text span often has only title)
+  const liRegex =
+    /<li[^>]*class="[^"]*wprm-recipe-instruction[^"]*"[^>]*>([\s\S]*?)<\/li>/gi;
+  while ((m = liRegex.exec(html)) !== null) {
+    const t = stripHtml(m[1]);
+    if (t.length > 5) steps.push({ text: t });
+  }
+  if (steps.length > 0) return steps;
+
+  // 2) WPRM: inside instructions container, first ol/ul – full li content (title + body)
+  const instructionsContainerRegex =
+    /<[^>]*class="[^"]*wprm-recipe-instructions(?!-ingredients)[^"]*"[^>]*>[\s\S]*?<(ol|ul)[^>]*>([\s\S]*?)<\/\1>/i;
+  const containerMatch = html.match(instructionsContainerRegex);
+  if (containerMatch && containerMatch[2]) {
+    const listHtml = containerMatch[2];
+    const liBlocks = listHtml.match(/<li[^>]*>([\s\S]*?)<\/li>/gi);
+    if (liBlocks && liBlocks.length >= 2) {
+      for (const li of liBlocks) {
+        const contentMatch = li.match(/<li[^>]*>([\s\S]*?)<\/li>/i);
+        const t = contentMatch ? stripHtml(contentMatch[1]) : stripHtml(li);
+        if (t.length > 5) steps.push({ text: t });
+      }
+      if (steps.length > 0) return steps;
+    }
+  }
+
+  // 3) Generic: after "Instructions" / "Bereiding" heading, first ol/ul – full li content
+  const afterInstructionsHeading = html.match(
+    /(?:Instructions|Bereiding|Directions|Instructies)[\s\S]{0,200}?<(ol|ul)[^>]*>([\s\S]*?)<\/\1>/i,
+  );
+  if (afterInstructionsHeading && afterInstructionsHeading[2]) {
+    const listHtml = afterInstructionsHeading[2];
+    const liBlocks = listHtml.match(/<li[^>]*>([\s\S]*?)<\/li>/gi);
+    if (liBlocks && liBlocks.length >= 2) {
+      for (const li of liBlocks) {
+        const contentMatch = li.match(/<li[^>]*>([\s\S]*?)<\/li>/i);
+        const t = contentMatch ? stripHtml(contentMatch[1]) : stripHtml(li);
+        if (t.length > 5) steps.push({ text: t });
+      }
+      if (steps.length > 0) return steps;
+    }
+  }
+
+  // 4) WPRM: div.wprm-recipe-instruction (full div content)
+  const divRegex =
+    /<div[^>]*class="[^"]*wprm-recipe-instruction[^"]*"[^>]*>([\s\S]*?)<\/div>/gi;
+  while ((m = divRegex.exec(html)) !== null) {
+    const t = stripHtml(m[1]);
+    if (t.length > 5) steps.push({ text: t });
+  }
+  if (steps.length > 0) return steps;
+
+  // 5) Last resort: .wprm-recipe-instruction-text (can be title-only; use only if nothing else gave full steps)
+  const textRegex =
+    /<[^>]*class="[^"]*wprm-recipe-instruction-text[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>/gi;
+  while ((m = textRegex.exec(html)) !== null) {
+    const t = stripHtml(m[1]);
+    if (t.length > 5) steps.push({ text: t });
+  }
+
+  return steps;
 }
 
 /**
@@ -638,12 +883,24 @@ function hasSufficientFields(recipe: Record<string, unknown>): boolean {
   if (!recipe || typeof recipe !== 'object') return false;
 
   const hasTitle = !!recipe.name || !!recipe.headline;
-  const hasIngredients = !!(
-    recipe.recipeIngredient &&
-    (Array.isArray(recipe.recipeIngredient)
-      ? recipe.recipeIngredient.length > 0
-      : recipe.recipeIngredient)
-  );
+  const hasIngredients =
+    !!(
+      recipe.recipeIngredient &&
+      (Array.isArray(recipe.recipeIngredient)
+        ? recipe.recipeIngredient.length > 0
+        : recipe.recipeIngredient)
+    ) ||
+    !!(
+      recipe.hasPart &&
+      Array.isArray(recipe.hasPart) &&
+      (recipe.hasPart as unknown[]).some((p: unknown) => {
+        const list =
+          p && typeof p === 'object'
+            ? (p as Record<string, unknown>).itemListElement
+            : undefined;
+        return Array.isArray(list) && list.length > 0;
+      })
+    );
   const hasSteps = !!(
     recipe.recipeInstructions &&
     (Array.isArray(recipe.recipeInstructions)
@@ -655,7 +912,7 @@ function hasSufficientFields(recipe: Record<string, unknown>): boolean {
 }
 
 /**
- * Extract text from recipe instruction (handles multiple formats)
+ * Extract a single instruction text (for one step)
  */
 function extractInstructionText(instruction: unknown): string | null {
   if (typeof instruction === 'string') {
@@ -664,11 +921,9 @@ function extractInstructionText(instruction: unknown): string | null {
 
   if (instruction && typeof instruction === 'object') {
     const inst = instruction as Record<string, unknown>;
-    // HowToStep format
     if (inst.text) {
       return String(inst.text).trim();
     }
-    // HowToSection format
     if (inst.itemListElement && Array.isArray(inst.itemListElement)) {
       return (inst.itemListElement as unknown[])
         .map((item: unknown) => extractInstructionText(item))
@@ -678,6 +933,105 @@ function extractInstructionText(instruction: unknown): string | null {
   }
 
   return null;
+}
+
+/**
+ * Flatten recipe instructions to an array of step texts.
+ * HowToSection with itemListElement yields one step per element; HowToStep yields one step.
+ * This ensures sites like foodbymars.com (WP Recipe Maker) get correct step-by-step instructions.
+ */
+function flattenInstructionSteps(instruction: unknown): string[] {
+  if (typeof instruction === 'string') {
+    const t = instruction.trim();
+    return t ? [t] : [];
+  }
+
+  if (instruction && typeof instruction === 'object') {
+    const inst = instruction as Record<string, unknown>;
+    if (inst.text) {
+      const t = String(inst.text).trim();
+      return t ? [t] : [];
+    }
+    if (inst.itemListElement && Array.isArray(inst.itemListElement)) {
+      return (inst.itemListElement as unknown[]).flatMap((item: unknown) =>
+        flattenInstructionSteps(item),
+      );
+    }
+  }
+
+  return [];
+}
+
+/**
+ * If a single instruction string actually contains multiple numbered steps (e.g. "1. ... 2. ... 3. ..."),
+ * split it into separate steps so we don't lose content. Some JSON-LD outputs one blob for all steps.
+ */
+function splitMultiStepInstruction(text: string): string[] {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length < 100) return trimmed ? [trimmed] : [];
+
+  // Match: start or newline, then number + period/paren + space, e.g. "1. " or "\n2) "
+  const stepStart = /(?:^|\n)\s*(\d+)\s*[.)]\s+/g;
+  const parts: string[] = [];
+  let lastEnd = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = stepStart.exec(trimmed)) !== null) {
+    if (match.index > lastEnd) {
+      const segment = trimmed.slice(lastEnd, match.index).trim();
+      if (segment) parts.push(segment);
+    }
+    lastEnd = match.index;
+  }
+
+  if (lastEnd < trimmed.length) {
+    const segment = trimmed.slice(lastEnd).trim();
+    if (segment) parts.push(segment);
+  }
+
+  if (parts.length >= 2) return parts;
+
+  // Fallback: split on **Bold step title:** pattern (e.g. "**Prepare the steak:** ... **Grill steak:**")
+  const boldSplits = trimmed.split(/\n\s*\*\*([^*]+)\*\*:?\s*/).filter(Boolean);
+  if (boldSplits.length >= 2) {
+    const result: string[] = [];
+    for (let i = 0; i < boldSplits.length; i++) {
+      const s = boldSplits[i].trim();
+      if (!s) continue;
+      result.push(s);
+    }
+    if (result.length >= 2) return result;
+  }
+
+  // Fallback: split on paragraph-style step titles (e.g. "Prepare the steak with marinade:\n...\nGrill steak:\n...")
+  // Each step is a line starting with an imperative phrase ending in ": " (Prepare..., Grill..., Make..., Assemble...)
+  const stepTitlePattern =
+    /\n\s*((?:Prepare|Grill|Make|Assemble|Add|Combine|Mix|Bake|Cook|Heat|Stir|Remove|Place|Serve|Bring|Drain|Cut|Slice)[^\n:]{0,70}:)\s*/gi;
+  const partsByTitle = trimmed
+    .split(stepTitlePattern)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (partsByTitle.length >= 3) {
+    const result: string[] = [];
+    let i = 0;
+    if (
+      partsByTitle[0] &&
+      partsByTitle[0].toLowerCase().startsWith('instruction')
+    ) {
+      i = 1;
+    }
+    while (i < partsByTitle.length) {
+      const title = partsByTitle[i];
+      const content = partsByTitle[i + 1] ?? '';
+      if (title && /^[A-Z]/.test(title)) {
+        result.push(content ? `${title} ${content}` : title);
+      }
+      i += 2;
+    }
+    if (result.length >= 2) return result;
+  }
+
+  return [trimmed];
 }
 
 /**
@@ -970,39 +1324,76 @@ function mapRecipeToDraft(
     recipe.totalTime as string | null | undefined,
   );
 
-  // Extract ingredients
+  // Extract ingredients (flat list or from hasPart/ItemList for some plugins)
   const ingredients: { text: string }[] = [];
+  const pushIngredient = (raw: unknown) => {
+    if (typeof raw === 'string' && raw.trim()) {
+      ingredients.push({ text: raw.trim() });
+    } else if (
+      raw &&
+      typeof raw === 'object' &&
+      typeof (raw as Record<string, unknown>).text === 'string'
+    ) {
+      ingredients.push({
+        text: String((raw as Record<string, unknown>).text).trim(),
+      });
+    }
+  };
+
   if (recipe.recipeIngredient) {
-    const ingredientList = Array.isArray(recipe.recipeIngredient)
+    const list = Array.isArray(recipe.recipeIngredient)
       ? recipe.recipeIngredient
       : [recipe.recipeIngredient];
-
-    for (const ingredient of ingredientList) {
-      if (typeof ingredient === 'string') {
-        ingredients.push({ text: ingredient.trim() });
-      } else if (
-        ingredient &&
-        typeof ingredient === 'object' &&
-        ingredient.text
-      ) {
-        ingredients.push({ text: String(ingredient.text).trim() });
+    for (const ingredient of list) {
+      pushIngredient(ingredient);
+    }
+  }
+  if (
+    ingredients.length === 0 &&
+    recipe.hasPart &&
+    Array.isArray(recipe.hasPart)
+  ) {
+    for (const part of recipe.hasPart as unknown[]) {
+      if (part && typeof part === 'object') {
+        const p = part as Record<string, unknown>;
+        if (Array.isArray(p.itemListElement)) {
+          for (const item of p.itemListElement) {
+            if (typeof item === 'string') {
+              pushIngredient(item);
+            } else if (
+              item &&
+              typeof item === 'object' &&
+              (item as Record<string, unknown>).text != null
+            ) {
+              pushIngredient((item as Record<string, unknown>).text);
+            } else {
+              pushIngredient(item);
+            }
+          }
+        }
       }
     }
   }
 
-  // Extract steps/instructions
-  const steps: { text: string }[] = [];
+  // Extract steps/instructions (flatten HowToSection; split single blobs that contain "1. ... 2. ..." or "Prepare...:\nGrill...:")
+  let steps: { text: string }[] = [];
   if (recipe.recipeInstructions) {
     const instructionList = Array.isArray(recipe.recipeInstructions)
       ? recipe.recipeInstructions
       : [recipe.recipeInstructions];
 
     for (const instruction of instructionList) {
-      const text = extractInstructionText(instruction);
-      if (text) {
-        steps.push({ text });
+      const texts = flattenInstructionSteps(instruction);
+      for (const text of texts) {
+        if (!text) continue;
+        const split = splitMultiStepInstruction(text);
+        for (const stepText of split) {
+          if (stepText.trim()) steps.push({ text: stepText.trim() });
+        }
       }
     }
+    // If we got many short steps (e.g. one sentence each), merge into paragraph-style steps
+    steps = mergeInstructionsIntoParagraphs(steps);
   }
 
   // Extract source language
@@ -1163,6 +1554,19 @@ export async function fetchAndParseRecipeJsonLd(
     // Map to RecipeDraft
     try {
       const draft = mapRecipeToDraft(selectedRecipe, url);
+
+      // Fallback: on WPRM/recipe sites, always try HTML instructions; use them when we get at least as many steps (fixes truncated JSON-LD)
+      const isWprmOrRecipe =
+        html.includes('wprm-recipe-instruction') ||
+        html.includes('wprm-recipe-instructions') ||
+        html.includes('wprm-recipe-container');
+      if (isWprmOrRecipe) {
+        const fromHtml = extractInstructionsFromHtml(html);
+        if (fromHtml.length > 0 && fromHtml.length >= draft.steps.length) {
+          draft.steps = fromHtml;
+        }
+      }
+
       return {
         ok: true,
         draft,

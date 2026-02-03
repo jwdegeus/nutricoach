@@ -38,7 +38,10 @@ import {
 import { useToast } from '@/src/components/app/ToastContext';
 import type { NutritionalProfile } from '@/src/lib/nevo/nutrition-calculator';
 import { quantityUnitToGrams } from '@/src/lib/recipes/quantity-unit-to-grams';
-import type { IngredientCandidate } from '../actions/ingredient-matching.actions';
+import type {
+  IngredientCandidate,
+  OptimisticMatchPayload,
+} from '../actions/ingredient-matching.actions';
 
 type Match = {
   source: 'nevo' | 'custom' | 'fndds';
@@ -73,8 +76,8 @@ type IngredientRowWithNutritionProps = {
   mealSource?: 'custom' | 'gemini';
   /** Voor legacy-ingrediënten: index in ingredients-array */
   ingredientIndex?: number;
-  /** Na bevestigen van een match: callback om recept te verversen */
-  onConfirmed?: () => void;
+  /** Na bevestigen van een match: callback met payload voor optimistische update (geen paginareload) */
+  onConfirmed?: (payload?: OptimisticMatchPayload) => void;
   /** Wordt true wanneer een andere rij aan het opslaan is; voorkomt gelijktijdige updates */
   externalSaving?: boolean;
   /** Callback wanneer deze rij begint/stopt met opslaan (voor globale lock) */
@@ -117,18 +120,22 @@ export function IngredientRowWithNutrition({
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [showRelinkUI, setShowRelinkUI] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const quantityForInput =
+    quantity != null && Number.isFinite(quantity) ? String(quantity) : '';
   const [editForm, setEditForm] = useState({
     name: displayName,
-    quantity: quantity ?? '',
+    quantity: quantityForInput,
     unit: unit ?? '',
     note: note ?? '',
   });
   const [editSaving, setEditSaving] = useState(false);
   useEffect(() => {
     if (editDialogOpen) {
+      const q =
+        quantity != null && Number.isFinite(quantity) ? String(quantity) : '';
       setEditForm({
         name: displayName,
-        quantity: quantity ?? '',
+        quantity: q,
         unit: unit ?? '',
         note: note ?? '',
       });
@@ -309,7 +316,25 @@ export function IngredientRowWithNutrition({
     onSavingChange?.(false);
     if (updateResult.ok) {
       setLinkDialogOpen(false);
-      onConfirmed?.();
+      const quantityG =
+        unitNorm === 'g'
+          ? typeof quantity === 'number' && quantity > 0
+            ? quantity
+            : 0
+          : undefined;
+      onConfirmed?.({
+        ingredientIndex: ingredientIndex!,
+        ref: {
+          source: candidate.source,
+          nevoCode: candidate.nevoCode,
+          customFoodId: candidate.customFoodId,
+          fdcId: candidate.fdcId,
+          displayName: candidate.name_nl,
+          quantity: typeof quantity === 'number' ? quantity : undefined,
+          unit: unit ?? undefined,
+          quantityG: quantityG ?? undefined,
+        },
+      });
     } else {
       setConfirmError(updateResult.error.message);
       showToast({
@@ -377,7 +402,23 @@ export function IngredientRowWithNutrition({
     onSavingChange?.(false);
     if (updateResult.ok) {
       setLinkDialogOpen(false);
-      onConfirmed?.();
+      const quantityG =
+        unitNorm === 'g'
+          ? typeof quantity === 'number' && quantity > 0
+            ? quantity
+            : 0
+          : undefined;
+      onConfirmed?.({
+        ingredientIndex: ingredientIndex!,
+        ref: {
+          source: 'custom',
+          customFoodId: result.data.customFoodId,
+          displayName: result.data.nameNl || displayName.trim(),
+          quantity: typeof quantity === 'number' ? quantity : undefined,
+          unit: unit ?? undefined,
+          quantityG: quantityG ?? undefined,
+        },
+      });
     } else {
       setAiError(updateResult.error.message);
       showToast({
@@ -482,7 +523,23 @@ export function IngredientRowWithNutrition({
       setLinkDialogOpen(false);
       setAiError(null);
       setConfirmError(null);
-      onConfirmed?.();
+      const quantityG =
+        unitNorm === 'g'
+          ? typeof quantity === 'number' && quantity > 0
+            ? quantity
+            : 0
+          : undefined;
+      onConfirmed?.({
+        ingredientIndex: ingredientIndex!,
+        ref: {
+          source: 'custom',
+          customFoodId: result.data.customFoodId,
+          displayName: result.data.nameNl || nameNl,
+          quantity: typeof quantity === 'number' ? quantity : undefined,
+          unit: unit ?? undefined,
+          quantityG: quantityG ?? undefined,
+        },
+      });
     } else {
       setManualError(updateResult.error.message);
       showToast({
@@ -1012,7 +1069,13 @@ export function IngredientRowWithNutrition({
             <Field>
               <Label>Hoeveelheid</Label>
               <Input
-                value={editForm.quantity}
+                value={
+                  editForm.quantity == null ||
+                  (typeof editForm.quantity === 'number' &&
+                    !Number.isFinite(editForm.quantity))
+                    ? ''
+                    : String(editForm.quantity)
+                }
                 onChange={(e) =>
                   setEditForm((f) => ({ ...f, quantity: e.target.value }))
                 }

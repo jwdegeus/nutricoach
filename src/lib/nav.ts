@@ -150,7 +150,7 @@ const ADMIN_BREADCRUMB_SEGMENTS: Array<{ path: string; label: string }> = [
   { path: '/admin/diet-types', label: 'Dieettypes' },
 ];
 
-/** Optional query for tab-specific breadcrumbs (e.g. Receptenbeheer > Recept keukens). */
+/** Optional query for tab-specific breadcrumbs (e.g. Receptenbeheer > Classificatie beheer). */
 export type BreadcrumbOptions = { tab?: string };
 
 // Helper function to get breadcrumbs from route
@@ -173,10 +173,10 @@ export function getBreadcrumbs(
     for (const { path, label } of ADMIN_BREADCRUMB_SEGMENTS) {
       if (pathname === path || pathname.startsWith(path + '/')) {
         breadcrumbs.push({ label, href: path });
-        // Receptenbeheer tab: extra crumb voor Recept keukens
+        // Receptenbeheer tab: extra crumb voor Classificatie beheer
         if (path === '/admin/receptenbeheer' && options?.tab === 'keukens') {
           breadcrumbs.push({
-            label: 'Recept keukens',
+            label: 'Classificatie beheer',
             href: '/admin/receptenbeheer?tab=keukens',
           });
         }

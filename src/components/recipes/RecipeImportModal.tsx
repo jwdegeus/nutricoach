@@ -135,15 +135,38 @@ export function RecipeImportModal({ open, onClose }: RecipeImportModalProps) {
             }, 100);
           }
         } else {
-          // Show error in modal and as toast so user always sees it (also in production)
+          // Show error in modal and as toast; if duplicate, add clickable link to existing recipe
+          const raw = result as Record<string, unknown>;
+          const recipeId =
+            raw?.recipeId != null
+              ? String(raw.recipeId)
+              : ((result as { recipeId?: string }).recipeId ?? null);
+          const isDuplicate =
+            raw?.errorCode === 'DUPLICATE_URL' ||
+            (typeof raw?.message === 'string' &&
+              (raw.message.includes('bestaande recept') ||
+                raw.message.includes('al eerder geïmporteerd')));
           const errorMessage =
-            result.message || 'Er is een fout opgetreden bij het importeren';
+            (typeof raw?.message === 'string' ? raw.message : null) ||
+            result.message ||
+            'Er is een fout opgetreden bij het importeren';
           setError(errorMessage);
           setInternalOpen(true); // Keep modal open on error
           showToast({
             type: 'error',
-            title: tImport('urlImportErrorTitle'),
+            title:
+              isDuplicate || recipeId
+                ? 'Recept bestaat al'
+                : tImport('urlImportErrorTitle'),
             description: errorMessage,
+            action: recipeId
+              ? {
+                  label: 'Open recept',
+                  href: `/recipes/${recipeId}`,
+                }
+              : isDuplicate
+                ? { label: 'Naar recepten', href: '/recipes' }
+                : undefined,
           });
         }
       } catch (err) {

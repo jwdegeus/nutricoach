@@ -14,8 +14,15 @@ import {
   updateRecipeImportStatusInputSchema,
   importRecipeFromUrlInputSchema,
 } from '../recipeImport.schemas';
-import type { ImportRecipeFromUrlResult } from '../recipeImport.types';
-import { processRecipeUrlWithGemini } from '../services/geminiRecipeUrlImport.service';
+import type {
+  ImportRecipeFromUrlResult,
+  ImportRecipeFromUrlSuccess,
+  ImportRecipeFromUrlError,
+} from '../recipeImport.types';
+import {
+  processRecipeUrlWithGemini,
+  RecipeImportAiParseError,
+} from '../services/geminiRecipeUrlImport.service';
 
 /**
  * Action result type
@@ -473,6 +480,55 @@ export async function updateRecipeImportStatusAction(
 export async function importRecipeFromUrlAction(
   raw: unknown,
 ): Promise<ImportRecipeFromUrlResult> {
+  const importStart = Date.now();
+  let logEmitted = false;
+  let domain = 'unknown';
+  let urlPath = 'unknown';
+  let importPath: 'jsonld' | 'heuristic' | 'gemini' = 'jsonld';
+  let fetchMs: number | undefined;
+  let jsonldMs: number | undefined;
+  let heuristicMs: number | undefined;
+  let geminiMs: number | undefined;
+  let translateMs: number | undefined;
+  let ingredientCount: number | undefined;
+  let instructionCount: number | undefined;
+  let geminiInfo:
+    | {
+        attempt?: number;
+        retryReason?: string | null;
+        parseFailed?: boolean;
+        placeholdersInjected?: boolean;
+        wasTruncated?: boolean;
+      }
+    | undefined;
+
+  const emitLog = (outcome: 'success' | 'fail', jobId?: string) => {
+    if (logEmitted) return;
+    logEmitted = true;
+    const payload = {
+      eventName: 'recipe_url_import',
+      domain,
+      path: importPath,
+      outcome,
+      jobId,
+      timings: {
+        fetchMs,
+        jsonldMs,
+        heuristicMs,
+        geminiMs,
+        translateMs,
+        totalMs: Date.now() - importStart,
+      },
+      gemini: geminiInfo,
+      counts:
+        ingredientCount != null || instructionCount != null
+          ? { ingredientCount, instructionCount }
+          : undefined,
+      url: { path: urlPath },
+    };
+    console.info(JSON.stringify(payload));
+  };
+
   try {
     // Get authenticated user
     const supabase = await createClient();
@@ -504,7 +560,9 @@ export async function importRecipeFromUrlAction(
     let urlObj: URL;
     try {
       urlObj = new URL(input.url);
+      urlPath = urlObj.pathname || 'unknown';
     } catch {
+      emitLog('fail');
       return {
         ok: false,
         errorCode: 'INVALID_URL',
@@ -513,25 +571,63 @@ export async function importRecipeFromUrlAction(
     }
 
     // Extract domain name from URL (e.g., "ah.nl" from "https://www.ah.nl/...")
-    const domain = urlObj.hostname.replace(/^www\./, ''); // Remove www. prefix if present
+    domain = urlObj.hostname.replace(/^www\./, ''); // Remove www. prefix if present
+
+    // Duplicate check: existing recipe with same source_url
+    try {
+      const normalizedUrl = input.url.replace(/\/+$/, '');
+      const urlCandidates = [normalizedUrl, `${normalizedUrl}/`];
+      const { data: existingMeal, error: existingError } = await supabase
+        .from('custom_meals')
+        .select('id,name,source_url')
+        .eq('user_id', user.id)
+        .in('source_url', urlCandidates)
+        .maybeSingle();
+
+      if (existingError) {
+        console.error(
+          '[importRecipeFromUrlAction] Duplicate check failed:',
+          existingError,
+        );
+      } else if (existingMeal?.id) {
+        emitLog('fail');
+        const recipeId = String(existingMeal.id);
+        const recipeName =
+          existingMeal.name != null ? String(existingMeal.name) : undefined;
+        return {
+          ok: false,
+          errorCode: 'DUPLICATE_URL',
+          message:
+            'Dit recept is al eerder geïmporteerd. Open het bestaande recept.',
+          recipeId,
+          recipeName,
+        };
+      }
+    } catch (dupError) {
+      console.error(
+        '[importRecipeFromUrlAction] Duplicate check error:',
+        dupError,
+      );
+    }
 
     // Fetch HTML from URL (with SSRF mitigation)
     let html: string;
     try {
       const { fetchHtml } = await import('../server/fetchAndParseRecipeJsonLd');
+      const fetchStart = Date.now();
       html = await fetchHtml(input.url);
+      fetchMs = Date.now() - fetchStart;
       console.log(
         `[importRecipeFromUrlAction] Fetched HTML, size: ${html.length} bytes`,
       );
 
       // Try JSON-LD first (faster and more reliable) – pass existing html to avoid duplicate fetch
       try {
-        const {
-          fetchAndParseRecipeJsonLd,
-          extractIngredientSectionsFromHtml,
-          assignSectionsToIngredients,
-        } = await import('../server/fetchAndParseRecipeJsonLd');
+        const { fetchAndParseRecipeJsonLd } =
+          await import('../server/fetchAndParseRecipeJsonLd');
+        const jsonLdStart = Date.now();
         const jsonLdResult = await fetchAndParseRecipeJsonLd(input.url, html);
+        jsonldMs = Date.now() - jsonLdStart;
         console.log(
           '[importRecipeFromUrlAction] JSON-LD result:',
           jsonLdResult.ok ? 'OK' : 'FAILED',
@@ -544,94 +640,72 @@ export async function importRecipeFromUrlAction(
             jsonLdResult.draft.ingredients.length > 0 &&
             jsonLdResult.draft.steps.length > 0
           ) {
+            importPath = 'jsonld';
+            ingredientCount = jsonLdResult.draft.ingredients.length;
+            instructionCount = jsonLdResult.draft.steps.length;
             // JSON-LD extraction succeeded - create job and save recipe (no auto-translate; user translates via button)
             console.log(
               '[importRecipeFromUrlAction] Recipe extracted via JSON-LD:',
               jsonLdResult.draft,
             );
-            let ingredientsList = jsonLdResult.draft.ingredients.map((ing) => {
-              const text = ing.text.trim();
-              let quantity: number | null = null;
-              let unit: string | null = null;
-              let name: string = text;
-              let note: string | null = null;
-              const noteMatch = text.match(/^(.+?)\s*\(([^)]+)\)$/);
-              const mainPart = noteMatch ? noteMatch[1].trim() : text;
-              if (noteMatch) note = noteMatch[2].trim();
-              const qtyUnitMatch = mainPart.match(
-                /^([\d\s½¼¾⅓⅔⅛⅜⅝⅞]+)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/,
-              );
-              if (qtyUnitMatch) {
-                const qtyStr = qtyUnitMatch[1].trim();
-                const fractionMap: Record<string, number> = {
-                  '½': 0.5,
-                  '¼': 0.25,
-                  '¾': 0.75,
-                  '⅓': 0.333,
-                  '⅔': 0.667,
-                  '⅛': 0.125,
-                  '⅜': 0.375,
-                  '⅝': 0.625,
-                  '⅞': 0.875,
-                };
-                let qty = 0;
-                for (const part of qtyStr.split(/\s+/)) {
-                  if (fractionMap[part]) qty += fractionMap[part];
-                  else {
-                    const num = parseFloat(part);
-                    if (!isNaN(num)) qty += num;
-                  }
-                }
-                if (qty > 0) {
-                  quantity = qty;
-                  unit = qtyUnitMatch[2].trim();
-                  name = qtyUnitMatch[3].trim();
-                }
-              } else {
-                const unitMatch = mainPart.match(
-                  /^([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/,
+            const ingredientsList = jsonLdResult.draft.ingredients.map(
+              (ing) => {
+                const text = ing.text.trim();
+                let quantity: number | null = null;
+                let unit: string | null = null;
+                let name: string = text;
+                let note: string | null = null;
+                const noteMatch = text.match(/^(.+?)\s*\(([^)]+)\)$/);
+                const mainPart = noteMatch ? noteMatch[1].trim() : text;
+                if (noteMatch) note = noteMatch[2].trim();
+                const qtyUnitMatch = mainPart.match(
+                  /^([\d\s½¼¾⅓⅔⅛⅜⅝⅞]+)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/,
                 );
-                if (unitMatch) {
-                  unit = unitMatch[1].trim();
-                  name = unitMatch[2].trim();
-                } else name = mainPart;
-              }
-              return {
-                original_line: ing.text,
-                name,
-                quantity,
-                unit,
-                note,
-                section: null as string | null,
-              };
-            });
-            const sectionsFromHtml = extractIngredientSectionsFromHtml(html);
-            const sectionTotal = sectionsFromHtml.reduce(
-              (s, x) => s + x.count,
-              0,
+                if (qtyUnitMatch) {
+                  const qtyStr = qtyUnitMatch[1].trim();
+                  const fractionMap: Record<string, number> = {
+                    '½': 0.5,
+                    '¼': 0.25,
+                    '¾': 0.75,
+                    '⅓': 0.333,
+                    '⅔': 0.667,
+                    '⅛': 0.125,
+                    '⅜': 0.375,
+                    '⅝': 0.625,
+                    '⅞': 0.875,
+                  };
+                  let qty = 0;
+                  for (const part of qtyStr.split(/\s+/)) {
+                    if (fractionMap[part]) qty += fractionMap[part];
+                    else {
+                      const num = parseFloat(part);
+                      if (!isNaN(num)) qty += num;
+                    }
+                  }
+                  if (qty > 0) {
+                    quantity = qty;
+                    unit = qtyUnitMatch[2].trim();
+                    name = qtyUnitMatch[3].trim();
+                  }
+                } else {
+                  const unitMatch = mainPart.match(
+                    /^([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(.+)$/,
+                  );
+                  if (unitMatch) {
+                    unit = unitMatch[1].trim();
+                    name = unitMatch[2].trim();
+                  } else name = mainPart;
+                }
+                return {
+                  original_line: ing.text,
+                  name,
+                  quantity,
+                  unit,
+                  note,
+                  section: null as string | null,
+                };
+              },
             );
-            console.log(
-              '[importRecipeFromUrlAction] Ingredient sections from HTML:',
-              sectionsFromHtml.length,
-              'groups,',
-              sectionTotal,
-              'items; JSON-LD ingredients:',
-              ingredientsList.length,
-            );
-            if (sectionsFromHtml.length > 0) {
-              ingredientsList = assignSectionsToIngredients(
-                ingredientsList,
-                sectionsFromHtml,
-              );
-              const withSection = ingredientsList.filter(
-                (i) => i.section != null && i.section !== '',
-              ).length;
-              console.log(
-                '[importRecipeFromUrlAction] Assigned section to',
-                withSection,
-                'ingredients',
-              );
-            }
             const jsonLdExtractedRecipe = {
               title: jsonLdResult.draft.title,
               language_detected: jsonLdResult.draft.sourceLanguage || 'en',
@@ -752,11 +826,13 @@ export async function importRecipeFromUrlAction(
               '[importRecipeFromUrlAction] Translating JSON-LD recipe to user language...',
             );
             try {
+              const translateStart = Date.now();
               const { translateRecipeImportAction } =
                 await import('./recipeImport.translate.actions');
               const translateResult = await translateRecipeImportAction({
                 jobId: jobData.id,
               });
+              translateMs = Date.now() - translateStart;
               if (translateResult.ok) {
                 console.log(
                   '[importRecipeFromUrlAction] Translation completed',
@@ -805,6 +881,7 @@ export async function importRecipeFromUrlAction(
                 } as RecipeImportJob)
               : undefined;
 
+            emitLog('success', jobData.id);
             return {
               ok: true,
               jobId: jobData.id,
@@ -839,6 +916,7 @@ export async function importRecipeFromUrlAction(
         errorCode === 'NOT_FOUND' ||
         errorCode === 'CLIENT_ERROR'
       ) {
+        emitLog('fail');
         return {
           ok: false,
           errorCode: 'INVALID_URL',
@@ -847,6 +925,7 @@ export async function importRecipeFromUrlAction(
       }
 
       if (errorCode === 'SERVER_ERROR') {
+        emitLog('fail');
         return {
           ok: false,
           errorCode: 'INTERNAL',
@@ -855,6 +934,7 @@ export async function importRecipeFromUrlAction(
       }
 
       if (errorCode === 'UNSUPPORTED_CONTENT_TYPE') {
+        emitLog('fail');
         return {
           ok: false,
           errorCode: 'INVALID_URL',
@@ -863,6 +943,7 @@ export async function importRecipeFromUrlAction(
       }
 
       if (errorCode === 'RESPONSE_TOO_LARGE') {
+        emitLog('fail');
         return {
           ok: false,
           errorCode: 'INVALID_URL',
@@ -871,6 +952,7 @@ export async function importRecipeFromUrlAction(
       }
 
       if (errorCode === 'FETCH_TIMEOUT') {
+        emitLog('fail');
         return {
           ok: false,
           errorCode: 'INVALID_URL',
@@ -878,6 +960,7 @@ export async function importRecipeFromUrlAction(
         };
       }
 
+      emitLog('fail');
       return {
         ok: false,
         errorCode: 'INVALID_URL',
@@ -885,19 +968,253 @@ export async function importRecipeFromUrlAction(
       };
     }
 
+    // Heuristic HTML headings parser (Ingredients/Instructions) before Gemini
+    try {
+      const heuristicStart = Date.now();
+      const { extractRecipeFromHtmlHeadings } =
+        await import('../server/fetchAndParseRecipeJsonLd');
+      const heuristic = extractRecipeFromHtmlHeadings(html, input.url);
+      heuristicMs = Date.now() - heuristicStart;
+      const debugEnabled =
+        typeof process !== 'undefined' &&
+        process.env.RECIPE_IMPORT_DEBUG === 'true';
+      if (debugEnabled) {
+        console.log(
+          '[importRecipeFromUrlAction] Heuristic headings',
+          JSON.stringify({
+            usedHeuristic: !!heuristic,
+            ingredientCount: heuristic?.ingredients.length ?? 0,
+            instructionCount: heuristic?.instructions.length ?? 0,
+          }),
+        );
+      }
+
+      if (heuristic) {
+        importPath = 'heuristic';
+        ingredientCount = heuristic.ingredients.length;
+        instructionCount = heuristic.instructions.length;
+        const langMatch = html.match(/<html[^>]*lang=["']([^"']+)["']/i);
+        const languageDetected = langMatch ? langMatch[1] : null;
+        const extractedHeuristic = {
+          title: heuristic.title || 'Recept',
+          language_detected: languageDetected,
+          translated_to: null,
+          servings: null,
+          times: {
+            prep_minutes: null,
+            cook_minutes: null,
+            total_minutes: null,
+          },
+          ingredients: heuristic.ingredients.map((text) => ({
+            original_line: text,
+            name: text,
+            quantity: null,
+            unit: null,
+            note: null,
+            section: null as string | null,
+          })),
+          instructions: heuristic.instructions.map((text, idx) => ({
+            step: idx + 1,
+            text,
+          })),
+          confidence: { overall: 70, fields: {} },
+          warnings: [],
+        };
+
+        const { data: jobData, error: jobError } = await supabase
+          .from('recipe_imports')
+          .insert({
+            user_id: user.id,
+            status: 'ready_for_review',
+            source_image_meta: {
+              url: input.url,
+              domain: domain,
+              source: 'url_import',
+              ...(heuristic.imageUrl ? { imageUrl: heuristic.imageUrl } : {}),
+            },
+            source_locale: languageDetected || undefined,
+            extracted_recipe_json: extractedHeuristic,
+            original_recipe_json: extractedHeuristic,
+            confidence_overall: extractedHeuristic.confidence?.overall || null,
+          })
+          .select('id')
+          .single();
+
+        if (jobError) {
+          console.error(
+            '[importRecipeFromUrlAction] Error creating job (heuristic):',
+            jobError,
+          );
+          return {
+            ok: false,
+            errorCode: 'INTERNAL',
+            message: `Fout bij aanmaken import job: ${jobError.message}`,
+          };
+        }
+
+        console.log(
+          '[importRecipeFromUrlAction] Recipe extracted via HTML headings heuristic',
+        );
+
+        // Download and save recipe image if available
+        let savedImageUrl: string | null = null;
+        let savedImagePath: string | null = null;
+        if (heuristic.imageUrl) {
+          console.log(
+            '[importRecipeFromUrlAction] Heuristic image URL found:',
+            heuristic.imageUrl,
+          );
+          console.log(
+            '[importRecipeFromUrlAction] Downloading and saving heuristic image...',
+          );
+          try {
+            const { downloadAndSaveRecipeImage } =
+              await import('../services/recipeImageDownload.service');
+            const imageResult = await downloadAndSaveRecipeImage(
+              heuristic.imageUrl,
+              user.id,
+            );
+
+            if (imageResult) {
+              savedImageUrl = imageResult.url;
+              savedImagePath = imageResult.path;
+              console.log(
+                '[importRecipeFromUrlAction] Heuristic image saved successfully:',
+                savedImageUrl,
+              );
+
+              await supabase
+                .from('recipe_imports')
+                .update({
+                  source_image_meta: {
+                    url: input.url,
+                    domain: domain,
+                    source: 'url_import',
+                    imageUrl: heuristic.imageUrl,
+                    savedImageUrl: savedImageUrl,
+                    savedImagePath: savedImagePath,
+                  },
+                })
+                .eq('id', jobData.id)
+                .eq('user_id', user.id);
+            } else {
+              console.warn(
+                '[importRecipeFromUrlAction] Failed to download/save heuristic image, continuing without it',
+              );
+            }
+          } catch (imageError) {
+            console.error(
+              '[importRecipeFromUrlAction] Heuristic image download error (non-fatal):',
+              imageError,
+            );
+          }
+        }
+
+        // Step 2: Translate to user language (ingredients, description, instructions)
+        console.log(
+          '[importRecipeFromUrlAction] Translating heuristic recipe to user language...',
+        );
+        try {
+          const translateStart = Date.now();
+          const { translateRecipeImportAction } =
+            await import('./recipeImport.translate.actions');
+          const translateResult = await translateRecipeImportAction({
+            jobId: jobData.id,
+          });
+          translateMs = Date.now() - translateStart;
+          if (translateResult.ok) {
+            console.log('[importRecipeFromUrlAction] Translation completed');
+          } else {
+            console.error(
+              '[importRecipeFromUrlAction] Translation failed (non-fatal):',
+              translateResult.error,
+            );
+          }
+        } catch (translateError) {
+          console.error(
+            '[importRecipeFromUrlAction] Translation error (non-fatal):',
+            translateError,
+          );
+        }
+
+        // Return fresh job (with translated extracted_recipe_json) so client shows it without refetch
+        const { data: freshData } = await supabase
+          .from('recipe_imports')
+          .select(
+            'id, user_id, status, source_image_path, source_image_meta, source_locale, target_locale, raw_ocr_text, gemini_raw_json, extracted_recipe_json, original_recipe_json, validation_errors_json, confidence_overall, created_at, updated_at, finalized_at, recipe_id',
+          )
+          .eq('id', jobData.id)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        const job = freshData
+          ? ({
+              id: freshData.id,
+              userId: freshData.user_id,
+              status: freshData.status as RecipeImportStatus,
+              sourceImagePath: freshData.source_image_path,
+              sourceImageMeta: freshData.source_image_meta,
+              sourceLocale: freshData.source_locale,
+              targetLocale: freshData.target_locale,
+              rawOcrText: freshData.raw_ocr_text,
+              geminiRawJson: freshData.gemini_raw_json,
+              extractedRecipeJson: freshData.extracted_recipe_json,
+              originalRecipeJson: freshData.original_recipe_json,
+              validationErrorsJson: freshData.validation_errors_json,
+              confidenceOverall: freshData.confidence_overall
+                ? parseFloat(freshData.confidence_overall.toString())
+                : null,
+              createdAt: freshData.created_at,
+              updatedAt: freshData.updated_at,
+              finalizedAt: freshData.finalized_at,
+              recipeId: freshData.recipe_id || null,
+            } as RecipeImportJob)
+          : undefined;
+
+        emitLog('success', jobData.id);
+        return {
+          ok: true,
+          jobId: jobData.id,
+          job,
+        };
+      }
+    } catch (heuristicError) {
+      console.error(
+        '[importRecipeFromUrlAction] Heuristic headings extraction failed:',
+        heuristicError,
+      );
+    }
+
     // Process with Gemini to extract recipe from HTML
     try {
+      importPath = 'gemini';
       console.log(
         `[importRecipeFromUrlAction] Calling Gemini with HTML size: ${html.length} bytes`,
       );
+      const geminiStart = Date.now();
       const geminiResult = await processRecipeUrlWithGemini({
         html,
         url: input.url,
       });
+      geminiMs = Date.now() - geminiStart;
 
       console.log(
         `[importRecipeFromUrlAction] Gemini extraction completed. Ingredients: ${geminiResult.extracted.ingredients.length}, Instructions: ${geminiResult.extracted.instructions.length}`,
       );
+      ingredientCount = geminiResult.extracted.ingredients.length;
+      instructionCount = geminiResult.extracted.instructions.length;
+      if (geminiResult.diagnostics) {
+        geminiInfo = {
+          attempt: geminiResult.diagnostics.attempt,
+          retryReason: geminiResult.diagnostics.retryReason ?? undefined,
+          parseFailed: false,
+          placeholdersInjected:
+            geminiResult.diagnostics.parseRepair
+              .injectedPlaceholdersIngredients ||
+            geminiResult.diagnostics.parseRepair
+              .injectedPlaceholdersInstructions,
+          wasTruncated: geminiResult.diagnostics.html.wasTruncated,
+        };
+      }
 
       // Check if extraction was successful (has ingredients and instructions)
       const hasIngredients = geminiResult.extracted.ingredients.length > 0;
@@ -1018,6 +1335,22 @@ export async function importRecipeFromUrlAction(
         }
       }
 
+      // Normalize: no sections for URL import; merge short instruction steps into paragraph-style steps
+      const { mergeInstructionsIntoParagraphs } =
+        await import('../recipeInstructionUtils');
+      const mergedInstructions = mergeInstructionsIntoParagraphs(
+        geminiResult.extracted.instructions.map((i) => ({ text: i.text })),
+      ).map((m, idx) => ({ step: idx + 1, text: m.text }));
+
+      const extractedNoSections = {
+        ...geminiResult.extracted,
+        ingredients: geminiResult.extracted.ingredients.map((ing) => ({
+          ...ing,
+          section: null as string | null,
+        })),
+        instructions: mergedInstructions,
+      };
+
       // Create job with extracted recipe
       const { data: jobData, error: jobError } = await supabase
         .from('recipe_imports')
@@ -1038,8 +1371,8 @@ export async function importRecipeFromUrlAction(
           },
           source_locale: geminiResult.extracted.language_detected || undefined,
           gemini_raw_json: geminiResult.rawResponse,
-          extracted_recipe_json: geminiResult.extracted,
-          original_recipe_json: geminiResult.extracted,
+          extracted_recipe_json: extractedNoSections,
+          original_recipe_json: extractedNoSections,
           confidence_overall:
             geminiResult.extracted.confidence?.overall || null,
         })
@@ -1116,13 +1449,54 @@ export async function importRecipeFromUrlAction(
           } as RecipeImportJob)
         : undefined;
 
-      return {
+      const successPayload: ImportRecipeFromUrlSuccess = {
         ok: true,
         jobId: jobData.id,
         job,
       };
+      if (geminiResult.diagnostics) {
+        successPayload.diagnostics = geminiResult.diagnostics;
+        console.log(
+          '[importRecipeFromUrlAction] RECIPE_IMPORT_DEBUG',
+          JSON.stringify({
+            jobId: jobData.id,
+            urlDomain: domain,
+            diagnostics: geminiResult.diagnostics,
+          }),
+        );
+      }
+      emitLog('success', jobData.id);
+      return successPayload;
     } catch (error) {
       console.error('Error processing recipe URL with Gemini:', error);
+
+      if (error instanceof RecipeImportAiParseError) {
+        const debugEnabled =
+          typeof process !== 'undefined' &&
+          process.env.RECIPE_IMPORT_DEBUG === 'true';
+        const message =
+          'AI kon geen geldig recept uit deze pagina halen. Probeer een andere URL of gebruik handmatige import.';
+        const payload: ImportRecipeFromUrlError = {
+          ok: false,
+          errorCode: 'AI_EXTRACTION_FAILED',
+          message,
+          error: { code: 'AI_EXTRACTION_FAILED', message },
+        };
+        if (debugEnabled && error.diagnostics) {
+          payload.diagnostics = error.diagnostics;
+          geminiInfo = {
+            attempt: error.diagnostics.attempt,
+            retryReason: error.diagnostics.retryReason ?? undefined,
+            parseFailed: true,
+            placeholdersInjected:
+              error.diagnostics.parseRepair.injectedPlaceholdersIngredients ||
+              error.diagnostics.parseRepair.injectedPlaceholdersInstructions,
+            wasTruncated: error.diagnostics.html.wasTruncated,
+          };
+        }
+        emitLog('fail');
+        return payload;
+      }
 
       // Check if error message indicates access denied or no recipe found
       const errorMessage =
@@ -1138,6 +1512,7 @@ export async function importRecipeFromUrlAction(
         errorMessage.toLowerCase().includes('no recipe found');
 
       if (isAccessDenied || isNoRecipeFound) {
+        emitLog('fail');
         return {
           ok: false,
           errorCode: 'INVALID_URL',
@@ -1145,6 +1520,7 @@ export async function importRecipeFromUrlAction(
         };
       }
 
+      emitLog('fail');
       return {
         ok: false,
         errorCode: 'INTERNAL',
@@ -1153,6 +1529,7 @@ export async function importRecipeFromUrlAction(
     }
   } catch (error) {
     console.error('Unexpected error in importRecipeFromUrlAction:', error);
+    emitLog('fail');
     return {
       ok: false,
       errorCode: 'INTERNAL',

@@ -8,7 +8,7 @@ import { Button } from '@/components/catalyst/button';
 import { Heading, Subheading } from '@/components/catalyst/heading';
 import { Text } from '@/components/catalyst/text';
 import { Badge } from '@/components/catalyst/badge';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { Link } from '@/components/catalyst/link';
 import {
   Dialog,
@@ -32,6 +32,7 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
   SparklesIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/solid';
 import { useToast } from '@/src/components/app/ToastContext';
 import { ImportStatusPanel } from './components/ImportStatusPanel';
@@ -43,14 +44,41 @@ import {
 } from './actions/recipeImport.actions';
 import { processRecipeImportWithGeminiAction } from './actions/recipeImport.process.actions';
 import { finalizeRecipeImportAction } from './actions/recipeImport.finalize.actions';
+import { getCatalogOptionsForPickerAction } from '../actions/catalog-options.actions';
 import type { RecipeImportJob, RecipeImportStatus } from './recipeImport.types';
 import type { GeminiExtractedRecipe } from './recipeImport.gemini.schemas';
+
+/** Shape of URL-import diagnostics (from server when RECIPE_IMPORT_DEBUG=true). No import from server-only service. */
+type UrlImportDiagnostics = {
+  html: {
+    strategy: string;
+    matchedSelector: string;
+    bytesBefore: number;
+    bytesAfter: number;
+    wasTruncated: boolean;
+    truncateMode: string;
+  };
+  parseRepair: {
+    usedExtractJsonFromResponse: boolean;
+    usedRepairTruncatedJson: boolean;
+    addedMissingClosers: boolean;
+    injectedPlaceholdersIngredients: boolean;
+    injectedPlaceholdersInstructions: boolean;
+  };
+  ingredientCount: number;
+  instructionCount: number;
+  minNonPlaceholderIngredientCount: number;
+  minNonPlaceholderInstructionCount: number;
+  confidence_overall: number | null;
+  language_detected: string | null;
+};
 
 // Maximum file size for base64 conversion
 // Note: Next.js has a default 1MB body limit for server actions
 // We compress images > 500KB to stay under this limit
 // Base64 encoding increases size by ~33%, so 700KB raw ≈ 930KB base64 (safe under 1MB)
 const MAX_FILE_SIZE_FOR_PROCESSING = 700 * 1024; // 700KB raw - will be compressed if larger
+const MAX_RECIPE_PAGES = 5;
 
 /**
  * Compress image to reduce file size
@@ -195,15 +223,26 @@ export function RecipeImportClient({
   const { showToast } = useToast();
   const [isPending, _startTransition] = useTransition();
 
-  // Local file state (for preview)
-  const [localSelectedFile, setLocalSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // Local file state: one or more pages (file + preview URL per page)
+  const [localPages, setLocalPages] = useState<
+    Array<{ file: File; previewUrl: string }>
+  >([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+
+  // Derived for backward compat: first page as "single" file/preview
+  const localSelectedFile = localPages[0]?.file ?? null;
+  const previewUrl = localPages[0]?.previewUrl ?? null;
 
   // URL import (inline block)
   const [urlImportValue, setUrlImportValue] = useState('');
   const [urlImportError, setUrlImportError] = useState<string | null>(null);
+  const [duplicateRecipeId, setDuplicateRecipeId] = useState<string | null>(
+    null,
+  );
+  const [duplicateRecipeName, setDuplicateRecipeName] = useState<string | null>(
+    null,
+  );
   const [isUrlImportPending, startUrlImportTransition] = useTransition();
 
   // Camera state
@@ -218,12 +257,18 @@ export function RecipeImportClient({
   const [processingJob, setProcessingJob] = useState(false);
   const [finalizingJob, setFinalizingJob] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedMealSlot, setSelectedMealSlot] = useState<
-    'breakfast' | 'lunch' | 'dinner' | 'snack' | ''
-  >('');
+  const [mealSlotOptions, setMealSlotOptions] = useState<
+    { id: string; label: string; key?: string | null }[]
+  >([]);
+  const [selectedMealSlotOptionId, setSelectedMealSlotOptionId] =
+    useState<string>('');
+  const [urlImportDiagnostics, setUrlImportDiagnostics] =
+    useState<UrlImportDiagnostics | null>(null);
+  const [isDebugModalOpen, setIsDebugModalOpen] = useState(false);
 
   // Get jobId from URL or initial prop
-  const jobId = initialJobId || searchParams.get('jobId');
+  const jobId = initialJobId ?? searchParams.get('jobId') ?? null;
+  const loadedJobIdRef = useRef<string | null>(null);
 
   // Derived UI state from remote job
   // If processingJob is true, always show processing state
@@ -234,6 +279,19 @@ export function RecipeImportClient({
       : jobId
         ? 'processing' // Loading state
         : 'idle';
+
+  // Load meal_slot catalog options (same as receptenbeheer Soort) when showing finalize step
+  useEffect(() => {
+    if (uiState !== 'ready_for_review' || mealSlotOptions.length > 0) return;
+    getCatalogOptionsForPickerAction({ dimension: 'meal_slot' }).then((res) => {
+      if (res.ok) {
+        setMealSlotOptions(res.data);
+        const dinnerOpt = res.data.find((o) => o.key === 'dinner');
+        if (dinnerOpt && !selectedMealSlotOptionId)
+          setSelectedMealSlotOptionId(dinnerOpt.id);
+      }
+    });
+  }, [uiState, mealSlotOptions.length]);
 
   // Load job from server
   const loadJob = useCallback(
@@ -270,9 +328,22 @@ export function RecipeImportClient({
     [t],
   );
 
-  // Load job whenever jobId in URL is present; use job from sessionStorage if just returned from URL import
+  // Load job whenever jobId in URL is present; use job from sessionStorage if just returned from URL import.
+  // Only load once per jobId to avoid repeated requests (e.g. from remounts or strict mode).
   useEffect(() => {
-    if (!jobId || loadingJob) return;
+    if (!jobId) {
+      loadedJobIdRef.current = null;
+      return;
+    }
+    if (loadingJob) return;
+    // Already have this job in state (e.g. from sessionStorage or previous load)
+    if (remoteJob?.id === jobId) {
+      loadedJobIdRef.current = jobId;
+      return;
+    }
+    // Already loaded this jobId in this mount – avoid duplicate load
+    if (loadedJobIdRef.current === jobId) return;
+
     if (typeof window !== 'undefined') {
       try {
         const stored = sessionStorage.getItem(`recipe-import-job-${jobId}`);
@@ -282,6 +353,7 @@ export function RecipeImportClient({
             sessionStorage.removeItem(`recipe-import-job-${jobId}`);
             setRemoteJob(job);
             setError(null);
+            loadedJobIdRef.current = jobId;
             return;
           }
         }
@@ -289,94 +361,106 @@ export function RecipeImportClient({
         // ignore
       }
     }
-    console.log('[RecipeImportClient] useEffect: Loading job, jobId:', jobId);
+
+    loadedJobIdRef.current = jobId;
     loadJob(jobId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
+  // Load URL-import diagnostics from sessionStorage when job is set (only when RECIPE_IMPORT_DEBUG was on)
+  useEffect(() => {
+    if (!remoteJob?.id || typeof window === 'undefined') {
+      setUrlImportDiagnostics(null);
+      return;
+    }
+    setIsDebugModalOpen(false);
+    try {
+      const raw = sessionStorage.getItem(
+        `recipe-import-diagnostics-${remoteJob.id}`,
+      );
+      if (raw) {
+        const d = JSON.parse(raw) as UrlImportDiagnostics;
+        setUrlImportDiagnostics(d);
+      } else {
+        setUrlImportDiagnostics(null);
+      }
+    } catch {
+      setUrlImportDiagnostics(null);
+    }
+  }, [remoteJob?.id]);
+
   // Translation happens during extraction, no polling needed
 
-  // Debug: Log when processingJob changes
-  useEffect(() => {
-    console.log('[RecipeImportClient] processingJob changed:', processingJob);
-  }, [processingJob]);
-
-  // Debug: Log when remoteJob changes
-  useEffect(() => {
-    console.log(
-      '[RecipeImportClient] remoteJob changed:',
-      remoteJob ? { id: remoteJob.id, status: remoteJob.status } : null,
-    );
-  }, [remoteJob]);
-
-  // Handle file selection
+  // Handle file selection (add one page; create job only when adding first page)
   const handleFileSelect = useCallback(
     async (file: File) => {
-      console.log(
-        '[RecipeImportClient] handleFileSelect called with file:',
-        file.name,
-        file.size,
-        file.type,
-      );
-
-      // Validate file type
       if (!file.type.startsWith('image/')) {
-        console.log('[RecipeImportClient] Invalid file type:', file.type);
         setError(t('errorImageOnly'));
         return;
       }
-
-      // Validate file size (max 10MB for upload, but 4MB for processing)
       if (file.size > 10 * 1024 * 1024) {
-        console.log('[RecipeImportClient] File too large:', file.size);
         setError(t('errorFileTooLarge'));
         return;
       }
 
-      console.log('[RecipeImportClient] File validation passed, proceeding...');
       setError(null);
-      setLocalSelectedFile(file);
+      const previewUrlForFile = URL.createObjectURL(file);
+      const newPage = { file, previewUrl: previewUrlForFile };
 
-      // Create preview URL
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
+      const isFirstPage = localPages.length === 0;
+      if (localPages.length >= MAX_RECIPE_PAGES) {
+        URL.revokeObjectURL(previewUrlForFile);
+        setError(t('errorMaxPages'));
+        return;
+      }
 
-      // Show immediate feedback: set processing state
-      console.log('[RecipeImportClient] Setting processingJob to true');
-      setProcessingJob(true);
+      if (isFirstPage) {
+        setProcessingJob(true);
+        try {
+          const result = await createRecipeImportAction({
+            sourceImageMeta: {
+              filename: file.name,
+              size: file.size,
+              mimetype: file.type,
+            },
+            targetLocale: locale || 'nl',
+          });
 
-      try {
-        // Step 1: Create recipe import job
-        console.log(
-          '[RecipeImportClient] Step 1: Creating recipe import job...',
-        );
-        const result = await createRecipeImportAction({
-          sourceImageMeta: {
-            filename: file.name,
-            size: file.size,
-            mimetype: file.type,
-          },
-          // sourceLocale omitted (will be detected by Gemini)
-          targetLocale: locale || 'nl',
-        });
-        console.log(
-          '[RecipeImportClient] Create job result:',
-          result.ok ? 'OK' : 'ERROR',
-          result,
-        );
+          if (!result.ok) {
+            URL.revokeObjectURL(previewUrlForFile);
+            setError(result.error.message);
+            setProcessingJob(false);
+            setRemoteJob({
+              id: '',
+              userId: '',
+              status: 'failed',
+              sourceImagePath: null,
+              sourceImageMeta: {
+                filename: file.name,
+                size: file.size,
+                mimetype: file.type,
+              },
+              sourceLocale: null,
+              targetLocale: null,
+              rawOcrText: null,
+              geminiRawJson: null,
+              extractedRecipeJson: null,
+              originalRecipeJson: null,
+              validationErrorsJson: result.error,
+              confidenceOverall: null,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              finalizedAt: null,
+              recipeId: null,
+            });
+            return;
+          }
 
-        if (!result.ok) {
-          console.error(
-            '[RecipeImportClient] Create job failed:',
-            result.error,
-          );
-          setError(result.error.message);
-          setProcessingJob(false);
-          // Set failed state
+          const newJobId = result.data.jobId;
           setRemoteJob({
-            id: '',
+            id: newJobId,
             userId: '',
-            status: 'failed',
+            status: 'uploaded',
             sourceImagePath: null,
             sourceImageMeta: {
               filename: file.name,
@@ -384,277 +468,64 @@ export function RecipeImportClient({
               mimetype: file.type,
             },
             sourceLocale: null,
-            targetLocale: null,
+            targetLocale: locale || 'nl',
             rawOcrText: null,
             geminiRawJson: null,
             extractedRecipeJson: null,
             originalRecipeJson: null,
-            validationErrorsJson: result.error,
+            validationErrorsJson: null,
             confidenceOverall: null,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             finalizedAt: null,
             recipeId: null,
           });
-          return;
-        }
-
-        const newJobId = result.data.jobId;
-        console.log(
-          '[RecipeImportClient] Step 2: Job created with ID:',
-          newJobId,
-        );
-
-        // Step 2: Set job state immediately (optimistic update)
-        console.log('[RecipeImportClient] Setting remoteJob optimistically...');
-        setRemoteJob({
-          id: newJobId,
-          userId: '',
-          status: 'uploaded',
-          sourceImagePath: null,
-          sourceImageMeta: {
-            filename: file.name,
-            size: file.size,
-            mimetype: file.type,
-          },
-          sourceLocale: null,
-          targetLocale: locale || 'nl',
-          rawOcrText: null,
-          geminiRawJson: null,
-          extractedRecipeJson: null,
-          originalRecipeJson: null,
-          validationErrorsJson: null,
-          confidenceOverall: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          finalizedAt: null,
-          recipeId: null,
-        });
-
-        // Step 3: Navigate to same page with jobId (don't wait for it)
-        console.log(
-          '[RecipeImportClient] Step 3: Navigating to page with jobId:',
-          newJobId,
-        );
-        router.push(`/recipes/import?jobId=${newJobId}`);
-
-        // Step 4: Compress image first, then check if we can auto-process
-        // Always compress to reduce size and avoid body limit issues
-        console.log(
-          '[RecipeImportClient] Step 4: Compressing image to reduce size...',
-        );
-        const compressStartTime = Date.now();
-        let fileToProcess: File;
-        try {
-          fileToProcess = await compressImage(file, 1200, 1200, 0.75);
-          const compressDuration = Date.now() - compressStartTime;
-          console.log(
-            `[RecipeImportClient] Compression took ${compressDuration}ms, original: ${(file.size / 1024).toFixed(2)}KB, compressed: ${(fileToProcess.size / 1024).toFixed(2)}KB`,
-          );
-        } catch (compressError) {
-          console.error(
-            '[RecipeImportClient] Compression failed, using original file:',
-            compressError,
-          );
-          fileToProcess = file; // Fallback to original if compression fails
-        }
-
-        // Step 5: Check if compressed file is small enough for auto-processing
-        console.log(
-          '[RecipeImportClient] Step 5: Checking compressed file size for auto-processing...',
-        );
-        console.log(
-          '[RecipeImportClient] Compressed file size:',
-          fileToProcess.size,
-          'bytes, MAX_FILE_SIZE_FOR_PROCESSING:',
-          MAX_FILE_SIZE_FOR_PROCESSING,
-          'bytes',
-        );
-
-        if (fileToProcess.size <= MAX_FILE_SIZE_FOR_PROCESSING) {
-          console.log(
-            '[RecipeImportClient] Compressed file size OK, starting auto-processing...',
-          );
-          try {
-            // Convert compressed file to data URL
-            console.log(
-              '[RecipeImportClient] Converting compressed file to data URL...',
-            );
-            const convertStartTime = Date.now();
-            const imageDataUrl = await fileToDataUrl(fileToProcess);
-            const convertDuration = Date.now() - convertStartTime;
-            console.log(
-              `[RecipeImportClient] File conversion took ${convertDuration}ms`,
-            );
-
-            // Check base64 size (data URL includes "data:image/...;base64," prefix)
-            const base64Size = imageDataUrl.length;
-            const base64DataSize = base64Size - (imageDataUrl.indexOf(',') + 1);
-            console.log(
-              `[RecipeImportClient] Base64 size: ${(base64DataSize / 1024).toFixed(2)}KB`,
-            );
-
-            // Base64 encoding increases size by ~33%
-            // We compress images, so they should be well under 1MB base64
-            const MAX_BASE64_SIZE = 900 * 1024; // 900KB base64 limit (safe under 1MB)
-            if (base64DataSize > MAX_BASE64_SIZE) {
-              console.error(
-                `[RecipeImportClient] Base64 size ${(base64DataSize / 1024).toFixed(2)}KB exceeds limit ${(MAX_BASE64_SIZE / 1024).toFixed(2)}KB`,
-              );
-              throw new Error(t('errorFileTooLargeForProcessing'));
-            }
-
-            // Update status to "processing" for immediate UI feedback
-            setRemoteJob((prev) =>
-              prev ? { ...prev, status: 'processing' } : null,
-            );
-
-            // Start processing automatically (this is the slow part - Gemini API call)
-            console.log(
-              '[RecipeImportClient] Starting automatic processing for job:',
-              newJobId,
-            );
-            const processStartTime = Date.now();
-
-            // Add timeout wrapper for Gemini processing (max 60 seconds)
-            const timeoutPromise = new Promise<never>((_, reject) => {
-              setTimeout(() => {
-                reject(
-                  new Error(
-                    'Processing timeout: Gemini API call duurde langer dan 60 seconden',
-                  ),
-                );
-              }, 60000);
-            });
-
-            try {
-              console.log(
-                '[RecipeImportClient] About to call processRecipeImportWithGeminiAction...',
-              );
-              console.log('[RecipeImportClient] JobId:', newJobId);
-              console.log(
-                '[RecipeImportClient] ImageDataUrl length:',
-                imageDataUrl.length,
-              );
-
-              const processResult = await Promise.race([
-                (async () => {
-                  console.log(
-                    '[RecipeImportClient] Inside Promise.race, calling action...',
-                  );
-                  const result = await processRecipeImportWithGeminiAction({
-                    jobId: newJobId,
-                    imageDataUrl,
-                    // targetLocale omitted - will be fetched from user preferences server-side
-                  });
-                  console.log(
-                    '[RecipeImportClient] Action returned:',
-                    result.ok ? 'OK' : 'ERROR',
-                    result,
-                  );
-                  return result;
-                })(),
-                timeoutPromise,
-              ]);
-
-              const processDuration = Date.now() - processStartTime;
-              console.log(
-                `[RecipeImportClient] Processing took ${processDuration}ms`,
-              );
-
-              if (processResult.ok) {
-                console.log(
-                  '[RecipeImportClient] Processing completed successfully',
-                );
-                // Only load job once at the end to get final state
-                await loadJob(newJobId);
-                setProcessingJob(false);
-              } else {
-                // Server action error may serialize to {} over the wire; use message with fallback
-                const err =
-                  processResult && 'error' in processResult
-                    ? processResult.error
-                    : undefined;
-                const errMessage =
-                  err &&
-                  typeof err === 'object' &&
-                  'message' in err &&
-                  typeof (err as { message: unknown }).message === 'string'
-                    ? (err as { message: string }).message
-                    : undefined;
-                console.error(
-                  '[RecipeImportClient] Processing failed:',
-                  err ?? processResult,
-                );
-                setError(errMessage ?? t('errorUnknown'));
-                // Load job to see failed status (job may have error_message set)
-                await loadJob(newJobId);
-                setProcessingJob(false);
-              }
-            } catch (timeoutError) {
-              const processDuration = Date.now() - processStartTime;
-              console.error(
-                `[RecipeImportClient] Processing timeout after ${processDuration}ms:`,
-                timeoutError,
-              );
-              setError(
-                timeoutError instanceof Error
-                  ? timeoutError.message
-                  : 'Processing timeout',
-              );
-              // Load job to see current status
-              await loadJob(newJobId);
-              setProcessingJob(false);
-            }
-          } catch (err) {
-            console.error('[RecipeImportClient] Auto-processing error:', err);
-            const msg = isNetworkOrFetchError(err)
-              ? t('errorNetworkOrTimeout')
-              : err instanceof Error
-                ? err.message
-                : t('errorUnknown');
-            setError(msg);
-            await loadJob(newJobId);
-            setProcessingJob(false);
-          }
-        } else {
-          // File too large - user will need to click "Start verwerking" button
-          console.log(
-            '[RecipeImportClient] File too large for auto-processing, user must click button',
-          );
-          console.log(
-            '[RecipeImportClient] File size:',
-            file.size,
-            'MAX_FILE_SIZE_FOR_PROCESSING:',
-            MAX_FILE_SIZE_FOR_PROCESSING,
-          );
-          // Don't set error - just show info message and keep file for manual processing
-          // Load job so user can see it and manually trigger processing
-          await loadJob(newJobId);
+          setLocalPages([newPage]);
+          router.push(`/recipes/import?jobId=${newJobId}`);
+        } catch (err) {
+          URL.revokeObjectURL(previewUrlForFile);
+          const msg = isNetworkOrFetchError(err)
+            ? t('errorNetworkOrTimeout')
+            : err instanceof Error
+              ? err.message
+              : t('errorUnknown');
+          setError(msg);
+        } finally {
           setProcessingJob(false);
-          // Keep localSelectedFile so user can click "Start verwerking" button
-          // The file is already set above, so it should remain
         }
-      } catch (err) {
-        console.error('[RecipeImportClient] File upload error:', err);
-        const msg = isNetworkOrFetchError(err)
-          ? t('errorNetworkOrTimeout')
-          : err instanceof Error
-            ? err.message
-            : t('errorUnknown');
-        setError(msg);
-        setProcessingJob(false);
+      } else {
+        setLocalPages((prev) => [...prev, newPage]);
       }
     },
-    [t, router, loadJob, locale],
+    [t, router, locale, localPages.length],
   );
 
-  // Handle file input change
+  // Remove a page by index; if no pages left, reset to idle
+  const handleRemovePage = useCallback(
+    (index: number) => {
+      setLocalPages((prev) => {
+        const next = prev.filter((_, i) => i !== index);
+        const removed = prev[index];
+        if (removed?.previewUrl) {
+          URL.revokeObjectURL(removed.previewUrl);
+        }
+        if (next.length === 0) {
+          setRemoteJob(null);
+          setError(null);
+          router.push('/recipes/import');
+        }
+        return next;
+      });
+    },
+    [router],
+  );
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       handleFileSelect(file);
     }
+    e.target.value = '';
   };
 
   // Handle drag and drop
@@ -851,39 +722,46 @@ export function RecipeImportClient({
     return () => clearTimeout(retryId);
   }, [cameraOpen, cameraStream]);
 
-  // Handle start processing with Gemini
   const handleStartProcessing = useCallback(async () => {
-    if (!remoteJob || !localSelectedFile || processingJob) return;
-
-    // Preflight check: file size
-    if (localSelectedFile.size > MAX_FILE_SIZE_FOR_PROCESSING) {
-      setError(t('errorFileTooLargeForProcessing'));
-      return;
-    }
+    if (!remoteJob || localPages.length === 0 || processingJob) return;
 
     setProcessingJob(true);
     setError(null);
 
     try {
-      // Convert file to data URL
-      const imageDataUrl = await fileToDataUrl(localSelectedFile);
+      const dataUrls: string[] = [];
+      for (let i = 0; i < localPages.length; i++) {
+        let file = localPages[i].file;
+        if (file.size > MAX_FILE_SIZE_FOR_PROCESSING) {
+          try {
+            file = await compressImage(file, 1200, 1200, 0.75);
+          } catch {
+            // keep original
+          }
+        }
+        if (file.size > MAX_FILE_SIZE_FOR_PROCESSING) {
+          setError(t('errorFileTooLargeForProcessing'));
+          setProcessingJob(false);
+          return;
+        }
+        dataUrls.push(await fileToDataUrl(file));
+      }
 
-      // Call Gemini processing action
-      // Note: targetLocale will be determined server-side from user preferences
-      // We pass locale as fallback, but server will use user_preferences.language
-      const result = await processRecipeImportWithGeminiAction({
-        jobId: remoteJob.id,
-        imageDataUrl,
-        // targetLocale omitted - will be fetched from user preferences server-side
-        // sourceLocale omitted (will be detected by Gemini)
-      });
+      const result =
+        dataUrls.length === 1
+          ? await processRecipeImportWithGeminiAction({
+              jobId: remoteJob.id,
+              imageDataUrl: dataUrls[0],
+            })
+          : await processRecipeImportWithGeminiAction({
+              jobId: remoteJob.id,
+              imageDataUrls: dataUrls,
+            });
 
       if (result.ok) {
-        // Reload job to get updated status and extracted data
         await loadJob(remoteJob.id);
       } else {
         setError(result.error.message);
-        // Reload job to get updated status (might be failed now)
         await loadJob(remoteJob.id);
       }
     } catch (err) {
@@ -897,49 +775,43 @@ export function RecipeImportClient({
     } finally {
       setProcessingJob(false);
     }
-  }, [remoteJob, localSelectedFile, processingJob, loadJob, t]);
+  }, [remoteJob, localPages, processingJob, loadJob, t]);
 
-  // Handle retry (for failed jobs or full reset)
   const handleRetry = useCallback(async () => {
     if (!remoteJob) {
-      // Full reset
       setRemoteJob(null);
-      setLocalSelectedFile(null);
-      setPreviewUrl(null);
+      setLocalPages((prev) => {
+        prev.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+        return [];
+      });
       setError(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
       router.push('/recipes/import');
       return;
     }
-
-    // Retry processing if status is failed and we have a file
-    if (remoteJob.status === 'failed' && localSelectedFile) {
+    if (remoteJob.status === 'failed' && localPages.length > 0) {
       await handleStartProcessing();
     } else {
-      // Reset everything
       setRemoteJob(null);
-      setLocalSelectedFile(null);
-      setPreviewUrl(null);
+      setLocalPages((prev) => {
+        prev.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+        return [];
+      });
       setError(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
       router.push('/recipes/import');
     }
-  }, [remoteJob, localSelectedFile, handleStartProcessing, router]);
+  }, [remoteJob, localPages.length, handleStartProcessing, router]);
 
-  // Handle full reset
   const handleFullReset = useCallback(() => {
     setRemoteJob(null);
-    setLocalSelectedFile(null);
-    setPreviewUrl(null);
+    setLocalPages((prev) => {
+      prev.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+      return [];
+    });
     setError(null);
-    setSelectedMealSlot('');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    setSelectedMealSlotOptionId('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
     router.push('/recipes/import');
   }, [router]);
 
@@ -949,6 +821,8 @@ export function RecipeImportClient({
       e.preventDefault();
       if (isUrlImportPending) return;
       setUrlImportError(null);
+      setDuplicateRecipeId(null);
+      setDuplicateRecipeName(null);
       const raw = urlImportValue.trim();
       if (!raw) {
         setUrlImportError(
@@ -956,6 +830,7 @@ export function RecipeImportClient({
         );
         return;
       }
+      setIsDebugModalOpen(false);
       let url = raw;
       if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
         url = `https://${raw}`;
@@ -988,20 +863,72 @@ export function RecipeImportClient({
                 // ignore
               }
             }
+            if (result.diagnostics && typeof window !== 'undefined') {
+              try {
+                sessionStorage.setItem(
+                  `recipe-import-diagnostics-${result.jobId}`,
+                  JSON.stringify(result.diagnostics),
+                );
+              } catch {
+                // ignore
+              }
+            }
             setUrlImportValue('');
             setUrlImportError(null);
+            setDuplicateRecipeId(null);
+            setDuplicateRecipeName(null);
             router.push(`/recipes/import?jobId=${result.jobId}`);
           } else {
+            const raw = result as Record<string, unknown>;
+            const resultRecipeId =
+              raw?.recipeId != null
+                ? String(raw.recipeId)
+                : ((result as { recipeId?: string }).recipeId ?? null);
+            const resultRecipeName =
+              (raw?.recipeName != null ? String(raw.recipeName) : null) ??
+              (result as { recipeName?: string }).recipeName ??
+              null;
+            const isDuplicate =
+              raw?.errorCode === 'DUPLICATE_URL' ||
+              (typeof raw?.message === 'string' &&
+                (raw.message.includes('bestaande recept') ||
+                  raw.message.includes('al eerder geïmporteerd')));
+            const duplicateId = resultRecipeId;
+            const duplicateName = resultRecipeName;
+            if (duplicateId) {
+              setDuplicateRecipeId(duplicateId);
+              setDuplicateRecipeName(duplicateName);
+            }
             const msg =
-              (result && 'message' in result && result.message) ||
+              (typeof raw?.message === 'string' ? raw.message : null) ||
+              (result &&
+              'message' in result &&
+              typeof result.message === 'string'
+                ? result.message
+                : null) ||
               (locale === 'nl'
                 ? 'Importeren mislukt. Probeer een andere URL.'
                 : 'Import failed. Try another URL.');
             setUrlImportError(msg);
+            const title =
+              (isDuplicate || duplicateId) && locale === 'nl'
+                ? 'Recept bestaat al'
+                : t('urlImportErrorTitle');
             showToast({
               type: 'error',
-              title: t('urlImportErrorTitle'),
+              title,
               description: msg,
+              action: duplicateId
+                ? {
+                    label: locale === 'nl' ? 'Open recept' : 'Open recipe',
+                    href: `/recipes/${duplicateId}`,
+                  }
+                : isDuplicate
+                  ? {
+                      label: locale === 'nl' ? 'Naar recepten' : 'View recipes',
+                      href: '/recipes',
+                    }
+                  : undefined,
             });
           }
         } catch (err) {
@@ -1038,7 +965,7 @@ export function RecipeImportClient({
     try {
       const result = await finalizeRecipeImportAction({
         jobId: remoteJob.id,
-        mealSlot: selectedMealSlot || undefined,
+        mealSlotOptionId: selectedMealSlotOptionId || undefined,
       });
 
       if (result.ok) {
@@ -1077,16 +1004,15 @@ export function RecipeImportClient({
     } finally {
       setFinalizingJob(false);
     }
-  }, [remoteJob, finalizingJob, selectedMealSlot, router, loadJob, t]);
+  }, [remoteJob, finalizingJob, selectedMealSlotOptionId, router, loadJob, t]);
 
-  // Cleanup preview URL on unmount or file change
+  const localPagesRef = useRef(localPages);
+  localPagesRef.current = localPages;
   useEffect(() => {
     return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
+      localPagesRef.current.forEach((p) => URL.revokeObjectURL(p.previewUrl));
     };
-  }, [previewUrl]);
+  }, []);
 
   // Cleanup camera stream on unmount
   useEffect(() => {
@@ -1281,7 +1207,19 @@ export function RecipeImportClient({
                   </div>
                   {urlImportError ? (
                     <ErrorMessage id="recipe-url-inline-error" className="mt-2">
-                      {urlImportError}
+                      <div className="space-y-2">
+                        <div>{urlImportError}</div>
+                        {duplicateRecipeId && (
+                          <Link
+                            href={`/recipes/${duplicateRecipeId}`}
+                            className="text-sm text-primary-600 hover:text-primary-500 dark:text-primary-400"
+                          >
+                            {duplicateRecipeName
+                              ? `Open bestaand recept: ${duplicateRecipeName}`
+                              : 'Open bestaand recept'}
+                          </Link>
+                        )}
+                      </div>
                     </ErrorMessage>
                   ) : (
                     <Description id="recipe-url-inline-hint" className="mt-2">
@@ -1310,19 +1248,111 @@ export function RecipeImportClient({
         </div>
       )}
 
-      {/* Preview */}
-      {previewUrl && uiState !== 'failed' && (
-        <div className="relative rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden min-h-[200px] max-h-64 w-full bg-zinc-50 dark:bg-zinc-900">
-          <Image
-            src={previewUrl}
-            alt="Recept preview"
-            fill
-            className="object-contain"
-            sizes="(max-width: 768px) 100vw, 512px"
-            unoptimized
-          />
+      {/* Preview: thumbnails for all pages */}
+      {localPages.length > 0 && uiState !== 'failed' && (
+        <div className="space-y-3">
+          <Text className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+            {localPages.length === 1
+              ? t('pagePreview')
+              : t('pagesPreview', { count: localPages.length })}
+          </Text>
+          <div className="flex flex-wrap gap-3">
+            {localPages.map((page, index) => (
+              <div
+                key={index}
+                className="relative rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden w-32 h-40 bg-zinc-50 dark:bg-zinc-900 flex-shrink-0 group"
+              >
+                <Image
+                  src={page.previewUrl}
+                  alt={t('pageNumber', { number: index + 1 })}
+                  fill
+                  className="object-cover"
+                  sizes="128px"
+                  unoptimized
+                />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5 flex items-center justify-between">
+                  <span className="text-xs font-medium text-white">
+                    {t('pageNumber', { number: index + 1 })}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemovePage(index)}
+                    className="p-1 rounded text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white"
+                    aria-label={t('removePage')}
+                  >
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
+
+      {/* Add another page (when job is uploaded/failed and we have 1–4 pages) */}
+      {remoteJob &&
+        (remoteJob.status === 'uploaded' || remoteJob.status === 'failed') &&
+        !processingJob &&
+        localPages.length >= 1 &&
+        localPages.length < MAX_RECIPE_PAGES && (
+          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 bg-zinc-50/80 dark:bg-zinc-800/40">
+            <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
+              {t('addAnotherPage')}
+            </Text>
+            <div className="flex flex-wrap gap-2">
+              <label htmlFor="recipe-upload-input" className="cursor-pointer">
+                <Button as="span" outline className="text-sm">
+                  <PhotoIcon className="h-4 w-4 mr-1.5" />
+                  {t('selectFile')}
+                </Button>
+              </label>
+              <Button onClick={handleOpenCamera} outline className="text-sm">
+                <CameraIcon className="h-4 w-4 mr-1.5" />
+                {t('takePhoto')}
+              </Button>
+              <Button
+                onClick={async () => {
+                  try {
+                    if (navigator.clipboard?.read) {
+                      const items = await navigator.clipboard.read();
+                      const imageItem = items.find((item) =>
+                        item.types.some((t) => t.startsWith('image/')),
+                      );
+                      if (imageItem) {
+                        const imageType = imageItem.types.find((t) =>
+                          t.startsWith('image/'),
+                        );
+                        if (imageType) {
+                          const blob = await imageItem.getType(imageType);
+                          const file = new File(
+                            [blob],
+                            `paste-${Date.now()}.${imageType.split('/')[1]}`,
+                            { type: imageType, lastModified: Date.now() },
+                          );
+                          handleFileSelect(file);
+                          return;
+                        }
+                      }
+                    }
+                    setError(t('pasteHint'));
+                  } catch {
+                    setError(t('pasteHint'));
+                  }
+                }}
+                outline
+                className="text-sm"
+              >
+                <ClipboardDocumentIcon className="h-4 w-4 mr-1.5" />
+                {t('pasteImage')}
+              </Button>
+            </div>
+            {localPages.length >= MAX_RECIPE_PAGES - 1 && (
+              <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
+                {t('maxPagesHint')}
+              </Text>
+            )}
+          </div>
+        )}
 
       {/* Error Display */}
       {error && (
@@ -1344,11 +1374,25 @@ export function RecipeImportClient({
         <>
           <ImportStatusPanel state={remoteJob.status} />
 
+          {/* Debug details (only when diagnostics present from URL import) */}
+          {urlImportDiagnostics && (
+            <div className="flex items-center gap-3 py-2">
+              <Button
+                type="button"
+                outline
+                onClick={() => setIsDebugModalOpen(true)}
+                className="text-sm"
+              >
+                Debug details
+              </Button>
+            </div>
+          )}
+
           {/* Start Processing Button - Only show if not already processing and file is available */}
           {(remoteJob.status === 'uploaded' || remoteJob.status === 'failed') &&
             !processingJob && (
               <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 bg-white dark:bg-zinc-900">
-                {!localSelectedFile ? (
+                {localPages.length === 0 ? (
                   <div className="space-y-3">
                     <Text className="text-sm text-zinc-600 dark:text-zinc-400">
                       {t('errorNoFileForProcessing')}
@@ -1518,7 +1562,7 @@ export function RecipeImportClient({
                       )}
                     </div>
                   )}
-                  {localSelectedFile && (
+                  {localPages.length > 0 && (
                     <Button onClick={handleRetry} color="red">
                       {t('retryProcessing')}
                     </Button>
@@ -1669,37 +1713,35 @@ export function RecipeImportClient({
                   {/* Finalize CTA */}
                   <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
                     <div className="space-y-4">
-                      {/* Meal Slot Select (Optional) */}
+                      {/* Categorie (Soort) – simple custom listbox i.p.v. native select */}
                       <div>
-                        <label
-                          htmlFor="meal-slot-select"
-                          className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2"
+                        <Text
+                          id="meal-slot-label"
+                          className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2"
                         >
                           {t('mealSlotLabel')}
-                        </label>
-                        <Select
-                          id="meal-slot-select"
-                          value={selectedMealSlot}
-                          onChange={(e) =>
-                            setSelectedMealSlot(
-                              e.target.value as
-                                | ''
-                                | 'breakfast'
-                                | 'lunch'
-                                | 'dinner'
-                                | 'snack',
+                        </Text>
+                        <Listbox
+                          aria-labelledby="meal-slot-label"
+                          value={selectedMealSlotOptionId ?? ''}
+                          onChange={(value) =>
+                            setSelectedMealSlotOptionId(
+                              value === '' ? '' : String(value),
                             )
                           }
                           disabled={finalizingJob}
+                          aria-label={t('mealSlotLabel')}
+                          placeholder={t('mealSlotOptional')}
                         >
-                          <option value="">{t('mealSlotOptional')}</option>
-                          <option value="breakfast">
-                            {t('mealSlotBreakfast')}
-                          </option>
-                          <option value="lunch">{t('mealSlotLunch')}</option>
-                          <option value="dinner">{t('mealSlotDinner')}</option>
-                          <option value="snack">{t('mealSlotSnack')}</option>
-                        </Select>
+                          <ListboxOption value="">
+                            {t('mealSlotOptional')}
+                          </ListboxOption>
+                          {mealSlotOptions.map((opt) => (
+                            <ListboxOption key={opt.id} value={opt.id}>
+                              {opt.label}
+                            </ListboxOption>
+                          ))}
+                        </Listbox>
                       </div>
 
                       {/* Finalize Button */}
@@ -1764,6 +1806,159 @@ export function RecipeImportClient({
           )}
         </>
       )}
+
+      {/* Debug diagnostics modal (URL import, RECIPE_IMPORT_DEBUG only) */}
+      <Dialog
+        open={isDebugModalOpen && !!urlImportDiagnostics}
+        onClose={() => setIsDebugModalOpen(false)}
+        size="lg"
+      >
+        <DialogTitle>Debug details (URL import)</DialogTitle>
+        <DialogBody>
+          {urlImportDiagnostics && (
+            <div className="space-y-6">
+              <div>
+                <Subheading level={3} className="mb-2">
+                  HTML extractie
+                </Subheading>
+                <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
+                  <dt className="text-zinc-500 dark:text-zinc-400">strategy</dt>
+                  <dd className="font-medium">
+                    {urlImportDiagnostics.html.strategy}
+                  </dd>
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    matchedSelector
+                  </dt>
+                  <dd className="font-medium">
+                    {urlImportDiagnostics.html.matchedSelector}
+                  </dd>
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    bytesBefore
+                  </dt>
+                  <dd>{urlImportDiagnostics.html.bytesBefore}</dd>
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    bytesAfter
+                  </dt>
+                  <dd>{urlImportDiagnostics.html.bytesAfter}</dd>
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    wasTruncated
+                  </dt>
+                  <dd>{String(urlImportDiagnostics.html.wasTruncated)}</dd>
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    truncateMode
+                  </dt>
+                  <dd>{urlImportDiagnostics.html.truncateMode}</dd>
+                </dl>
+              </div>
+              <div>
+                <Subheading level={3} className="mb-2">
+                  Parse / repair
+                </Subheading>
+                <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    usedExtractJsonFromResponse
+                  </dt>
+                  <dd>
+                    {String(
+                      urlImportDiagnostics.parseRepair
+                        .usedExtractJsonFromResponse,
+                    )}
+                  </dd>
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    usedRepairTruncatedJson
+                  </dt>
+                  <dd>
+                    {String(
+                      urlImportDiagnostics.parseRepair.usedRepairTruncatedJson,
+                    )}
+                  </dd>
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    addedMissingClosers
+                  </dt>
+                  <dd>
+                    {String(
+                      urlImportDiagnostics.parseRepair.addedMissingClosers,
+                    )}
+                  </dd>
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    injectedPlaceholdersIngredients
+                  </dt>
+                  <dd>
+                    {String(
+                      urlImportDiagnostics.parseRepair
+                        .injectedPlaceholdersIngredients,
+                    )}
+                  </dd>
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    injectedPlaceholdersInstructions
+                  </dt>
+                  <dd>
+                    {String(
+                      urlImportDiagnostics.parseRepair
+                        .injectedPlaceholdersInstructions,
+                    )}
+                  </dd>
+                </dl>
+              </div>
+              <div>
+                <Subheading level={3} className="mb-2">
+                  Counts
+                </Subheading>
+                <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    ingredientCount
+                  </dt>
+                  <dd>{urlImportDiagnostics.ingredientCount}</dd>
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    instructionCount
+                  </dt>
+                  <dd>{urlImportDiagnostics.instructionCount}</dd>
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    minNonPlaceholderIngredientCount
+                  </dt>
+                  <dd>
+                    {urlImportDiagnostics.minNonPlaceholderIngredientCount}
+                  </dd>
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    minNonPlaceholderInstructionCount
+                  </dt>
+                  <dd>
+                    {urlImportDiagnostics.minNonPlaceholderInstructionCount}
+                  </dd>
+                </dl>
+              </div>
+              <div>
+                <Subheading level={3} className="mb-2">
+                  Model
+                </Subheading>
+                <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    confidence_overall
+                  </dt>
+                  <dd>{urlImportDiagnostics.confidence_overall ?? '—'}</dd>
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    language_detected
+                  </dt>
+                  <dd>{urlImportDiagnostics.language_detected ?? '—'}</dd>
+                </dl>
+              </div>
+              <div>
+                <Subheading level={3} className="mb-2">
+                  Raw (JSON)
+                </Subheading>
+                <pre className="max-h-96 overflow-auto rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 p-4 text-xs font-mono">
+                  {JSON.stringify(urlImportDiagnostics, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+        </DialogBody>
+        <DialogActions>
+          <Button onClick={() => setIsDebugModalOpen(false)} outline>
+            Sluiten
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Camera Dialog */}
       <Dialog open={cameraOpen} onClose={handleCloseCamera} size="lg">

@@ -282,7 +282,14 @@
     "warningCookMinutesMissing": "Kooktijd ontbreekt",
     "warningRestingTimeNotIncluded": "Rusttijd is niet meegenomen in totale tijd",
     "warningPrepMinutesMissing": "Bereidingstijd ontbreekt",
-    "warningTotalMinutesMissing": "Totale tijd ontbreekt"
+    "warningTotalMinutesMissing": "Totale tijd ontbreekt",
+    "pagePreview": "Pagina preview",
+    "pagesPreview": "{count} pagina's",
+    "pageNumber": "Pagina {number}",
+    "removePage": "Pagina verwijderen",
+    "addAnotherPage": "Recept op meerdere pagina's? Voeg hier de volgende pagina toe.",
+    "maxPagesHint": "Maximaal 5 pagina's per recept.",
+    "errorMaxPages": "Maximaal 5 pagina's. Verwijder een pagina om een andere toe te voegen."
   },
   "mealPlan": {
     "slotStylePromptLabels": {

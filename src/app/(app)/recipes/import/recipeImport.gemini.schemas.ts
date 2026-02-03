@@ -50,31 +50,28 @@ export const geminiInstructionStepSchema = z.object({
   text: z.string().describe('Instruction text for this step'),
 });
 
+/** Coerce numeric minutes (accept float from Gemini, round to integer). */
+const intMinutesSchema = z
+  .union([z.number(), z.null(), z.undefined()])
+  .transform((v) => {
+    if (v == null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+  });
+
 /**
  * Times schema from Gemini
  */
 export const geminiTimesSchema = z.object({
-  prep_minutes: z
-    .number()
-    .int()
-    .min(0)
-    .nullable()
+  prep_minutes: intMinutesSchema
     .optional()
     .default(null)
     .describe('Preparation time in minutes'),
-  cook_minutes: z
-    .number()
-    .int()
-    .min(0)
-    .nullable()
+  cook_minutes: intMinutesSchema
     .optional()
     .default(null)
     .describe('Cooking time in minutes'),
-  total_minutes: z
-    .number()
-    .int()
-    .min(0)
-    .nullable()
+  total_minutes: intMinutesSchema
     .optional()
     .default(null)
     .describe('Total time in minutes (prep + cook)'),

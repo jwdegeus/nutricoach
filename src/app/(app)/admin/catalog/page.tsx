@@ -8,7 +8,7 @@ export const metadata = {
 };
 
 /**
- * Catalog-beheer is verplaatst naar Receptenbeheer > Recept keukens.
+ * Catalog-beheer is verplaatst naar Receptenbeheer > Classificatie beheer.
  * Canonical entry: /admin/receptenbeheer?tab=keukens.
  * Redirect oude links; geen UI render (redirect() throwt).
  */

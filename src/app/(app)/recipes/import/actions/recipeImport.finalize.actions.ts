@@ -22,12 +22,21 @@ type ActionResult<T> =
       };
     };
 
+const MEAL_SLOT_KEYS = [
+  'breakfast',
+  'lunch',
+  'dinner',
+  'snack',
+  'other',
+] as const;
+
 /**
- * Finalize recipe import input schema
+ * Finalize recipe import input schema.
+ * mealSlotOptionId: catalog_options id (Soort); resolved to meal_slot key for RPC; stored as meal_slot_option_id on recipe.
  */
 const finalizeRecipeImportInputSchema = z.object({
   jobId: z.string().uuid('jobId must be a valid UUID'),
-  mealSlot: z.enum(['breakfast', 'lunch', 'dinner', 'snack']).optional(),
+  mealSlotOptionId: z.string().uuid().optional(),
 });
 
 /**
@@ -97,13 +106,43 @@ export async function finalizeRecipeImportAction(
       );
     }
 
+    // Resolve meal_slot key from catalog option (DB column meal_slot only allows breakfast/lunch/dinner/snack/other)
+    let mealSlot: 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'other' =
+      'dinner';
+    if (input.mealSlotOptionId) {
+      const { data: opt } = await supabase
+        .from('catalog_options')
+        .select('key')
+        .eq('id', input.mealSlotOptionId)
+        .eq('dimension', 'meal_slot')
+        .maybeSingle();
+      const key = opt?.key as string | undefined;
+      if (
+        key &&
+        MEAL_SLOT_KEYS.includes(key as (typeof MEAL_SLOT_KEYS)[number])
+      ) {
+        mealSlot = key as (typeof MEAL_SLOT_KEYS)[number];
+      } else if (key) {
+        mealSlot = 'other'; // Smoothie, IJs, Gebak, Bijgerecht etc. → other + meal_slot_option_id
+      }
+    }
+
     // Finalize recipe import (RPC handles all validation, ownership checks, and writes atomically)
     try {
       const result = await finalizeRecipeImport({
         userId: user.id,
         jobId: input.jobId,
-        mealSlot: input.mealSlot || 'dinner',
+        mealSlot,
       });
+
+      // Store chosen catalog option (Soort) on the created recipe so it matches receptenbeheer
+      if (result.recipeId && input.mealSlotOptionId) {
+        await supabase
+          .from('custom_meals')
+          .update({ meal_slot_option_id: input.mealSlotOptionId })
+          .eq('id', result.recipeId)
+          .eq('user_id', user.id);
+      }
 
       // Verify the recipe was created with image URL
       if (result.recipeId) {

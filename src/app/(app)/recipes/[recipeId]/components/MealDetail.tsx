@@ -56,6 +56,7 @@ import {
 import {
   getRecipeNutritionSummaryAction,
   getResolvedIngredientMatchesAction,
+  type OptimisticMatchPayload,
   type RecipeNutritionSummary,
   type ResolvedIngredientMatch,
 } from '../actions/ingredient-matching.actions';
@@ -177,8 +178,8 @@ type MealDetailProps = {
   complianceScore?: RecipeComplianceResult | null;
   /** Wordt aangeroepen nadat AI Magician een aangepaste versie heeft toegepast, zodat de pagina kan verversen */
   onRecipeApplied?: () => void;
-  /** Wordt aangeroepen na het koppelen van een ingrediënt (stille refresh + notificatie, geen volledige paginaload) */
-  onIngredientMatched?: () => void;
+  /** Wordt aangeroepen na het koppelen van een ingrediënt; payload = optimistische update zonder paginareload */
+  onIngredientMatched?: (payload?: OptimisticMatchPayload) => void;
   /** Wordt aangeroepen nadat de receptbron is opgeslagen, zodat meal-data wordt ververst en het label gelijk blijft */
   onSourceSaved?: () => void;
 };
@@ -503,6 +504,7 @@ export function MealDetail({
       if (result.data != null) {
         setClassificationOverlay(mealClassificationDataToDraft(result.data));
         setClassificationDialogOpen(false);
+        onRecipeApplied?.();
         showToast({
           type: 'success',
           title: 'Classificatie opgeslagen',
@@ -510,7 +512,7 @@ export function MealDetail({
         });
       }
     },
-    [mealId, mealClassificationDataToDraft, showToast],
+    [mealId, mealClassificationDataToDraft, onRecipeApplied, showToast],
   );
 
   useEffect(() => {
@@ -779,43 +781,49 @@ export function MealDetail({
     };
   }, [meal?.id, hasLegacyIngredients, displayMealData?.ingredients]);
 
-  const handleLegacyIngredientConfirmed = useCallback(() => {
-    if (onIngredientMatched) {
-      onIngredientMatched();
-      return;
-    }
-    onRecipeApplied?.();
-    const ingredients = displayMealData?.ingredients as
-      | MealIngredientLike[]
-      | undefined;
-    if (ingredients?.length) {
-      const lineOptionsPerIngredient = ingredients.map(
-        (ing: MealIngredientLike) => {
-          const name = ing.name || ing.original_line || '';
-          const qty = ing.quantity ?? ing.amount;
-          const numQty =
-            typeof qty === 'number'
-              ? qty
-              : typeof qty === 'string'
-                ? parseFloat(qty)
-                : undefined;
-          const unit = (ing.unit ?? 'g')?.toString().trim() || 'g';
-          const options: string[] = [];
-          if (ing.original_line?.trim()) options.push(ing.original_line.trim());
-          if (name.trim() && numQty != null && unit) {
-            const fullLine = `${name.trim()} ${numQty} ${unit}`.trim();
-            if (!options.includes(fullLine)) options.push(fullLine);
-          }
-          if (name.trim() && !options.includes(name.trim()))
-            options.push(name.trim());
-          return options.length > 0 ? options : [name || ''];
-        },
-      );
-      getResolvedIngredientMatchesAction(lineOptionsPerIngredient).then((r) => {
-        if (r.ok) setResolvedLegacyMatches(r.data);
-      });
-    }
-  }, [onIngredientMatched, onRecipeApplied, displayMealData?.ingredients]);
+  const handleLegacyIngredientConfirmed = useCallback(
+    (payload?: OptimisticMatchPayload) => {
+      if (onIngredientMatched) {
+        onIngredientMatched(payload);
+        return;
+      }
+      onRecipeApplied?.();
+      const ingredients = displayMealData?.ingredients as
+        | MealIngredientLike[]
+        | undefined;
+      if (ingredients?.length) {
+        const lineOptionsPerIngredient = ingredients.map(
+          (ing: MealIngredientLike) => {
+            const name = ing.name || ing.original_line || '';
+            const qty = ing.quantity ?? ing.amount;
+            const numQty =
+              typeof qty === 'number'
+                ? qty
+                : typeof qty === 'string'
+                  ? parseFloat(qty)
+                  : undefined;
+            const unit = (ing.unit ?? 'g')?.toString().trim() || 'g';
+            const options: string[] = [];
+            if (ing.original_line?.trim())
+              options.push(ing.original_line.trim());
+            if (name.trim() && numQty != null && unit) {
+              const fullLine = `${name.trim()} ${numQty} ${unit}`.trim();
+              if (!options.includes(fullLine)) options.push(fullLine);
+            }
+            if (name.trim() && !options.includes(name.trim()))
+              options.push(name.trim());
+            return options.length > 0 ? options : [name || ''];
+          },
+        );
+        getResolvedIngredientMatchesAction(lineOptionsPerIngredient).then(
+          (r) => {
+            if (r.ok) setResolvedLegacyMatches(r.data);
+          },
+        );
+      }
+    },
+    [onIngredientMatched, onRecipeApplied, displayMealData?.ingredients],
+  );
 
   const handleEditIngredient = useCallback(
     async (
@@ -890,53 +898,55 @@ export function MealDetail({
   return (
     <div className="space-y-6">
       {/* Header Info */}
-      <div className="rounded-lg bg-white shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10 overflow-hidden">
-        {/* Receptafbeelding bovenaan met knoppen (Vervangen, Verwijderen, Genereer met AI) */}
-        <RecipeImageUpload
-          mealId={mealId}
-          source={mealSource}
-          currentImageUrl={imageUrl ?? null}
-          onImageUploaded={(url) => {
-            setImageUrlOverride(url);
-            window.location.reload();
-          }}
-          onImageRemoved={() => {
-            setImageUrlOverride(null);
-            window.location.reload();
-          }}
-          onImageClick={() => setLightboxOpen(true)}
-          recipeContext={{
-            name: mealName,
-            summary:
-              Array.isArray(displayMealData?.ingredients) &&
-              displayMealData.ingredients.length > 0
-                ? `Ingrediënten: ${(
-                    displayMealData.ingredients as { name?: string }[]
-                  )
-                    .slice(0, 5)
-                    .map((i) => i.name ?? '')
-                    .filter(Boolean)
-                    .join(
-                      ', ',
-                    )}${(displayMealData.ingredients as unknown[]).length > 5 ? '…' : ''}`
-                : Array.isArray(displayAiAnalysis?.instructions) &&
-                    displayAiAnalysis.instructions.length > 0
-                  ? `Bereiding: ${String(
-                      (
-                        displayAiAnalysis.instructions as {
-                          text?: string;
-                          step?: string;
-                        }[]
-                      )[0]?.text ??
-                        (displayAiAnalysis.instructions as string[])[0] ??
-                        '',
-                    ).slice(0, 120)}…`
-                  : undefined,
-          }}
-          renderHero
-        />
-        <div className="p-6">
-          <div className="flex flex-col gap-6 mb-4">
+      <div className="rounded-lg bg-white shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 p-6">
+          <div className="order-1 lg:order-2">
+            {/* Receptafbeelding rechts (desktop) en bovenaan (mobile) */}
+            <RecipeImageUpload
+              mealId={mealId}
+              source={mealSource}
+              currentImageUrl={imageUrl ?? null}
+              onImageUploaded={(url) => {
+                setImageUrlOverride(url);
+                window.location.reload();
+              }}
+              onImageRemoved={() => {
+                setImageUrlOverride(null);
+                window.location.reload();
+              }}
+              onImageClick={() => setLightboxOpen(true)}
+              recipeContext={{
+                name: mealName,
+                summary:
+                  Array.isArray(displayMealData?.ingredients) &&
+                  displayMealData.ingredients.length > 0
+                    ? `Ingrediënten: ${(
+                        displayMealData.ingredients as { name?: string }[]
+                      )
+                        .slice(0, 5)
+                        .map((i) => i.name ?? '')
+                        .filter(Boolean)
+                        .join(
+                          ', ',
+                        )}${(displayMealData.ingredients as unknown[]).length > 5 ? '…' : ''}`
+                    : Array.isArray(displayAiAnalysis?.instructions) &&
+                        displayAiAnalysis.instructions.length > 0
+                      ? `Bereiding: ${String(
+                          (
+                            displayAiAnalysis.instructions as {
+                              text?: string;
+                              step?: string;
+                            }[]
+                          )[0]?.text ??
+                            (displayAiAnalysis.instructions as string[])[0] ??
+                            '',
+                        ).slice(0, 120)}…`
+                      : undefined,
+              }}
+              square
+            />
+          </div>
+          <div className="order-2 lg:order-1 flex flex-col gap-6">
             <div className="flex-1 min-w-0">
               <h2 className="text-2xl font-bold text-zinc-950 dark:text-white mb-2">
                 {mealName}
@@ -1104,117 +1114,117 @@ export function MealDetail({
                 </div>
               )}
             </div>
-          </div>
-          {imageUrl && (
-            <ImageLightbox
-              open={lightboxOpen}
-              onClose={() => setLightboxOpen(false)}
-              imageUrl={imageUrl}
-              alt={mealName}
-            />
-          )}
-
-          {/* Prep Time and Servings Editor — prefer classificationOverlay after save so Porties/Prep update without reload */}
-          <div className="mt-4">
-            <RecipePrepTimeAndServingsEditor
-              currentPrepTime={
-                classificationOverlay?.totalMinutes != null
-                  ? classificationOverlay.totalMinutes
-                  : typeof mealData?.prepTime === 'number'
-                    ? mealData.prepTime
-                    : typeof mealData?.prepTime === 'string'
-                      ? parseFloat(mealData.prepTime) || null
-                      : null
-              }
-              currentServings={
-                classificationOverlay?.servings != null
-                  ? typeof classificationOverlay.servings === 'number'
-                    ? classificationOverlay.servings
-                    : typeof classificationOverlay.servings === 'string'
-                      ? parseFloat(classificationOverlay.servings) || null
-                      : null
-                  : typeof mealData?.servings === 'number'
-                    ? mealData.servings
-                    : typeof mealData?.servings === 'string'
-                      ? parseFloat(mealData.servings) || null
-                      : null
-              }
-              mealId={mealId}
-              source={mealSource}
-              onUpdated={() => {
-                router.refresh();
-              }}
-            />
-          </div>
-
-          {/* Basic Info */}
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            {consumptionCount > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-zinc-600 dark:text-zinc-400">
-                  {mealSource === 'custom' ? 'Geconsumeerd' : 'Gebruikt'}:{' '}
-                  <span className="font-medium">{consumptionCount}x</span>
-                </span>
-              </div>
+            {imageUrl && (
+              <ImageLightbox
+                open={lightboxOpen}
+                onClose={() => setLightboxOpen(false)}
+                imageUrl={imageUrl}
+                alt={mealName}
+              />
             )}
 
-            {userRating != null && (
-              <div className="flex items-center gap-2">
-                <span className="text-zinc-600 dark:text-zinc-400">
-                  Beoordeling:
-                </span>
-                <div className="flex items-center gap-1">
-                  <div className="flex gap-0.5">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <StarIcon
-                        key={star}
-                        className={`h-4 w-4 ${
-                          star <= Number(userRating)
-                            ? 'text-yellow-400 fill-yellow-400'
-                            : 'text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="font-medium text-zinc-900 dark:text-white ml-1">
-                    {Number(userRating)}/5
+            {/* Prep Time and Servings Editor — prefer classificationOverlay after save so Porties/Prep update without reload */}
+            <div className="mt-4">
+              <RecipePrepTimeAndServingsEditor
+                currentPrepTime={
+                  classificationOverlay?.totalMinutes != null
+                    ? classificationOverlay.totalMinutes
+                    : typeof mealData?.prepTime === 'number'
+                      ? mealData.prepTime
+                      : typeof mealData?.prepTime === 'string'
+                        ? parseFloat(mealData.prepTime) || null
+                        : null
+                }
+                currentServings={
+                  classificationOverlay?.servings != null
+                    ? typeof classificationOverlay.servings === 'number'
+                      ? classificationOverlay.servings
+                      : typeof classificationOverlay.servings === 'string'
+                        ? parseFloat(classificationOverlay.servings) || null
+                        : null
+                    : typeof mealData?.servings === 'number'
+                      ? mealData.servings
+                      : typeof mealData?.servings === 'string'
+                        ? parseFloat(mealData.servings) || null
+                        : null
+                }
+                mealId={mealId}
+                source={mealSource}
+                onUpdated={() => {
+                  router.refresh();
+                }}
+              />
+            </div>
+
+            {/* Basic Info */}
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              {consumptionCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-zinc-600 dark:text-zinc-400">
+                    {mealSource === 'custom' ? 'Geconsumeerd' : 'Gebruikt'}:{' '}
+                    <span className="font-medium">{consumptionCount}x</span>
                   </span>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
 
-          {/* Dates */}
-          <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-400 space-y-1">
-            {createdAt && <div>Toegevoegd: {formatDate(createdAt)}</div>}
-            {firstConsumedAt && (
-              <div>
-                Eerst {mealSource === 'custom' ? 'geconsumeerd' : 'gebruikt'}:{' '}
-                {formatDate(firstConsumedAt)}
-              </div>
-            )}
-            {lastConsumedAt && (
-              <div>
-                Laatst {mealSource === 'custom' ? 'geconsumeerd' : 'gebruikt'}:{' '}
-                {formatDate(lastConsumedAt)}
-              </div>
-            )}
-          </div>
-
-          {/* Bron-URL (originele receptpagina) */}
-          {sourceUrl && (
-            <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 text-sm">
-              <a
-                href={sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                <LinkIcon className="h-4 w-4 flex-shrink-0" />
-                Bron: originele receptpagina
-              </a>
+              {userRating != null && (
+                <div className="flex items-center gap-2">
+                  <span className="text-zinc-600 dark:text-zinc-400">
+                    Beoordeling:
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <StarIcon
+                          key={star}
+                          className={`h-4 w-4 ${
+                            star <= Number(userRating)
+                              ? 'text-yellow-400 fill-yellow-400'
+                              : 'text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="font-medium text-zinc-900 dark:text-white ml-1">
+                      {Number(userRating)}/5
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Dates */}
+            <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-400 space-y-1">
+              {createdAt && <div>Toegevoegd: {formatDate(createdAt)}</div>}
+              {firstConsumedAt && (
+                <div>
+                  Eerst {mealSource === 'custom' ? 'geconsumeerd' : 'gebruikt'}:{' '}
+                  {formatDate(firstConsumedAt)}
+                </div>
+              )}
+              {lastConsumedAt && (
+                <div>
+                  Laatst {mealSource === 'custom' ? 'geconsumeerd' : 'gebruikt'}
+                  : {formatDate(lastConsumedAt)}
+                </div>
+              )}
+            </div>
+
+            {/* Bron-URL (originele receptpagina) */}
+            {sourceUrl && (
+              <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 text-sm">
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  <LinkIcon className="h-4 w-4 flex-shrink-0" />
+                  Bron: originele receptpagina
+                </a>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1597,12 +1607,16 @@ export function MealDetail({
                           ing.original_line ||
                           `Ingrediënt ${idx + 1}`);
                       const quantity = ing.quantity ?? ing.amount;
-                      const numQty =
+                      const rawNumQty =
                         typeof quantity === 'number'
                           ? quantity
                           : typeof quantity === 'string'
                             ? parseFloat(quantity)
                             : undefined;
+                      const numQty =
+                        rawNumQty != null && Number.isFinite(rawNumQty)
+                          ? rawNumQty
+                          : undefined;
                       const unit = (ing.unit ?? 'g')?.toString().trim() || 'g';
                       const note = ing.note ?? ing.notes;
                       const isToTaste = isToTasteIngredient(name);
@@ -1699,12 +1713,16 @@ export function MealDetail({
                           ing.original_line ||
                           `Ingrediënt ${idx + 1}`);
                       const quantity = ing.quantity ?? ing.amount;
-                      const numQty =
+                      const rawNumQty =
                         typeof quantity === 'number'
                           ? quantity
                           : typeof quantity === 'string'
                             ? parseFloat(quantity)
                             : undefined;
+                      const numQty =
+                        rawNumQty != null && Number.isFinite(rawNumQty)
+                          ? rawNumQty
+                          : undefined;
                       const unit = (ing.unit ?? 'g')?.toString().trim() || 'g';
                       const note = ing.note ?? ing.notes;
                       const isToTaste = isToTasteIngredient(name);
