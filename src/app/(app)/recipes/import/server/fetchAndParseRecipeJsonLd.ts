@@ -914,7 +914,7 @@ function hasSufficientFields(recipe: Record<string, unknown>): boolean {
 /**
  * Extract a single instruction text (for one step)
  */
-function extractInstructionText(instruction: unknown): string | null {
+function _extractInstructionText(instruction: unknown): string | null {
   if (typeof instruction === 'string') {
     return instruction.trim();
   }
@@ -926,7 +926,7 @@ function extractInstructionText(instruction: unknown): string | null {
     }
     if (inst.itemListElement && Array.isArray(inst.itemListElement)) {
       return (inst.itemListElement as unknown[])
-        .map((item: unknown) => extractInstructionText(item))
+        .map((item: unknown) => _extractInstructionText(item))
         .filter((text: string | null) => text)
         .join(' ');
     }

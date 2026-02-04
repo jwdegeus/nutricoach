@@ -21,7 +21,7 @@ interface SettingsPageContentProps {
 }
 
 export function SettingsPageContent({
-  user,
+  user: _user,
   schedulePrefs,
   isAdmin,
 }: SettingsPageContentProps) {

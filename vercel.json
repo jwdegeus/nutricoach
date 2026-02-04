@@ -1,7 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm run deploy-check",
   "framework": "nextjs",
   "installCommand": "npm ci",
-  "ignoreCommand": "[ \"$VERCEL_GIT_COMMIT_REF\" != \"main\" ]"
+  "buildCommand": "npm run deploy-check"
 }

@@ -62,10 +62,12 @@ export function FavoritesPickerDialog({
 
   useEffect(() => {
     if (open) {
-      setLocalIds(selectedIds);
-      setSearchQuery('');
-      setSearchResults([]);
-      setSearchError(null);
+      queueMicrotask(() => {
+        setLocalIds(selectedIds);
+        setSearchQuery('');
+        setSearchResults([]);
+        setSearchError(null);
+      });
     }
   }, [open, selectedIds]);
 

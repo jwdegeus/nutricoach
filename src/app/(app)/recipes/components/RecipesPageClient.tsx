@@ -233,7 +233,7 @@ export function RecipesPageClient({
     if (alreadyLoaded) return;
 
     let cancelled = false;
-    setComplianceLoading(true);
+    queueMicrotask(() => setComplianceLoading(true));
     const items = buildComplianceItems(paginatedMeals);
     getRecipeComplianceScoresAction(items)
       .then((result) => {
@@ -248,7 +248,7 @@ export function RecipesPageClient({
     return () => {
       cancelled = true;
     };
-  }, [pageIdsKey, complianceScores]);
+  }, [pageIdsKey, complianceScores, paginatedMeals]);
 
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);

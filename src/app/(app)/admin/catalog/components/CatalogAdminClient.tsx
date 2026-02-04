@@ -73,7 +73,7 @@ export function CatalogAdminClient() {
   }, [dimension]);
 
   useEffect(() => {
-    load();
+    queueMicrotask(() => load());
   }, [load]);
 
   const handleCreateOpen = () => {

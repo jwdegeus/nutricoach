@@ -111,7 +111,7 @@ export function MealSlotStylePreferencesClient() {
   }, []);
 
   useEffect(() => {
-    loadPrefs();
+    queueMicrotask(() => loadPrefs());
   }, [loadPrefs]);
 
   const weekendDaysValid = weekendDays.length >= 1;
@@ -308,7 +308,7 @@ export function MealSlotStylePreferencesClient() {
               <CheckboxField>
                 <Checkbox
                   checked={weekendDays.includes(SATURDAY)}
-                  onChange={(value) => toggleWeekendDay(SATURDAY)}
+                  onChange={(_value) => toggleWeekendDay(SATURDAY)}
                   disabled={savePending}
                 />
                 <Label>{t('saturday')}</Label>
@@ -316,7 +316,7 @@ export function MealSlotStylePreferencesClient() {
               <CheckboxField>
                 <Checkbox
                   checked={weekendDays.includes(SUNDAY)}
-                  onChange={(value) => toggleWeekendDay(SUNDAY)}
+                  onChange={(_value) => toggleWeekendDay(SUNDAY)}
                   disabled={savePending}
                 />
                 <Label>{t('sunday')}</Label>

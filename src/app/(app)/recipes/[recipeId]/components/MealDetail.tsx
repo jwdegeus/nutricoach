@@ -192,7 +192,7 @@ export function MealDetail({
   complianceScore,
   onRecipeApplied,
   onIngredientMatched,
-  onSourceSaved,
+  onSourceSaved: _onSourceSaved,
 }: MealDetailProps) {
   const { showToast } = useToast();
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -361,13 +361,17 @@ export function MealDetail({
   // Load classification when custom meal is shown (1x per mealId; no waterfall)
   useEffect(() => {
     if (mealSource !== 'custom' || !mealId) {
-      setClassificationLoadState('idle');
-      setClassificationLoadError(null);
+      queueMicrotask(() => {
+        setClassificationLoadState('idle');
+        setClassificationLoadError(null);
+      });
       return;
     }
     let cancelled = false;
-    setClassificationLoadState('loading');
-    setClassificationLoadError(null);
+    queueMicrotask(() => {
+      setClassificationLoadState('loading');
+      setClassificationLoadError(null);
+    });
     loadMealClassificationAction({ mealId }).then((result) => {
       if (cancelled) return;
       if (!result.ok) {
@@ -388,10 +392,12 @@ export function MealDetail({
   // Sync classification draft when opening Classificeren dialog (overlay ?? meal); reset save error
   useEffect(() => {
     if (classificationDialogOpen) {
-      setClassificationDraft(
-        classificationOverlay ?? buildInitialClassificationDraft(),
-      );
-      setClassificationSaveError(null);
+      queueMicrotask(() => {
+        setClassificationDraft(
+          classificationOverlay ?? buildInitialClassificationDraft(),
+        );
+        setClassificationSaveError(null);
+      });
     }
   }, [
     classificationDialogOpen,
@@ -403,7 +409,7 @@ export function MealDetail({
   useEffect(() => {
     if (!classificationDialogOpen) return;
     let cancelled = false;
-    setCatalogOptionsLoading(true);
+    queueMicrotask(() => setCatalogOptionsLoading(true));
     const mealSlotSelected = classificationDraft.mealSlotOptionId ?? undefined;
     const cuisineSelected = classificationDraft.cuisineOptionId ?? undefined;
     const proteinSelected =
@@ -614,7 +620,7 @@ export function MealDetail({
 
   // Reset override when switching to another meal
   useEffect(() => {
-    setImageUrlOverride(undefined);
+    queueMicrotask(() => setImageUrlOverride(undefined));
   }, [mealId]);
 
   const [recipeSource, setRecipeSource] = useState<string | null>(
@@ -626,7 +632,7 @@ export function MealDetail({
 
   useEffect(() => {
     const newSource = mealSourceProp ?? null;
-    setRecipeSource(newSource);
+    queueMicrotask(() => setRecipeSource(newSource));
   }, [mealSourceProp]);
 
   const formatMealSlot = (slot: string) => {
@@ -706,11 +712,11 @@ export function MealDetail({
 
   useEffect(() => {
     if (!meal?.id || !mealSource || !hasIngredientsForNutrition) {
-      setRecipeNutritionSummary(null);
+      queueMicrotask(() => setRecipeNutritionSummary(null));
       return;
     }
     let cancelled = false;
-    setRecipeNutritionLoading(true);
+    queueMicrotask(() => setRecipeNutritionLoading(true));
     getRecipeNutritionSummaryAction({ mealId, source: mealSource })
       .then((result) => {
         if (cancelled) return;
@@ -738,7 +744,7 @@ export function MealDetail({
 
   useEffect(() => {
     if (!meal?.id || !hasLegacyIngredients || !displayMealData?.ingredients) {
-      setResolvedLegacyMatches(null);
+      queueMicrotask(() => setResolvedLegacyMatches(null));
       return;
     }
     const ingredients = displayMealData.ingredients as MealIngredientLike[];
@@ -765,7 +771,7 @@ export function MealDetail({
       },
     );
     if (lineOptionsPerIngredient.every((opts) => opts.length === 0)) {
-      setResolvedLegacyMatches(null);
+      queueMicrotask(() => setResolvedLegacyMatches(null));
       return;
     }
     let cancelled = false;

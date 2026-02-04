@@ -48,7 +48,7 @@ export function HouseholdServingsClient() {
   }, [showToast]);
 
   useEffect(() => {
-    loadPrefs();
+    queueMicrotask(() => loadPrefs());
   }, [loadPrefs]);
 
   const isValid =

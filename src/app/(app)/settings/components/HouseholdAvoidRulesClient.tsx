@@ -78,7 +78,7 @@ export function HouseholdAvoidRulesClient() {
   }, [showToast]);
 
   useEffect(() => {
-    loadRules();
+    queueMicrotask(() => loadRules());
   }, [loadRules]);
 
   const validateValue = useCallback((): boolean => {

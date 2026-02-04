@@ -396,7 +396,7 @@ export function RecipesIndexClient({
     [handleSearchSubmit],
   );
 
-  const handleAddTag = useCallback(() => {
+  const _handleAddTag = useCallback(() => {
     const t = tagInput.trim().toLowerCase();
     if (!t || tags.includes(t)) {
       setTagInput('');
@@ -407,7 +407,7 @@ export function RecipesIndexClient({
     tagInputRef.current?.focus();
   }, [pushParams, tags, tagInput]);
 
-  const applyDrawer = useCallback(
+  const _applyDrawer = useCallback(
     (drawer: {
       mealSlot?: string;
       maxTotalMinutes?: number | null;

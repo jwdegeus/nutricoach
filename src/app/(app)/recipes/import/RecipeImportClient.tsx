@@ -232,7 +232,7 @@ export function RecipeImportClient({
 
   // Derived for backward compat: first page as "single" file/preview
   const localSelectedFile = localPages[0]?.file ?? null;
-  const previewUrl = localPages[0]?.previewUrl ?? null;
+  const _previewUrl = localPages[0]?.previewUrl ?? null;
 
   // URL import (inline block)
   const [urlImportValue, setUrlImportValue] = useState('');
@@ -291,7 +291,7 @@ export function RecipeImportClient({
           setSelectedMealSlotOptionId(dinnerOpt.id);
       }
     });
-  }, [uiState, mealSlotOptions.length]);
+  }, [uiState, mealSlotOptions.length, selectedMealSlotOptionId]);
 
   // Load job from server
   const loadJob = useCallback(

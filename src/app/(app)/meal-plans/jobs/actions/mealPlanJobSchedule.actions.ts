@@ -106,7 +106,7 @@ function zonedTimeToUtcIso(params: {
 }): string {
   const { date, time, timeZone } = params;
   const [targetH, targetM] = time.split(':').map(Number);
-  const [ty, tm, td] = date.split('-').map(Number);
+  const [_ty, _tm, td] = date.split('-').map(Number);
 
   const fmt = new Intl.DateTimeFormat('en-CA', {
     timeZone,
@@ -124,8 +124,8 @@ function zonedTimeToUtcIso(params: {
     const parts = fmt.formatToParts(candidate);
     const get = (t: string) =>
       Number(parts.find((p) => p.type === t)?.value ?? 0);
-    const fy = get('year');
-    const fm = get('month');
+    const _fy = get('year');
+    const _fm = get('month');
     const fd = get('day');
     const fh = get('hour');
     const fmin = get('minute');
