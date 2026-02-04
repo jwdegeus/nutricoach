@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import { ThemeProvider } from '@/src/components/theme-provider';
 import { getLocale, getMessages, getTimeZone } from 'next-intl/server';
 import { I18nProvider } from '@/src/components/i18n-provider';
@@ -57,6 +58,7 @@ export default async function RootLayout({
             {children}
           </ThemeProvider>
         </I18nProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
