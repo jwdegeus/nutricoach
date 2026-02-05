@@ -388,6 +388,7 @@ export function RecipeDetailPageClient({
           });
         }}
         onSourceSaved={loadMealSilent}
+        onRatingUpdated={loadMealSilent}
       />
     </div>
   );

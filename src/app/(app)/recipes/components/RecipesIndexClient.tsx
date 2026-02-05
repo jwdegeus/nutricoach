@@ -32,6 +32,7 @@ import {
   TagIcon,
   Square3Stack3DIcon,
   PhotoIcon,
+  StarIcon,
 } from '@heroicons/react/20/solid';
 import { BookmarkIcon as BookmarkIconSolid } from '@heroicons/react/16/solid';
 import { BookmarkIcon as BookmarkIconOutline } from '@heroicons/react/24/outline';
@@ -1371,6 +1372,28 @@ function MealCard({
               <span className="text-xs text-zinc-500 dark:text-zinc-400">
                 {item.servings} porties
               </span>
+            )}
+            {item.userRating != null && item.userRating >= 1 && (
+              <div
+                className="flex items-center gap-0.5"
+                title={`Beoordeling: ${item.userRating}/5`}
+              >
+                <div className="flex gap-0.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <StarIcon
+                      key={star}
+                      className={`h-3.5 w-3.5 ${
+                        star <= item.userRating!
+                          ? 'text-yellow-400 fill-yellow-400'
+                          : 'text-zinc-300 dark:text-zinc-600 fill-zinc-300 dark:fill-zinc-600'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {item.userRating}/5
+                </span>
+              </div>
             )}
           </div>
           {item.tags.length > 0 && (

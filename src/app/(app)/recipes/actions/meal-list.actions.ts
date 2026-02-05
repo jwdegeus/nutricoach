@@ -28,7 +28,7 @@ type ActionResult<T> =
       };
     };
 
-/** Single meal row for list (minimal columns + tags + isFavorited). */
+/** Single meal row for list (minimal columns + tags + isFavorited + userRating). */
 export type MealListItem = {
   mealId: string;
   title: string;
@@ -45,6 +45,8 @@ export type MealListItem = {
   updatedAt: string | null;
   /** Whether the current user has this meal in meal_favorites (1 query per list, no N+1). */
   isFavorited: boolean;
+  /** User rating 1–5 from meal_history (for custom meals). */
+  userRating: number | null;
 };
 
 export type ListMealsOutput = {
@@ -148,7 +150,18 @@ function rowToMealListItem(
     tags: uniqueTags,
     updatedAt: row.updated_at ?? null,
     isFavorited: favoritedSet.has(row.id),
+    userRating: null,
   };
+}
+
+function attachUserRatings<T extends MealListItem>(
+  items: T[],
+  ratingsByMealId: Record<string, number>,
+): T[] {
+  return items.map((item) => ({
+    ...item,
+    userRating: ratingsByMealId[item.mealId] ?? null,
+  }));
 }
 
 /**
@@ -345,20 +358,34 @@ export async function listMealsAction(
 
     const mealIds = (rows ?? []).map((r) => (r as unknown as CustomMealRow).id);
     let favoritedSet = new Set<string>();
+    const ratingsByMealId: Record<string, number> = {};
     if (mealIds.length > 0) {
-      const { data: favRows } = await supabase
-        .from('meal_favorites')
-        .select('meal_id')
-        .eq('user_id', user.id)
-        .in('meal_id', mealIds);
+      const [favRes, ratingRes] = await Promise.all([
+        supabase
+          .from('meal_favorites')
+          .select('meal_id')
+          .eq('user_id', user.id)
+          .in('meal_id', mealIds),
+        supabase
+          .from('meal_history')
+          .select('meal_id, user_rating')
+          .eq('user_id', user.id)
+          .in('meal_id', mealIds),
+      ]);
       favoritedSet = new Set(
-        (favRows ?? []).map((r) => (r as { meal_id: string }).meal_id),
+        (favRes.data ?? []).map((r) => (r as { meal_id: string }).meal_id),
       );
+      for (const r of ratingRes.data ?? []) {
+        const row = r as { meal_id: string; user_rating: number | null };
+        if (row.user_rating != null)
+          ratingsByMealId[row.meal_id] = row.user_rating;
+      }
     }
 
-    const items = (rows ?? []).map((row) =>
+    const rawItems = (rows ?? []).map((row) =>
       rowToMealListItem(row as unknown as CustomMealRow, favoritedSet),
     );
+    const items = attachUserRatings(rawItems, ratingsByMealId);
 
     return {
       ok: true,

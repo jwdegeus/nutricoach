@@ -833,6 +833,19 @@ export async function searchIngredientCandidatesAction(
     for (const t of getExtraSearchTerms(searchTerm)) {
       if (t && !searchTerms.includes(t)) searchTerms.push(t);
     }
+    // Nederlandse varianten zodat NEVO-namen (bijv. "Haver, vlokken") matchen op "havermout"
+    const termVariants: Record<string, string[]> = {
+      havermout: ['haver'],
+      haver: ['havermout'],
+    };
+    const termLower = searchTerm.toLowerCase().trim();
+    for (const [key, variants] of Object.entries(termVariants)) {
+      if (termLower === key || termLower.includes(key)) {
+        for (const v of variants) {
+          if (v && !searchTerms.includes(v)) searchTerms.push(v);
+        }
+      }
+    }
     // Elk significant woord apart zoeken (bijv. "gedroogde tijm" → ook "tijm") zodat NEVO "Tijm, gedroogd" matcht.
     // Woorden van 1–2 tekens overslaan: "%ui%" matcht ook "beschuit"/"biscuit", "%ro%" te veel ruis.
     const words = searchTerm
@@ -1195,10 +1208,16 @@ export async function searchIngredientCandidatesAction(
       }
     }
 
-    const combined = sortCandidatesByRelevance(
-      [...nevoCandidates, ...customCandidates, ...fnddsCandidates],
-      raw,
-    ).slice(0, limit);
+    // NEVO primair: per bron op relevantie sorteren, dan NEVO → custom → FNDDS concat en top nemen
+    const byRelevance = (list: IngredientCandidate[]) =>
+      sortCandidatesByRelevance(list, raw);
+    const nevoSorted = byRelevance(nevoCandidates);
+    const customSorted = byRelevance(customCandidates);
+    const fnddsSorted = byRelevance(fnddsCandidates);
+    const combined = [...nevoSorted, ...customSorted, ...fnddsSorted].slice(
+      0,
+      limit,
+    );
     return { ok: true, data: combined };
   } catch (e) {
     return {
@@ -1350,6 +1369,8 @@ export async function getRecipeNutritionSummaryAction(args: {
     }
 
     const recipeIngredients: RecipeIngredient[] = [];
+    /** Max gram per ingredient om onrealistische waarden (verkeerde match/unit) te beperken. */
+    const MAX_GRAMS_PER_INGREDIENT = 2000;
 
     type IngredientRefLike = {
       nevoCode?: unknown;
@@ -1375,12 +1396,24 @@ export async function getRecipeNutritionSummaryAction(args: {
         let amountG = Number(ref.quantityG ?? ref.quantity_g ?? 0);
         if (!Number.isFinite(amountG) || amountG <= 0) {
           const q = ref.quantity ?? ref.quantityG;
-          const u = ref.unit ?? 'g';
-          if (typeof q === 'number' && Number.isFinite(q) && u) {
-            amountG = quantityUnitToGrams(q, String(u));
+          const u =
+            (ref.unit ?? 'g') && String(ref.unit).trim()
+              ? String(ref.unit).trim()
+              : 'g';
+          const numQty =
+            q == null
+              ? NaN
+              : typeof q === 'number'
+                ? q
+                : parseFloat(String(q).replace(/,/g, '.'));
+          if (Number.isFinite(numQty) && numQty > 0) {
+            amountG = quantityUnitToGrams(numQty, u);
           }
         }
         if (!Number.isFinite(amountG) || amountG <= 0) continue;
+        if (amountG > MAX_GRAMS_PER_INGREDIENT) {
+          amountG = MAX_GRAMS_PER_INGREDIENT;
+        }
         if (ref.customFoodId ?? ref.custom_food_id) {
           recipeIngredients.push({
             custom_food_id: ref.customFoodId ?? ref.custom_food_id,
@@ -1429,11 +1462,14 @@ export async function getRecipeNutritionSummaryAction(args: {
             : typeof quantity === 'string'
               ? parseFloat(quantity)
               : NaN;
-        const amountG =
+        let amountG =
           Number.isFinite(numQty) && numQty > 0
             ? quantityUnitToGrams(numQty, unit)
             : 0;
         if (amountG <= 0) continue;
+        if (amountG > MAX_GRAMS_PER_INGREDIENT) {
+          amountG = MAX_GRAMS_PER_INGREDIENT;
+        }
 
         if (match.source === 'nevo' && match.nevo_code != null) {
           recipeIngredients.push({

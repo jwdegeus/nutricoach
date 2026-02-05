@@ -52,7 +52,28 @@ export async function getAllMealsAction(): Promise<
     const service = new CustomMealsService();
     const customMeals = await service.getUserMeals(user.id);
 
-    // Also get meal history
+    // Enrich custom meals with user_rating from meal_history (ratings are stored there)
+    const customIds = customMeals.map((m) => m.id);
+    const ratingsByMealId: Record<string, number> = {};
+    if (customIds.length > 0) {
+      const { data: ratingRows } = await supabase
+        .from('meal_history')
+        .select('meal_id, user_rating')
+        .eq('user_id', user.id)
+        .in('meal_id', customIds);
+      if (ratingRows) {
+        for (const row of ratingRows) {
+          const r = row as { meal_id: string; user_rating: number | null };
+          if (r.user_rating != null) ratingsByMealId[r.meal_id] = r.user_rating;
+        }
+      }
+    }
+    const customMealsWithRating = customMeals.map((m) => ({
+      ...m,
+      userRating: ratingsByMealId[m.id] ?? null,
+    }));
+
+    // Also get meal history (already includes user_rating from select *)
     const { data: mealHistory } = await supabase
       .from('meal_history')
       .select('*')
@@ -62,7 +83,7 @@ export async function getAllMealsAction(): Promise<
     return {
       ok: true,
       data: {
-        customMeals,
+        customMeals: customMealsWithRating,
         mealHistory: mealHistory || [],
       },
     };
@@ -547,6 +568,71 @@ export async function getRecipeRatingAction(args: {
 }
 
 /**
+ * Clear (remove) rating for a meal (custom or gemini); meal must exist in meal_history.
+ */
+export async function clearRecipeRatingAction(args: {
+  mealId: string;
+  source: 'custom' | 'gemini';
+}): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: {
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
+        },
+      };
+    }
+
+    const { data: row, error: fetchError } = await supabase
+      .from('meal_history')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('meal_id', args.mealId)
+      .maybeSingle();
+
+    if (fetchError) {
+      return {
+        ok: false,
+        error: { code: 'DB_ERROR', message: fetchError.message },
+      };
+    }
+    if (!row) {
+      return { ok: true, data: undefined };
+    }
+
+    const { error: updateError } = await supabase
+      .from('meal_history')
+      .update({ user_rating: null })
+      .eq('id', (row as { id: string }).id)
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      return {
+        ok: false,
+        error: { code: 'DB_ERROR', message: updateError.message },
+      };
+    }
+
+    return { ok: true, data: undefined };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+    };
+  }
+}
+
+/**
  * Update notes for a meal
  */
 export async function updateRecipeNotesAction(args: {
@@ -923,18 +1009,21 @@ function normalizeIngredientText(text: string): string {
   return text.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
-/** Schat quantityG uit quantity + unit (bijv. 200 + "g" → 200; anders 100). */
+/** Bepaal quantityG uit quantity + unit via quantityUnitToGrams (correct voor g, ml, el, tl, etc.). */
 function quantityGFromIngredient(ing: {
   quantity?: string | number | null;
   unit?: string | null;
 }): number {
   const q = ing.quantity;
-  const u = (ing.unit ?? 'g').toString().toLowerCase();
-  if (u === 'g' && q != null) {
-    const n = typeof q === 'number' ? q : parseFloat(String(q));
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-  return 100;
+  const u = (ing.unit ?? 'g').toString().trim().toLowerCase() || 'g';
+  const numQty =
+    q == null
+      ? NaN
+      : typeof q === 'number'
+        ? q
+        : parseFloat(String(q).replace(/,/g, '.'));
+  if (!Number.isFinite(numQty) || numQty <= 0) return 0;
+  return quantityUnitToGrams(numQty, u);
 }
 
 /**

@@ -95,6 +95,7 @@ function rowToRecentMealListItem(
     tags: uniqueTags,
     updatedAt: row.updated_at ?? null,
     isFavorited: favoritedSet.has(row.id),
+    userRating: null,
     lastViewedAt,
   };
 }
@@ -277,25 +278,42 @@ export async function listRecentMealsAction(
     );
 
     let favoritedSet = new Set<string>();
+    const ratingsByMealId: Record<string, number> = {};
     if (mealIdsOrdered.length > 0) {
-      const { data: favRows } = await supabase
-        .from('meal_favorites')
-        .select('meal_id')
-        .eq('user_id', user.id)
-        .in('meal_id', mealIdsOrdered);
+      const [favRes, ratingRes] = await Promise.all([
+        supabase
+          .from('meal_favorites')
+          .select('meal_id')
+          .eq('user_id', user.id)
+          .in('meal_id', mealIdsOrdered),
+        supabase
+          .from('meal_history')
+          .select('meal_id, user_rating')
+          .eq('user_id', user.id)
+          .in('meal_id', mealIdsOrdered),
+      ]);
       favoritedSet = new Set(
-        (favRows ?? []).map((r) => (r as { meal_id: string }).meal_id),
+        (favRes.data ?? []).map((r) => (r as { meal_id: string }).meal_id),
       );
+      for (const r of ratingRes.data ?? []) {
+        const row = r as { meal_id: string; user_rating: number | null };
+        if (row.user_rating != null)
+          ratingsByMealId[row.meal_id] = row.user_rating;
+      }
     }
 
-    const items: RecentMealListItem[] = [];
+    const rawItems: RecentMealListItem[] = [];
     for (const mealId of mealIdsOrdered) {
       const row = mealRowsById.get(mealId);
       const lastViewedAt = lastViewedByMealId.get(mealId);
       if (row && lastViewedAt) {
-        items.push(rowToRecentMealListItem(row, favoritedSet, lastViewedAt));
+        rawItems.push(rowToRecentMealListItem(row, favoritedSet, lastViewedAt));
       }
     }
+    const items = rawItems.map((item) => ({
+      ...item,
+      userRating: ratingsByMealId[item.mealId] ?? null,
+    }));
 
     return {
       ok: true,

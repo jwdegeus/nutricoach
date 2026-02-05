@@ -22,10 +22,13 @@ import {
   Description,
   ErrorMessage,
 } from '@/components/catalyst/fieldset';
+import { Textarea } from '@/components/catalyst/textarea';
 import {
   PhotoIcon,
   CameraIcon,
   ClipboardDocumentIcon,
+  DocumentTextIcon,
+  PencilSquareIcon,
 } from '@heroicons/react/24/solid';
 import {
   ArrowPathIcon,
@@ -42,6 +45,10 @@ import {
   loadRecipeImportAction,
   importRecipeFromUrlAction,
 } from './actions/recipeImport.actions';
+import {
+  importRecipeFromTextAction,
+  createRecipeImportFromScratchAction,
+} from './actions/recipeImport.textAndScratch.actions';
 import { processRecipeImportWithGeminiAction } from './actions/recipeImport.process.actions';
 import { finalizeRecipeImportAction } from './actions/recipeImport.finalize.actions';
 import { getCatalogOptionsForPickerAction } from '../actions/catalog-options.actions';
@@ -241,6 +248,14 @@ export function RecipeImportClient({
     null,
   );
   const [isUrlImportPending, startUrlImportTransition] = useTransition();
+
+  // Text paste import
+  const [textImportValue, setTextImportValue] = useState('');
+  const [textImportError, setTextImportError] = useState<string | null>(null);
+  const [isTextImportPending, startTextImportTransition] = useTransition();
+
+  // From scratch
+  const [isFromScratchPending, startFromScratchTransition] = useTransition();
 
   // Camera state
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -950,6 +965,105 @@ export function RecipeImportClient({
     ],
   );
 
+  const handleTextImportSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (isTextImportPending) return;
+      setTextImportError(null);
+      const text = textImportValue.trim();
+      if (!text) {
+        setTextImportError(t('textImportPlaceholder'));
+        return;
+      }
+      if (text.length < 10) {
+        setTextImportError(t('textImportMinLength'));
+        return;
+      }
+      startTextImportTransition(async () => {
+        try {
+          const result = await importRecipeFromTextAction({ text });
+          if (result.ok && result.jobId) {
+            if (result.job && typeof window !== 'undefined') {
+              try {
+                sessionStorage.setItem(
+                  `recipe-import-job-${result.jobId}`,
+                  JSON.stringify(result.job),
+                );
+              } catch {
+                // ignore
+              }
+            }
+            setTextImportValue('');
+            setTextImportError(null);
+            router.push(`/recipes/import?jobId=${result.jobId}`);
+          } else {
+            const errorMsg = !result.ok ? result.message : t('textImportError');
+            setTextImportError(errorMsg);
+            showToast({
+              type: 'error',
+              title: t('textImportErrorTitle'),
+              description: errorMsg,
+            });
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : t('textImportError');
+          setTextImportError(msg);
+          showToast({
+            type: 'error',
+            title: t('textImportErrorTitle'),
+            description: msg,
+          });
+        }
+      });
+    },
+    [
+      textImportValue,
+      isTextImportPending,
+      router,
+      showToast,
+      t,
+      startTextImportTransition,
+    ],
+  );
+
+  const handleFromScratch = useCallback(() => {
+    if (isFromScratchPending) return;
+    startFromScratchTransition(async () => {
+      try {
+        const result = await createRecipeImportFromScratchAction();
+        if (result.ok && result.data.jobId) {
+          if (result.data.job && typeof window !== 'undefined') {
+            try {
+              sessionStorage.setItem(
+                `recipe-import-job-${result.data.jobId}`,
+                JSON.stringify(result.data.job),
+              );
+            } catch {
+              // ignore
+            }
+          }
+          router.push(`/recipes/import?jobId=${result.data.jobId}`);
+        } else {
+          const errorMsg = !result.ok
+            ? result.error.message
+            : t('fromScratchError');
+          showToast({
+            type: 'error',
+            title: t('fromScratchErrorTitle'),
+            description: errorMsg,
+          });
+        }
+      } catch (err) {
+        showToast({
+          type: 'error',
+          title: t('fromScratchErrorTitle'),
+          description:
+            err instanceof Error ? err.message : t('fromScratchError'),
+        });
+      }
+    });
+  }, [isFromScratchPending, router, showToast, t, startFromScratchTransition]);
+
   // Translation happens automatically - no manual trigger needed
 
   // Handle finalize recipe import
@@ -1065,181 +1179,291 @@ export function RecipeImportClient({
     <div className="space-y-6">
       {/* Upload Area */}
       {uiState === 'idle' && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div>
             <Heading level={2}>{t('uploadTitle')}</Heading>
             <Text>{t('uploadDescription')}</Text>
           </div>
 
-          {/* Dropzone */}
-          <div
-            ref={dropZoneRef}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className="relative border-2 border-dashed rounded-lg p-8 transition-colors border-zinc-300 dark:border-zinc-700 hover:border-primary-400 dark:hover:border-primary-600"
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleInputChange}
-              disabled={isPending}
-              className="hidden"
-              id="recipe-upload-input"
-              aria-label={t('selectFile')}
-            />
-
-            <div className="flex flex-col items-center justify-center text-center space-y-4">
-              <div className="rounded-full bg-primary-100 dark:bg-primary-900/30 p-4">
-                <PhotoIcon className="h-8 w-8 text-primary-600 dark:text-primary-400" />
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                <label htmlFor="recipe-upload-input" className="cursor-pointer">
-                  <Button
-                    as="span"
-                    color="primary"
-                    disabled={isPending}
-                    className="w-full sm:w-auto"
-                  >
-                    <PhotoIcon className="h-4 w-4 mr-2" />
-                    {isPending ? t('uploading') : t('selectFile')}
-                  </Button>
-                </label>
-                <Button
-                  onClick={handleOpenCamera}
-                  disabled={isPending}
-                  color="primary"
-                  className="w-full sm:w-auto"
-                >
-                  <CameraIcon className="h-4 w-4 mr-2" />
-                  {t('takePhoto')}
-                </Button>
-                <Button
-                  onClick={async () => {
-                    // Try to read from clipboard API (works in some browsers)
-                    try {
-                      if (navigator.clipboard && navigator.clipboard.read) {
-                        const items = await navigator.clipboard.read();
-                        const imageItem = items.find((item) =>
-                          item.types.some((type) => type.startsWith('image/')),
-                        );
-                        if (imageItem) {
-                          const imageType = imageItem.types.find((type) =>
-                            type.startsWith('image/'),
-                          );
-                          if (imageType) {
-                            const blob = await imageItem.getType(imageType);
-                            const file = new File(
-                              [blob],
-                              `paste-${Date.now()}.${imageType.split('/')[1]}`,
-                              {
-                                type: imageType,
-                                lastModified: Date.now(),
-                              },
-                            );
-                            handleFileSelect(file);
-                            return;
-                          }
-                        }
-                      }
-                      // If clipboard API doesn't work, show hint
-                      setError(t('pasteHint'));
-                    } catch (_err) {
-                      // Clipboard API not available or permission denied - show hint
-                      setError(t('pasteHint'));
-                    }
-                  }}
-                  disabled={isPending}
-                  color="primary"
-                  className="w-full sm:w-auto"
-                >
-                  <ClipboardDocumentIcon className="h-4 w-4 mr-2" />
-                  {t('pasteImage')}
-                </Button>
-              </div>
-              <Text className="mt-2">{t('dragDrop')}</Text>
-              <Text className="text-sm text-zinc-500 dark:text-zinc-400">
-                {t('fileTypes')}
-              </Text>
-            </div>
-          </div>
-
-          {/* URL import block – same width as upload area */}
-          <div className="pt-6 border-t border-zinc-200 dark:border-zinc-700">
-            <div className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/80 dark:bg-zinc-800/40 p-6 shadow-sm">
-              <form
-                onSubmit={handleUrlImportSubmit}
-                className="flex flex-col items-center text-center space-y-4"
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+            {/* Left column: image upload + URL import */}
+            <div className="space-y-6">
+              {/* Dropzone */}
+              <div
+                ref={dropZoneRef}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className="relative border-2 border-dashed rounded-lg p-8 transition-colors border-zinc-300 dark:border-zinc-700 hover:border-primary-400 dark:hover:border-primary-600 min-h-[280px] flex flex-col justify-center"
               >
-                <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  {t('importViaUrlOr')}
-                </Text>
-                <Field className="w-full text-left">
-                  <Label htmlFor="recipe-url-inline">
-                    {t('recipeUrlLabel')}
-                  </Label>
-                  <div className="mt-2">
-                    <div className="flex items-center rounded-md bg-white dark:bg-zinc-800/80 pl-3 shadow-sm ring-1 ring-zinc-950/10 dark:ring-white/10 focus-within:ring-2 focus-within:ring-primary-500 dark:focus-within:ring-primary-400 focus-within:ring-offset-0">
-                      <span className="shrink-0 text-base text-zinc-500 dark:text-zinc-400 select-none sm:text-sm/6">
-                        https://
-                      </span>
-                      <input
-                        id="recipe-url-inline"
-                        type="text"
-                        name="recipe-url"
-                        value={urlImportValue}
-                        onChange={(e) => setUrlImportValue(e.target.value)}
-                        placeholder={t('recipeUrlPlaceholder')}
-                        disabled={isUrlImportPending || isPending}
-                        className="block min-w-0 grow py-2.5 pr-3 pl-2 text-base text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 dark:placeholder:text-zinc-400 bg-transparent border-0 outline-none focus:ring-0 rounded-r-md sm:text-sm/6"
-                        aria-invalid={urlImportError ? 'true' : 'false'}
-                        aria-describedby={
-                          urlImportError
-                            ? 'recipe-url-inline-error'
-                            : 'recipe-url-inline-hint'
-                        }
-                      />
-                    </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleInputChange}
+                  disabled={isPending}
+                  className="hidden"
+                  id="recipe-upload-input"
+                  aria-label={t('selectFile')}
+                />
+
+                <div className="flex flex-col items-center justify-center text-center space-y-4">
+                  <div className="rounded-full bg-primary-100 dark:bg-primary-900/30 p-4">
+                    <PhotoIcon className="h-8 w-8 text-primary-600 dark:text-primary-400" />
                   </div>
-                  {urlImportError ? (
-                    <ErrorMessage id="recipe-url-inline-error" className="mt-2">
-                      <div className="space-y-2">
-                        <div>{urlImportError}</div>
-                        {duplicateRecipeId && (
-                          <Link
-                            href={`/recipes/${duplicateRecipeId}`}
-                            className="text-sm text-primary-600 hover:text-primary-500 dark:text-primary-400"
-                          >
-                            {duplicateRecipeName
-                              ? `Open bestaand recept: ${duplicateRecipeName}`
-                              : 'Open bestaand recept'}
-                          </Link>
-                        )}
-                      </div>
-                    </ErrorMessage>
-                  ) : (
-                    <Description id="recipe-url-inline-hint" className="mt-2">
-                      {t('urlImportHint')}
-                    </Description>
-                  )}
-                </Field>
-                <Button
-                  type="submit"
-                  color="primary"
-                  disabled={isUrlImportPending || isPending}
-                  className="w-full sm:w-auto min-w-[8rem]"
+                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <label
+                      htmlFor="recipe-upload-input"
+                      className="cursor-pointer"
+                    >
+                      <Button
+                        as="span"
+                        color="primary"
+                        disabled={isPending}
+                        className="w-full sm:w-auto"
+                      >
+                        <PhotoIcon className="h-4 w-4 mr-2" />
+                        {isPending ? t('uploading') : t('selectFile')}
+                      </Button>
+                    </label>
+                    <Button
+                      onClick={handleOpenCamera}
+                      disabled={isPending}
+                      color="primary"
+                      className="w-full sm:w-auto"
+                    >
+                      <CameraIcon className="h-4 w-4 mr-2" />
+                      {t('takePhoto')}
+                    </Button>
+                    <Button
+                      onClick={async () => {
+                        // Try to read from clipboard API (works in some browsers)
+                        try {
+                          if (navigator.clipboard && navigator.clipboard.read) {
+                            const items = await navigator.clipboard.read();
+                            const imageItem = items.find((item) =>
+                              item.types.some((type) =>
+                                type.startsWith('image/'),
+                              ),
+                            );
+                            if (imageItem) {
+                              const imageType = imageItem.types.find((type) =>
+                                type.startsWith('image/'),
+                              );
+                              if (imageType) {
+                                const blob = await imageItem.getType(imageType);
+                                const file = new File(
+                                  [blob],
+                                  `paste-${Date.now()}.${imageType.split('/')[1]}`,
+                                  {
+                                    type: imageType,
+                                    lastModified: Date.now(),
+                                  },
+                                );
+                                handleFileSelect(file);
+                                return;
+                              }
+                            }
+                          }
+                          // If clipboard API doesn't work, show hint
+                          setError(t('pasteHint'));
+                        } catch (_err) {
+                          // Clipboard API not available or permission denied - show hint
+                          setError(t('pasteHint'));
+                        }
+                      }}
+                      disabled={isPending}
+                      color="primary"
+                      className="w-full sm:w-auto"
+                    >
+                      <ClipboardDocumentIcon className="h-4 w-4 mr-2" />
+                      {t('pasteImage')}
+                    </Button>
+                  </div>
+                  <Text className="mt-2">{t('dragDrop')}</Text>
+                  <Text className="text-sm text-zinc-500 dark:text-zinc-400">
+                    {t('fileTypes')}
+                  </Text>
+                </div>
+              </div>
+
+              {/* URL import block */}
+              <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/80 dark:bg-zinc-800/40 p-6 shadow-sm">
+                <form
+                  onSubmit={handleUrlImportSubmit}
+                  className="flex flex-col items-center text-center space-y-4"
                 >
-                  {isUrlImportPending ? (
+                  <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {t('importViaUrlOr')}
+                  </Text>
+                  <Field className="w-full text-left">
+                    <Label htmlFor="recipe-url-inline">
+                      {t('recipeUrlLabel')}
+                    </Label>
+                    <div className="mt-2">
+                      <div className="flex items-center rounded-md bg-white dark:bg-zinc-800/80 pl-3 shadow-sm ring-1 ring-zinc-950/10 dark:ring-white/10 focus-within:ring-2 focus-within:ring-primary-500 dark:focus-within:ring-primary-400 focus-within:ring-offset-0">
+                        <span className="shrink-0 text-base text-zinc-500 dark:text-zinc-400 select-none sm:text-sm/6">
+                          https://
+                        </span>
+                        <input
+                          id="recipe-url-inline"
+                          type="text"
+                          name="recipe-url"
+                          value={urlImportValue}
+                          onChange={(e) => setUrlImportValue(e.target.value)}
+                          placeholder={t('recipeUrlPlaceholder')}
+                          disabled={isUrlImportPending || isPending}
+                          className="block min-w-0 grow py-2.5 pr-3 pl-2 text-base text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 dark:placeholder:text-zinc-400 bg-transparent border-0 outline-none focus:ring-0 rounded-r-md sm:text-sm/6"
+                          aria-invalid={urlImportError ? 'true' : 'false'}
+                          aria-describedby={
+                            urlImportError
+                              ? 'recipe-url-inline-error'
+                              : 'recipe-url-inline-hint'
+                          }
+                        />
+                      </div>
+                    </div>
+                    {urlImportError ? (
+                      <ErrorMessage
+                        id="recipe-url-inline-error"
+                        className="mt-2"
+                      >
+                        <div className="space-y-2">
+                          <div>{urlImportError}</div>
+                          {duplicateRecipeId && (
+                            <Link
+                              href={`/recipes/${duplicateRecipeId}`}
+                              className="text-sm text-primary-600 hover:text-primary-500 dark:text-primary-400"
+                            >
+                              {duplicateRecipeName
+                                ? `Open bestaand recept: ${duplicateRecipeName}`
+                                : 'Open bestaand recept'}
+                            </Link>
+                          )}
+                        </div>
+                      </ErrorMessage>
+                    ) : (
+                      <Description id="recipe-url-inline-hint" className="mt-2">
+                        {t('urlImportHint')}
+                      </Description>
+                    )}
+                  </Field>
+                  <Button
+                    type="submit"
+                    color="primary"
+                    disabled={isUrlImportPending || isPending}
+                    className="w-full sm:w-auto min-w-[8rem]"
+                  >
+                    {isUrlImportPending ? (
+                      <>
+                        <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                        {t('processing')}
+                      </>
+                    ) : (
+                      t('urlImportButton')
+                    )}
+                  </Button>
+                </form>
+              </div>
+            </div>
+
+            {/* Right column: text paste + from scratch */}
+            <div className="space-y-6">
+              {/* Text paste import */}
+              <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/80 dark:bg-zinc-800/40 p-6 shadow-sm">
+                <form
+                  onSubmit={handleTextImportSubmit}
+                  className="flex flex-col space-y-4"
+                >
+                  <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {t('textImportHeading')}
+                  </Text>
+                  <Field className="w-full text-left">
+                    <Label htmlFor="recipe-text-paste">
+                      {t('textImportLabel')}
+                    </Label>
+                    <Textarea
+                      id="recipe-text-paste"
+                      name="recipe-text"
+                      value={textImportValue}
+                      onChange={(e) => {
+                        setTextImportValue(e.target.value);
+                        if (textImportError) setTextImportError(null);
+                      }}
+                      placeholder={t('textImportPlaceholder')}
+                      disabled={isTextImportPending || isPending}
+                      rows={6}
+                      className="mt-2"
+                      aria-invalid={textImportError ? 'true' : 'false'}
+                      aria-describedby={
+                        textImportError
+                          ? 'recipe-text-error'
+                          : 'recipe-text-hint'
+                      }
+                    />
+                    {textImportError ? (
+                      <ErrorMessage id="recipe-text-error" className="mt-2">
+                        {textImportError}
+                      </ErrorMessage>
+                    ) : (
+                      <Description id="recipe-text-hint" className="mt-2">
+                        {t('textImportHint')}
+                      </Description>
+                    )}
+                  </Field>
+                  <Button
+                    type="submit"
+                    color="primary"
+                    disabled={
+                      isTextImportPending ||
+                      isPending ||
+                      textImportValue.trim().length < 10
+                    }
+                    className="w-full sm:w-auto min-w-[8rem]"
+                  >
+                    {isTextImportPending ? (
+                      <>
+                        <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                        {t('processing')}
+                      </>
+                    ) : (
+                      <>
+                        <DocumentTextIcon className="h-4 w-4 mr-2" />
+                        {t('textImportButton')}
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </div>
+
+              {/* From scratch */}
+              <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/80 dark:bg-zinc-800/40 p-6 shadow-sm">
+                <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                  {t('fromScratchHeading')}
+                </Text>
+                <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                  {t('fromScratchDescription')}
+                </Text>
+                <Button
+                  type="button"
+                  onClick={handleFromScratch}
+                  disabled={isFromScratchPending || isPending}
+                  outline
+                  className="w-full sm:w-auto"
+                >
+                  {isFromScratchPending ? (
                     <>
                       <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
-                      {t('processing')}
+                      {t('loading')}
                     </>
                   ) : (
-                    t('urlImportButton')
+                    <>
+                      <PencilSquareIcon className="h-4 w-4 mr-2" />
+                      {t('fromScratchButton')}
+                    </>
                   )}
                 </Button>
-              </form>
+              </div>
             </div>
           </div>
         </div>

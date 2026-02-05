@@ -287,7 +287,20 @@
     "removePage": "Remove page",
     "addAnotherPage": "Recipe spans multiple pages? Add the next page here.",
     "maxPagesHint": "Maximum 5 pages per recipe.",
-    "errorMaxPages": "Maximum 5 pages. Remove a page to add another."
+    "errorMaxPages": "Maximum 5 pages. Remove a page to add another.",
+    "textImportHeading": "Or paste recipe text",
+    "textImportLabel": "Recipe text",
+    "textImportPlaceholder": "Paste recipe text here (from a website, app, or notes). It will be analyzed and converted into a recipe.",
+    "textImportHint": "Minimum 10 characters. Ingredients and steps will be detected automatically.",
+    "textImportButton": "Analyze",
+    "textImportMinLength": "Enter at least 10 characters to recognize a recipe.",
+    "textImportError": "The text could not be recognized as a recipe. Try again or add manually.",
+    "textImportErrorTitle": "Recipe text import failed",
+    "fromScratchHeading": "Enter recipe manually",
+    "fromScratchDescription": "No source? Type preparation instructions and add ingredients yourself.",
+    "fromScratchButton": "Create recipe from scratch",
+    "fromScratchErrorTitle": "Create recipe failed",
+    "fromScratchError": "The recipe could not be created. Please try again."
   },
   "mealPlan": {
     "slotStylePromptLabels": {

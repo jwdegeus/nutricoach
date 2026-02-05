@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { mealId, source, recipeName, recipeSummary } = body;
+    const { mealId, source, recipeName, recipeSummary, recipeDishType } = body;
 
     if (!mealId || !source) {
       return NextResponse.json(
@@ -41,9 +41,27 @@ export async function POST(request: NextRequest) {
 
     const name = String(recipeName || '').trim() || 'Recept';
     const summary = String(recipeSummary || '').trim();
-    const prompt = summary
-      ? `Generate a single appetizing, photorealistic food photograph for this recipe. Style: professional food photography, natural lighting, clean presentation. Recipe: "${name}". Context: ${summary}. Output one image only, no text.`
-      : `Generate a single appetizing, photorealistic food photograph for a dish called "${name}". Style: professional food photography, natural lighting, clean presentation. Output one image only, no text.`;
+    const dishType = String(recipeDishType || '')
+      .trim()
+      .toLowerCase();
+
+    // Presentation hint based on dish type so the model shows the right vessel (e.g. smoothie in glass, not bowl)
+    const presentationHint = (() => {
+      if (!dishType) return '';
+      const drinkLike =
+        /smoothie|smoothies|shake|drink|sap|sapje|juice|milkshake|frappé/i.test(
+          dishType,
+        );
+      const soupLike = /soep|soup|bouillon/i.test(dishType);
+      if (drinkLike)
+        return ' The dish is a drink or smoothie: show it in a tall glass or tumbler, not in a bowl.';
+      if (soupLike)
+        return ' The dish is a soup: show it in a bowl or soup plate.';
+      return ` Present as appropriate for this type of dish: "${dishType}".`;
+    })();
+
+    const contextPart = summary ? ` Context: ${summary}.` : '';
+    const prompt = `Generate a single appetizing, photorealistic food photograph for this recipe. Style: professional food photography, natural lighting, clean presentation. Recipe: "${name}".${contextPart}${presentationHint} Output one image only, no text.`;
 
     const result = await generateRecipeImage(prompt);
     if (!result) {

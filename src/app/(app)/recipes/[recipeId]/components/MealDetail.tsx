@@ -55,6 +55,8 @@ import {
   removeRecipeIngredientAction,
   updateRecipeContentAction,
   updateRecipeRefIngredientAction,
+  rateRecipeAction,
+  clearRecipeRatingAction,
 } from '../../actions/meals.actions';
 import {
   getRecipeNutritionSummaryAction,
@@ -188,6 +190,8 @@ type MealDetailProps = {
   onIngredientMatched?: (payload?: OptimisticMatchPayload) => void;
   /** Wordt aangeroepen nadat de receptbron is opgeslagen, zodat meal-data wordt ververst en het label gelijk blijft */
   onSourceSaved?: () => void;
+  /** Wordt aangeroepen nadat de gebruiker een beoordeling heeft opgeslagen (bijv. om meal opnieuw te laden) */
+  onRatingUpdated?: () => void;
 };
 
 export function MealDetail({
@@ -200,6 +204,7 @@ export function MealDetail({
   onRecipeAppliedSilent,
   onIngredientMatched,
   onSourceSaved: _onSourceSaved,
+  onRatingUpdated,
 }: MealDetailProps) {
   const { showToast } = useToast();
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -227,6 +232,8 @@ export function MealDetail({
   /** Recept verwijderen: dialog open, bezig, fout */
   const [deleteRecipeDialogOpen, setDeleteRecipeDialogOpen] = useState(false);
   const [isDeletingRecipe, setIsDeletingRecipe] = useState(false);
+  const [isRatingSubmitting, setIsRatingSubmitting] = useState(false);
+  const [optimisticRating, setOptimisticRating] = useState<number | null>(null);
   const [deleteRecipeError, setDeleteRecipeError] = useState<string | null>(
     null,
   );
@@ -365,6 +372,15 @@ export function MealDetail({
     }, [meal]);
 
   const mealId = meal?.id != null ? String(meal.id) : '';
+  /** Id voor rating-API: custom = meal.id, gemini = meal_history.meal_id */
+  const ratingMealId =
+    mealSource === 'custom'
+      ? mealId
+      : String(
+          (meal as Record<string, unknown>).mealId ??
+            (meal as Record<string, unknown>).meal_id ??
+            meal.id,
+        );
 
   // Wis instructies-override bij wisselen van recept of na refetch (bijv. andere bewerking)
   useEffect(() => {
@@ -722,6 +738,77 @@ export function MealDetail({
   const userRating = meal.userRating || meal.user_rating;
   const nutritionScore = meal.nutritionScore || meal.nutrition_score;
 
+  const handleRatingStarClick = useCallback(
+    async (star: number) => {
+      if (isRatingSubmitting || !ratingMealId) return;
+      const current =
+        optimisticRating ??
+        (userRating != null ? Number(userRating) : null) ??
+        0;
+      const isClearing = current > 0 && star === current;
+      if (isClearing) {
+        setOptimisticRating(0);
+      } else {
+        setOptimisticRating(star);
+      }
+      setIsRatingSubmitting(true);
+      try {
+        if (isClearing) {
+          const result = await clearRecipeRatingAction({
+            mealId: ratingMealId,
+            source: mealSource,
+          });
+          if (result.ok) {
+            setOptimisticRating(null);
+            onRatingUpdated?.();
+          } else {
+            setOptimisticRating(null);
+            showToast({
+              type: 'error',
+              title: 'Beoordeling wissen mislukt',
+              description: result.error.message,
+            });
+          }
+        } else {
+          const result = await rateRecipeAction({
+            mealId: ratingMealId,
+            source: mealSource,
+            rating: star,
+          });
+          if (result.ok) {
+            setOptimisticRating(null);
+            onRatingUpdated?.();
+          } else {
+            setOptimisticRating(null);
+            showToast({
+              type: 'error',
+              title: 'Beoordeling opslaan mislukt',
+              description: result.error.message,
+            });
+          }
+        }
+      } catch {
+        setOptimisticRating(null);
+        showToast({
+          type: 'error',
+          title: 'Beoordeling opslaan mislukt',
+          description: 'Er is een fout opgetreden.',
+        });
+      } finally {
+        setIsRatingSubmitting(false);
+      }
+    },
+    [
+      isRatingSubmitting,
+      ratingMealId,
+      mealSource,
+      userRating,
+      optimisticRating,
+      onRatingUpdated,
+      showToast,
+    ],
+  );
+
   // Laad voeding van gerecht wanneer er gekoppelde ingrediënten zijn (ingredientRefs of legacy ingredients)
   const hasIngredientsForNutrition =
     (mealData?.ingredientRefs?.length ?? 0) > 0 ||
@@ -1037,6 +1124,10 @@ export function MealDetail({
               onImageClick={() => setLightboxOpen(true)}
               recipeContext={{
                 name: mealName,
+                dishType:
+                  classificationOverlay?.mealSlotLabel ??
+                  classificationOverlay?.tags?.[0] ??
+                  formatMealSlot(classificationOverlay?.mealSlot ?? mealSlot),
                 summary:
                   Array.isArray(displayMealData?.ingredients) &&
                   displayMealData.ingredients.length > 0
@@ -1287,30 +1378,51 @@ export function MealDetail({
                 </div>
               )}
 
-              {userRating != null && (
-                <div className="flex items-center gap-2">
-                  <span className="text-zinc-600 dark:text-zinc-400">
-                    Beoordeling:
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <div className="flex gap-0.5">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <StarIcon
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-600 dark:text-zinc-400">
+                  Beoordeling:
+                </span>
+                <div className="flex items-center gap-1">
+                  <div
+                    className="flex gap-0.5"
+                    role="group"
+                    aria-label="Beoordeling aanpassen"
+                  >
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const displayRating =
+                        optimisticRating ??
+                        (userRating != null ? Number(userRating) : null) ??
+                        0;
+                      const filled = star <= displayRating;
+                      return (
+                        <button
                           key={star}
-                          className={`h-4 w-4 ${
-                            star <= Number(userRating)
-                              ? 'text-yellow-400 fill-yellow-400'
-                              : 'text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className="font-medium text-zinc-900 dark:text-white ml-1">
-                      {Number(userRating)}/5
-                    </span>
+                          type="button"
+                          disabled={isRatingSubmitting}
+                          onClick={() => handleRatingStarClick(star)}
+                          className="p-0.5 rounded touch-manipulation disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 dark:focus-visible:ring-white"
+                          aria-label={`${star} van 5 sterren`}
+                          aria-pressed={filled}
+                        >
+                          <StarIcon
+                            className={`h-4 w-4 ${
+                              filled
+                                ? 'text-yellow-400 fill-yellow-400'
+                                : 'text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700'
+                            }`}
+                          />
+                        </button>
+                      );
+                    })}
                   </div>
+                  <span className="font-medium text-zinc-900 dark:text-white ml-1">
+                    {optimisticRating ??
+                      (userRating != null ? Number(userRating) : null) ??
+                      0}
+                    /5
+                  </span>
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Dates */}

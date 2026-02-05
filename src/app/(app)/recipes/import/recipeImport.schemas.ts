@@ -73,3 +73,14 @@ export const importRecipeFromUrlInputSchema = z.object({
     )
     .transform((url) => url.trim()),
 });
+
+/**
+ * Import recipe from pasted text input schema
+ */
+export const importRecipeFromTextInputSchema = z.object({
+  text: z
+    .string()
+    .min(10, 'Tekst is te kort om een recept te herkennen')
+    .max(50000, 'Tekst mag maximaal 50.000 tekens zijn')
+    .transform((s) => s.trim()),
+});

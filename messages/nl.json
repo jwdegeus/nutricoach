@@ -289,7 +289,20 @@
     "removePage": "Pagina verwijderen",
     "addAnotherPage": "Recept op meerdere pagina's? Voeg hier de volgende pagina toe.",
     "maxPagesHint": "Maximaal 5 pagina's per recept.",
-    "errorMaxPages": "Maximaal 5 pagina's. Verwijder een pagina om een andere toe te voegen."
+    "errorMaxPages": "Maximaal 5 pagina's. Verwijder een pagina om een andere toe te voegen.",
+    "textImportHeading": "Of plak recepttekst",
+    "textImportLabel": "Recepttekst",
+    "textImportPlaceholder": "Plak hier de tekst van een recept (van een website, app of notities). De tekst wordt geanalyseerd en omgezet naar een recept.",
+    "textImportHint": "Minimaal 10 tekens. Ingrediënten en bereidingsstappen worden automatisch herkend.",
+    "textImportButton": "Analyseren",
+    "textImportMinLength": "Voer minimaal 10 tekens in om een recept te herkennen.",
+    "textImportError": "De tekst kon niet als recept worden herkend. Probeer het opnieuw of voeg handmatig toe.",
+    "textImportErrorTitle": "Recepttekst importeren mislukt",
+    "fromScratchHeading": "Recept zelf invoeren",
+    "fromScratchDescription": "Geen bron? Typ zelf de bereidingsinstructies en voeg ingrediënten toe.",
+    "fromScratchButton": "Recept van scratch maken",
+    "fromScratchErrorTitle": "Recept aanmaken mislukt",
+    "fromScratchError": "Het recept kon niet worden aangemaakt. Probeer het opnieuw."
   },
   "mealPlan": {
     "slotStylePromptLabels": {

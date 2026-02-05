@@ -21,8 +21,8 @@ type RecipeImageUploadProps = {
   onImageUploaded: (imageUrl: string) => void;
   onImageRemoved?: () => void;
   onImageClick?: () => void;
-  /** Optional recipe context for AI image generation (name + short summary). */
-  recipeContext?: { name: string; summary?: string };
+  /** Optional recipe context for AI image generation (name, summary, dish type). */
+  recipeContext?: { name: string; summary?: string; dishType?: string };
   /** When true, render as hero image (full width, larger) with overlay buttons. Use at top of recipe card. */
   renderHero?: boolean;
   /** When true, render as a square image card with overlay buttons. */
@@ -345,6 +345,7 @@ export function RecipeImageUpload({
           source,
           recipeName: recipeContext?.name ?? '',
           recipeSummary: recipeContext?.summary ?? '',
+          recipeDishType: recipeContext?.dishType ?? '',
         }),
       });
       const result = await response.json();
