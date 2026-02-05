@@ -237,7 +237,7 @@
     "reviewPlaceholder": "Dit is een placeholder preview. De definitieve import functionaliteit wordt in een latere stap toegevoegd.",
     "errorImageOnly": "Alleen afbeeldingsbestanden zijn toegestaan",
     "errorFileTooLarge": "Bestand is te groot. Maximum grootte is 10MB",
-    "errorFileTooLargeForProcessing": "Bestand is te groot voor verwerking. Maximum grootte is 4MB.",
+    "errorFileTooLargeForProcessing": "Bestand is te groot voor verwerking. Maximum grootte is 10MB.",
     "errorJobNotFound": "Recipe import niet gevonden of geen toegang",
     "errorUnknown": "Onbekende fout opgetreden",
     "errorNetworkOrTimeout": "Netwerkfout of time-out. Controleer je verbinding en probeer het opnieuw.",

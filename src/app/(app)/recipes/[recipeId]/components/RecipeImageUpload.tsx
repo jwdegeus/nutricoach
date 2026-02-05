@@ -9,7 +9,8 @@ import {
   PhotoIcon,
   TrashIcon,
   SparklesIcon,
-  ArrowPathIcon,
+  ArrowUpTrayIcon,
+  ClipboardDocumentIcon,
 } from '@heroicons/react/20/solid';
 import { ImageLightbox } from './ImageLightbox';
 
@@ -40,6 +41,7 @@ export function RecipeImageUpload({
   square = false,
 }: RecipeImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [isPasting, setIsPasting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -254,6 +256,71 @@ export function RecipeImageUpload({
     });
   };
 
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const handlePaste = async () => {
+    if (!navigator.clipboard?.read) {
+      setError(
+        'Plakken wordt niet ondersteund in deze browser. Gebruik Bestand uploaden.',
+      );
+      return;
+    }
+    setIsPasting(true);
+    setError(null);
+    try {
+      const items = await navigator.clipboard.read();
+      const imageType = items.find((item) =>
+        item.types.some((t) => t.startsWith('image/')),
+      );
+      if (!imageType) {
+        setError('Geen afbeelding in klembord. Kopieer eerst een afbeelding.');
+        return;
+      }
+      const type =
+        imageType.types.find((t) => t.startsWith('image/')) ?? 'image/png';
+      const blob = await imageType.getType(type);
+      const base64 = await blobToBase64(blob);
+      const ext =
+        type.replace('image/', '') === 'jpeg'
+          ? 'jpg'
+          : type.replace('image/', '') || 'png';
+      const response = await fetch('/api/recipes/upload-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mealId,
+          source,
+          imageData: base64,
+          filename: `geplakt.${ext}`,
+        }),
+      });
+      const result = await response.json();
+      if (!result.ok) {
+        throw new Error(result.error?.message || 'Upload mislukt');
+      }
+      setPreviewUrl(result.data.url);
+      setImageLoadError(false);
+      onImageUploaded(result.data.url);
+    } catch (err) {
+      if (err instanceof Error && err.name === 'NotAllowedError') {
+        setError(
+          'Toegang tot klembord geweigerd. Gebruik de knop opnieuw en sta toegang toe.',
+        );
+      } else {
+        setError(err instanceof Error ? err.message : 'Plakken mislukt');
+      }
+    } finally {
+      setIsPasting(false);
+    }
+  };
+
   const handleClick = () => {
     if (previewUrl && !isUploading && !imageLoadError) {
       if (onImageClick) {
@@ -294,15 +361,48 @@ export function RecipeImageUpload({
     }
   };
 
-  const isBusy = isUploading || isDeleting || isGenerating;
+  const isBusy = isUploading || isPasting || isDeleting || isGenerating;
 
+  // Solid look on hover/active (override Catalyst plain variant's light tint); use data-hover/data-active so Catalyst Button state is overridden
   const iconButtonClass =
     'p-2 rounded-lg shadow-md border border-zinc-200/80 dark:border-zinc-700/80 transition-[background-color,box-shadow] duration-150 ' +
-    'focus:outline-none focus-visible:outline-none [&[data-focus]]:!outline-none [&[data-focus]]:!outline-offset-0 [&[data-focus]]:!ring-0 [&[data-focus]]:!ring-offset-0 ' +
-    'hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:shadow-sm [&[data-focus]]:shadow-sm [&[data-focus]]:bg-zinc-100 dark:[&[data-focus]]:bg-zinc-800';
+    'outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 ' +
+    'ring-0 ring-offset-0 hover:ring-0 active:ring-0 ' +
+    'data-[focus]:outline-none data-[focus]:ring-0 data-[focus]:ring-offset-0 [&[data-focus]]:!outline-none [&[data-focus]]:!ring-0 [&[data-focus]]:!ring-offset-0 ' +
+    'data-hover:!bg-zinc-200/95 dark:data-hover:!bg-zinc-600/95 data-active:!bg-zinc-200/95 dark:data-active:!bg-zinc-600/95 ' +
+    'hover:!bg-zinc-200/95 dark:hover:!bg-zinc-600/95 active:!bg-zinc-200/95 dark:active:!bg-zinc-600/95 ' +
+    '[&[data-focus]]:!shadow-sm [&[data-focus]]:!bg-zinc-200/95 dark:[&[data-focus]]:!bg-zinc-600/95';
 
   const overlayButtons = (
-    <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1.5 justify-end">
+    <div className="absolute bottom-2 right-2 z-0 flex items-center gap-1.5 justify-end">
+      <Button
+        plain
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          fileInputRef.current?.click();
+        }}
+        disabled={isBusy}
+        title="Bestand uploaden"
+        aria-label="Bestand uploaden"
+        className={`${iconButtonClass} bg-white/95 dark:bg-zinc-900/95 text-zinc-600 dark:text-zinc-400`}
+      >
+        <ArrowUpTrayIcon className="h-5 w-5" aria-hidden />
+      </Button>
+      <Button
+        plain
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handlePaste();
+        }}
+        disabled={isBusy}
+        title={isPasting ? 'Bezig…' : 'Plakken'}
+        aria-label={isPasting ? 'Bezig…' : 'Plakken'}
+        className={`${iconButtonClass} bg-white/95 dark:bg-zinc-900/95 text-zinc-600 dark:text-zinc-400`}
+      >
+        <ClipboardDocumentIcon className="h-5 w-5" aria-hidden />
+      </Button>
       <Button
         plain
         onClick={(e) => {
@@ -316,23 +416,6 @@ export function RecipeImageUpload({
         className={`${iconButtonClass} bg-white/95 dark:bg-zinc-900/95 text-blue-600 dark:text-blue-400`}
       >
         <SparklesIcon className="h-5 w-5" aria-hidden />
-      </Button>
-      <Button
-        plain
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          fileInputRef.current?.click();
-        }}
-        disabled={isBusy}
-        title="Vervangen"
-        aria-label="Vervangen"
-        className={
-          iconButtonClass +
-          ' bg-white/95 dark:bg-zinc-900/95 text-zinc-600 dark:text-zinc-400'
-        }
-      >
-        <ArrowPathIcon className="h-5 w-5" aria-hidden />
       </Button>
       <Button
         plain
@@ -396,32 +479,58 @@ export function RecipeImageUpload({
           )}
         </>
       ) : square && !previewUrl ? (
-        <div className="relative border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg p-8 flex flex-col items-center justify-center gap-3 aspect-square bg-zinc-50 dark:bg-zinc-900/50">
-          <button
-            type="button"
-            onClick={handleClick}
-            disabled={isBusy}
-            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 disabled:opacity-50"
-          >
-            <PhotoIcon className="h-12 w-12 shrink-0 text-zinc-400 dark:text-zinc-500" />
-            <span className="text-sm text-zinc-600 dark:text-zinc-400 text-center">
-              {isUploading ? 'Uploaden...' : 'Upload foto van eindresultaat'}
-            </span>
-          </button>
-          {recipeContext && (
+        <div className="relative border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg p-6 flex flex-col items-center justify-center gap-4 aspect-square bg-zinc-50 dark:bg-zinc-900/50">
+          <PhotoIcon className="h-12 w-12 shrink-0 text-zinc-400 dark:text-zinc-500" />
+          <span className="text-sm text-zinc-600 dark:text-zinc-400 text-center">
+            Productafbeelding
+          </span>
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Button
               plain
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                handleGenerateImage();
+                fileInputRef.current?.click();
               }}
               disabled={isBusy}
-              className="relative z-10 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
             >
-              <SparklesIcon className="h-4 w-4 mr-1.5 inline" />
-              {isGenerating ? 'Bezig…' : 'Genereer foto met AI'}
+              <ArrowUpTrayIcon className="h-4 w-4" aria-hidden />
+              {isUploading ? 'Bezig…' : 'Bestand uploaden'}
             </Button>
+            {recipeContext && (
+              <Button
+                plain
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleGenerateImage();
+                }}
+                disabled={isBusy}
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+              >
+                <SparklesIcon className="h-4 w-4" aria-hidden />
+                {isGenerating ? 'Bezig…' : 'AI genereren'}
+              </Button>
+            )}
+            <Button
+              plain
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handlePaste();
+              }}
+              disabled={isBusy}
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+            >
+              <ClipboardDocumentIcon className="h-4 w-4" aria-hidden />
+              {isPasting ? 'Bezig…' : 'Plakken'}
+            </Button>
+          </div>
+          {error && (
+            <span className="mt-2 block text-sm text-red-600 dark:text-red-400 text-center">
+              {error}
+            </span>
           )}
         </div>
       ) : renderHero && previewUrl && !imageLoadError ? (
@@ -453,32 +562,58 @@ export function RecipeImageUpload({
           )}
         </>
       ) : renderHero && !previewUrl ? (
-        <div className="relative border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-t-lg p-8 sm:p-10 flex flex-col items-center justify-center gap-3 min-h-[140px] bg-zinc-50 dark:bg-zinc-900/50">
-          <button
-            type="button"
-            onClick={handleClick}
-            disabled={isBusy}
-            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 disabled:opacity-50"
-          >
-            <PhotoIcon className="h-12 w-12 shrink-0 text-zinc-400 dark:text-zinc-500" />
-            <span className="text-sm text-zinc-600 dark:text-zinc-400 text-center">
-              {isUploading ? 'Uploaden...' : 'Upload foto van eindresultaat'}
-            </span>
-          </button>
-          {recipeContext && (
+        <div className="relative border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-t-lg p-6 sm:p-8 flex flex-col items-center justify-center gap-4 min-h-[140px] bg-zinc-50 dark:bg-zinc-900/50">
+          <PhotoIcon className="h-12 w-12 shrink-0 text-zinc-400 dark:text-zinc-500" />
+          <span className="text-sm text-zinc-600 dark:text-zinc-400 text-center">
+            Productafbeelding
+          </span>
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Button
               plain
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                handleGenerateImage();
+                fileInputRef.current?.click();
               }}
               disabled={isBusy}
-              className="relative z-10 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
             >
-              <SparklesIcon className="h-4 w-4 mr-1.5 inline" />
-              {isGenerating ? 'Bezig…' : 'Genereer foto met AI'}
+              <ArrowUpTrayIcon className="h-4 w-4" aria-hidden />
+              {isUploading ? 'Bezig…' : 'Bestand uploaden'}
             </Button>
+            {recipeContext && (
+              <Button
+                plain
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleGenerateImage();
+                }}
+                disabled={isBusy}
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+              >
+                <SparklesIcon className="h-4 w-4" aria-hidden />
+                {isGenerating ? 'Bezig…' : 'AI genereren'}
+              </Button>
+            )}
+            <Button
+              plain
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handlePaste();
+              }}
+              disabled={isBusy}
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+            >
+              <ClipboardDocumentIcon className="h-4 w-4" aria-hidden />
+              {isPasting ? 'Bezig…' : 'Plakken'}
+            </Button>
+          </div>
+          {error && (
+            <span className="mt-2 block text-sm text-red-600 dark:text-red-400 text-center">
+              {error}
+            </span>
           )}
         </div>
       ) : previewUrl && !renderHero ? (
@@ -530,33 +665,54 @@ export function RecipeImageUpload({
         </div>
       ) : (
         <div>
-          <div className="relative border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg p-6 sm:p-8 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors flex flex-col items-center justify-center gap-3 min-h-[120px]">
-            <button
-              type="button"
-              onClick={handleClick}
-              disabled={isUploading || isGenerating}
-              className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 disabled:opacity-50 box-border rounded-lg"
-            >
-              <PhotoIcon className="h-10 w-10 shrink-0 text-zinc-400 dark:text-zinc-500" />
-              <span className="text-sm text-zinc-600 dark:text-zinc-400 text-center break-words">
-                {isUploading ? 'Uploaden...' : 'Upload foto van eindresultaat'}
-              </span>
-            </button>
-            {recipeContext && (
+          <div className="relative border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg p-6 sm:p-8 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors flex flex-col items-center justify-center gap-4 min-h-[120px]">
+            <PhotoIcon className="h-10 w-10 shrink-0 text-zinc-400 dark:text-zinc-500" />
+            <span className="text-sm text-zinc-600 dark:text-zinc-400 text-center break-words">
+              Productafbeelding
+            </span>
+            <div className="flex flex-wrap items-center justify-center gap-2">
               <Button
                 plain
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  handleGenerateImage();
+                  fileInputRef.current?.click();
                 }}
-                disabled={isUploading || isGenerating}
-                className="relative z-10 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                disabled={isBusy}
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
               >
-                <SparklesIcon className="h-4 w-4 mr-1.5 inline" />
-                {isGenerating ? 'Bezig…' : 'Genereer foto met AI'}
+                <ArrowUpTrayIcon className="h-4 w-4" aria-hidden />
+                {isUploading ? 'Bezig…' : 'Bestand uploaden'}
               </Button>
-            )}
+              {recipeContext && (
+                <Button
+                  plain
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleGenerateImage();
+                  }}
+                  disabled={isBusy}
+                  className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                >
+                  <SparklesIcon className="h-4 w-4" aria-hidden />
+                  {isGenerating ? 'Bezig…' : 'AI genereren'}
+                </Button>
+              )}
+              <Button
+                plain
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handlePaste();
+                }}
+                disabled={isBusy}
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+              >
+                <ClipboardDocumentIcon className="h-4 w-4" aria-hidden />
+                {isPasting ? 'Bezig…' : 'Plakken'}
+              </Button>
+            </div>
           </div>
           {error && (
             <p className="mt-2 text-sm text-red-600 dark:text-red-400">

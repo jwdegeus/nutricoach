@@ -1,9 +1,18 @@
 'use client';
 
+import { useState } from 'react';
 import type { MealPlanResponse } from '@/src/lib/diets';
 import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
 import type { MealPlanStatus } from '@/src/lib/meal-plans/mealPlans.types';
+import { Text } from '@/components/catalyst/text';
 import { MealPlanCards } from './MealPlanCards';
+import { ArrowPathIcon } from '@heroicons/react/20/solid';
+
+export type LinkedRecipe = {
+  recipeId: string;
+  imageUrl: string | null;
+  name?: string;
+};
 
 type MealPlanPageClientProps = {
   planId: string;
@@ -11,6 +20,7 @@ type MealPlanPageClientProps = {
   enrichment?: MealPlanEnrichmentResponse | null;
   nevoFoodNamesByCode: Record<string, string>;
   planStatus?: MealPlanStatus;
+  linkedRecipesByMealId?: Record<string, LinkedRecipe>;
 };
 
 export function MealPlanPageClient({
@@ -19,14 +29,39 @@ export function MealPlanPageClient({
   enrichment,
   nevoFoodNamesByCode,
   planStatus,
+  linkedRecipesByMealId = {},
 }: MealPlanPageClientProps) {
+  const [isEditing, setIsEditing] = useState(false);
+
   return (
-    <MealPlanCards
-      planId={planId}
-      plan={plan}
-      enrichment={enrichment}
-      nevoFoodNamesByCode={nevoFoodNamesByCode}
-      planStatus={planStatus}
-    />
+    <div className="space-y-4">
+      {isEditing && (
+        <div
+          className="rounded-lg border border-border bg-muted/30 px-4 py-3 flex items-start gap-3"
+          role="status"
+          aria-live="polite"
+        >
+          <ArrowPathIcon className="h-5 w-5 text-muted-foreground animate-spin flex-shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <Text className="text-sm font-medium text-foreground">
+              Bezig met aanpassen…
+            </Text>
+            <Text className="text-xs text-muted-foreground">
+              Dit kan even duren; de pagina ververst zodra de wijziging is
+              verwerkt.
+            </Text>
+          </div>
+        </div>
+      )}
+      <MealPlanCards
+        planId={planId}
+        plan={plan}
+        enrichment={enrichment}
+        nevoFoodNamesByCode={nevoFoodNamesByCode}
+        planStatus={planStatus}
+        linkedRecipesByMealId={linkedRecipesByMealId}
+        onEditStarted={() => setIsEditing(true)}
+      />
+    </div>
   );
 }

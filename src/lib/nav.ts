@@ -1,7 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
-  Users,
   Sparkles,
   UtensilsCrossed,
   Calendar,
@@ -9,7 +8,6 @@ import {
   FileText,
   ShoppingBasket,
   ShoppingCart,
-  Activity,
 } from 'lucide-react';
 
 export type NavItem = {
@@ -34,12 +32,6 @@ export const baseNavItems: NavItem[] = [
     translationKey: 'dashboard',
   },
   {
-    label: 'Clients',
-    href: '/clients',
-    icon: Users,
-    translationKey: 'clients',
-  },
-  {
     label: 'Generator',
     href: '/meal-plans',
     icon: Sparkles,
@@ -62,12 +54,6 @@ export const baseNavItems: NavItem[] = [
     href: '/pantry',
     icon: ShoppingBasket,
     translationKey: 'pantry',
-  },
-  {
-    label: 'Runs',
-    href: '/runs',
-    icon: Activity,
-    translationKey: 'runs',
   },
   {
     label: 'Calendar',
@@ -133,6 +119,9 @@ export function getPageTitle(
   }
   if (pathname === '/settings' || pathname.startsWith('/settings')) {
     return t ? t('nav.settings') : 'Instellingen';
+  }
+  if (pathname === '/runs' || pathname.startsWith('/runs')) {
+    return t ? t('nav.runs') : 'Runs';
   }
   // Meal plan shopping sub-route: /meal-plans/[planId]/shopping
   if (/^\/meal-plans\/[^/]+\/shopping$/.test(pathname)) {
@@ -216,6 +205,37 @@ export function getBreadcrumbs(
           : 'Boodschappenlijst';
       breadcrumbs.push({ label: shoppingLabel, href: pathname });
     }
+    return breadcrumbs;
+  }
+
+  // Account section: Mijn Account, Runs, Instellingen
+  if (pathname === '/account' || pathname.startsWith('/account')) {
+    breadcrumbs.push({
+      label: t ? t('account.title') : 'Mijn Account',
+      href: '/account',
+    });
+    return breadcrumbs;
+  }
+  if (pathname === '/runs' || pathname.startsWith('/runs')) {
+    breadcrumbs.push({
+      label: t ? t('account.title') : 'Mijn Account',
+      href: '/account',
+    });
+    breadcrumbs.push({
+      label: t ? t('nav.runs') : 'Runs',
+      href: '/runs',
+    });
+    return breadcrumbs;
+  }
+  if (pathname === '/settings' || pathname.startsWith('/settings')) {
+    breadcrumbs.push({
+      label: t ? t('account.title') : 'Mijn Account',
+      href: '/account',
+    });
+    breadcrumbs.push({
+      label: t ? t('nav.settings') : 'Instellingen',
+      href: '/settings',
+    });
     return breadcrumbs;
   }
 

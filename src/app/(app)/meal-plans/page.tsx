@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/src/lib/supabase/server';
+import { Button } from '@/components/catalyst/button';
 import { listMealPlansAction } from './actions/mealPlans.actions';
 import { MealPlansTable } from './components/MealPlansTable';
 
@@ -45,12 +45,9 @@ export default async function MealPlansPage() {
           </p>
         </div>
         {plansResult.data.length > 0 && (
-          <Link
-            href="/meal-plans/new"
-            className="inline-flex items-center justify-center rounded-lg border border-transparent bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
+          <Button href="/meal-plans/new" color="primary">
             Nieuw weekmenu
-          </Link>
+          </Button>
         )}
       </div>
 

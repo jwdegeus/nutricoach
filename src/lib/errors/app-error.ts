@@ -14,7 +14,10 @@ export type AppErrorCode =
   | 'RATE_LIMIT'
   | 'CONFLICT'
   | 'GUARDRAILS_VIOLATION'
-  | 'MEAL_LOCKED';
+  | 'MEAL_LOCKED'
+  | 'INSUFFICIENT_ALLOWED_INGREDIENTS'
+  | 'MEAL_PLAN_SANITY_FAILED'
+  | 'MEAL_PLAN_CONFIG_INVALID';
 
 /** Ontbrekende FORCE-categorie bij quotum-falen (voor substitutie/“voeg toe”-feedback) */
 export type ForceDeficitItem = {
@@ -46,6 +49,8 @@ export class AppError extends Error {
   public readonly code: AppErrorCode;
   public readonly safeMessage: string;
   public readonly guardrailsDetails?: GuardrailsViolationDetails;
+  /** Optional payload for observability (e.g. retryReason: 'POOL_EMPTY' for INSUFFICIENT_ALLOWED_INGREDIENTS) */
+  public readonly details?: Record<string, unknown>;
 
   constructor(
     code: AppErrorCode,
@@ -70,6 +75,12 @@ export class AppError extends Error {
     } else if (causeOrDetails instanceof Error) {
       // Preserve original error as cause (for debugging)
       this.cause = causeOrDetails;
+    } else if (
+      causeOrDetails &&
+      typeof causeOrDetails === 'object' &&
+      !Array.isArray(causeOrDetails)
+    ) {
+      this.details = causeOrDetails as Record<string, unknown>;
     } else if (causeOrDetails) {
       this.cause = new Error(String(causeOrDetails));
     }
@@ -81,12 +92,13 @@ export class AppError extends Error {
   toJSON(): {
     code: AppErrorCode;
     message: string;
-    details?: GuardrailsViolationDetails;
+    details?: GuardrailsViolationDetails | Record<string, unknown>;
   } {
     return {
       code: this.code,
       message: this.safeMessage,
       ...(this.guardrailsDetails && { details: this.guardrailsDetails }),
+      ...(this.details && !this.guardrailsDetails && { details: this.details }),
     };
   }
 }

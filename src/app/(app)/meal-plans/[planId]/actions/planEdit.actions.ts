@@ -3,7 +3,7 @@
 import { createClient } from '@/src/lib/supabase/server';
 import { getGeminiClient } from '@/src/lib/ai/gemini/gemini.client';
 import { applyPlanEdit } from '@/src/lib/agents/meal-planner/planEdit.apply';
-import { AppError } from '@/src/lib/errors/app-error';
+import { AppError, type AppErrorCode } from '@/src/lib/errors/app-error';
 import type { PlanEdit } from '@/src/lib/agents/meal-planner/planEdit.types';
 
 /**
@@ -14,16 +14,7 @@ type ActionResult<T> =
   | {
       ok: false;
       error: {
-        code:
-          | 'AUTH_ERROR'
-          | 'UNAUTHORIZED'
-          | 'VALIDATION_ERROR'
-          | 'DB_ERROR'
-          | 'AGENT_ERROR'
-          | 'RATE_LIMIT'
-          | 'CONFLICT'
-          | 'GUARDRAILS_VIOLATION'
-          | 'MEAL_LOCKED';
+        code: AppErrorCode;
         message: string;
       };
     };

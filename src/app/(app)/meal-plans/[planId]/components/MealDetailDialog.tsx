@@ -21,8 +21,11 @@ import type {
   EnrichedMeal,
   CookPlanDay,
 } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
+import { Text } from '@/components/catalyst/text';
 import { useToast } from '@/src/components/app/ToastContext';
 import { addMealToRecipesAction } from '../actions/addMealToRecipes.actions';
+import { MealRating } from './MealRating';
+import type { LinkedRecipe } from './MealPlanPageClient';
 
 type MealDetailDialogProps = {
   open: boolean;
@@ -33,6 +36,8 @@ type MealDetailDialogProps = {
   nevoFoodNamesByCode: Record<string, string>;
   /** When set, shows "Toevoegen aan recepten" to save this meal to the recipes database */
   planId?: string;
+  /** When set, this meal was already added to recipes; show link and optional image */
+  linkedRecipe?: LinkedRecipe;
 };
 
 export function MealDetailDialog({
@@ -43,6 +48,7 @@ export function MealDetailDialog({
   cookPlanDay,
   nevoFoodNamesByCode,
   planId,
+  linkedRecipe,
 }: MealDetailDialogProps) {
   const { showToast } = useToast();
   const [addingToRecipes, setAddingToRecipes] = useState(false);
@@ -102,6 +108,15 @@ export function MealDetailDialog({
       </DialogDescription>
 
       <DialogBody className="space-y-6">
+        {linkedRecipe?.imageUrl && (
+          <div className="rounded-lg overflow-hidden aspect-video bg-zinc-100 dark:bg-zinc-800">
+            <img
+              src={linkedRecipe.imageUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          </div>
+        )}
         {/* Enrichment Info */}
         {enrichedMeal ? (
           <>
@@ -300,17 +315,37 @@ export function MealDetailDialog({
             </div>
           </div>
         )}
+
+        {/* Beoordeel maaltijd */}
+        <div className="pt-4 border-t border-border space-y-2">
+          <Text className="text-sm font-medium text-foreground">
+            Beoordeel maaltijd
+          </Text>
+          <Text className="text-xs text-muted-foreground">
+            Gebruik sterren om deze maaltijd te markeren voor
+            hergebruik/voorkeur.
+          </Text>
+          <MealRating mealId={meal.id} className="mt-2" />
+        </div>
       </DialogBody>
 
       <DialogActions>
-        {planId && (
+        {(planId || linkedRecipe) && (
           <>
-            {addedRecipeId ? (
+            {linkedRecipe ? (
+              <Button
+                color="primary"
+                href={`/recipes/${linkedRecipe.recipeId}`}
+              >
+                <BookMarked className="h-4 w-4" />
+                Bekijk in recepten
+              </Button>
+            ) : addedRecipeId ? (
               <Button color="green" href={`/recipes/${addedRecipeId}`}>
                 <BookMarked className="h-4 w-4" />
                 Naar recept
               </Button>
-            ) : (
+            ) : planId ? (
               <Button
                 plain
                 onClick={handleAddToRecipes}
@@ -323,7 +358,7 @@ export function MealDetailDialog({
                 )}
                 Toevoegen aan recepten
               </Button>
-            )}
+            ) : null}
           </>
         )}
         <Button onClick={onClose}>Sluiten</Button>

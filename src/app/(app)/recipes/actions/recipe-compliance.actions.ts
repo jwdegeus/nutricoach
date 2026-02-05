@@ -11,6 +11,10 @@ import type {
   GuardrailsRuleset,
 } from '@/src/lib/guardrails-vnext/types';
 import { getCurrentDietIdAction } from '../[recipeId]/actions/recipe-ai.persist.actions';
+import {
+  getNevoFoodNamesByCodesAction,
+  getCustomFoodNamesByIdsAction,
+} from '../[recipeId]/actions/ingredient-matching.actions';
 
 type ActionResult<T> =
   | { ok: true; data: T }
@@ -87,9 +91,105 @@ export type RecipeComplianceInputItem = {
   meal_data?: unknown;
 };
 
+type IngredientRefLike = {
+  displayName?: string;
+  display_name?: string;
+  nevoCode?: string | number;
+  nevo_code?: string | number;
+  customFoodId?: string;
+};
+
+/** Collect nevoCodes and customFoodIds that need displayName for guardrails matching. */
+function collectRefsMissingDisplayName(items: RecipeComplianceInputItem[]): {
+  nevoCodes: (string | number)[];
+  customFoodIds: string[];
+} {
+  const nevoCodes = new Set<string | number>();
+  const customFoodIds = new Set<string>();
+  for (const item of items) {
+    const raw = (item.mealData ?? item.meal_data ?? null) as Record<
+      string,
+      unknown
+    > | null;
+    const refs = (raw?.ingredientRefs ?? raw?.ingredient_refs) as
+      | IngredientRefLike[]
+      | undefined;
+    if (!Array.isArray(refs)) continue;
+    for (const ref of refs) {
+      if (ref == null || typeof ref !== 'object') continue;
+      const hasName =
+        (ref.displayName ?? ref.display_name ?? '').toString().trim() !== '';
+      if (hasName) continue;
+      if (ref.nevoCode != null || ref.nevo_code != null) {
+        const c = ref.nevoCode ?? ref.nevo_code;
+        if (c != null) nevoCodes.add(c);
+      }
+      if (
+        typeof ref.customFoodId === 'string' &&
+        ref.customFoodId.trim() !== ''
+      ) {
+        customFoodIds.add(ref.customFoodId.trim());
+      }
+    }
+  }
+  return {
+    nevoCodes: [...nevoCodes],
+    customFoodIds: [...customFoodIds],
+  };
+}
+
+/**
+ * Enrich meal payload: set displayName on refs that have nevoCode/customFoodId
+ * but no displayName, using the provided name maps. Ensures guardrails evaluate
+ * on ingredient names (e.g. "griekse yoghurt") instead of codes.
+ */
+function enrichMealPayloadWithDisplayNames(
+  raw: Record<string, unknown> | null,
+  nevoNamesByCode: Record<string, string>,
+  customNamesById: Record<string, string>,
+): Record<string, unknown> | null {
+  if (!raw) return null;
+  const refs = (raw.ingredientRefs ?? raw.ingredient_refs) as
+    | IngredientRefLike[]
+    | undefined;
+  if (!Array.isArray(refs) || refs.length === 0) {
+    return {
+      ...raw,
+      ingredientRefs: raw.ingredientRefs ?? raw.ingredient_refs,
+      instructions: raw.instructions,
+      name: raw.name ?? raw.meal_name,
+      steps: raw.steps,
+    };
+  }
+  const enrichedRefs = refs.map((ref) => {
+    if (ref == null || typeof ref !== 'object') return ref;
+    const hasName =
+      (ref.displayName ?? ref.display_name ?? '').toString().trim() !== '';
+    if (hasName) return ref;
+    let name: string | undefined;
+    if (ref.nevoCode != null || ref.nevo_code != null) {
+      const c = String(ref.nevoCode ?? ref.nevo_code);
+      name = nevoNamesByCode[c];
+    }
+    if (name == null && typeof ref.customFoodId === 'string')
+      name = customNamesById[ref.customFoodId];
+    if (name == null) return ref;
+    return { ...ref, displayName: name };
+  });
+  return {
+    ...raw,
+    ingredientRefs: enrichedRefs,
+    instructions: raw.instructions,
+    name: raw.name ?? raw.meal_name,
+    steps: raw.steps,
+  };
+}
+
 /**
  * Get compliance scores for multiple recipes against the current user's diet.
  * Returns 0–100% per recipe; uses dieetregels (guardrails) for the active diet.
+ * Enriches ingredientRefs with displayNames (from NEVO/custom_foods) when missing
+ * so that compliance is evaluated on ingredient names (e.g. "griekse yoghurt").
  */
 export async function getRecipeComplianceScoresAction(
   items: RecipeComplianceInputItem[],
@@ -147,6 +247,25 @@ export async function getRecipeComplianceScoresAction(
     timestamp: new Date().toISOString(),
   };
 
+  // Resolve displayNames for refs that only have nevoCode/customFoodId (so guardrails match on names)
+  const { nevoCodes, customFoodIds } = collectRefsMissingDisplayName(items);
+  const [nevoResult, customResult] = await Promise.all([
+    nevoCodes.length > 0
+      ? getNevoFoodNamesByCodesAction(nevoCodes)
+      : Promise.resolve({
+          ok: true as const,
+          data: {} as Record<string, string>,
+        }),
+    customFoodIds.length > 0
+      ? getCustomFoodNamesByIdsAction(customFoodIds)
+      : Promise.resolve({
+          ok: true as const,
+          data: {} as Record<string, string>,
+        }),
+  ]);
+  const nevoNamesByCode = nevoResult.ok ? nevoResult.data : {};
+  const customNamesById = customResult.ok ? customResult.data : {};
+
   const scores: Record<string, RecipeComplianceResult> = {};
 
   for (const item of items) {
@@ -154,18 +273,11 @@ export async function getRecipeComplianceScoresAction(
       string,
       unknown
     > | null;
-    const mealPayload = raw
-      ? {
-          ...raw,
-          ingredientRefs:
-            (raw.ingredientRefs as unknown[]) ??
-            (raw.ingredient_refs as unknown[]) ??
-            undefined,
-          instructions: (raw.instructions as unknown) ?? undefined,
-          name: raw.name ?? raw.meal_name ?? undefined,
-          steps: raw.steps ?? undefined,
-        }
-      : null;
+    const mealPayload = enrichMealPayloadWithDisplayNames(
+      raw,
+      nevoNamesByCode,
+      customNamesById,
+    );
     const targets = mapMealToGuardrailsTargets(
       mealPayload as Parameters<typeof mapMealToGuardrailsTargets>[0],
       'nl',

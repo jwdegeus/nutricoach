@@ -144,5 +144,21 @@ export async function addMealToRecipesAction(args: {
     }
   }
 
+  // Bron + koppeling meal plan zodat wijzigingen in recept (foto, ingrediënten) in het plan zichtbaar zijn
+  const { error: linkError } = await supabase
+    .from('custom_meals')
+    .update({
+      source: 'AI gegenereerd',
+      linked_meal_plan_id: planId,
+      linked_meal_plan_meal_id: meal.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', record.id)
+    .eq('user_id', user.id);
+
+  if (linkError) {
+    console.error('[addMealToRecipes] set source/link failed:', linkError);
+  }
+
   return { ok: true, recipeId: record.id };
 }

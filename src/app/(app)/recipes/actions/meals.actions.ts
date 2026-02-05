@@ -9,6 +9,7 @@ import { MealHistoryService } from '@/src/lib/meal-history';
 import { isVercelBlobUrl } from '@/src/lib/storage/storage.service';
 import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
 import type { MealSlot } from '@/src/lib/diets';
+import { quantityUnitToGrams } from '@/src/lib/recipes/quantity-unit-to-grams';
 
 /**
  * Action result type
@@ -1185,6 +1186,164 @@ export async function removeRecipeIngredientAction(args: {
         ok: false,
         error: { code: 'DB_ERROR', message: updateError.message },
       };
+    }
+
+    // Sync recipe_ingredients: remove row at same index (custom_meals only)
+    if (tableName === 'custom_meals') {
+      const { data: ingRows } = await supabase
+        .from('recipe_ingredients')
+        .select('id')
+        .eq('recipe_id', args.mealId)
+        .eq('user_id', user.id)
+        .order('id', { ascending: true });
+      if (ingRows && ingRows.length > args.index) {
+        const idToDelete = (ingRows[args.index] as { id: string }).id;
+        await supabase
+          .from('recipe_ingredients')
+          .delete()
+          .eq('id', idToDelete)
+          .eq('user_id', user.id);
+      }
+    }
+
+    return { ok: true, data: undefined };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: 'DB_ERROR',
+        message: error instanceof Error ? error.message : 'Onbekende fout',
+      },
+    };
+  }
+}
+
+/**
+ * Update één ingredientRef (en sync recipe_ingredients) voor recepten met alleen refs (bijv. uit meal plan).
+ * Alleen voor custom_meals (source === 'custom').
+ */
+export async function updateRecipeRefIngredientAction(args: {
+  mealId: string;
+  index: number;
+  patch: {
+    name: string;
+    quantity?: string | number | null;
+    unit?: string | null;
+    note?: string | null;
+  };
+}): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: {
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
+        },
+      };
+    }
+
+    const { data: row, error: fetchError } = await supabase
+      .from('custom_meals')
+      .select('meal_data')
+      .eq('id', args.mealId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (fetchError || !row) {
+      return {
+        ok: false,
+        error: {
+          code: fetchError ? 'DB_ERROR' : 'VALIDATION_ERROR',
+          message: fetchError?.message ?? 'Recept niet gevonden',
+        },
+      };
+    }
+
+    const mealData = (row.meal_data as Record<string, unknown>) || {};
+    const refs = Array.isArray(mealData.ingredientRefs)
+      ? [...(mealData.ingredientRefs as Record<string, unknown>[])]
+      : [];
+    if (args.index < 0 || args.index >= refs.length) {
+      return {
+        ok: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Ongeldige ingrediëntindex',
+        },
+      };
+    }
+    const ref = refs[args.index];
+    if (!ref || typeof ref !== 'object') {
+      return {
+        ok: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Ingrediënt niet gevonden',
+        },
+      };
+    }
+    const unit = (args.patch.unit ?? ref.unit ?? 'g')?.toString().trim() || 'g';
+    const qty =
+      args.patch.quantity != null
+        ? typeof args.patch.quantity === 'number'
+          ? args.patch.quantity
+          : parseFloat(String(args.patch.quantity))
+        : (ref.quantity as number | undefined);
+    const numQty = typeof qty === 'number' && Number.isFinite(qty) ? qty : 0;
+    const quantityG =
+      unit === 'g' && numQty > 0 ? numQty : quantityUnitToGrams(numQty, unit);
+    const updatedRef = {
+      ...ref,
+      displayName: String(args.patch.name ?? ref.displayName ?? '').trim(),
+      quantity: numQty,
+      quantityG,
+      quantity_g: quantityG,
+      unit,
+    };
+    const newRefs = refs.map((r, i) => (i === args.index ? updatedRef : r));
+    const { error: updateMealError } = await supabase
+      .from('custom_meals')
+      .update({
+        meal_data: { ...mealData, ingredientRefs: newRefs },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', args.mealId)
+      .eq('user_id', user.id);
+
+    if (updateMealError) {
+      return {
+        ok: false,
+        error: { code: 'DB_ERROR', message: updateMealError.message },
+      };
+    }
+
+    // Sync recipe_ingredients row at same index (order by id)
+    const { data: ingRows, error: ingFetchError } = await supabase
+      .from('recipe_ingredients')
+      .select('id')
+      .eq('recipe_id', args.mealId)
+      .eq('user_id', user.id)
+      .order('id', { ascending: true });
+
+    if (!ingFetchError && ingRows && ingRows.length > args.index) {
+      const ingId = (ingRows[args.index] as { id: string }).id;
+      const originalLine = `${numQty} ${unit} ${String(args.patch.name ?? ref.displayName ?? '').trim()}`;
+      await supabase
+        .from('recipe_ingredients')
+        .update({
+          name: String(args.patch.name ?? ref.displayName ?? '').trim(),
+          quantity: quantityG,
+          original_line: originalLine,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', ingId)
+        .eq('user_id', user.id);
     }
 
     return { ok: true, data: undefined };

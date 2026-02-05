@@ -73,11 +73,8 @@ type UrlImportDiagnostics = {
   language_detected: string | null;
 };
 
-// Maximum file size for base64 conversion
-// Note: Next.js has a default 1MB body limit for server actions
-// We compress images > 500KB to stay under this limit
-// Base64 encoding increases size by ~33%, so 700KB raw ≈ 930KB base64 (safe under 1MB)
-const MAX_FILE_SIZE_FOR_PROCESSING = 700 * 1024; // 700KB raw - will be compressed if larger
+// Maximum file size for processing (server action bodySizeLimit is 10MB in next.config)
+const MAX_FILE_SIZE_FOR_PROCESSING = 10 * 1024 * 1024; // 10MB
 const MAX_RECIPE_PAGES = 5;
 
 /**

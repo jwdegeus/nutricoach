@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 import { createClient } from '@/src/lib/supabase/server';
 import { getTranslations } from 'next-intl/server';
 import { Button } from '@/components/catalyst/button';
@@ -12,6 +13,7 @@ import {
 import { listRecentMealsAction } from './actions/meal-recent.actions';
 import { getCatalogOptionsForPickerAction } from './actions/catalog-options.actions';
 import { RecipesIndexClient } from '@/src/app/(app)/recipes/components/RecipesIndexClient';
+import RecipesIndexLoading from './loading';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('recipes');
@@ -138,17 +140,12 @@ type RecipesPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function RecipesPage({ searchParams }: RecipesPageProps) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/login');
-  }
-
-  const params = await searchParams;
+/** Async content: fetches catalog + list + i18n in parallel, then renders. Wrapped in Suspense so shell can stream first. */
+async function RecipesListContent({
+  params,
+}: {
+  params: Record<string, string | string[] | undefined>;
+}) {
   const collectionParam =
     typeof params.collection === 'string'
       ? params.collection
@@ -162,8 +159,6 @@ export default async function RecipesPage({ searchParams }: RecipesPageProps) {
         ? 'saved'
         : 'all';
 
-  const t = await getTranslations('recipes');
-
   const cuisineParam =
     typeof params.cuisine === 'string'
       ? params.cuisine
@@ -176,7 +171,27 @@ export default async function RecipesPage({ searchParams }: RecipesPageProps) {
       : Array.isArray(params.protein)
         ? (params.protein[0] ?? '')
         : '';
-  const [cuisineRes, proteinRes] = await Promise.all([
+
+  const listPromise =
+    collection === 'recent'
+      ? (() => {
+          const limit =
+            typeof params.limit === 'string' && params.limit.trim() !== ''
+              ? parseInt(params.limit, 10)
+              : 12;
+          const offset =
+            typeof params.offset === 'string' && params.offset.trim() !== ''
+              ? parseInt(params.offset, 10)
+              : 0;
+          const limitNum =
+            Number.isFinite(limit) && limit >= 1 && limit <= 50 ? limit : 12;
+          const offsetNum = Number.isFinite(offset) && offset >= 0 ? offset : 0;
+          return listRecentMealsAction({ limit: limitNum, offset: offsetNum });
+        })()
+      : listMealsAction(parseListMealsInput(params));
+
+  const [t, cuisineRes, proteinRes, listResult] = await Promise.all([
+    getTranslations('recipes'),
     getCatalogOptionsForPickerAction({
       dimension: 'cuisine',
       selectedId: cuisineParam || undefined,
@@ -185,7 +200,9 @@ export default async function RecipesPage({ searchParams }: RecipesPageProps) {
       dimension: 'protein_type',
       selectedId: proteinParam || undefined,
     }),
+    listPromise,
   ]);
+
   const cuisineOptions = cuisineRes.ok ? cuisineRes.data : [];
   const proteinTypeOptions = proteinRes.ok ? proteinRes.data : [];
   const catalogLoadError = !cuisineRes.ok
@@ -194,98 +211,51 @@ export default async function RecipesPage({ searchParams }: RecipesPageProps) {
       ? proteinRes.error.message
       : undefined;
 
-  if (collection === 'recent') {
-    // Recent: alleen limit/offset uit URL; q/filters worden niet toegepast (MVP).
-    const limit =
-      typeof params.limit === 'string' && params.limit.trim() !== ''
-        ? parseInt(params.limit, 10)
-        : 12;
-    const offset =
-      typeof params.offset === 'string' && params.offset.trim() !== ''
-        ? parseInt(params.offset, 10)
-        : 0;
-    const limitNum =
-      Number.isFinite(limit) && limit >= 1 && limit <= 50 ? limit : 12;
-    const offsetNum = Number.isFinite(offset) && offset >= 0 ? offset : 0;
-    const result = await listRecentMealsAction({
-      limit: limitNum,
-      offset: offsetNum,
-    });
-    if (!result.ok) {
-      return (
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
-          <h1 className="text-3xl font-bold tracking-tight mb-4">
-            {t('pageTitle')}
-          </h1>
-          <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4">
-            <p className="text-red-800 dark:text-red-200">
-              {t('error')}: {result.error.message}
-            </p>
-            <Link
-              href="/recipes"
-              className="mt-2 inline-block text-sm font-medium text-red-700 dark:text-red-300 hover:underline"
-            >
-              Opnieuw proberen
-            </Link>
-          </div>
-        </div>
-      );
-    }
-    const {
-      items,
-      totalCount,
-      limit: resLimit,
-      offset: resOffset,
-    } = result.data;
+  if (!listResult.ok) {
     return (
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight">
-            {t('pageTitle')}
-          </h1>
-          <Link href="/recipes/import">
-            <Button color="primary">
-              <PlusIcon className="h-4 w-4 mr-2" />
-              {t('addRecipe')}
-            </Button>
-          </Link>
-        </div>
-        <RecipesIndexClient
-          listResult={{ items, totalCount, limit: resLimit, offset: resOffset }}
-          searchParams={params}
-          cuisineOptions={cuisineOptions}
-          proteinTypeOptions={proteinTypeOptions}
-          catalogLoadError={catalogLoadError}
-        />
+      <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4">
+        <p className="text-red-800 dark:text-red-200">
+          {t('error')}: {listResult.error.message}
+        </p>
+        <Link
+          href="/recipes"
+          className="mt-2 inline-block text-sm font-medium text-red-700 dark:text-red-300 hover:underline"
+        >
+          Opnieuw proberen
+        </Link>
       </div>
     );
   }
 
-  const input = parseListMealsInput(params);
-  const result = await listMealsAction(input);
+  const { items, totalCount, limit, offset } = listResult.data;
 
-  if (!result.ok) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
-        <h1 className="text-3xl font-bold tracking-tight mb-4">
-          {t('pageTitle')}
-        </h1>
-        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4">
-          <p className="text-red-800 dark:text-red-200">
-            {t('error')}: {result.error.message}
-          </p>
-          <Link
-            href="/recipes"
-            className="mt-2 inline-block text-sm font-medium text-red-700 dark:text-red-300 hover:underline"
-          >
-            Opnieuw proberen
-          </Link>
-        </div>
-      </div>
-    );
+  return (
+    <RecipesIndexClient
+      listResult={{ items, totalCount, limit, offset }}
+      searchParams={params}
+      cuisineOptions={cuisineOptions}
+      proteinTypeOptions={proteinTypeOptions}
+      catalogLoadError={catalogLoadError}
+    />
+  );
+}
+
+export default async function RecipesPage({ searchParams }: RecipesPageProps) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect('/login');
   }
 
-  const { items, totalCount, limit, offset } = result.data;
+  const [params, t] = await Promise.all([
+    searchParams,
+    getTranslations('recipes'),
+  ]);
+
+  const resolvedParams = await params;
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
@@ -298,13 +268,9 @@ export default async function RecipesPage({ searchParams }: RecipesPageProps) {
           </Button>
         </Link>
       </div>
-      <RecipesIndexClient
-        listResult={{ items, totalCount, limit, offset }}
-        searchParams={params}
-        cuisineOptions={cuisineOptions}
-        proteinTypeOptions={proteinTypeOptions}
-        catalogLoadError={catalogLoadError}
-      />
+      <Suspense fallback={<RecipesIndexLoading />}>
+        <RecipesListContent params={resolvedParams} />
+      </Suspense>
     </div>
   );
 }

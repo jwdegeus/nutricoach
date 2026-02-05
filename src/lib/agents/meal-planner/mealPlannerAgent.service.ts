@@ -39,21 +39,29 @@ import {
 import { getMealPlanResponseJsonSchemaForGemini } from './mealPlannerAgent.gemini-schema';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 // vNext guard rails (shadow mode + enforcement) + Diet Logic (Dieetregels)
-import {
-  loadRulesetWithDietLogic,
-  evaluateGuardrails,
-  compileConstraintsForAI,
-} from '@/src/lib/guardrails-vnext';
+import { compileConstraintsForAI } from '@/src/lib/guardrails-vnext';
 import { loadGuardrailsRuleset } from '@/src/lib/guardrails-vnext/ruleset-loader';
-import {
-  mapMealPlanToGuardrailsTargets,
-  getMealPlanIngredientsPerDay,
-} from '@/src/lib/guardrails-vnext/adapters/meal-planner';
-import type { EvaluationContext } from '@/src/lib/guardrails-vnext/types';
-import { evaluateDietLogic } from '@/src/lib/diet-logic';
 import { AppError } from '@/src/lib/errors/app-error';
+import { enforceMealPlannerGuardrails } from './enforceMealPlannerGuardrails';
 import { getMealPlannerConfig } from '@/src/lib/meal-plans/mealPlans.config';
 import { getShakeSmoothieGuidance } from '@/src/lib/messages.server';
+import type { GeneratorMeta } from '@/src/lib/diets/diet.types';
+import { sanitizeCandidatePool } from '@/src/lib/meal-plans/candidatePoolSanitizer';
+import {
+  validateMealPlanSanity,
+  type SanityResult,
+} from '@/src/lib/meal-plans/mealPlanSanityValidator';
+import { createClient } from '@/src/lib/supabase/server';
+import {
+  loadMealPlanGeneratorConfig,
+  mergePoolItemsWithCandidatePool,
+  filterTemplatePoolsByExcludeTerms,
+} from '@/src/lib/meal-plans/mealPlanGeneratorConfigLoader';
+import {
+  generateTemplatePlan,
+  InsufficientAllowedIngredientsError,
+} from '@/src/lib/meal-plans/templateFallbackGenerator';
+import { loadHardBlockTermsForDiet } from '@/src/lib/meal-plans/guardrailsExcludeTerms';
 
 /**
  * Simple in-memory cache for candidate pools
@@ -351,6 +359,44 @@ function attachGuardrailsMeta(
   plan.metadata = meta as MealPlanResponse['metadata'];
 }
 
+/** Attach generator observability to plan.metadata (mode, attempts, retryReason, templateInfo, sanity). */
+function attachGeneratorMeta(
+  plan: MealPlanResponse,
+  generator: GeneratorMeta,
+): void {
+  const meta = (plan.metadata ?? {}) as Record<string, unknown>;
+  meta.generator = generator;
+  plan.metadata = meta as MealPlanResponse['metadata'];
+}
+
+/** Throw AppError MEAL_PLAN_SANITY_FAILED when sanity check failed (safe NL message + details.issues). */
+function throwIfSanityFailed(sanity: SanityResult): void {
+  if (sanity.ok) return;
+  throw new AppError(
+    'MEAL_PLAN_SANITY_FAILED',
+    'Het weekmenu voldoet niet aan de kwaliteitscontrole. Probeer opnieuw of pas je voorkeuren aan.',
+    { issues: sanity.issues },
+  );
+}
+
+/** Run shared guardrails enforcement; throws AppError GUARDRAILS_VIOLATION when blocked. */
+async function runGuardrailsAndThrow(
+  plan: MealPlanResponse,
+  dietKey: string,
+  locale: 'nl' | 'en',
+  userId?: string,
+): Promise<void> {
+  const result = await enforceMealPlannerGuardrails(
+    plan,
+    dietKey,
+    locale,
+    userId,
+  );
+  if (!result.ok) {
+    throw new AppError('GUARDRAILS_VIOLATION', result.message, result.details);
+  }
+}
+
 /**
  * Meal Planner Agent Service
  *
@@ -402,7 +448,7 @@ export class MealPlannerAgentService {
       ...request.profile.dislikes,
       ...(request.excludeIngredients || []),
     ];
-    const candidates = await getCandidatePool(
+    const rawCandidates = await getCandidatePool(
       request.profile.dietKey,
       excludeTerms,
     );
@@ -421,6 +467,166 @@ export class MealPlannerAgentService {
           ? String(constraintsResult.version)
           : null,
     };
+
+    // Step 4b: Template-based generator (no free-form AI) when enabled
+    const useTemplateGenerator =
+      process.env.USE_TEMPLATE_MEAL_GENERATOR === 'true';
+    const enforceVNextGuardrails =
+      process.env.ENFORCE_VNEXT_GUARDRAILS_MEAL_PLANNER === 'true';
+
+    if (useTemplateGenerator) {
+      const supabase = await createClient();
+      // Load generator config once (templates + slots, pool items, settings from DB; RLS, max 4 queries).
+      const config = await loadMealPlanGeneratorConfig(
+        supabase,
+        request.profile.dietKey,
+      );
+      const guardrailsTerms = enforceVNextGuardrails
+        ? await loadHardBlockTermsForDiet(
+            supabase,
+            request.profile.dietKey,
+            language,
+          )
+        : [];
+      const { pool: candidates, metrics: poolMetrics } = sanitizeCandidatePool(
+        rawCandidates,
+        excludeTerms,
+        guardrailsTerms.length > 0
+          ? { extraExcludeTerms: guardrailsTerms }
+          : undefined,
+      );
+      const combinedExclude =
+        guardrailsTerms.length > 0
+          ? [...excludeTerms, ...guardrailsTerms]
+          : excludeTerms;
+      let templatePools;
+      try {
+        const merged = mergePoolItemsWithCandidatePool(
+          config.poolItems,
+          candidates,
+        );
+        templatePools = filterTemplatePoolsByExcludeTerms(
+          merged,
+          combinedExclude,
+        );
+      } catch (e) {
+        if (e instanceof InsufficientAllowedIngredientsError) {
+          throw new AppError('INSUFFICIENT_ALLOWED_INGREDIENTS', e.message, {
+            retryReason: 'POOL_EMPTY',
+          });
+        }
+        throw e;
+      }
+      let plan: MealPlanResponse;
+      let templateInfo: { rotation: string[]; usedTemplateIds: string[] };
+      let templateAttempts = 1;
+      let templateRetryReason: GeneratorMeta['retryReason'] | undefined;
+      try {
+        const result = await generateTemplatePlan(
+          request,
+          config,
+          templatePools,
+        );
+        plan = result.plan;
+        templateInfo = result.templateInfo;
+      } catch (e) {
+        if (e instanceof InsufficientAllowedIngredientsError) {
+          throw new AppError('INSUFFICIENT_ALLOWED_INGREDIENTS', e.message, {
+            retryReason: 'POOL_EMPTY',
+          });
+        }
+        throw e;
+      }
+      const enforceVNext =
+        process.env.ENFORCE_VNEXT_GUARDRAILS_MEAL_PLANNER === 'true';
+      if (enforceVNext) {
+        try {
+          await runGuardrailsAndThrow(plan, request.profile.dietKey, language);
+        } catch (guardError) {
+          if (
+            guardError instanceof AppError &&
+            guardError.code === 'GUARDRAILS_VIOLATION'
+          ) {
+            try {
+              const retryResult = await generateTemplatePlan(
+                request,
+                config,
+                templatePools,
+                1,
+              );
+              plan = retryResult.plan;
+              templateInfo = retryResult.templateInfo;
+              templateAttempts = 2;
+              templateRetryReason = 'GUARDRAILS_VIOLATION';
+              await runGuardrailsAndThrow(
+                plan,
+                request.profile.dietKey,
+                language,
+              );
+            } catch (_retryError) {
+              throw guardError;
+            }
+          } else {
+            throw guardError;
+          }
+        }
+      }
+      // Culinary sanity check; max 1 retry with retrySeed 2
+      let sanity = validateMealPlanSanity(plan);
+      if (!sanity.ok) {
+        try {
+          const sanityRetryResult = await generateTemplatePlan(
+            request,
+            config,
+            templatePools,
+            2,
+          );
+          plan = sanityRetryResult.plan;
+          templateInfo = sanityRetryResult.templateInfo;
+          if (enforceVNext) {
+            await runGuardrailsAndThrow(
+              plan,
+              request.profile.dietKey,
+              language,
+            );
+          }
+          sanity = validateMealPlanSanity(plan);
+        } catch {
+          // Keep original sanity result for throw
+        }
+      }
+      await applyPrefilledAndAttachProvenance(
+        plan,
+        request,
+        options ?? {},
+        rules,
+      );
+      attachGuardrailsMeta(
+        plan,
+        !!guardrailsConstraintsText?.trim(),
+        guardrailsMeta.contentHash,
+        guardrailsMeta.version,
+      );
+      attachGeneratorMeta(plan, {
+        mode: 'template',
+        attempts: templateAttempts,
+        ...(templateRetryReason && { retryReason: templateRetryReason }),
+        templateInfo,
+        poolMetrics,
+        ...(guardrailsTerms.length > 0 && {
+          guardrailsExcludeTermsCount: guardrailsTerms.length,
+        }),
+        sanity: { ok: sanity.ok, issues: sanity.issues },
+      });
+      throwIfSanityFailed(sanity);
+      return plan;
+    }
+
+    // Gemini path: sanitize pool (no guardrails extra terms; template path did its own sanitize above)
+    const { pool: candidates, metrics: poolMetrics } = sanitizeCandidatePool(
+      rawCandidates,
+      excludeTerms,
+    );
 
     // Step 5: Build original prompt with candidates (guidance from messages, no hardcoded text)
     const shakeSmoothieGuidance = getShakeSmoothieGuidance(language);
@@ -466,7 +672,7 @@ export class MealPlannerAgentService {
         process.env.ENFORCE_VNEXT_GUARDRAILS_MEAL_PLANNER === 'true';
       if (enforceVNext) {
         try {
-          await this.enforceVNextMealPlannerGuardrails(
+          await runGuardrailsAndThrow(
             firstAttemptResult.response!,
             request.profile.dietKey,
             language,
@@ -508,12 +714,13 @@ export class MealPlannerAgentService {
             if (!retryResult.success) {
               throw guardError;
             }
-            await this.enforceVNextMealPlannerGuardrails(
+            await runGuardrailsAndThrow(
               retryResult.response!,
               request.profile.dietKey,
               language,
             );
             const plan = retryResult.response!;
+            const sanity = validateMealPlanSanity(plan);
             await applyPrefilledAndAttachProvenance(
               plan,
               request,
@@ -526,12 +733,53 @@ export class MealPlannerAgentService {
               guardrailsMeta.contentHash,
               guardrailsMeta.version,
             );
+            attachGeneratorMeta(plan, {
+              mode: 'gemini',
+              attempts: 2,
+              retryReason: 'GUARDRAILS_VIOLATION',
+              poolMetrics,
+              sanity: { ok: sanity.ok, issues: sanity.issues },
+            });
+            throwIfSanityFailed(sanity);
             return plan;
           }
           throw guardError;
         }
       }
-      const plan = firstAttemptResult.response!;
+      let plan = firstAttemptResult.response!;
+      let sanity = validateMealPlanSanity(plan);
+      if (!sanity.ok) {
+        try {
+          const sanityRetryRawJson = await gemini.generateJson({
+            prompt: originalPrompt,
+            jsonSchema,
+            temperature: 0.3,
+            purpose: 'plan',
+            maxOutputTokens: MEAL_PLAN_JSON_MAX_TOKENS,
+          });
+          const sanityRetryResult = await this.parseAndValidate(
+            sanityRetryRawJson,
+            request,
+            rules,
+          );
+          if (sanityRetryResult.success && sanityRetryResult.response) {
+            const sanityPlan: MealPlanResponse = sanityRetryResult.response;
+            const enforceVNext =
+              process.env.ENFORCE_VNEXT_GUARDRAILS_MEAL_PLANNER === 'true';
+            if (enforceVNext) {
+              await runGuardrailsAndThrow(
+                sanityPlan,
+                request.profile.dietKey,
+                language,
+              );
+            }
+            sanity = validateMealPlanSanity(sanityPlan);
+            if (sanity.ok) plan = sanityPlan;
+          }
+        } catch {
+          // Keep original plan and sanity for attach + throw
+        }
+      }
       await applyPrefilledAndAttachProvenance(plan, request, options, rules);
       attachGuardrailsMeta(
         plan,
@@ -539,6 +787,13 @@ export class MealPlannerAgentService {
         guardrailsMeta.contentHash,
         guardrailsMeta.version,
       );
+      attachGeneratorMeta(plan, {
+        mode: 'gemini',
+        attempts: 1,
+        poolMetrics,
+        sanity: { ok: sanity.ok, issues: sanity.issues },
+      });
+      throwIfSanityFailed(sanity);
       return plan;
     }
 
@@ -579,13 +834,14 @@ export class MealPlannerAgentService {
       const enforceVNext =
         process.env.ENFORCE_VNEXT_GUARDRAILS_MEAL_PLANNER === 'true';
       if (enforceVNext) {
-        await this.enforceVNextMealPlannerGuardrails(
+        await runGuardrailsAndThrow(
           repairResult.response!,
           request.profile.dietKey,
           language,
         );
       }
       const plan = repairResult.response!;
+      const sanity = validateMealPlanSanity(plan);
       await applyPrefilledAndAttachProvenance(plan, request, options, rules);
       attachGuardrailsMeta(
         plan,
@@ -593,6 +849,14 @@ export class MealPlannerAgentService {
         guardrailsMeta.contentHash,
         guardrailsMeta.version,
       );
+      attachGeneratorMeta(plan, {
+        mode: 'gemini',
+        attempts: 2,
+        retryReason: 'AI_PARSE',
+        poolMetrics,
+        sanity: { ok: sanity.ok, issues: sanity.issues },
+      });
+      throwIfSanityFailed(sanity);
       return plan;
     }
 
@@ -662,11 +926,7 @@ export class MealPlannerAgentService {
     const useVNextGuardrails = process.env.USE_VNEXT_GUARDRAILS === 'true';
     if (useVNextGuardrails) {
       try {
-        await this.enforceVNextMealPlannerGuardrails(
-          response,
-          request.profile.dietKey,
-          'nl',
-        );
+        await runGuardrailsAndThrow(response, request.profile.dietKey, 'nl');
       } catch (error) {
         // Don't fail the request if vNext evaluation fails
         console.error(
@@ -1118,134 +1378,5 @@ export class MealPlannerAgentService {
 
     // Step 10: Success - return meal
     return { meal };
-  }
-
-  /**
-   * Enforce vNext guard rails + Diet Logic on meal plan
-   *
-   * Evaluates the generated meal plan with guardrails (allow/block) and Diet Logic
-   * (DROP/FORCE/LIMIT/PASS). Blocks if HARD violations or diet logic violations are detected.
-   *
-   * @param plan - Generated meal plan
-   * @param dietKey - Diet key for ruleset loading
-   * @param locale - Locale for evaluation
-   * @param userId - Optional; when set, diet logic uses is_inflamed from user_diet_profiles
-   * @throws AppError with GUARDRAILS_VIOLATION if violations detected
-   */
-  private async enforceVNextMealPlannerGuardrails(
-    plan: MealPlanResponse,
-    dietKey: string,
-    locale: 'nl' | 'en' = 'nl',
-    userId?: string,
-  ): Promise<void> {
-    try {
-      const targets = mapMealPlanToGuardrailsTargets(plan, locale);
-
-      const { guardrails, dietLogic } = await loadRulesetWithDietLogic({
-        dietId: dietKey,
-        mode: 'meal_planner',
-        locale,
-        userId,
-      });
-
-      const context: EvaluationContext = {
-        dietKey,
-        mode: 'meal_planner',
-        locale,
-        timestamp: new Date().toISOString(),
-      };
-
-      const decision = evaluateGuardrails({
-        ruleset: guardrails,
-        context,
-        targets,
-      });
-
-      // Diet Logic: DROP/LIMIT per plan; FORCE-quotum per dag (dag-aggregatie)
-      let dietResult: {
-        ok: boolean;
-        summary: string;
-        warnings?: string[];
-      } | null = null;
-      let forceDeficits:
-        | Array<{
-            categoryCode: string;
-            categoryNameNl: string;
-            minPerDay?: number;
-            minPerWeek?: number;
-          }>
-        | undefined;
-      if (dietLogic) {
-        const ingredientsPerDay = getMealPlanIngredientsPerDay(plan);
-        const dayResults = ingredientsPerDay.map((dayIngredients) =>
-          evaluateDietLogic(dietLogic, { ingredients: dayIngredients }),
-        );
-        const firstFail = dayResults.findIndex((r) => !r.ok);
-        if (firstFail >= 0) {
-          const failed = dayResults[firstFail];
-          dietResult = {
-            ok: false,
-            summary: failed.summary,
-            warnings: failed.warnings,
-          };
-          const dayLabel = plan.days[firstFail]?.date ?? `dag ${firstFail + 1}`;
-          dietResult.summary = `${dietResult.summary} (${dayLabel})`;
-          const phase2 = failed.phaseResults.find((p) => p.phase === 2);
-          if (phase2?.forceDeficits?.length) {
-            forceDeficits = phase2.forceDeficits;
-          }
-        } else {
-          const allWarnings = dayResults.flatMap((r) => r.warnings ?? []);
-          dietResult = {
-            ok: true,
-            summary: 'Dieetregels: alle fases geslaagd.',
-            warnings: allWarnings.length ? allWarnings : undefined,
-          };
-        }
-      }
-
-      const blockedByGuardrails = !decision.ok;
-      const blockedByDietLogic = dietResult !== null && !dietResult.ok;
-
-      if (blockedByGuardrails || blockedByDietLogic) {
-        const reasonCodes = blockedByGuardrails
-          ? decision.reasonCodes
-          : [...decision.reasonCodes, 'DIET_LOGIC_VIOLATION'];
-        const message =
-          blockedByDietLogic && dietResult
-            ? dietResult.summary
-            : 'Het gegenereerde meal plan voldoet niet aan de dieetregels';
-
-        console.log(
-          `[MealPlanner] vNext guard rails blocked plan: dietKey=${dietKey}, outcome=${decision.outcome}, reasonCodes=${reasonCodes.slice(0, 5).join(',')}, hash=${guardrails.contentHash}`,
-        );
-
-        throw new AppError('GUARDRAILS_VIOLATION', message, {
-          outcome: 'blocked',
-          reasonCodes,
-          contentHash: guardrails.contentHash,
-          rulesetVersion: guardrails.version,
-          ...(forceDeficits && forceDeficits.length > 0 && { forceDeficits }),
-        });
-      }
-    } catch (error) {
-      if (error instanceof AppError && error.code === 'GUARDRAILS_VIOLATION') {
-        throw error;
-      }
-
-      console.error(
-        `[MealPlanner] vNext guard rails evaluation error: dietKey=${dietKey}, error=${error instanceof Error ? error.message : String(error)}`,
-      );
-
-      throw new AppError(
-        'GUARDRAILS_VIOLATION',
-        'Fout bij evalueren dieetregels',
-        {
-          outcome: 'blocked',
-          reasonCodes: ['EVALUATOR_ERROR'],
-          contentHash: '',
-        },
-      );
-    }
   }
 }

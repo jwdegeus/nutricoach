@@ -8,7 +8,7 @@
     'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   --font-sans--font-feature-settings: 'cv11';
 
-  /* Nutrition App Color Palette - Primary: Emerald (health, fresh, natural) */
+  /* Primary: Emerald only (oklch hue ~162–172). Do not use blue (hue 250–255). */
   --color-primary-50: oklch(0.979 0.021 166.113);
   --color-primary-100: oklch(0.95 0.052 163.051);
   --color-primary-200: oklch(0.905 0.093 164.15);
@@ -85,6 +85,19 @@
   --color-emerald-800: var(--color-primary-800);
   --color-emerald-900: var(--color-primary-900);
   --color-emerald-950: var(--color-primary-950);
+
+  /* Blue palette: alias to primary (emerald). Catalyst uses blue-500/600/700 for focus rings and selection; primary must remain emerald. */
+  --color-blue-50: var(--color-primary-50);
+  --color-blue-100: var(--color-primary-100);
+  --color-blue-200: var(--color-primary-200);
+  --color-blue-300: var(--color-primary-300);
+  --color-blue-400: var(--color-primary-400);
+  --color-blue-500: var(--color-primary-500);
+  --color-blue-600: var(--color-primary-600);
+  --color-blue-700: var(--color-primary-700);
+  --color-blue-800: var(--color-primary-800);
+  --color-blue-900: var(--color-primary-900);
+  --color-blue-950: var(--color-primary-950);
 
   /* White and Black - Required for Catalyst UI components */
   --color-white: oklch(1 0 0);

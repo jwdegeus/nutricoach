@@ -2,7 +2,7 @@
 
 import { createClient } from '@/src/lib/supabase/server';
 import { PlanChatService } from '@/src/lib/agents/meal-planner/planChat.service';
-import { AppError } from '@/src/lib/errors/app-error';
+import { AppError, type AppErrorCode } from '@/src/lib/errors/app-error';
 
 /**
  * Action result type
@@ -12,16 +12,7 @@ type ActionResult<T> =
   | {
       ok: false;
       error: {
-        code:
-          | 'AUTH_ERROR'
-          | 'UNAUTHORIZED'
-          | 'VALIDATION_ERROR'
-          | 'DB_ERROR'
-          | 'AGENT_ERROR'
-          | 'RATE_LIMIT'
-          | 'CONFLICT'
-          | 'GUARDRAILS_VIOLATION'
-          | 'MEAL_LOCKED';
+        code: AppErrorCode;
         message: string;
         details?: {
           outcome: 'blocked';

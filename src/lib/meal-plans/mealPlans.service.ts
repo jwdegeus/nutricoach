@@ -145,6 +145,7 @@ function isMealBlockedByAllergiesOrDislikes(
     if (term && nameLower.includes(term)) return true;
   }
   for (const ref of meal.ingredientRefs ?? []) {
+    if (ref == null) continue;
     const displayLower = (ref.displayName ?? '').toLowerCase();
     for (const term of terms) {
       if (term && displayLower.includes(term)) return true;
@@ -168,10 +169,12 @@ function scaleMealPlanToHousehold(
     meals: day.meals.map((meal) => {
       const baseServings = meal.servings ?? 1;
       const factor = baseServings > 0 ? householdSize / baseServings : 1;
-      const scaledRefs = (meal.ingredientRefs ?? []).map((ref) => ({
-        ...ref,
-        quantityG: Math.max(1, Math.round((ref.quantityG ?? 0) * factor)),
-      }));
+      const scaledRefs = (meal.ingredientRefs ?? [])
+        .filter((ref): ref is NonNullable<typeof ref> => ref != null)
+        .map((ref) => ({
+          ...ref,
+          quantityG: Math.max(1, Math.round((ref.quantityG ?? 0) * factor)),
+        }));
       return {
         ...meal,
         servings: householdSize,

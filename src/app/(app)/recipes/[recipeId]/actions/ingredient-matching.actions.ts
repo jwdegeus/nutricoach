@@ -748,12 +748,22 @@ function sortCandidatesByRelevance(
   const lastSignificantWord =
     queryWords.length > 0 ? queryWords[queryWords.length - 1] : '';
 
+  /** "Los ingrediënt": exact "havermout" of "havermout, volkoren" → bovenaan */
+  const isStandalone = (name: string): boolean => {
+    const n = (name ?? '').toLowerCase().trim();
+    if (!q || n === q) return true;
+    if (n.startsWith(q)) {
+      const rest = n.slice(q.length);
+      return rest === '' || rest.startsWith(',') || rest.startsWith(' ');
+    }
+    return false;
+  };
+
   const score = (name: string): number => {
     const n = (name ?? '').toLowerCase();
     if (n === q) return 0;
-    // Zoekregel bevat productnaam (bijv. "kokosolie 2 el" bevat "kokosolie") → hoge relevantie
+    if (isStandalone(name ?? '')) return 0.5;
     if (n.length >= 2 && q.includes(n)) return 1;
-    // NEVO "Olijf, olie" vs zoekregel "olijfolie 2 el": genormaliseerd bevat zoekregel de productnaam
     const nNorm = normalizeForMatch(n);
     if (nNorm.length >= 2 && qNorm.includes(nNorm)) return 1;
     if (n.startsWith(q)) return 2;
@@ -763,7 +773,6 @@ function sortCandidatesByRelevance(
     );
     if (wordBoundary.test(n)) return 3;
     if (n.includes(q)) return 4;
-    // NEVO "Tijm, gedroogd" bij zoekterm "gedroogde tijm": naam bevat kernwoord "tijm" → hoger dan alleen "gedroogde" matches
     if (
       lastSignificantWord &&
       (n.includes(lastSignificantWord) ||
@@ -777,8 +786,10 @@ function sortCandidatesByRelevance(
   };
 
   return [...candidates].sort((a, b) => {
-    const sa = score(a.name_nl);
-    const sb = score(b.name_nl);
+    const nameA = a.name_nl ?? a.name_en ?? '';
+    const nameB = b.name_nl ?? b.name_en ?? '';
+    const sa = Math.min(score(a.name_nl), nameA ? score(nameA) : 99);
+    const sb = Math.min(score(b.name_nl), nameB ? score(nameB) : 99);
     if (sa !== sb) return sa - sb;
     return (a.name_nl ?? '').localeCompare(b.name_nl ?? '');
   });
@@ -871,10 +882,153 @@ export async function searchIngredientCandidatesAction(
     const customCols =
       'id, name_nl, name_en, food_group_nl, energy_kcal, protein_g, fat_g, carbs_g, fiber_g, created_by';
 
+    const esc = (t: string) => t.replace(/'/g, "''");
+
+    // Eerste ronde: exact en "los ingrediënt" (naam = zoekterm of zoekterm gevolgd door komma/spatie).
+    // Zorgt dat "havermout" ook "Havermout" en "Havermout, volkoren" oplevert als die in de DB staan.
+    const exactLimit = Math.min(limit, 20);
+    const primaryEsc = esc(searchTerm);
+    const patternsStandalone = [
+      primaryEsc,
+      primaryEsc + ',%',
+      primaryEsc + ' %',
+    ];
+    for (const pat of patternsStandalone) {
+      const [nevoNl, nevoEn, customNl, customEn, fnddsDesc, fnddsDisp] =
+        await Promise.all([
+          supabase
+            .from('nevo_foods')
+            .select(nevoCols)
+            .ilike('name_nl', pat)
+            .limit(exactLimit),
+          supabase
+            .from('nevo_foods')
+            .select(nevoCols)
+            .ilike('name_en', pat)
+            .limit(exactLimit),
+          supabase
+            .from('custom_foods')
+            .select(customCols)
+            .ilike('name_nl', pat)
+            .limit(exactLimit),
+          supabase
+            .from('custom_foods')
+            .select(customCols)
+            .ilike('name_en', pat)
+            .limit(exactLimit),
+          supabase
+            .from('fndds_survey_foods')
+            .select('fdc_id, description')
+            .ilike('description', pat)
+            .limit(exactLimit),
+          supabase
+            .from('fndds_survey_food_translations')
+            .select('fdc_id, display_name')
+            .eq('locale', 'nl-NL')
+            .ilike('display_name', pat)
+            .limit(exactLimit),
+        ]);
+      const addNevo = (
+        list: {
+          nevo_code: number;
+          name_nl: string | null;
+          name_en: string | null;
+          [k: string]: unknown;
+        }[],
+      ) => {
+        for (const r of list) {
+          if (seenKeys.has(`nevo:${r.nevo_code}`)) continue;
+          seenKeys.add(`nevo:${r.nevo_code}`);
+          nevoCandidates.push({
+            source: 'nevo',
+            sourceLabel: 'Nevo',
+            nevoCode: r.nevo_code,
+            name_nl: r.name_nl ?? '',
+            name_en: r.name_en ?? null,
+            food_group_nl: (r.food_group_nl as string) ?? null,
+            energy_kcal: (r.energy_kcal as number) ?? null,
+            protein_g: (r.protein_g as number) ?? null,
+            fat_g: (r.fat_g as number) ?? null,
+            carbs_g: (r.carbs_g as number) ?? null,
+            fiber_g: (r.fiber_g as number) ?? null,
+          });
+        }
+      };
+      addNevo([...(nevoNl.data ?? []), ...(nevoEn.data ?? [])]);
+      const addCustom = (
+        list: {
+          id: string;
+          name_nl: string | null;
+          name_en: string | null;
+          [k: string]: unknown;
+        }[],
+      ) => {
+        for (const r of list) {
+          if (seenKeys.has(`custom:${r.id}`)) continue;
+          seenKeys.add(`custom:${r.id}`);
+          customCandidates.push({
+            source: 'custom',
+            sourceLabel: (r as CustomRow).created_by ? 'AI' : 'Eigen',
+            customFoodId: r.id,
+            name_nl: r.name_nl ?? '',
+            name_en: r.name_en ?? null,
+            food_group_nl: (r.food_group_nl as string) ?? null,
+            energy_kcal: (r.energy_kcal as number) ?? null,
+            protein_g: (r.protein_g as number) ?? null,
+            fat_g: (r.fat_g as number) ?? null,
+            carbs_g: (r.carbs_g as number) ?? null,
+            fiber_g: (r.fiber_g as number) ?? null,
+          });
+        }
+      };
+      addCustom([...(customNl.data ?? []), ...(customEn.data ?? [])]);
+      const fnddsByDescList = (fnddsDesc.data ?? []) as {
+        fdc_id: number;
+        description: string;
+      }[];
+      const fnddsByDisplayList = (fnddsDisp.data ?? []) as {
+        fdc_id: number;
+        display_name: string;
+      }[];
+      const fnddsMap = new Map<
+        number,
+        { name_nl: string; name_en: string | null }
+      >();
+      for (const row of fnddsByDisplayList) {
+        if (!fnddsMap.has(row.fdc_id))
+          fnddsMap.set(row.fdc_id, {
+            name_nl: row.display_name ?? '',
+            name_en: null,
+          });
+        else fnddsMap.get(row.fdc_id)!.name_nl = row.display_name ?? '';
+      }
+      for (const row of fnddsByDescList) {
+        const cur = fnddsMap.get(row.fdc_id);
+        if (!cur)
+          fnddsMap.set(row.fdc_id, {
+            name_nl: row.description ?? '',
+            name_en: row.description ?? null,
+          });
+        else cur.name_en = row.description ?? null;
+      }
+      for (const [fdcId, names] of fnddsMap) {
+        if (seenKeys.has(`fndds:${fdcId}`)) continue;
+        seenKeys.add(`fndds:${fdcId}`);
+        if (!names.name_nl && !names.name_en) continue;
+        fnddsCandidates.push({
+          source: 'fndds',
+          sourceLabel: 'FNDDS',
+          fdcId,
+          name_nl: names.name_nl || names.name_en || '',
+          name_en: names.name_en ?? null,
+        });
+      }
+    }
+
     // Zoek voor élke term (niet stoppen bij limit), zodat bv. "tijm" resultaten niet worden weggelaten
     // doordat "gedroogde" al 15 treffers gaf. Daarna sorteren we op relevantie en nemen we de top.
     for (const q of searchTerms) {
-      const pattern = `%${q.replace(/'/g, "''")}%`;
+      const pattern = `%${esc(q)}%`;
 
       // NEVO: inline queries zodat we fouten kunnen doorgeven (searchNevoFoods geeft [] bij error)
       const [

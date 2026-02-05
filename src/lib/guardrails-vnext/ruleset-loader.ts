@@ -481,6 +481,22 @@ function getFallbackRuleset(dietId: string): GuardrailsRuleset {
         specificity: 'global',
       },
     },
+    {
+      id: 'fallback:yoghurt',
+      action: 'block',
+      strictness: 'hard',
+      priority: 50,
+      target: 'ingredient',
+      match: {
+        term: 'yoghurt',
+        synonyms: ['yogurt', 'greek yogurt', 'griekse yoghurt'],
+      },
+      metadata: {
+        ruleCode: 'FORBIDDEN_INGREDIENT',
+        label: 'Zuivel verboden',
+        specificity: 'global',
+      },
+    },
   ];
 
   // Calculate content hash (policy payload only, excluding provenance timestamps)

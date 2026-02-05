@@ -228,7 +228,7 @@
     "reviewPlaceholder": "This is a placeholder preview. The final import functionality will be added in a later step.",
     "errorImageOnly": "Only image files are allowed",
     "errorFileTooLarge": "File is too large. Maximum size is 10MB",
-    "errorFileTooLargeForProcessing": "File is too large for processing. Maximum size is 4MB.",
+    "errorFileTooLargeForProcessing": "File is too large for processing. Maximum size is 10MB.",
     "errorJobNotFound": "Recipe import not found or no access",
     "errorUnknown": "Unknown error occurred",
     "errorNetworkOrTimeout": "Network error or timeout. Check your connection and try again.",

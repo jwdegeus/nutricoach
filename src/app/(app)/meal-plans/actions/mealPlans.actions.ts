@@ -2,7 +2,7 @@
 
 import { createClient } from '@/src/lib/supabase/server';
 import { MealPlansService } from '@/src/lib/meal-plans/mealPlans.service';
-import { AppError } from '@/src/lib/errors/app-error';
+import { AppError, type AppErrorCode } from '@/src/lib/errors/app-error';
 import { createInboxNotificationAction } from '@/src/app/(app)/inbox/actions/inboxNotifications.actions';
 import type {
   CreateMealPlanInput,
@@ -22,29 +22,29 @@ type ActionResult<T> =
   | {
       ok: false;
       error: {
-        code:
-          | 'AUTH_ERROR'
-          | 'UNAUTHORIZED'
-          | 'VALIDATION_ERROR'
-          | 'DB_ERROR'
-          | 'AGENT_ERROR'
-          | 'RATE_LIMIT'
-          | 'CONFLICT'
-          | 'GUARDRAILS_VIOLATION'
-          | 'MEAL_LOCKED';
+        code: AppErrorCode;
         message: string;
-        details?: {
-          outcome: 'blocked';
-          reasonCodes: string[];
-          contentHash: string;
-          rulesetVersion?: number;
-          forceDeficits?: Array<{
-            categoryCode: string;
-            categoryNameNl: string;
-            minPerDay?: number;
-            minPerWeek?: number;
-          }>;
-        };
+        details?:
+          | {
+              outcome: 'blocked';
+              reasonCodes: string[];
+              contentHash: string;
+              rulesetVersion?: number;
+              forceDeficits?: Array<{
+                categoryCode: string;
+                categoryNameNl: string;
+                minPerDay?: number;
+                minPerWeek?: number;
+              }>;
+            }
+          | {
+              issues?: Array<{
+                code: string;
+                message: string;
+                mealId?: string;
+                date?: string;
+              }>;
+            };
       };
     };
 
@@ -106,6 +106,8 @@ export async function createMealPlanAction(
         code: error.code,
         message: error.safeMessage,
         ...(error.guardrailsDetails && { details: error.guardrailsDetails }),
+        ...(error.details &&
+          !error.guardrailsDetails && { details: error.details }),
       };
     } else {
       const errorMessage =
@@ -197,6 +199,8 @@ export async function regenerateMealPlanAction(
           code: error.code,
           message: error.safeMessage,
           ...(error.guardrailsDetails && { details: error.guardrailsDetails }),
+          ...(error.details &&
+            !error.guardrailsDetails && { details: error.details }),
         },
       };
     }

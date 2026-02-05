@@ -454,6 +454,8 @@ Alleen objecten met confidence >= ${AI_SUGGESTION_MIN_CONFIDENCE} opnemen.`;
       'bloemkool',
       'cauliflower rice',
       'cauliflower',
+      'ijsblokjes',
+      'ijsblokje',
       'kokosyoghurt',
       'kokos yoghurt',
       'amandelyoghurt',

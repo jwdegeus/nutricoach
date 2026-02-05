@@ -1,10 +1,10 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useState, useEffect } from 'react';
 import type { MealPlanResponse } from '@/src/lib/diets';
 import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
 import type { MealPlanStatus } from '@/src/lib/meal-plans/mealPlans.types';
-import { MealPlanPageClient } from './MealPlanPageClient';
 import { GuardrailsViolationEmptyState } from './GuardrailsViolationEmptyState';
 import { getCurrentDietIdAction } from '@/src/app/(app)/recipes/[recipeId]/actions/recipe-ai.persist.actions';
 import { regenerateMealPlanAction } from '../../actions/mealPlans.actions';
@@ -28,14 +28,16 @@ type MealPlanPageWrapperProps = {
   enrichment?: MealPlanEnrichmentResponse | null;
   nevoFoodNamesByCode: Record<string, string>;
   planStatus?: MealPlanStatus;
+  children: ReactNode;
 };
 
 export function MealPlanPageWrapper({
   planId,
-  plan,
-  enrichment,
-  nevoFoodNamesByCode,
-  planStatus,
+  plan: _plan,
+  enrichment: _enrichment,
+  nevoFoodNamesByCode: _nevoFoodNamesByCode,
+  planStatus: _planStatus,
+  children,
 }: MealPlanPageWrapperProps) {
   const router = useRouter();
   const [guardrailsViolation, setGuardrailsViolation] =
@@ -99,7 +101,8 @@ export function MealPlanPageWrapper({
         // Check for guardrails violation again
         if (
           result.error.code === 'GUARDRAILS_VIOLATION' &&
-          result.error.details
+          result.error.details &&
+          'reasonCodes' in result.error.details
         ) {
           const d = result.error.details;
           setGuardrailsViolation({
@@ -134,13 +137,7 @@ export function MealPlanPageWrapper({
           isRetrying={isRetrying}
         />
       ) : (
-        <MealPlanPageClient
-          planId={planId}
-          plan={plan}
-          enrichment={enrichment}
-          nevoFoodNamesByCode={nevoFoodNamesByCode}
-          planStatus={planStatus}
-        />
+        children
       )}
     </>
   );

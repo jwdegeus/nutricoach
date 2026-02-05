@@ -85,6 +85,16 @@ const saveClassificationSchema = z.object({
     .nullable()
     .optional()
     .transform((v) => v ?? null),
+  sourceName: z
+    .string()
+    .max(500)
+    .optional()
+    .transform((v) => (v == null || v === '' ? null : v.trim())),
+  sourceUrl: z
+    .string()
+    .max(2000)
+    .optional()
+    .transform((v) => (v == null || v === '' ? null : v.trim())),
 });
 
 export type SaveMealClassificationInput = z.infer<
@@ -275,6 +285,8 @@ export async function saveMealClassificationAction(args: {
       cuisineOptionId,
       proteinTypeOptionId,
       recipeBookOptionId,
+      sourceName,
+      sourceUrl,
     } = parsed.data;
 
     let mealSlotValue: string = mealSlot ?? 'dinner';
@@ -327,6 +339,8 @@ export async function saveMealClassificationAction(args: {
         meal_slot_option_id: mealSlotOptionId ?? null,
         total_minutes: totalMinutes,
         servings,
+        source: sourceName ?? null,
+        source_url: sourceUrl ?? null,
         cuisine_option_id: cuisineOptionId ?? null,
         protein_type_option_id: proteinTypeOptionId ?? null,
         recipe_book_option_id: recipeBookOptionId ?? null,

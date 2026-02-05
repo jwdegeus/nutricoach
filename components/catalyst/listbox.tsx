@@ -2,7 +2,17 @@
 
 import * as Headless from '@headlessui/react';
 import clsx from 'clsx';
-import { Fragment } from 'react';
+import React, { Fragment } from 'react';
+
+/** Filter children to only ListboxOption elements, so custom content (e.g. search in dropdown) is not shown in the button. */
+function onlyListboxOptions(
+  children: React.ReactNode,
+  OptionComponent: React.ComponentType<unknown>,
+): React.ReactNode[] {
+  return React.Children.toArray(children).filter(
+    (child) => React.isValidElement(child) && child.type === OptionComponent,
+  );
+}
 
 export function Listbox<T>({
   className,
@@ -18,6 +28,10 @@ export function Listbox<T>({
   'aria-label'?: string;
   children?: React.ReactNode;
 } & Omit<Headless.ListboxProps<typeof Fragment, T>, 'as' | 'multiple'>) {
+  const optionChildrenOnly = onlyListboxOptions(
+    options,
+    ListboxOption as React.ComponentType<unknown>,
+  );
   return (
     <Headless.Listbox as="div" {...props} multiple={false}>
       <Headless.ListboxButton
@@ -42,7 +56,7 @@ export function Listbox<T>({
       >
         <Headless.ListboxSelectedOption
           as="span"
-          options={options}
+          options={optionChildrenOnly}
           placeholder={
             placeholder && (
               <span className="block truncate text-zinc-500">

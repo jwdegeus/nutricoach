@@ -10,9 +10,15 @@ import type { PlanEdit } from '@/src/lib/agents/meal-planner/planEdit.types';
 type QuickEditBarProps = {
   planId: string;
   date: string;
+  /** Called when a per-meal edit (Tussendoortje/Regenereren) is started */
+  onEditStarted?: () => void;
 };
 
-export function QuickEditBar({ planId, date }: QuickEditBarProps) {
+export function QuickEditBar({
+  planId,
+  date,
+  onEditStarted,
+}: QuickEditBarProps) {
   const _router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +27,7 @@ export function QuickEditBar({ planId, date }: QuickEditBarProps) {
     setError(null);
     startTransition(async () => {
       try {
+        onEditStarted?.();
         const edit: PlanEdit = {
           action: 'ADD_SNACK',
           planId,
@@ -50,6 +57,7 @@ export function QuickEditBar({ planId, date }: QuickEditBarProps) {
     setError(null);
     startTransition(async () => {
       try {
+        onEditStarted?.();
         const edit: PlanEdit = {
           action: 'REGENERATE_DAY',
           planId,

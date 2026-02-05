@@ -338,6 +338,73 @@ export type GuardrailsVNextDiagnostics = {
   };
 };
 
+/** Generator observability: which path was used and retry/failure reasons */
+export type GeneratorRetryReason =
+  | 'GUARDRAILS_VIOLATION'
+  | 'AI_PARSE'
+  | 'POOL_EMPTY'
+  | 'UNKNOWN';
+
+/** Optional pool category counts for observability (before/after sanitization). */
+export type GeneratorPoolMetrics = {
+  before: {
+    proteins: number;
+    vegetables: number;
+    fruits: number;
+    fats: number;
+  };
+  after: { proteins: number; vegetables: number; fruits: number; fats: number };
+  removedDuplicates: number;
+  removedByExcludeTerms: number;
+  /** When guardrails block terms were applied: count removed by those terms only. */
+  removedByGuardrailsTerms?: number;
+};
+
+/** Sanity check result for metadata.generator.sanity (optional). */
+export type GeneratorSanityMeta = {
+  ok: boolean;
+  issues?: Array<{
+    code: string;
+    message: string;
+    mealId?: string;
+    date?: string;
+  }>;
+};
+
+/** Per-meal quality (score + reasons) from template generator. */
+export type MealQualityEntry = {
+  date: string;
+  slot: string;
+  score: number;
+  reasons: string[];
+};
+
+export type GeneratorMeta = {
+  mode: 'template' | 'gemini';
+  attempts: number;
+  retryReason?: GeneratorRetryReason;
+  templateInfo?: {
+    rotation: string[];
+    usedTemplateIds: string[];
+    quality?: {
+      repeatsAvoided: number;
+      repeatsForced: number;
+      proteinRepeatsForced?: number;
+      templateRepeatsForced?: number;
+      proteinCountsTop?: Array<{ nevoCode: string; count: number }>;
+      templateCounts?: Array<{ id: string; count: number }>;
+    };
+    /** Per-meal quality score + reasons (template generator only). */
+    mealQualities?: MealQualityEntry[];
+  };
+  /** Optional pool sanitization metrics (backwards compatible). */
+  poolMetrics?: GeneratorPoolMetrics;
+  /** When guardrails block terms were applied in template path: number of terms used. */
+  guardrailsExcludeTermsCount?: number;
+  /** Optional culinary sanity check result (backwards compatible). */
+  sanity?: GeneratorSanityMeta;
+};
+
 /**
  * Meal plan response - Output from the agent
  */
@@ -351,5 +418,7 @@ export type MealPlanResponse = {
     totalMeals: number;
     /** Guard Rails vNext diagnostics (shadow mode, optional) */
     guardrailsVnext?: GuardrailsVNextDiagnostics;
+    /** Generator path + retries (observability; backwards-compatible) */
+    generator?: GeneratorMeta;
   };
 };

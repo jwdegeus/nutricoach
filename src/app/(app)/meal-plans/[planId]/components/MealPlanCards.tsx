@@ -3,6 +3,7 @@
 import type { MealPlanResponse, MealPlanDay } from '@/src/lib/diets';
 import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
 import type { MealPlanStatus } from '@/src/lib/meal-plans/mealPlans.types';
+import type { LinkedRecipe } from './MealPlanPageClient';
 import { MealCard } from './MealCard';
 import { QuickEditBar } from './QuickEditBar';
 import { Heading } from '@/components/catalyst/heading';
@@ -13,6 +14,9 @@ type MealPlanCardsProps = {
   enrichment?: MealPlanEnrichmentResponse | null;
   nevoFoodNamesByCode: Record<string, string>;
   planStatus?: MealPlanStatus;
+  linkedRecipesByMealId?: Record<string, LinkedRecipe>;
+  /** Called when a per-meal edit (Wissel/Verwijder/QuickEditBar) is started */
+  onEditStarted?: () => void;
 };
 
 export function MealPlanCards({
@@ -21,6 +25,8 @@ export function MealPlanCards({
   enrichment,
   nevoFoodNamesByCode,
   planStatus,
+  linkedRecipesByMealId = {},
+  onEditStarted,
 }: MealPlanCardsProps) {
   // Create enrichment map for quick lookup
   const enrichmentMap = new Map<
@@ -83,7 +89,11 @@ export function MealPlanCards({
           {/* Day Header */}
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">{formatDate(day.date)}</h2>
-            <QuickEditBar planId={planId} date={day.date} />
+            <QuickEditBar
+              planId={planId}
+              date={day.date}
+              onEditStarted={onEditStarted}
+            />
           </div>
 
           {/* Meal Cards Grid */}
@@ -97,6 +107,7 @@ export function MealPlanCards({
                 (cp) => cp.date === meal.date,
               );
 
+              const linkedRecipe = linkedRecipesByMealId[meal.id];
               return (
                 <MealCard
                   key={meal.id}
@@ -111,9 +122,11 @@ export function MealPlanCards({
                   cookTime={enriched?.cookTimeMin}
                   macros={meal.estimatedMacros}
                   enrichedMeal={enriched}
+                  linkedRecipe={linkedRecipe}
                   cookPlanDay={cookPlan}
                   nevoFoodNamesByCode={nevoFoodNamesByCode}
                   planStatus={planStatus}
+                  onEditStarted={onEditStarted}
                 />
               );
             })}

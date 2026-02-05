@@ -521,8 +521,8 @@ export function RecipesIndexClient({
           onClick={handleTabAlles}
           className={
             activeCollection === 'all'
-              ? 'border-b-2 border-zinc-950 dark:border-white px-3 py-2 text-sm font-medium text-zinc-950 dark:text-white'
-              : 'border-b-2 border-transparent px-3 py-2 text-sm font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+              ? 'border-b-2 border-primary-600 dark:border-primary-500 px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400'
+              : 'border-b-2 border-transparent px-3 py-2 text-sm font-medium text-zinc-500 hover:text-primary-600 dark:text-zinc-400 dark:hover:text-primary-400'
           }
         >
           Alles
@@ -532,8 +532,8 @@ export function RecipesIndexClient({
           onClick={handleTabOpgeslagen}
           className={
             activeCollection === 'saved'
-              ? 'border-b-2 border-zinc-950 dark:border-white px-3 py-2 text-sm font-medium text-zinc-950 dark:text-white'
-              : 'border-b-2 border-transparent px-3 py-2 text-sm font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+              ? 'border-b-2 border-primary-600 dark:border-primary-500 px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400'
+              : 'border-b-2 border-transparent px-3 py-2 text-sm font-medium text-zinc-500 hover:text-primary-600 dark:text-zinc-400 dark:hover:text-primary-400'
           }
         >
           Opgeslagen
@@ -543,8 +543,8 @@ export function RecipesIndexClient({
           onClick={handleTabRecent}
           className={
             activeCollection === 'recent'
-              ? 'border-b-2 border-zinc-950 dark:border-white px-3 py-2 text-sm font-medium text-zinc-950 dark:text-white'
-              : 'border-b-2 border-transparent px-3 py-2 text-sm font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+              ? 'border-b-2 border-primary-600 dark:border-primary-500 px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400'
+              : 'border-b-2 border-transparent px-3 py-2 text-sm font-medium text-zinc-500 hover:text-primary-600 dark:text-zinc-400 dark:hover:text-primary-400'
           }
         >
           Recent
@@ -898,7 +898,7 @@ export function RecipesIndexClient({
               {totalCount} recepten
             </Text>
           )}
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:gap-x-8">
             {items.map((item) => (
               <MealCard
                 key={item.mealId}

@@ -26,11 +26,14 @@ type RecipeContentEditorProps = {
   ingredients: IngredientRow[];
   /** Huidige instructies (actieve versie) */
   instructions: InstructionRow[];
-  onUpdated: () => void;
+  /** Na succesvol opslaan; bij instructionsOnly wordt de opgeslagen instructies-array doorgegeven */
+  onUpdated: (updatedInstructions?: InstructionRow[]) => void;
   /** Alleen bereidingsinstructies tonen (voor gebruik in het instructieblok) */
   instructionsOnly?: boolean;
   /** Bij annuleren (bijv. sluit dialog) */
   onCancel?: () => void;
+  /** Start direct in bewerkmodus (bijv. wanneer geopend in een dialog) */
+  defaultEditing?: boolean;
 };
 
 function instructionsFromAi(ai: unknown): InstructionRow[] {
@@ -82,8 +85,9 @@ export function RecipeContentEditor({
   onUpdated,
   instructionsOnly = false,
   onCancel: onCancelProp,
+  defaultEditing = false,
 }: RecipeContentEditorProps) {
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(defaultEditing);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -159,7 +163,7 @@ export function RecipeContentEditor({
 
       if (result.ok) {
         setIsEditing(false);
-        onUpdated();
+        onUpdated(instructionsOnly ? cleanInst : undefined);
       } else {
         setError(result.error.message);
       }

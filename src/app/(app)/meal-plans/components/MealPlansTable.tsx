@@ -27,7 +27,7 @@ export function MealPlansTable({ plans }: MealPlansTableProps) {
           <Text className="text-sm text-zinc-500 dark:text-zinc-400">
             Je hebt nog geen weekmenu&apos;s. Genereer er een om te beginnen.
           </Text>
-          <Button href="/meal-plans/new">
+          <Button href="/meal-plans/new" color="primary">
             <Calendar className="h-4 w-4 mr-2" />
             Nieuw weekmenu
           </Button>

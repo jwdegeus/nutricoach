@@ -319,6 +319,7 @@ export function RecipeDetailPageClient({
         customFoodNamesById={customFoodNamesById}
         complianceScore={complianceScore}
         onRecipeApplied={loadMeal}
+        onRecipeAppliedSilent={loadMealSilent}
         onIngredientMatched={(payload?: OptimisticMatchPayload) => {
           if (payload && meal) {
             // Optimistische update: geen paginareload, direct state bijwerken

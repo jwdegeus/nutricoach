@@ -466,6 +466,7 @@ async function validateNevoCodes(
           refIndex++
         ) {
           const ref = meal.ingredientRefs[refIndex];
+          if (ref == null) continue;
           const path = `days[${dayIndex}].meals[${mealIndex}].ingredientRefs[${refIndex}]`;
 
           // Verify NEVO code exists
@@ -717,6 +718,7 @@ export async function validateHardConstraints(args: {
           refIndex++
         ) {
           const ref = meal.ingredientRefs[refIndex];
+          if (ref == null) continue;
           const path = `days[${dayIndex}].meals[${mealIndex}].ingredientRefs[${refIndex}]`;
 
           // Check displayName against allergens/dislikes/forbidden (if provided)
@@ -936,6 +938,7 @@ export async function validateDayHardConstraints(args: {
         refIndex++
       ) {
         const ref = meal.ingredientRefs[refIndex];
+        if (ref == null) continue;
         const path = `days[${dayIndex}].meals[${mealIndex}].ingredientRefs[${refIndex}]`;
 
         // Check displayName against allergens/dislikes/forbidden (if provided)

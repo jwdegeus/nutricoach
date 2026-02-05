@@ -6,11 +6,12 @@ import { getNevoFoodByCode } from '@/src/lib/nevo/nutrition-calculator';
 import { MealPlanSummary } from './components/MealPlanSummary';
 import { MealPlanActionsClient } from './components/MealPlanActionsClient';
 import { MealPlanPageWrapper } from './components/MealPlanPageWrapper';
+import { MealPlanPageClient } from './components/MealPlanPageClient';
 import { MealPlanDraftBannerClient } from './components/MealPlanDraftBannerClient';
-import { MealPlanProvenance } from './components/MealPlanProvenance';
+import { MealPlanHeaderMeta } from '../components/MealPlanHeaderMeta';
 import { Heading } from '@/components/catalyst/heading';
 import { Text } from '@/components/catalyst/text';
-import { Badge } from '@/components/catalyst/badge';
+import { Link } from '@/components/catalyst/link';
 
 export const metadata: Metadata = {
   title: 'Weekmenu | NutriCoach',
@@ -129,6 +130,18 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
     plan.status === 'draft' && plan.draftPlanSnapshot != null
       ? plan.draftPlanSnapshot
       : plan.planSnapshot;
+
+  // Empty plan: geen days of som van meals over alle days === 0
+  function hasNoMeals(snapshot: typeof currentSnapshot): boolean {
+    if (!snapshot?.days || !Array.isArray(snapshot.days)) return true;
+    const total = snapshot.days.reduce(
+      (sum, day) => sum + (day?.meals?.length ?? 0),
+      0,
+    );
+    return total === 0;
+  }
+  const isEmptyPlan = hasNoMeals(currentSnapshot);
+
   const provenance = (
     currentSnapshot?.metadata as Record<string, unknown> | undefined
   )?.provenance as
@@ -144,8 +157,11 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
       : null;
   const showProvenanceCounters =
     reused !== null && generated !== null && (reused > 0 || generated > 0);
-  const total = showProvenanceCounters ? reused! + generated! : 0;
-  const reusePct = total > 0 ? Math.round((reused! / total) * 100) : 0;
+  const totalProvenance = (reused ?? 0) + (generated ?? 0);
+  const reusePct =
+    totalProvenance > 0 && reused != null
+      ? Math.round((reused / totalProvenance) * 100)
+      : 0;
 
   // Servings metadata (defensive: plan may have been scaled to household)
   const servingsMeta = (
@@ -199,6 +215,26 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
   const weekendStyleDisplay = showWeekendOverride
     ? (WEEKEND_STYLE_LABELS[weekendDinnerStyle!] ?? weekendDinnerStyle)
     : null;
+  const weekendText =
+    weekendStyleDisplay && weekendDaysDisplay
+      ? `${weekendStyleDisplay} · Dagen: ${weekendDaysDisplay}`
+      : (weekendStyleDisplay ?? null);
+
+  // Header: periode en totalen
+  const startDate = new Date(plan.dateFrom);
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + plan.days - 1);
+  const endDateStr = endDate.toISOString().split('T')[0];
+  const periodText = `${plan.dateFrom} tot ${endDateStr}`;
+  const totalMeals = plan.planSnapshot.days.reduce(
+    (sum, day) => sum + day.meals.length,
+    0,
+  );
+  const hasEnrichment = plan.enrichmentSnapshot != null;
+  const servingsPolicyLabel =
+    showServingsMeta && servingsPolicy
+      ? SERVINGS_POLICY_LABELS[servingsPolicy]
+      : null;
 
   // Guardrails meta from snapshot (defensive: no DB, render only if present)
   const guardrailsMeta = (
@@ -250,81 +286,107 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
     }
   }
 
+  // Recepten die uit dit plan zijn toegevoegd aan Recepten: toon afbeelding en link
+  type LinkedRecipe = {
+    recipeId: string;
+    imageUrl: string | null;
+    name?: string;
+  };
+  const linkedRecipesByMealId: Record<string, LinkedRecipe> = {};
+  const { data: linkedRows } = await supabase
+    .from('custom_meals')
+    .select('id, linked_meal_plan_meal_id, source_image_url, name')
+    .eq('user_id', user.id)
+    .eq('linked_meal_plan_id', plan.id);
+  if (linkedRows?.length) {
+    for (const row of linkedRows as Array<{
+      id: string;
+      linked_meal_plan_meal_id: string | null;
+      source_image_url: string | null;
+      name: string | null;
+    }>) {
+      const mealId = row.linked_meal_plan_meal_id;
+      if (mealId) {
+        linkedRecipesByMealId[mealId] = {
+          recipeId: row.id,
+          imageUrl: row.source_image_url ?? null,
+          name: row.name ?? undefined,
+        };
+      }
+    }
+  }
+
   return (
     <div className="space-y-6">
       {plan.status === 'draft' && (
         <MealPlanDraftBannerClient planId={plan.id} />
       )}
-      <div>
-        <Heading level={1}>Weekmenu</Heading>
-        <Text className="mt-2 text-zinc-500 dark:text-zinc-400">
-          Plan ID: {plan.id.substring(0, 8)}...
-        </Text>
-        <MealPlanProvenance cronJobId={cronJobId} />
-        {showProvenanceCounters && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Badge>Hergebruikt: {reused}</Badge>
-            <Badge>Nieuw: {generated}</Badge>
-            <Text className="text-sm text-muted-foreground">
-              Reuse: {reusePct}%
-            </Text>
-          </div>
-        )}
-        {showServingsMeta && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Badge>Huishouden: {householdSize}</Badge>
-            <Badge>{SERVINGS_POLICY_LABELS[servingsPolicy!]}</Badge>
-          </div>
-        )}
-        {showWeekendOverride && weekendStyleDisplay && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Badge>Weekend</Badge>
-            <Text className="text-sm text-muted-foreground">
-              Diner: {weekendStyleDisplay}
-              {weekendDaysDisplay ? ` · Dagen: ${weekendDaysDisplay}` : ''}
-            </Text>
-          </div>
-        )}
-        {showGuardrailsMeta && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Badge>Guardrails</Badge>
-            <Badge color={constraintsInPrompt ? 'green' : 'zinc'}>
-              Constraints: {constraintsInPrompt ? 'ja' : 'nee'}
-            </Badge>
-            {contentHash && (
-              <Text className="text-sm text-muted-foreground font-mono">
-                hash:{' '}
-                {contentHash.length > 8
-                  ? `${contentHash.slice(0, 8)}…`
-                  : contentHash}
-              </Text>
-            )}
-            {version && (
-              <Text className="text-sm text-muted-foreground">
-                v: {version.length > 12 ? `${version.slice(0, 12)}…` : version}
-              </Text>
-            )}
-          </div>
-        )}
-      </div>
+      <MealPlanHeaderMeta
+        planId={plan.id}
+        dietTypeName={dietTypeName}
+        periodText={periodText}
+        days={plan.days}
+        totalMeals={totalMeals}
+        householdSize={householdSize}
+        servingsPolicyLabel={servingsPolicyLabel}
+        hasEnrichment={hasEnrichment}
+        cronJobId={cronJobId}
+        weekendText={weekendText}
+        constraintsInPrompt={constraintsInPrompt}
+        contentHash={contentHash}
+        version={version}
+        showGuardrailsMeta={showGuardrailsMeta}
+        reuse={
+          showProvenanceCounters && reused !== null && generated !== null
+            ? { reused, generated, reusePct }
+            : null
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <MealPlanSummary plan={plan} dietTypeName={dietTypeName} />
-        <MealPlanActionsClient
-          planId={plan.id}
-          plan={plan.planSnapshot}
-          planStatus={plan.status}
-        />
+        <div id="acties">
+          <MealPlanActionsClient
+            planId={plan.id}
+            plan={plan.planSnapshot}
+            planStatus={plan.status}
+          />
+        </div>
       </div>
 
-      {/* Plan Cards or Guardrails Violation */}
+      {/* Plan Cards, Empty state, or Guardrails Violation (wrapper altijd gemount voor violation-events) */}
       <MealPlanPageWrapper
         planId={plan.id}
         plan={plan.planSnapshot}
         enrichment={plan.enrichmentSnapshot}
         nevoFoodNamesByCode={nevoFoodNamesByCode}
         planStatus={plan.status}
-      />
+      >
+        {isEmptyPlan ? (
+          <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
+            <Heading level={2}>Geen maaltijden in dit weekmenu</Heading>
+            <Text className="mt-2 text-muted-foreground">
+              Dit plan bevat nog geen maaltijden. Gebruik het Acties-paneel om
+              het plan opnieuw te genereren.
+            </Text>
+            <Link
+              href="#acties"
+              className="mt-4 inline-block text-sm font-medium text-foreground underline hover:no-underline"
+            >
+              Ga naar Acties om te regenereren
+            </Link>
+          </div>
+        ) : (
+          <MealPlanPageClient
+            planId={plan.id}
+            plan={plan.planSnapshot}
+            enrichment={plan.enrichmentSnapshot}
+            nevoFoodNamesByCode={nevoFoodNamesByCode}
+            planStatus={plan.status}
+            linkedRecipesByMealId={linkedRecipesByMealId}
+          />
+        )}
+      </MealPlanPageWrapper>
     </div>
   );
 }

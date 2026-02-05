@@ -11,6 +11,7 @@ import {
   XCircleIcon,
   ChartBarIcon,
   BeakerIcon,
+  Cog6ToothIcon,
 } from '@heroicons/react/20/solid';
 
 type StatItem = {
@@ -39,6 +40,11 @@ type AdminStats = {
     custom: number;
     fndds: number;
     withoutCategory: number;
+  };
+  generator: {
+    templatesTotal: number;
+    templatesActive: number;
+    poolItems: number;
   };
 };
 
@@ -132,6 +138,24 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
           value: stats.ingredients.withoutCategory,
           href: '/admin/ingredients?filter=noCategory',
         },
+      ],
+    },
+    {
+      name: 'Generator beheer',
+      description:
+        'Beheer templates, slots, pools en instellingen voor de weekmenu-generator. Genereer een preview zonder plan op te slaan.',
+      href: '/admin/generator-config',
+      icon: Cog6ToothIcon,
+      iconBackground: 'bg-emerald-500',
+      stats: [
+        { label: 'Templates totaal', value: stats.generator.templatesTotal },
+        {
+          label: 'Templates actief',
+          value: stats.generator.templatesActive,
+          icon: CheckCircleIcon,
+          iconColor: 'text-green-600 dark:text-green-400',
+        },
+        { label: 'Pool items', value: stats.generator.poolItems },
       ],
     },
   ];

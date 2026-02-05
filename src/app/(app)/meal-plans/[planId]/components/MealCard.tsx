@@ -21,11 +21,11 @@ import type {
   CookPlanDay,
 } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
 import type { MealPlanStatus } from '@/src/lib/meal-plans/mealPlans.types';
-import { MealRating } from './MealRating';
 import { MealDetailDialog } from './MealDetailDialog';
 import { applyDirectPlanEditAction } from '../actions/planEdit.actions';
 import { updateMealPlanDraftSlotAction } from '../actions/planReview.actions';
 import type { PlanEdit } from '@/src/lib/agents/meal-planner/planEdit.types';
+import type { LinkedRecipe } from './MealPlanPageClient';
 
 type MealCardProps = {
   planId: string;
@@ -42,13 +42,17 @@ type MealCardProps = {
   cookPlanDay?: CookPlanDay;
   nevoFoodNamesByCode: Record<string, string>;
   planStatus?: MealPlanStatus;
+  /** Recept uit Recepten gekoppeld aan deze planmaaltijd (afbeelding, link) */
+  linkedRecipe?: LinkedRecipe;
+  /** Called when a per-meal edit (Wissel/Verwijder) is started */
+  onEditStarted?: () => void;
 };
 
 export function MealCard({
   planId,
   date,
   mealSlot,
-  mealId,
+  mealId: _mealId,
   meal,
   title,
   summaryLines = [],
@@ -59,6 +63,8 @@ export function MealCard({
   cookPlanDay,
   nevoFoodNamesByCode,
   planStatus,
+  linkedRecipe,
+  onEditStarted,
 }: MealCardProps) {
   const router = useRouter();
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
@@ -154,6 +160,7 @@ export function MealCard({
     setError(null);
     startTransition(async () => {
       try {
+        onEditStarted?.();
         const edit: PlanEdit = {
           action: 'REPLACE_MEAL',
           planId,
@@ -182,6 +189,7 @@ export function MealCard({
       setError(null);
       startTransition(async () => {
         try {
+          onEditStarted?.();
           const edit: PlanEdit = {
             action: 'REMOVE_MEAL',
             planId,
@@ -230,6 +238,15 @@ export function MealCard({
         className="rounded-lg bg-white p-4 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10 cursor-pointer hover:ring-zinc-950/10 dark:hover:ring-white/20 transition-all"
         onClick={() => setShowDetailDialog(true)}
       >
+        {linkedRecipe?.imageUrl && (
+          <div className="mb-3 -mx-4 -mt-4 overflow-hidden rounded-t-lg aspect-[16/10] bg-zinc-100 dark:bg-zinc-800">
+            <img
+              src={linkedRecipe.imageUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          </div>
+        )}
         <div className="flex items-start justify-between mb-2">
           <div className="flex-1">
             <div className="text-xs text-muted-foreground uppercase tracking-wide">
@@ -308,14 +325,6 @@ export function MealCard({
           </div>
         )}
 
-        {/* Rating */}
-        <div
-          className="mb-2 pt-2 border-t border-zinc-200 dark:border-zinc-800"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <MealRating mealId={mealId} />
-        </div>
-
         {/* Actions */}
         <div
           className="flex flex-col gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800"
@@ -378,6 +387,7 @@ export function MealCard({
         cookPlanDay={cookPlanDay}
         nevoFoodNamesByCode={nevoFoodNamesByCode}
         planId={planId}
+        linkedRecipe={linkedRecipe}
       />
 
       {/* Swap (draft) Dialog */}

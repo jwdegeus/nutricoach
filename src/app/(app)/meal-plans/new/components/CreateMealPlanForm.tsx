@@ -180,7 +180,8 @@ export function CreateMealPlanForm() {
           // Check for guardrails violation
           if (
             result.error.code === 'GUARDRAILS_VIOLATION' &&
-            result.error.details
+            result.error.details &&
+            'reasonCodes' in result.error.details
           ) {
             const d = result.error.details;
             setGuardrailsViolation({
@@ -257,7 +258,8 @@ export function CreateMealPlanForm() {
           }
           if (
             result.error.code === 'GUARDRAILS_VIOLATION' &&
-            result.error.details
+            result.error.details &&
+            'reasonCodes' in result.error.details
           ) {
             const d = result.error.details;
             setGuardrailsViolation({

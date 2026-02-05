@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -64,8 +64,11 @@ type RecipeClassificationDialogProps = {
   onChange: (next: RecipeClassificationDraft) => void;
   open: boolean;
   onClose: () => void;
-  /** Called when user clicks Opslaan; caller performs save and passes back error/saving state. */
-  onSave?: (draft: RecipeClassificationDraft) => void;
+  /** Called when user clicks Opslaan or on auto-save. options.auto === true means do not close dialog. */
+  onSave?: (
+    draft: RecipeClassificationDraft,
+    options?: { auto?: boolean },
+  ) => void;
   /** Save error message from parent (e.g. after saveMealClassificationAction failed). */
   errorMessage?: string | null;
   /** Whether save is in progress (parent-controlled). */
@@ -92,6 +95,12 @@ type RecipeClassificationDialogProps = {
   onCreateRecipeBookOption?: (
     label: string,
   ) => Promise<{ id: string; label: string } | { error: string }>;
+  /** Bron (source) options from recipe_sources (id and label = name). */
+  sourceOptions?: CatalogOptionItem[];
+  /** Create new recipe source; returns { id, name } or { error }. */
+  onCreateSourceOption?: (
+    name: string,
+  ) => Promise<{ id: string; label: string } | { error: string }>;
 };
 
 export function RecipeClassificationDialog({
@@ -110,6 +119,8 @@ export function RecipeClassificationDialog({
   onCreateCuisineOption,
   onCreateProteinTypeOption,
   onCreateRecipeBookOption,
+  sourceOptions = [],
+  onCreateSourceOption,
 }: RecipeClassificationDialogProps) {
   const [tagInput, setTagInput] = useState('');
   const tagInputRef = useRef<HTMLInputElement>(null);
@@ -124,6 +135,29 @@ export function RecipeClassificationDialog({
   const [recipeBookAddError, setRecipeBookAddError] = useState<string | null>(
     null,
   );
+  const [sourceAddInput, setSourceAddInput] = useState('');
+  const [sourceAddSaving, setSourceAddSaving] = useState(false);
+  const [sourceAddError, setSourceAddError] = useState<string | null>(null);
+  const [sourceSearchQuery, setSourceSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (!open) setSourceSearchQuery('');
+  }, [open]);
+
+  const MIN_SOURCES_FOR_SEARCH = 10;
+  const SOURCE_SEARCH_MIN_CHARS = 3;
+  const sortedSourceOptions = useMemo(
+    () =>
+      [...sourceOptions].sort((a, b) => a.label.localeCompare(b.label, 'nl')),
+    [sourceOptions],
+  );
+  const filteredSourceOptions = useMemo(() => {
+    const q = sourceSearchQuery.trim().toLowerCase();
+    if (q.length < SOURCE_SEARCH_MIN_CHARS) return sortedSourceOptions;
+    return sortedSourceOptions.filter((opt) =>
+      opt.label.toLowerCase().includes(q),
+    );
+  }, [sortedSourceOptions, sourceSearchQuery]);
 
   const update = useCallback(
     (patch: Partial<RecipeClassificationDraft>) => {
@@ -163,8 +197,33 @@ export function RecipeClassificationDialog({
   );
 
   const handleSave = useCallback(() => {
-    onSave?.(value);
+    onSave?.(value, { auto: false });
   }, [onSave, value]);
+
+  const initialDraftWhenOpenedRef = useRef<string | null>(null);
+  const lastAutoSavedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (open) {
+      if (initialDraftWhenOpenedRef.current === null) {
+        initialDraftWhenOpenedRef.current = JSON.stringify(value);
+      }
+    } else {
+      initialDraftWhenOpenedRef.current = null;
+      lastAutoSavedRef.current = null;
+    }
+  }, [open, value]);
+  useEffect(() => {
+    if (!open || !onSave || isSaving) return;
+    const payload = JSON.stringify(value);
+    const initial = initialDraftWhenOpenedRef.current;
+    if (initial !== null && payload === initial) return;
+    if (lastAutoSavedRef.current === payload) return;
+    const t = setTimeout(() => {
+      lastAutoSavedRef.current = payload;
+      onSave(value, { auto: true });
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [open, value, onSave, isSaving]);
 
   const handleAddCuisine = useCallback(async () => {
     const label = cuisineAddInput.trim();
@@ -219,6 +278,24 @@ export function RecipeClassificationDialog({
       setRecipeBookAddSaving(false);
     }
   }, [recipeBookAddInput, onCreateRecipeBookOption, update]);
+
+  const handleAddSource = useCallback(async () => {
+    const name = sourceAddInput.trim();
+    if (!name || !onCreateSourceOption) return;
+    setSourceAddError(null);
+    setSourceAddSaving(true);
+    try {
+      const result = await onCreateSourceOption(name);
+      if ('error' in result) {
+        setSourceAddError(result.error);
+      } else {
+        update({ sourceName: result.label });
+        setSourceAddInput('');
+      }
+    } finally {
+      setSourceAddSaving(false);
+    }
+  }, [sourceAddInput, onCreateSourceOption, update]);
 
   return (
     <Dialog open={open} onClose={onClose} size="xl">
@@ -440,38 +517,116 @@ export function RecipeClassificationDialog({
             )}
           </Field>
 
-          {/* 7) Bron */}
-          <div className="space-y-4">
-            <span className="text-base/6 font-medium text-zinc-950 sm:text-sm/6 dark:text-white">
-              Bron
-            </span>
-            <div className="space-y-3">
-              <Field>
-                <Label className="text-sm font-normal text-zinc-500 dark:text-zinc-400">
-                  Naam
-                </Label>
-                <Input
-                  type="text"
-                  placeholder="bijv. Allerhande, Oma's kookboek"
-                  value={value.sourceName}
-                  onChange={(e) => update({ sourceName: e.target.value })}
-                  disabled={isSaving}
-                />
-              </Field>
-              <Field>
-                <Label className="text-sm font-normal text-zinc-500 dark:text-zinc-400">
-                  URL
-                </Label>
-                <Input
-                  type="url"
-                  placeholder="https://..."
-                  value={value.sourceUrl}
-                  onChange={(e) => update({ sourceUrl: e.target.value })}
-                  disabled={isSaving}
-                />
-              </Field>
+          {/* 7) Bron — voorkeuze of eigen bron toevoegen; zoekveld in dropdown, filter na 3 tekens */}
+          <Field>
+            <Label>Bron</Label>
+            <Listbox
+              value={value.sourceName ?? ''}
+              onChange={(v) =>
+                update({
+                  sourceName:
+                    v === '' || v === undefined || v === null ? '' : String(v),
+                })
+              }
+              disabled={isSaving || optionsLoading}
+              placeholder="Geen gekozen"
+              aria-label="Bron"
+            >
+              {/* Zoekveld direct bovenaan in de dropdown (alleen bij lange lijst); klik sluit dropdown niet */}
+              {sourceOptions.length >= MIN_SOURCES_FOR_SEARCH && (
+                <div
+                  className="sticky top-0 z-10 border-b border-zinc-200 bg-white p-1.5 dark:border-zinc-600 dark:bg-zinc-800"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                >
+                  <Input
+                    type="search"
+                    placeholder="Zoeken (min. 3 tekens)…"
+                    value={sourceSearchQuery}
+                    onChange={(e) => setSourceSearchQuery(e.target.value)}
+                    disabled={isSaving || optionsLoading}
+                    autoComplete="off"
+                    aria-label="Bronnen filteren"
+                    className="h-9 text-sm"
+                  />
+                </div>
+              )}
+              <ListboxOption value="">Geen gekozen</ListboxOption>
+              {value.sourceName &&
+                !sourceOptions.some((o) => o.id === value.sourceName) &&
+                (sourceSearchQuery.trim().length < SOURCE_SEARCH_MIN_CHARS ||
+                  value.sourceName
+                    .toLowerCase()
+                    .includes(sourceSearchQuery.trim().toLowerCase())) && (
+                  <ListboxOption value={value.sourceName}>
+                    {value.sourceName}
+                  </ListboxOption>
+                )}
+              {filteredSourceOptions.map((opt) => (
+                <ListboxOption key={opt.id} value={opt.id}>
+                  {opt.isActive !== false
+                    ? opt.label
+                    : `${opt.label} (inactief)`}
+                </ListboxOption>
+              ))}
+            </Listbox>
+            {optionsLoading && (
+              <Text className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                Laden…
+              </Text>
+            )}
+            {onCreateSourceOption && (
+              <div className="mt-2 space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    placeholder="Eigen bron toevoegen"
+                    value={sourceAddInput}
+                    onChange={(e) => {
+                      setSourceAddInput(e.target.value);
+                      setSourceAddError(null);
+                    }}
+                    disabled={isSaving || sourceAddSaving}
+                    onKeyDown={(e) =>
+                      e.key === 'Enter' &&
+                      (e.preventDefault(), handleAddSource())
+                    }
+                  />
+                  <Button
+                    type="button"
+                    outline
+                    onClick={handleAddSource}
+                    disabled={
+                      isSaving || sourceAddSaving || !sourceAddInput.trim()
+                    }
+                  >
+                    {sourceAddSaving ? '…' : 'Toevoegen'}
+                  </Button>
+                </div>
+                {sourceAddError && (
+                  <div
+                    className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 px-3 py-2 text-sm text-red-700 dark:text-red-300"
+                    role="alert"
+                  >
+                    {sourceAddError}
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="mt-3">
+              <Label className="text-sm font-normal text-zinc-500 dark:text-zinc-400">
+                URL (originele receptpagina)
+              </Label>
+              <Input
+                type="url"
+                placeholder="https://..."
+                value={value.sourceUrl}
+                onChange={(e) => update({ sourceUrl: e.target.value })}
+                disabled={isSaving}
+                className="mt-1"
+              />
             </div>
-          </div>
+          </Field>
 
           {/* 6) Receptenboek — Catalyst Listbox (from catalog_options) */}
           <Field>

@@ -1,6 +1,6 @@
 'use client';
 
-import { Link } from '@/components/catalyst/link';
+import { AccountSectionTabs } from '@/src/components/app/AccountSectionTabs';
 import { AccountProfile } from './account-profile';
 import { DietPreferencesForm } from './diet-preferences-form';
 import { LanguageSelector } from './language-selector';
@@ -13,50 +13,11 @@ interface AccountPageContentProps {
 
 export function AccountPageContent({ user }: AccountPageContentProps) {
   const t = useTranslations('account');
-  const tNav = useTranslations('nav');
 
   return (
     <>
       <h1 className="sr-only">{t('title')}</h1>
-
-      <header className="sticky top-16 z-10 border-b border-zinc-200 bg-white lg:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:lg:bg-zinc-950">
-        <nav className="flex overflow-x-auto py-4" aria-label="Account secties">
-          <ul
-            role="list"
-            className="flex min-w-full flex-none gap-x-6 px-4 text-sm/6 font-semibold text-zinc-500 sm:px-6 dark:text-zinc-400 lg:px-8"
-          >
-            <li>
-              <Link href="/account" className="text-zinc-950 dark:text-white">
-                {t('title')}
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/account#diet"
-                className="text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white"
-              >
-                {t('dietPreferences')}
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/account#language"
-                className="text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white"
-              >
-                {t('languagePreference')}
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/settings"
-                className="text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white"
-              >
-                {tNav('settings')}
-              </Link>
-            </li>
-          </ul>
-        </nav>
-      </header>
+      <AccountSectionTabs />
 
       <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
         <section
