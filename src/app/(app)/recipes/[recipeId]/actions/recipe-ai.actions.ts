@@ -32,7 +32,7 @@ const requestRecipeAdaptationInputSchema = z.object({
       violationChoices: z
         .array(
           z.object({
-            choice: z.enum(['use_allowed', 'substitute', 'remove']),
+            choice: z.enum(['use_allowed', 'substitute', 'remove', 'keep']),
             substitute: z.string().optional(),
           }),
         )

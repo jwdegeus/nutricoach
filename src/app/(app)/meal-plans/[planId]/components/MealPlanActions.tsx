@@ -19,14 +19,13 @@ import {
   applyMealPlanDraftAction,
 } from '../actions/planReview.actions';
 import {
-  Loader2,
-  RefreshCw,
-  Calendar,
-  Trash2,
-  PenSquare,
-  CheckCircle,
-} from 'lucide-react';
-import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
+  ArrowPathIcon,
+  CalendarIcon,
+  TrashIcon,
+  PencilSquareIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/react/16/solid';
 import type { MealPlanResponse } from '@/src/lib/diets';
 import type { MealPlanStatus } from '@/src/lib/meal-plans/mealPlans.types';
 
@@ -277,8 +276,8 @@ export function MealPlanActions({
         setError(null);
         showToast({ type: 'success', title: 'Weekmenu verwijderd' });
         window.dispatchEvent(new CustomEvent('meal-plan-changed'));
-        router.push('/meal-plans');
-        router.refresh();
+        // Replace so we leave the deleted plan URL; full navigation ensures the list is shown
+        window.location.href = '/meal-plans';
       } else {
         setError(result.error.message);
         // Keep dialog open so user sees the error
@@ -312,7 +311,7 @@ export function MealPlanActions({
         isLoading={isDeleting}
         error={error}
       />
-      <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+      <div className="rounded-2xl bg-muted/20 p-6 shadow-sm">
         <div className="flex flex-wrap items-center gap-3 sm:gap-4">
           <Heading>Acties</Heading>
           {planStatus === 'draft' && <Badge color="yellow">Draft</Badge>}
@@ -334,12 +333,12 @@ export function MealPlanActions({
                 >
                   {isApplyingDraft ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
                       Bezig met toepassen...
                     </>
                   ) : (
                     <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
+                      <CheckCircleIcon className="h-4 w-4 mr-2" />
                       Pas draft toe
                     </>
                   )}
@@ -358,12 +357,12 @@ export function MealPlanActions({
                 >
                   {isStartingReview ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
                       Bezig met starten...
                     </>
                   ) : (
                     <>
-                      <PenSquare className="h-4 w-4 mr-2" />
+                      <PencilSquareIcon className="h-4 w-4 mr-2" />
                       Start review
                     </>
                   )}
@@ -390,12 +389,12 @@ export function MealPlanActions({
             >
               {isRegenerating ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
                   Regenereren...
                 </>
               ) : (
                 <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <ArrowPathIcon className="h-4 w-4 mr-2" />
                   Regenereren Volledig Plan
                 </>
               )}
@@ -439,12 +438,12 @@ export function MealPlanActions({
               >
                 {isRegeneratingDay ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
                     Regenereren...
                   </>
                 ) : (
                   <>
-                    <Calendar className="h-4 w-4 mr-2" />
+                    <CalendarIcon className="h-4 w-4 mr-2" />
                     Regenereren dag
                   </>
                 )}
@@ -455,7 +454,7 @@ export function MealPlanActions({
             </p>
           </div>
 
-          <div className="pt-4 border-t">
+          <div className="pt-4 mt-4">
             <Button
               onClick={() => {
                 setError(null);
@@ -471,7 +470,7 @@ export function MealPlanActions({
               outline
               className="w-full"
             >
-              <Trash2 className="h-4 w-4 mr-2" />
+              <TrashIcon className="h-4 w-4 mr-2" />
               Verwijderen
             </Button>
             <p className="text-xs text-muted-foreground mt-2">

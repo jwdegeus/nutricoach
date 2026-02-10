@@ -207,21 +207,31 @@ export async function scheduleNextMealPlanJobAction(): Promise<
       new Date(shoppingUtcIso).getTime() - leadTimeHours * 3600 * 1000,
     ).toISOString();
 
-    const { data: profile, error: profileError } = await supabase
-      .from('user_diet_profiles')
-      .select('diet_types(name)')
-      .eq('user_id', user.id)
-      .is('ends_on', null)
-      .maybeSingle();
+    const { getDefaultFamilyMemberId } =
+      await import('@/src/lib/family/defaultFamilyMember');
+    const familyMemberId = await getDefaultFamilyMemberId(supabase, user.id);
 
-    if (profileError) {
-      return {
-        ok: false,
-        error: {
-          code: 'DB_ERROR',
-          message: `Voorkeuren ophalen mislukt: ${profileError.message}`,
-        },
-      };
+    let profile: { diet_types?: { name: string } | { name: string }[] } | null =
+      null;
+
+    if (familyMemberId) {
+      const { data: fmProfile } = await supabase
+        .from('family_member_diet_profiles')
+        .select('diet_types(name)')
+        .eq('family_member_id', familyMemberId)
+        .is('ends_on', null)
+        .maybeSingle();
+      profile = fmProfile;
+    }
+
+    if (!profile) {
+      const { data: userProfile } = await supabase
+        .from('user_diet_profiles')
+        .select('diet_types(name)')
+        .eq('user_id', user.id)
+        .is('ends_on', null)
+        .maybeSingle();
+      profile = userProfile;
     }
 
     const dietTypesRow = profile?.diet_types as

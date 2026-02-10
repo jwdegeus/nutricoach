@@ -166,7 +166,12 @@ type ButtonProps = (
   | { color?: keyof typeof styles.colors; outline?: never; plain?: never }
   | { color?: never; outline: true; plain?: never }
   | { color?: never; outline?: never; plain: true }
-) & { className?: string; children: React.ReactNode } & (
+) & {
+  className?: string;
+  children: React.ReactNode;
+  /** Not supported; stripped to avoid DOM warning when passed by wrappers (e.g. DropdownButton). Use href for links. */
+  asChild?: boolean;
+} & (
     | ({ href?: never } & Omit<Headless.ButtonProps, 'as' | 'className'>)
     | ({ href: string } & Omit<
         React.ComponentPropsWithoutRef<typeof Link>,
@@ -175,7 +180,15 @@ type ButtonProps = (
   );
 
 export const Button = forwardRef(function Button(
-  { color, outline, plain, className, children, ...props }: ButtonProps,
+  {
+    color,
+    outline,
+    plain,
+    className,
+    children,
+    asChild: _asChild,
+    ...props
+  }: ButtonProps,
   ref: React.ForwardedRef<HTMLElement>,
 ) {
   const classes = clsx(

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/catalyst/button';
 import { Select } from '@/components/catalyst/select';
@@ -15,6 +15,7 @@ import {
   getMealSlotStylePreferencesAction,
   updateMealSlotStylePreferencesAction,
 } from '../actions/meal-slot-style-preferences.actions';
+import type { MealSlotStylePreferences } from '../actions/meal-slot-style-preferences.actions';
 
 const BREAKFAST_VALUES = ['any', 'shake', 'eggs', 'yogurt', 'oatmeal'] as const;
 const LUNCH_VALUES = ['any', 'salad', 'smoothie', 'leftovers', 'soup'] as const;
@@ -65,23 +66,39 @@ const WEEKEND_DINNER_OPTION_KEYS: Record<string, string> = {
   special: 'weekendDinnerOptSpecial',
 };
 
-export function MealSlotStylePreferencesClient() {
+export function MealSlotStylePreferencesClient({
+  initialPrefs,
+}: {
+  initialPrefs?: MealSlotStylePreferences;
+} = {}) {
   const t = useTranslations('settings');
   const tCommon = useTranslations('common');
-  const [loading, setLoading] = useState(true);
+  const defaultWeekend = useMemo(() => [6, 0], []);
+  const initialWeekend =
+    initialPrefs?.weekendDays && initialPrefs.weekendDays.length >= 1
+      ? [...initialPrefs.weekendDays].sort((a, b) => a - b)
+      : defaultWeekend;
+
+  const [loading, setLoading] = useState(!initialPrefs);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [savePending, setSavePending] = useState(false);
 
   const [preferredBreakfastStyle, setPreferredBreakfastStyle] =
-    useState<BreakfastStyle>(null);
-  const [preferredLunchStyle, setPreferredLunchStyle] =
-    useState<LunchStyle>(null);
-  const [preferredDinnerStyle, setPreferredDinnerStyle] =
-    useState<DinnerStyle>(null);
+    useState<BreakfastStyle>(
+      (initialPrefs?.preferredBreakfastStyle ?? null) as BreakfastStyle,
+    );
+  const [preferredLunchStyle, setPreferredLunchStyle] = useState<LunchStyle>(
+    (initialPrefs?.preferredLunchStyle ?? null) as LunchStyle,
+  );
+  const [preferredDinnerStyle, setPreferredDinnerStyle] = useState<DinnerStyle>(
+    (initialPrefs?.preferredDinnerStyle ?? null) as DinnerStyle,
+  );
   const [preferredWeekendDinnerStyle, setPreferredWeekendDinnerStyle] =
-    useState<WeekendDinnerStyle>(null);
-  const [weekendDays, setWeekendDays] = useState<number[]>([6, 0]);
+    useState<WeekendDinnerStyle>(
+      (initialPrefs?.preferredWeekendDinnerStyle ?? null) as WeekendDinnerStyle,
+    );
+  const [weekendDays, setWeekendDays] = useState<number[]>(initialWeekend);
   const [weekendDaysError, setWeekendDaysError] = useState<string | null>(null);
 
   const loadPrefs = useCallback(async () => {
@@ -102,17 +119,18 @@ export function MealSlotStylePreferencesClient() {
         Array.isArray(result.data.weekendDays) &&
           result.data.weekendDays.length >= 1
           ? [...result.data.weekendDays].sort((a, b) => a - b)
-          : [6, 0],
+          : defaultWeekend,
       );
       setWeekendDaysError(null);
     } else {
       setError(result.error.message);
     }
-  }, []);
+  }, [defaultWeekend]);
 
   useEffect(() => {
+    if (initialPrefs != null) return;
     queueMicrotask(() => loadPrefs());
-  }, [loadPrefs]);
+  }, [initialPrefs, loadPrefs]);
 
   const weekendDaysValid = weekendDays.length >= 1;
   const toggleWeekendDay = (day: number) => {

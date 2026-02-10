@@ -223,12 +223,15 @@ export function RecipeAIMagician({
         result.data.violations.forEach((v, i) => {
           const learnedSub =
             learned?.[normalizeIngredientForLookup(v.ingredientName)];
+          const severity = getViolationSeverity(v);
           defaults[i] = learnedSub
             ? { choice: 'substitute', substitute: learnedSub }
             : {
                 choice: v.allowedAlternativeInText
                   ? 'use_allowed'
-                  : 'substitute',
+                  : severity.level === 'niet_gewenst'
+                    ? 'keep'
+                    : 'substitute',
               };
         });
         setViolationChoices(defaults);
@@ -282,14 +285,21 @@ export function RecipeAIMagician({
         ? (analysisData as { learnedSubstitutions?: Record<string, string> })
             .learnedSubstitutions
         : undefined;
-    const choicesArray = analysisData.violations.map((v, i) => ({
-      choice:
-        violationChoices[i]?.choice ??
-        (v.allowedAlternativeInText ? 'use_allowed' : 'substitute'),
-      substitute:
-        violationChoices[i]?.substitute ??
-        learned?.[normalizeIngredientForLookup(v.ingredientName)],
-    }));
+    const choicesArray = analysisData.violations.map((v, i) => {
+      const sev = getViolationSeverity(v);
+      return {
+        choice:
+          violationChoices[i]?.choice ??
+          (v.allowedAlternativeInText
+            ? 'use_allowed'
+            : sev.level === 'niet_gewenst'
+              ? 'keep'
+              : 'substitute'),
+        substitute:
+          violationChoices[i]?.substitute ??
+          learned?.[normalizeIngredientForLookup(v.ingredientName)],
+      };
+    });
     setRewriteError(null);
     setPersistError(null);
     setApplyError(null);
@@ -601,13 +611,26 @@ export function RecipeAIMagician({
                 >
                   {state.data.violations.map((violation, idx) => {
                     const severity = getViolationSeverity(violation);
+                    const rawChoice = violationChoices[idx]?.choice;
+                    const selectedSubstitute =
+                      violationChoices[idx]?.substitute;
                     const choice =
-                      violationChoices[idx]?.choice ??
+                      rawChoice ??
                       (violation.allowedAlternativeInText
                         ? 'use_allowed'
-                        : 'substitute');
+                        : severity.level === 'niet_gewenst'
+                          ? 'keep'
+                          : 'substitute');
                     const hasAllowed =
                       !!violation.allowedAlternativeInText?.trim();
+                    const alternatives =
+                      violation.substitutionSuggestions?.filter(Boolean) ?? [];
+                    const effectiveSubstitute =
+                      selectedSubstitute ?? alternatives[0];
+                    const radioValue =
+                      choice === 'substitute' && effectiveSubstitute
+                        ? `substitute__${effectiveSubstitute}`
+                        : choice;
                     return (
                       <div
                         key={idx}
@@ -678,15 +701,27 @@ export function RecipeAIMagician({
                                 Jouw keuze
                               </Text>
                               <RadioGroup
-                                value={choice}
-                                onChange={(value: string) =>
-                                  setViolationChoices((prev) => ({
-                                    ...prev,
-                                    [idx]: {
-                                      choice: value as ViolationChoice,
-                                    },
-                                  }))
-                                }
+                                value={radioValue}
+                                onChange={(value: string) => {
+                                  if (value.startsWith('substitute__')) {
+                                    setViolationChoices((prev) => ({
+                                      ...prev,
+                                      [idx]: {
+                                        choice: 'substitute',
+                                        substitute: value.slice(
+                                          'substitute__'.length,
+                                        ),
+                                      },
+                                    }));
+                                  } else {
+                                    setViolationChoices((prev) => ({
+                                      ...prev,
+                                      [idx]: {
+                                        choice: value as ViolationChoice,
+                                      },
+                                    }));
+                                  }
+                                }}
                                 className="space-y-2"
                               >
                                 {hasAllowed && (
@@ -703,12 +738,43 @@ export function RecipeAIMagician({
                                     </Text>
                                   </label>
                                 )}
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                  <Radio value="substitute" color="dark/zinc" />
-                                  <Text className="text-sm text-zinc-700 dark:text-zinc-300">
-                                    Vervang door advies uit dieetregels
-                                  </Text>
-                                </label>
+                                {alternatives.length > 0 ? (
+                                  alternatives.map((alt) => (
+                                    <label
+                                      key={alt}
+                                      className="flex items-center gap-2 cursor-pointer"
+                                    >
+                                      <Radio
+                                        value={`substitute__${alt}`}
+                                        color="dark/zinc"
+                                      />
+                                      <Text className="text-sm text-zinc-700 dark:text-zinc-300">
+                                        Vervang door{' '}
+                                        <span className="font-medium text-zinc-900 dark:text-white">
+                                          {alt}
+                                        </span>
+                                      </Text>
+                                    </label>
+                                  ))
+                                ) : (
+                                  <label className="flex items-center gap-2 cursor-pointer">
+                                    <Radio
+                                      value="substitute"
+                                      color="dark/zinc"
+                                    />
+                                    <Text className="text-sm text-zinc-700 dark:text-zinc-300">
+                                      Vervang door advies uit dieetregels
+                                    </Text>
+                                  </label>
+                                )}
+                                {severity.level === 'niet_gewenst' && (
+                                  <label className="flex items-center gap-2 cursor-pointer">
+                                    <Radio value="keep" color="dark/zinc" />
+                                    <Text className="text-sm text-zinc-700 dark:text-zinc-300">
+                                      Behoud dit ingrediënt
+                                    </Text>
+                                  </label>
+                                )}
                                 <label className="flex items-center gap-2 cursor-pointer">
                                   <Radio value="remove" color="dark/zinc" />
                                   <Text className="text-sm text-zinc-700 dark:text-zinc-300">

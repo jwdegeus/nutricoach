@@ -152,8 +152,8 @@ const SUBSTRING_FALSE_POSITIVE_IF_CONTAINS: Record<string, string | string[]> =
     // "ijs" in "ijsblokjes" = ijsblokjes (ice cubes), geen zuivel; "ijs" in "radijs" = radijs (radish)
     ijs: ['radijs', 'ijsblokjes', 'ijsblokje'],
     oca: 'avocado',
-    // "rijst" in "bloemkoolrijst" = groente (cauliflower rice), geen graan/zuivel
-    rijst: ['bloemkoolrijst', 'bloemkool'],
+    // "rijst" in "bloemkoolrijst" = groente (cauliflower rice), geen graan; "rijstazijn" = azijn, geen zuivel/graan
+    rijst: ['bloemkoolrijst', 'bloemkool', 'rijstazijn'],
     // "kool" in "bloemkool" = bloemkool (cauliflower), geen gewone kool/zuivel
     kool: ['bloemkoolrijst', 'bloemkool'],
     // Zuivelalternatieven: bevatten "yoghurt"/"melk" maar zijn geen zuivel
@@ -244,6 +244,17 @@ function isBloemkoolRelated(text: string): boolean {
   );
 }
 
+/** Rijstazijn is azijn, geen zuivel – nooit als zuivel flaggen */
+function isRijstazijn(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  return (
+    lower === 'rijstazijn' ||
+    lower === 'rice vinegar' ||
+    lower.includes('rijstazijn') ||
+    lower.includes('rice vinegar')
+  );
+}
+
 function isDairyRule(forbidden: {
   term: string;
   ruleLabel?: string;
@@ -279,6 +290,49 @@ function isGlutenRule(forbidden: {
     c.includes('gluten') ||
     c.includes('pasta') ||
     c.includes('wahls_forbidden_gluten')
+  );
+}
+
+/** Peper (kruid) is toegestaan; alleen paprika/chili/pepper als groente zijn nachtschades. */
+function isNightshadeRule(forbidden: {
+  term: string;
+  ruleLabel?: string;
+  ruleCode?: string;
+}): boolean {
+  const t = (forbidden.term ?? '').toLowerCase();
+  const l = (forbidden.ruleLabel ?? '').toLowerCase();
+  const c = (forbidden.ruleCode ?? '').toLowerCase();
+  return (
+    t.includes('pepper') ||
+    t.includes('paprika') ||
+    t.includes('chili') ||
+    t === 'nachtschade' ||
+    l.includes('nachtschade') ||
+    l.includes('nightshade') ||
+    c.includes('nightshade') ||
+    c.includes('nachtschade')
+  );
+}
+
+/** Zwarte/witte peper (kruid) ≠ paprika/chili (groente). */
+const SPICE_PEPPER_INDICATORS = [
+  'peper',
+  'zwarte peper',
+  'witte peper',
+  'black pepper',
+  'white pepper',
+  'peperkorrel',
+  'gemalen peper',
+  'ground pepper',
+  'zeezout en peper',
+  'zout en peper',
+];
+
+function isSpicePepper(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  if (!lower) return false;
+  return SPICE_PEPPER_INDICATORS.some(
+    (ind) => lower === ind || lower.includes(ind),
   );
 }
 
@@ -432,6 +486,24 @@ export function findForbiddenMatches(
     // Bloemkool(rijst) is groente, geen gluten/zuivel – nooit als zodanig flaggen
     if (context === 'ingredients' && isBloemkoolRelated(lowerText)) {
       if (isDairyRule(forbidden) || isGlutenRule(forbidden)) continue;
+    }
+
+    // Rijstazijn is azijn, geen zuivel – nooit onder zuivelregel flaggen
+    if (
+      context === 'ingredients' &&
+      isDairyRule(forbidden) &&
+      isRijstazijn(lowerText)
+    ) {
+      continue;
+    }
+
+    // Peper als kruid (zwarte/witte peper) is toegestaan; nachtschade-regels gaan over paprika/chili (groente)
+    if (
+      context === 'ingredients' &&
+      isNightshadeRule(forbidden) &&
+      isSpicePepper(lowerText)
+    ) {
+      continue;
     }
 
     // For ingredients, check if the text exactly matches the forbidden term or any synonym

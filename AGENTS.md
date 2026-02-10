@@ -59,6 +59,16 @@ All components are located in `/components/catalyst/`:
 - **SECONDARY**: `lucide-react` may be used temporarily but should be migrated to Heroicons
 - **NEVER** use icon libraries that conflict with Catalyst design system
 
+#### 4.0 BORDERS — avoid strong borders; light borders allowed for contrast
+
+- **Default:** Prefer **shadow** (`shadow-sm`, `shadow`), **background contrast** (`bg-background`, `bg-muted/20`, `bg-muted/30`), and **spacing** (`gap`, `padding`) to separate and define areas.
+- **Avoid** heavy or prominent borders (`border`, `border-2`, `ring-2`, dark outlines) for layout, cards, or section separation.
+- **Allowed for contrast:** Light, subtle borders are permitted when needed for readability (e.g. in dark theme or card grids). Use low-opacity outlines/dividers only, for example:
+  - **Card outline:** `outline outline-1 -outline-offset-1 outline-white/10`
+  - **Section divider inside card:** `border-b border-white/10`
+  - **Description list dividers:** `divide-y divide-white/10`
+- Keep borders minimal (e.g. `white/10`, `zinc-950/10` in light mode) so they define edges without dominating the layout.
+
 #### 4. Styling
 
 - **Tailwind CSS v4** is the styling framework
@@ -66,6 +76,16 @@ All components are located in `/components/catalyst/`:
 - Customize components by modifying classes directly in component files
 - Follow Catalyst's design patterns and spacing scale
 - Use default Tailwind theme configuration (Catalyst is built around defaults)
+
+#### 4.1 Layout and visual design — ALWAYS check Tailwind UI / Tailwind Plus
+
+- **Before building or redesigning any page layout (dashboards, overviews, grids):** consult **Tailwind UI** and **Tailwind Plus** for proven patterns and a modern look-and-feel.
+- **Primary references:**
+  - **Bento grids:** https://tailwindcss.com/plus/ui-blocks/marketing/sections/bento-grids — use bento-style card grids (varied cell sizes, rounded corners, clear hierarchy) for dashboards and feature sections.
+  - **Application UI:** https://tailwindcss.com/plus/ui-blocks/application-ui — tables, feeds, form layouts, navbars, etc.
+  - **UI Blocks index:** https://tailwindcss.com/plus/ui-blocks — browse Marketing (sections, bento, stats), Application UI, and Ecommerce for layout ideas.
+- **Dashboards:** Prefer a bento grid layout: mix of compact KPI/summary cards, larger content cards, filters in the header of relevant cards, and semantic spacing (`gap-4`/`gap-6`, `rounded-2xl`, **shadow** and **background contrast**). Use light outlines/dividers only when needed for contrast (e.g. `outline-white/10`, `divide-white/10` — see 4.0). Avoid long single-column dumps; use a grid with `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4` or asymmetric `col-span-2` / `row-span-2` for visual interest.
+- **Theme tokens:** Prefer `bg-background`, `text-foreground`, `text-muted-foreground`, `bg-muted/30` over hard-coded grays (e.g. `bg-zinc-100`). Prefer shadow and background contrast for separation; light borders (e.g. `outline-white/10`) are allowed for contrast (see 4.0).
 
 #### 5. Dependencies
 
@@ -236,10 +256,10 @@ To avoid theme drift across breakpoints (especially mobile), prefer **semantic t
 
 - Prefer tokens (examples):
   - `bg-background`, `text-foreground`, `text-muted-foreground`
-  - `border-border`, `bg-accent`, `text-accent-foreground`
+  - `bg-accent`, `text-accent-foreground` (no borders — use shadow/background for separation)
   - `ring-ring`, `focus-visible:ring-ring`
 - Avoid introducing hard-coded palette utilities like:
-  - `bg-white`, `text-gray-900`, `border-gray-200`, `ring-blue-500`
+  - `bg-white`, `text-gray-900`, `ring-blue-500` (and never use borders for layout/cards)
 
 **Exception**: If the Catalyst component source already uses specific palette utilities, match that existing pattern instead of inventing a new one.
 

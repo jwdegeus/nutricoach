@@ -4,15 +4,28 @@ import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/catalyst/button';
 import { Heading } from '@/components/catalyst/heading';
-import { Description } from '@/components/catalyst/fieldset';
 import { Input } from '@/components/catalyst/input';
-import { Field, Label } from '@/components/catalyst/fieldset';
+import { Field, Label, Description } from '@/components/catalyst/fieldset';
 import { Text } from '@/components/catalyst/text';
+import { Select } from '@/components/catalyst/select';
+import { SwitchField, Switch } from '@/components/catalyst/switch';
 import { createMealPlanAction } from '../../actions/mealPlans.actions';
 import { getLatestRunningRunAction } from '../../../runs/actions/runs.actions';
 import { getCurrentDietIdAction } from '@/src/app/(app)/recipes/[recipeId]/actions/recipe-ai.persist.actions';
 import { GuardrailsViolationEmptyState } from '../../[planId]/components/GuardrailsViolationEmptyState';
-import { Loader2, Calendar } from 'lucide-react';
+import { useToast } from '@/src/components/app/ToastContext';
+import {
+  ArrowPathIcon,
+  CalendarDaysIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/react/16/solid';
+
+/** Error payload from createMealPlanAction (NL message + hints + optional diagnostics). */
+type CreatePlanErrorState = {
+  message: string;
+  userActionHints?: string[];
+  diagnostics?: Record<string, unknown>;
+};
 
 type GuardrailsViolationState = {
   reasonCodes: string[];
@@ -26,37 +39,38 @@ type GuardrailsViolationState = {
   }>;
 };
 
-export function CreateMealPlanForm() {
+type CreateMealPlanFormProps = {
+  /** When true, show diagnostics block (admin only). */
+  showDiagnostics?: boolean;
+};
+
+export function CreateMealPlanForm({
+  showDiagnostics = false,
+}: CreateMealPlanFormProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<CreatePlanErrorState | null>(
+    null,
+  );
   const [guardrailsViolation, setGuardrailsViolation] =
     useState<GuardrailsViolationState | null>(null);
   const [dietTypeId, setDietTypeId] = useState<string | undefined>(undefined);
   const [isRetrying, setIsRetrying] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
-  const [hasSubmitted, setHasSubmitted] = useState(() => {
-    // Check if we just submitted (prevent double submission on remount)
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem('meal-plan-submitting') === 'true';
-    }
-    return false;
-  });
   const [dateFrom, setDateFrom] = useState<string>(() => {
-    // Default to today
     return new Date().toISOString().split('T')[0];
   });
   const [days, setDays] = useState<string>('7');
+  const [repeatWindowDays, setRepeatWindowDays] = useState<number>(7);
+  const [aiFillMode, setAiFillMode] = useState<'strict' | 'normal'>('normal');
 
-  // Cleanup on unmount
+  // Clear stale sessionStorage on mount so returning to this page always allows generating again
   useEffect(() => {
-    return () => {
-      // Clear submitting flag when component unmounts
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('meal-plan-submitting');
-      }
-    };
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('meal-plan-submitting');
+    }
   }, []);
 
   // Fetch dietTypeId when violation occurs
@@ -117,36 +131,22 @@ export function CreateMealPlanForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Prevent double submission
-    if (isPending || hasSubmitted) {
+    // Prevent double submission (button is also disabled when isPending)
+    if (isPending) {
       return;
     }
 
-    setError(null);
+    setCreateError(null);
     setGuardrailsViolation(null);
-    setHasSubmitted(true);
-
-    // Mark as submitting in sessionStorage to prevent double submission
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('meal-plan-submitting', 'true');
-    }
 
     const daysNum = parseInt(days, 10);
     if (isNaN(daysNum) || daysNum < 1 || daysNum > 30) {
-      setError('Aantal dagen moet tussen 1 en 30 zijn');
-      setHasSubmitted(false);
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('meal-plan-submitting');
-      }
+      setCreateError({ message: 'Aantal dagen moet tussen 1 en 30 zijn' });
       return;
     }
 
     if (!dateFrom) {
-      setError('Selecteer een startdatum');
-      setHasSubmitted(false);
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('meal-plan-submitting');
-      }
+      setCreateError({ message: 'Selecteer een startdatum' });
       return;
     }
 
@@ -155,60 +155,53 @@ export function CreateMealPlanForm() {
         const result = await createMealPlanAction({
           dateFrom,
           days: daysNum,
+          dbFirstSettings: {
+            repeatWindowDays,
+            aiFillMode,
+          },
         });
 
         if (result.ok) {
-          // Clear submitting flag immediately
-          if (typeof window !== 'undefined') {
-            sessionStorage.removeItem('meal-plan-submitting');
-          }
-
-          // Dispatch custom event to notify shopping cart (but don't wait)
-          window.dispatchEvent(new CustomEvent('meal-plan-changed'));
-
-          // Use replace instead of push to prevent back button issues
-          // and immediately navigate away to prevent any re-submission
-          router.replace(`/meal-plans/${result.data.planId}`);
-
-          // Don't reset hasSubmitted - we're redirecting anyway
-          return; // Early return to prevent any further execution
-        } else {
-          setHasSubmitted(false);
-          if (typeof window !== 'undefined') {
-            sessionStorage.removeItem('meal-plan-submitting');
-          }
-          // Check for guardrails violation
-          if (
-            result.error.code === 'GUARDRAILS_VIOLATION' &&
-            result.error.details &&
-            'reasonCodes' in result.error.details
-          ) {
-            const d = result.error.details;
-            setGuardrailsViolation({
-              reasonCodes: d.reasonCodes,
-              contentHash: d.contentHash,
-              rulesetVersion: d.rulesetVersion,
-              ...('forceDeficits' in d &&
-                Array.isArray(d.forceDeficits) && {
-                  forceDeficits: d.forceDeficits,
-                }),
+          if (result.data.dbCoverageBelowTarget) {
+            showToast({
+              type: 'success',
+              title: 'Menu gegenereerd',
+              description:
+                'Er staan meer AI-maaltijden in dan de streefwaarde. Voeg meer recepten toe voor een evenwichtiger menu.',
             });
-          } else if (result.error.code === 'CONFLICT') {
-            setError(
-              'Er is al een generatie bezig. Wacht even en probeer het opnieuw. Als dit probleem aanhoudt, wacht 10 minuten en probeer het dan opnieuw.',
-            );
-          } else {
-            setError(result.error.message);
           }
+          window.dispatchEvent(new CustomEvent('meal-plan-changed'));
+          router.replace(`/meal-plans/${result.data.planId}`);
+          return;
+        }
+        // Check for guardrails violation
+        if (
+          result.error.code === 'GUARDRAILS_VIOLATION' &&
+          result.error.details &&
+          'reasonCodes' in result.error.details
+        ) {
+          const d = result.error.details;
+          setGuardrailsViolation({
+            reasonCodes: d.reasonCodes,
+            contentHash: d.contentHash,
+            rulesetVersion: d.rulesetVersion,
+            ...('forceDeficits' in d &&
+              Array.isArray(d.forceDeficits) && {
+                forceDeficits: d.forceDeficits,
+              }),
+          });
+        } else {
+          setCreateError({
+            message: result.error.userMessageNl ?? result.error.message,
+            userActionHints: result.error.userActionHints,
+            diagnostics: result.error.diagnostics,
+          });
         }
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : 'Fout bij aanmaken weekmenu',
-        );
-        setHasSubmitted(false);
-        if (typeof window !== 'undefined') {
-          sessionStorage.removeItem('meal-plan-submitting');
-        }
+        setCreateError({
+          message:
+            err instanceof Error ? err.message : 'Fout bij aanmaken weekmenu',
+        });
       }
     });
   };
@@ -216,25 +209,20 @@ export function CreateMealPlanForm() {
   const handleRetry = async () => {
     setIsRetrying(true);
     setGuardrailsViolation(null);
-    setError(null);
+    setCreateError(null);
 
     // Trigger form submission again
     const daysNum = parseInt(days, 10);
     if (isNaN(daysNum) || daysNum < 1 || daysNum > 30) {
-      setError('Aantal dagen moet tussen 1 en 30 zijn');
+      setCreateError({ message: 'Aantal dagen moet tussen 1 en 30 zijn' });
       setIsRetrying(false);
       return;
     }
 
     if (!dateFrom) {
-      setError('Selecteer een startdatum');
+      setCreateError({ message: 'Selecteer een startdatum' });
       setIsRetrying(false);
       return;
-    }
-
-    setHasSubmitted(true);
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('meal-plan-submitting', 'true');
     }
 
     startTransition(async () => {
@@ -242,51 +230,52 @@ export function CreateMealPlanForm() {
         const result = await createMealPlanAction({
           dateFrom,
           days: daysNum,
+          dbFirstSettings: {
+            repeatWindowDays,
+            aiFillMode,
+          },
         });
 
         if (result.ok) {
-          if (typeof window !== 'undefined') {
-            sessionStorage.removeItem('meal-plan-submitting');
+          if (result.data.dbCoverageBelowTarget) {
+            showToast({
+              type: 'success',
+              title: 'Menu gegenereerd',
+              description:
+                'Er staan meer AI-maaltijden in dan de streefwaarde. Voeg meer recepten toe voor een evenwichtiger menu.',
+            });
           }
           window.dispatchEvent(new CustomEvent('meal-plan-changed'));
           router.replace(`/meal-plans/${result.data.planId}`);
           return;
+        }
+        if (
+          result.error.code === 'GUARDRAILS_VIOLATION' &&
+          result.error.details &&
+          'reasonCodes' in result.error.details
+        ) {
+          const d = result.error.details;
+          setGuardrailsViolation({
+            reasonCodes: d.reasonCodes,
+            contentHash: d.contentHash,
+            rulesetVersion: d.rulesetVersion,
+            ...('forceDeficits' in d &&
+              Array.isArray(d.forceDeficits) && {
+                forceDeficits: d.forceDeficits,
+              }),
+          });
         } else {
-          setHasSubmitted(false);
-          if (typeof window !== 'undefined') {
-            sessionStorage.removeItem('meal-plan-submitting');
-          }
-          if (
-            result.error.code === 'GUARDRAILS_VIOLATION' &&
-            result.error.details &&
-            'reasonCodes' in result.error.details
-          ) {
-            const d = result.error.details;
-            setGuardrailsViolation({
-              reasonCodes: d.reasonCodes,
-              contentHash: d.contentHash,
-              rulesetVersion: d.rulesetVersion,
-              ...('forceDeficits' in d &&
-                Array.isArray(d.forceDeficits) && {
-                  forceDeficits: d.forceDeficits,
-                }),
-            });
-          } else if (result.error.code === 'CONFLICT') {
-            setError(
-              'Er is al een generatie bezig. Wacht even en probeer het opnieuw. Als dit probleem aanhoudt, wacht 10 minuten en probeer het dan opnieuw.',
-            );
-          } else {
-            setError(result.error.message);
-          }
+          setCreateError({
+            message: result.error.userMessageNl ?? result.error.message,
+            userActionHints: result.error.userActionHints,
+            diagnostics: result.error.diagnostics,
+          });
         }
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : 'Fout bij aanmaken weekmenu',
-        );
-        setHasSubmitted(false);
-        if (typeof window !== 'undefined') {
-          sessionStorage.removeItem('meal-plan-submitting');
-        }
+        setCreateError({
+          message:
+            err instanceof Error ? err.message : 'Fout bij aanmaken weekmenu',
+        });
       } finally {
         setIsRetrying(false);
       }
@@ -321,8 +310,7 @@ export function CreateMealPlanForm() {
           onSubmit={handleSubmit}
           className="space-y-6"
           onKeyDown={(e) => {
-            // Prevent form submission on Enter key if already submitting
-            if (e.key === 'Enter' && (isPending || hasSubmitted)) {
+            if (e.key === 'Enter' && isPending) {
               e.preventDefault();
             }
           }}
@@ -353,36 +341,112 @@ export function CreateMealPlanForm() {
             <Description>Aantal dagen voor het weekmenu (1-30)</Description>
           </Field>
 
-          {error && (
-            <div className="rounded-lg bg-red-50 dark:bg-red-950/50 p-3 text-sm text-red-600 dark:text-red-400">
-              <strong>Fout:</strong> {error}
+          <div className="space-y-4">
+            <Text className="text-sm font-medium text-foreground">
+              Weekmenu-instellingen
+            </Text>
+            <Field>
+              <Label>Variatie-venster (dagen)</Label>
+              <Select
+                value={String(repeatWindowDays)}
+                onChange={(e) => setRepeatWindowDays(Number(e.target.value))}
+                disabled={isPending}
+              >
+                <option value={3}>3 dagen</option>
+                <option value={5}>5 dagen</option>
+                <option value={7}>7 dagen</option>
+                <option value={10}>10 dagen</option>
+                <option value={14}>14 dagen</option>
+              </Select>
+              <Description>
+                Zelfde recept niet opnieuw binnen dit aantal dagen (zelfde
+                maaltijdsoort)
+              </Description>
+            </Field>
+            <SwitchField>
+              <Label>AI alleen als nodig</Label>
+              <Switch
+                checked={aiFillMode === 'normal'}
+                onChange={(checked) =>
+                  setAiFillMode(checked ? 'normal' : 'strict')
+                }
+                disabled={isPending}
+              />
+              <Description>
+                {aiFillMode === 'normal'
+                  ? 'AI vult alleen gaten als er geen geschikt recept uit je database is.'
+                  : 'Nooit AI aanvullen — alleen recepten uit je database (kan mislukken als te weinig recepten).'}
+              </Description>
+            </SwitchField>
+            <Text className="text-sm text-muted-foreground">
+              Database is leidend; AI vult alleen gaten (tenzij uitgeschakeld).
+            </Text>
+          </div>
+
+          {createError && (
+            <div
+              className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4"
+              role="alert"
+            >
+              <div className="flex items-start gap-3">
+                <ExclamationTriangleIcon className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <Text className="font-semibold text-red-900 dark:text-red-100">
+                      Menu genereren mislukt
+                    </Text>
+                    <Text className="mt-1 text-sm text-red-700 dark:text-red-300">
+                      {createError.message}
+                    </Text>
+                  </div>
+                  {createError.userActionHints &&
+                    createError.userActionHints.length > 0 && (
+                      <ul className="list-disc list-inside text-sm text-red-700 dark:text-red-300 space-y-1">
+                        {createError.userActionHints.map((hint, i) => (
+                          <li key={i}>{hint}</li>
+                        ))}
+                      </ul>
+                    )}
+                  {showDiagnostics &&
+                    createError.diagnostics &&
+                    Object.keys(createError.diagnostics).length > 0 && (
+                      <details className="mt-2">
+                        <summary className="text-xs font-medium text-red-800 dark:text-red-200 cursor-pointer">
+                          Technische details
+                        </summary>
+                        <pre className="mt-2 text-xs overflow-auto rounded bg-red-100 dark:bg-red-950/80 p-3 text-red-900 dark:text-red-100 font-mono max-h-48">
+                          {JSON.stringify(createError.diagnostics, null, 2)}
+                        </pre>
+                      </details>
+                    )}
+                </div>
+              </div>
             </div>
           )}
 
-          {isPending && progress && (
-            <div className="rounded-lg bg-blue-50 dark:bg-blue-950/50 p-4 space-y-3">
-              <div className="flex items-center gap-3">
-                <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />
-                <div className="flex-1">
-                  <Text className="font-medium text-blue-900 dark:text-blue-100">
-                    {progress}
+          {isPending && (
+            <div className="flex flex-col items-center justify-center text-center space-y-4 py-8">
+              <ArrowPathIcon className="h-10 w-10 text-primary-600 dark:text-primary-400 animate-spin" />
+              <div className="space-y-1">
+                <Text className="font-medium text-foreground">
+                  {progress ?? 'Weekmenu genereren...'}
+                </Text>
+                {(elapsedTime > 0 || progress) && (
+                  <Text className="text-sm text-muted-foreground">
+                    {elapsedTime > 0 && `${Math.floor(elapsedTime / 1000)}s`}
+                    {elapsedTime > 0 && progress && ' · '}
+                    Dit kan 20–40 seconden duren. Blijf deze pagina open.
                   </Text>
-                  <Text className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                    {elapsedTime > 0 && `(${Math.floor(elapsedTime / 1000)}s)`}
-                  </Text>
-                </div>
+                )}
               </div>
-              <div className="w-full bg-blue-200 dark:bg-blue-900 rounded-full h-2 overflow-hidden">
+              <div className="w-full max-w-xs bg-muted rounded-full h-2 overflow-hidden">
                 <div
-                  className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-500"
+                  className="bg-primary-500 h-2 rounded-full transition-all duration-500"
                   style={{
-                    width: `${Math.min(90, Math.max(10, (elapsedTime / 40000) * 100))}%`,
+                    width: `${Math.min(95, Math.max(5, (elapsedTime / 40000) * 100))}%`,
                   }}
                 />
               </div>
-              <Text className="text-xs text-blue-600 dark:text-blue-400">
-                Dit kan 20-40 seconden duren. Blijf deze pagina open.
-              </Text>
             </div>
           )}
 
@@ -398,12 +462,12 @@ export function CreateMealPlanForm() {
             <Button type="submit" disabled={isPending} className="flex-1">
               {isPending ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
                   Genereren...
                 </>
               ) : (
                 <>
-                  <Calendar className="h-4 w-4 mr-2" />
+                  <CalendarDaysIcon className="h-4 w-4 mr-2" />
                   Genereer weekmenu
                 </>
               )}

@@ -51,6 +51,7 @@ import {
   validateMealPlanSanity,
   type SanityResult,
 } from '@/src/lib/meal-plans/mealPlanSanityValidator';
+import { validateCulinaryCoherence } from './validators/culinaryCoherenceValidator';
 import { createClient } from '@/src/lib/supabase/server';
 import {
   loadMealPlanGeneratorConfig,
@@ -62,6 +63,7 @@ import {
   InsufficientAllowedIngredientsError,
 } from '@/src/lib/meal-plans/templateFallbackGenerator';
 import { loadHardBlockTermsForDiet } from '@/src/lib/meal-plans/guardrailsExcludeTerms';
+import { estimateTherapeuticCoverage } from '@/src/lib/therapeutic/therapeuticCoverageEstimator';
 
 /**
  * Simple in-memory cache for candidate pools
@@ -95,16 +97,53 @@ function normalizeJsonFromModel(raw: string): string {
   return s;
 }
 
+/** True when user has shake/smoothie preference for any slot (used to always remind in repair prompts). */
+function hasShakeSmoothiePreferenceInRequest(
+  request: MealPlanRequest,
+): boolean {
+  const mealPrefs = request.profile.mealPreferences;
+  const all = [
+    ...(mealPrefs?.breakfast ?? []),
+    ...(mealPrefs?.lunch ?? []),
+    ...(mealPrefs?.dinner ?? []),
+  ];
+  const lower = all.join(' ').toLowerCase();
+  return (
+    lower.includes('shake') ||
+    lower.includes('smoothie') ||
+    lower.includes('eiwit shake')
+  );
+}
+
 /** Provenance counters for plan_snapshot (debugging/UX) */
 export type PlanProvenance = {
   reusedRecipeCount: number;
   generatedRecipeCount: number;
 };
 
-/** Options for generateMealPlan: optional prefilled meals from DB (e.g. meal_history) */
+/** Options for generateMealPlan: optional prefilled meals, AI slot cap, culinary rules, DB coverage (from DB config) */
 export type GenerateMealPlanOptions = {
   /** Meals by slot (breakfast/lunch/dinner) to prefer; ~80% of slots will be filled from these when possible */
   prefilledBySlot?: Partial<Record<MealSlot, Meal[]>>;
+  /** Max AI-invented slots for this plan (from DB config). When set, prompt instructs cap and post-check enforces it. */
+  maxAiSlotsForPlan?: number;
+  /** Culinary coherence rules (from loadMealPlanGeneratorDbConfig). When set, Gemini path validates plan against them. */
+  culinaryRules?: import('@/src/lib/meal-planner/config/mealPlanGeneratorDbConfig').MealPlanCulinaryRuleV1[];
+  /** Min ratio of slots that must be DB-backed (history/custom/recipe). When set, Gemini path enforces after provenance is attached. */
+  minDbRecipeCoverageRatio?: number;
+  /** Variety targets for prompt (retry only); when set, adds VARIETY HARD REQUIREMENTS to Gemini prompt. Same caps apply. */
+  varietyTargetsForPrompt?: {
+    unique_veg_min: number;
+    unique_fruit_min: number;
+    protein_rotation_min_categories: number;
+    max_repeat_same_recipe_within_days: number;
+  };
+  /** When true, accept plan even if DB recipe ratio is below minDbRecipeCoverageRatio (set metadata.dbCoverageBelowTarget instead of throwing). */
+  allowDbCoverageFallback?: boolean;
+  /** When true, skip template generator and use Gemini only (for DB-first flow: fill only missing slots). */
+  dbFirstFillMissing?: boolean;
+  /** When set with dbFirstFillMissing, only these slots need to be filled by AI; service merges result into skeleton. Agent still returns full plan. */
+  onlySlots?: Array<{ date: string; slot: MealSlot }>;
 };
 
 /**
@@ -280,6 +319,72 @@ async function applyPrefilledAndAttachProvenance(
 }
 
 /**
+ * Throws MEAL_PLAN_AI_BUDGET_EXCEEDED when plan has more AI-generated slots than allowed.
+ * Call after applyPrefilledAndAttachProvenance when maxAiSlotsForPlan is set.
+ */
+function throwIfAiBudgetExceeded(
+  plan: MealPlanResponse,
+  maxAiSlotsForPlan: number | undefined,
+): void {
+  if (maxAiSlotsForPlan === undefined) return;
+  const generated =
+    (
+      plan.metadata as
+        | { provenance?: { generatedRecipeCount?: number } }
+        | undefined
+    )?.provenance?.generatedRecipeCount ?? 0;
+  if (generated <= maxAiSlotsForPlan) return;
+  throw new AppError(
+    'MEAL_PLAN_AI_BUDGET_EXCEEDED',
+    'Het aantal AI-gegenereerde maaltijden overschrijdt het maximum. Voeg meer recepten toe of vraag de beheerder het maximum aan te passen.',
+    { generated, maxAllowed: maxAiSlotsForPlan },
+  );
+}
+
+/**
+ * Throws MEAL_PLAN_DB_COVERAGE_TOO_LOW when DB-backed slot ratio is below required minimum.
+ * When allowFallback is true, accepts the plan and sets metadata.dbCoverageBelowTarget instead (AI fills the gap).
+ * Uses plan.metadata.provenance (reusedRecipeCount = DB, generatedRecipeCount = AI). Call after applyPrefilledAndAttachProvenance.
+ */
+function throwIfDbCoverageTooLow(
+  plan: MealPlanResponse,
+  minDbRecipeCoverageRatio: number | undefined,
+  allowFallback?: boolean,
+): void {
+  if (minDbRecipeCoverageRatio === undefined || minDbRecipeCoverageRatio <= 0)
+    return;
+  const totalSlots =
+    plan.metadata?.totalMeals ??
+    plan.days.reduce((s, d) => s + (d.meals?.length ?? 0), 0);
+  if (totalSlots === 0) return;
+  const dbSlots =
+    (
+      plan.metadata as
+        | { provenance?: { reusedRecipeCount?: number } }
+        | undefined
+    )?.provenance?.reusedRecipeCount ?? 0;
+  const requiredDbSlots = Math.ceil(totalSlots * minDbRecipeCoverageRatio);
+  const actualRatio = dbSlots / totalSlots;
+  if (dbSlots >= requiredDbSlots) return;
+  if (allowFallback) {
+    const meta = (plan.metadata ?? {}) as Record<string, unknown>;
+    meta.dbCoverageBelowTarget = true;
+    plan.metadata = meta as MealPlanResponse['metadata'];
+    return;
+  }
+  throw new AppError(
+    'MEAL_PLAN_DB_COVERAGE_TOO_LOW',
+    'Het menu bevat te weinig recepten uit je eigen database. Voeg meer recepten toe of verlaag de vereiste verhouding in de beheerinstellingen.',
+    {
+      dbSlots,
+      totalSlots,
+      requiredRatio: minDbRecipeCoverageRatio,
+      actualRatio: Math.round(actualRatio * 1000) / 1000,
+    },
+  );
+}
+
+/**
  * Get or build candidate pool (with caching)
  */
 async function getCandidatePool(
@@ -369,6 +474,26 @@ function attachGeneratorMeta(
   plan.metadata = meta as MealPlanResponse['metadata'];
 }
 
+/** Attach therapeutic targets snapshot + coverage to plan.metadata when request has therapeuticTargets (template + Gemini). */
+function attachTherapeuticMetadata(
+  plan: MealPlanResponse,
+  request: MealPlanRequest,
+): void {
+  if (
+    !request.therapeuticTargets ||
+    typeof request.therapeuticTargets !== 'object'
+  )
+    return;
+  const meta = { ...plan.metadata };
+  (meta as Record<string, unknown>).therapeuticTargets =
+    request.therapeuticTargets;
+  const coverage = estimateTherapeuticCoverage(plan, request);
+  if (coverage) {
+    (meta as Record<string, unknown>).therapeuticCoverage = coverage;
+  }
+  plan.metadata = meta as MealPlanResponse['metadata'];
+}
+
 /** Throw AppError MEAL_PLAN_SANITY_FAILED when sanity check failed (safe NL message + details.issues). */
 function throwIfSanityFailed(sanity: SanityResult): void {
   if (sanity.ok) return;
@@ -428,10 +553,10 @@ export class MealPlannerAgentService {
     language: 'nl' | 'en' = 'nl',
     options?: GenerateMealPlanOptions,
   ): Promise<MealPlanResponse> {
-    // Step 1: Validate input request
+    // Step 1: Validate input request (includes optional therapeuticTargets from schema)
     let request: MealPlanRequest;
     try {
-      request = mealPlanRequestSchema.parse(raw);
+      request = mealPlanRequestSchema.parse(raw) as MealPlanRequest;
     } catch (error) {
       throw new Error(
         `Invalid meal plan request: ${error instanceof Error ? error.message : 'Unknown validation error'}`,
@@ -468,8 +593,9 @@ export class MealPlannerAgentService {
           : null,
     };
 
-    // Step 4b: Template-based generator (no free-form AI) when enabled
+    // Step 4b: Template-based generator (no free-form AI) when enabled (skip when DB-first is filling only missing slots)
     const useTemplateGenerator =
+      !options?.dbFirstFillMissing &&
       process.env.USE_TEMPLATE_MEAL_GENERATOR === 'true';
     const enforceVNextGuardrails =
       process.env.ENFORCE_VNEXT_GUARDRAILS_MEAL_PLANNER === 'true';
@@ -618,6 +744,7 @@ export class MealPlannerAgentService {
         }),
         sanity: { ok: sanity.ok, issues: sanity.issues },
       });
+      attachTherapeuticMetadata(plan, request);
       throwIfSanityFailed(sanity);
       return plan;
     }
@@ -630,6 +757,8 @@ export class MealPlannerAgentService {
 
     // Step 5: Build original prompt with candidates (guidance from messages, no hardcoded text)
     const shakeSmoothieGuidance = getShakeSmoothieGuidance(language);
+    const maxAiSlotsForPlan = options?.maxAiSlotsForPlan;
+    const varietyTargetsForPrompt = options?.varietyTargetsForPrompt;
     const originalPrompt = buildMealPlanPrompt({
       request,
       rules,
@@ -637,6 +766,8 @@ export class MealPlannerAgentService {
       language,
       guardrailsConstraintsText,
       shakeSmoothieGuidance,
+      ...(maxAiSlotsForPlan !== undefined && { maxAiSlots: maxAiSlotsForPlan }),
+      ...(varietyTargetsForPrompt && { varietyTargetsForPrompt }),
     });
 
     // Step 6: Use flattened JSON schema (Gemini has a max nesting depth limit)
@@ -693,6 +824,10 @@ export class MealPlannerAgentService {
               },
               guardrailsConstraintsText,
               shakeSmoothieGuidance,
+              ...(maxAiSlotsForPlan !== undefined && {
+                maxAiSlots: maxAiSlotsForPlan,
+              }),
+              ...(varietyTargetsForPrompt && { varietyTargetsForPrompt }),
             });
             let retryRawJson: string;
             try {
@@ -727,6 +862,13 @@ export class MealPlannerAgentService {
               options,
               rules,
             );
+            validateCulinaryCoherence(plan, options?.culinaryRules ?? []);
+            throwIfDbCoverageTooLow(
+              plan,
+              options?.minDbRecipeCoverageRatio,
+              options?.allowDbCoverageFallback,
+            );
+            throwIfAiBudgetExceeded(plan, options?.maxAiSlotsForPlan);
             attachGuardrailsMeta(
               plan,
               !!guardrailsConstraintsText?.trim(),
@@ -740,6 +882,7 @@ export class MealPlannerAgentService {
               poolMetrics,
               sanity: { ok: sanity.ok, issues: sanity.issues },
             });
+            attachTherapeuticMetadata(plan, request);
             throwIfSanityFailed(sanity);
             return plan;
           }
@@ -781,6 +924,13 @@ export class MealPlannerAgentService {
         }
       }
       await applyPrefilledAndAttachProvenance(plan, request, options, rules);
+      validateCulinaryCoherence(plan, options?.culinaryRules ?? []);
+      throwIfDbCoverageTooLow(
+        plan,
+        options?.minDbRecipeCoverageRatio,
+        options?.allowDbCoverageFallback,
+      );
+      throwIfAiBudgetExceeded(plan, options?.maxAiSlotsForPlan);
       attachGuardrailsMeta(
         plan,
         !!guardrailsConstraintsText?.trim(),
@@ -793,17 +943,21 @@ export class MealPlannerAgentService {
         poolMetrics,
         sanity: { ok: sanity.ok, issues: sanity.issues },
       });
+      attachTherapeuticMetadata(plan, request);
       throwIfSanityFailed(sanity);
       return plan;
     }
 
     // Step 10: Repair attempt (max 1 attempt)
     const issues = firstAttemptResult.issues.join('\n');
+    const hasShakeSmoothiePreference =
+      hasShakeSmoothiePreferenceInRequest(request);
     const repairPrompt = buildRepairPrompt({
       originalPrompt,
       badOutput: rawJson,
       issues,
       responseJsonSchema: jsonSchema,
+      hasShakeSmoothiePreference,
     });
 
     // Call Gemini with lower temperature for repair
@@ -843,6 +997,13 @@ export class MealPlannerAgentService {
       const plan = repairResult.response!;
       const sanity = validateMealPlanSanity(plan);
       await applyPrefilledAndAttachProvenance(plan, request, options, rules);
+      validateCulinaryCoherence(plan, options?.culinaryRules ?? []);
+      throwIfDbCoverageTooLow(
+        plan,
+        options?.minDbRecipeCoverageRatio,
+        options?.allowDbCoverageFallback,
+      );
+      throwIfAiBudgetExceeded(plan, options?.maxAiSlotsForPlan);
       attachGuardrailsMeta(
         plan,
         !!guardrailsConstraintsText?.trim(),
@@ -856,6 +1017,7 @@ export class MealPlannerAgentService {
         poolMetrics,
         sanity: { ok: sanity.ok, issues: sanity.issues },
       });
+      attachTherapeuticMetadata(plan, request);
       throwIfSanityFailed(sanity);
       return plan;
     }
@@ -1062,6 +1224,8 @@ export class MealPlannerAgentService {
         badOutput: rawJson,
         issues: issues.join('\n'),
         responseJsonSchema: jsonSchema,
+        hasShakeSmoothiePreference:
+          hasShakeSmoothiePreferenceInRequest(request),
       });
 
       // Call Gemini with lower temperature for repair
@@ -1325,6 +1489,8 @@ export class MealPlannerAgentService {
         badOutput: rawJson,
         issues: issues.join('\n'),
         responseJsonSchema: jsonSchema,
+        hasShakeSmoothiePreference:
+          hasShakeSmoothiePreferenceInRequest(request),
       });
 
       // Call Gemini with lower temperature for repair

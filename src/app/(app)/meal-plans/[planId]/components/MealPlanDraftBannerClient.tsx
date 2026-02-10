@@ -115,10 +115,10 @@ export function MealPlanDraftBannerClient({
                       Deze draft schendt huishouden-allergieën/avoid regels.
                     </Text>
                     <Link
-                      href="/settings"
+                      href="/familie/edit#household-avoid"
                       className="inline-flex items-center text-sm font-medium text-red-700 underline hover:text-red-900 dark:text-red-300 dark:hover:text-red-100"
                     >
-                      Instellingen weekmenu
+                      Gezinsinstellingen (avoid-regels)
                     </Link>
                   </div>
                 )}

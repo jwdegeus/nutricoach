@@ -4,7 +4,13 @@ import { useState } from 'react';
 import { Heading } from '@/components/catalyst/heading';
 import { Text } from '@/components/catalyst/text';
 import { Button } from '@/components/catalyst/button';
-import { Plus, Loader2, CheckCircle2, ShoppingBag } from 'lucide-react';
+import { Badge } from '@/components/catalyst/badge';
+import {
+  PlusIcon,
+  ArrowPathIcon,
+  CheckCircleIcon,
+  ShoppingBagIcon,
+} from '@heroicons/react/16/solid';
 import { useRouter } from 'next/navigation';
 import {
   upsertUserPantryItemAction,
@@ -157,9 +163,9 @@ export function ShoppingListView({
             color="green"
           >
             {isBulkAdding ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
             ) : (
-              <CheckCircle2 className="h-4 w-4 mr-2" />
+              <CheckCircleIcon className="h-4 w-4 mr-2" />
             )}
             Markeer {checkedItems.size} item{checkedItems.size > 1 ? 's' : ''}{' '}
             als gekocht
@@ -182,7 +188,7 @@ export function ShoppingListView({
               className="rounded-lg bg-white p-4 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10"
             >
               <div className="flex items-center gap-2 mb-3">
-                <ShoppingBag className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
+                <ShoppingBagIcon className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
                 <Heading level={3} className="text-base font-semibold">
                   {group.category}
                 </Heading>
@@ -218,30 +224,36 @@ export function ShoppingListView({
                         title={isChecked ? 'Geselecteerd' : 'Selecteer'}
                       >
                         {isChecked && (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                          <CheckCircleIcon className="h-3.5 w-3.5 text-white" />
                         )}
                       </button>
 
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-zinc-950 dark:text-white">
-                          {item.name}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-zinc-950 dark:text-white">
+                            {item.name}
+                          </span>
+                          {pantryInfo && (
+                            <Badge color="green" className="text-xs">
+                              In voorraad
+                              {pantryInfo.type === 'quantity' &&
+                              pantryInfo.value != null
+                                ? ` (${pantryInfo.value.toFixed(0)}g)`
+                                : ''}
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <Text className="text-xs text-zinc-500 dark:text-zinc-400">
                             {item.missingG.toFixed(0)}g nodig
                           </Text>
-                          {pantryInfo && (
-                            <>
-                              <span className="text-zinc-300 dark:text-zinc-700">
-                                •
-                              </span>
+                          {pantryInfo &&
+                            pantryInfo.type === 'quantity' &&
+                            pantryInfo.value != null && (
                               <Text className="text-xs text-zinc-500 dark:text-zinc-400">
-                                {pantryInfo.type === 'quantity'
-                                  ? `${pantryInfo.value.toFixed(0)}g in pantry`
-                                  : 'Aanwezig in pantry'}
+                                • {pantryInfo.value.toFixed(0)}g in voorraad
                               </Text>
-                            </>
-                          )}
+                            )}
                         </div>
                       </div>
 
@@ -259,12 +271,15 @@ export function ShoppingListView({
                           title="Voeg toe aan pantry"
                         >
                           {isAdding ? (
-                            <Loader2
+                            <ArrowPathIcon
                               className="h-3.5 w-3.5 animate-spin"
                               data-slot="icon"
                             />
                           ) : (
-                            <Plus className="h-3.5 w-3.5" data-slot="icon" />
+                            <PlusIcon
+                              className="h-3.5 w-3.5"
+                              data-slot="icon"
+                            />
                           )}
                         </Button>
                       </div>

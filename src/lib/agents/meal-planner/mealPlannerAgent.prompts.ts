@@ -195,6 +195,15 @@ export function buildMealPlanPrompt(input: {
   guardrailsConstraintsText?: string;
   /** Shake/smoothie guidance text (from messages); when provided and user has shake/smoothie preference, injected in prompt */
   shakeSmoothieGuidance?: string;
+  /** Max number of slots that may be AI-invented; rest must come from provided candidates. When set, adds hard constraint to prompt. */
+  maxAiSlots?: number;
+  /** Variety targets from DB (for retry); when set, adds VARIETY HARD REQUIREMENTS section. */
+  varietyTargetsForPrompt?: {
+    unique_veg_min: number;
+    unique_fruit_min: number;
+    protein_rotation_min_categories: number;
+    max_repeat_same_recipe_within_days: number;
+  };
 }): string {
   const {
     request,
@@ -204,6 +213,8 @@ export function buildMealPlanPrompt(input: {
     forceDeficitHint,
     guardrailsConstraintsText,
     shakeSmoothieGuidance: shakeSmoothieGuidanceOverride,
+    maxAiSlots,
+    varietyTargetsForPrompt,
   } = input;
 
   const dateRange = formatDateRange(
@@ -330,16 +341,20 @@ ${
 
 ${additionalExclusions ? `\n${additionalExclusions}` : ''}
 ${preferredIngredients ? `\n${preferredIngredients}` : ''}
-${mealPreferencesInfo ? `\nMEAL PREFERENCES (REQUIRED):\nThe user has REQUIRED preferences for meal types. You MUST generate meals that match these preferences:\n${mealPreferencesInfo}\n\nIMPORTANT: For each meal slot, the generated meal MUST match at least one of the specified preferences. For example, if breakfast preference is "eiwit shake", the breakfast meal MUST be an eiwit shake (protein shake), not eggs or other breakfast items.\n` : ''}
+${mealPreferencesInfo ? `\nMEAL PREFERENCES (REQUIRED):\nThe user has REQUIRED preferences for meal types. You MUST generate meals that match these preferences:\n${mealPreferencesInfo}\n\nIMPORTANT: For each meal slot, the generated meal MUST match at least one of the specified preferences.\n- If the preference is "eiwitshake" or "eiwit shake": the meal MUST be a protein shake containing eiwit/poeder/protein (e.g. eiwitpoeder, whey, protein powder). A fruit-only smoothie (e.g. "Appel Sinaasappel Smoothie", "Granaatappel Smoothie") does NOT satisfy eiwitshake – you must include a protein source in the name and ingredients.\n- For other preferences, the meal name and ingredients must clearly reflect the preference.\n` : ''}
+${hasShakeSmoothiePreference ? '\nSHAKES & SMOOTHIES (HARD): Shakes and smoothies must NOT contain egg (ei), meat, chicken, or fish (vlees, kip, vis). Use only dairy, fruit, vegetables, protein powder, nuts, etc.\n' : ''}
 ${shakeSmoothieGuidance}
 
 ${candidates ? `\nAVAILABLE INGREDIENTS (CANDIDATE POOL):\nYou MUST choose ingredients ONLY from this list. Use the exact nevoCode values provided.\n${formatCandidatePool(candidates)}\n` : ''}
+${maxAiSlots !== undefined ? `\nCRITICAL - AI SLOT CAP: At most ${maxAiSlots} meal slot(s) may be AI-invented (new meal compositions). The candidate pool above is ingredients only – use only those nevoCodes. The system will fill other slots from the user's saved meals where possible.\n` : ''}
+${varietyTargetsForPrompt ? `\nVARIETY HARD REQUIREMENTS (MUST MEET):\n- Use at least ${varietyTargetsForPrompt.unique_veg_min} distinct vegetable ingredients across the plan.\n- Use at least ${varietyTargetsForPrompt.unique_fruit_min} distinct fruit ingredients across the plan.\n- Use at least ${varietyTargetsForPrompt.protein_rotation_min_categories} distinct protein types/categories across the plan.\n- Do NOT repeat the same meal name within ${varietyTargetsForPrompt.max_repeat_same_recipe_within_days} days.\n` : ''}
+${varietyTargetsForPrompt && hasShakeSmoothiePreference ? '\nREMINDER – SHAKES/SMOOTHIES (HARD): Shakes and smoothies must NOT contain meat, chicken, or fish (vlees, kip, vis). Use only dairy, fruit, vegetables, protein powder, nuts.\n' : ''}
 
 VARIETY (HARD – no repetition on consecutive days):
-- Do NOT use the same meal (same name/same recipe) on two consecutive days for the same slot. Each day must have a different breakfast, different lunch, and different dinner than the previous day.
+- Avoid repeating the same or very similar meal name on two consecutive days for the same slot. Each day should have a different breakfast, lunch, and dinner than the previous day.
 
-LUNCH (SOFT – normal meals):
-- Lunch should normally be a proper meal (salad, soup, sandwich, warm dish, leftovers), not only a vegetable smoothie. Raw broccoli or vegetable-only smoothies for lunch are unusual unless the user explicitly prefers smoothies for lunch.
+LUNCH (SOFT):
+- Lunch may be a proper meal (salad, soup, sandwich, warm dish, leftovers) or a smoothie/shake. Both are allowed. If the user has a shake/smoothie preference for lunch, use a smoothie or shake; otherwise you may choose either type.
 
 CRITICAL REQUIREMENTS:
 1. Output MUST be exactly ONE valid JSON object conforming to the provided schema
@@ -544,7 +559,8 @@ ${constraintSummary}${guardrailsConstraintsText !== undefined ? `\n\nDIET CONSTR
 
 ${additionalExclusions ? `\n${additionalExclusions}` : ''}
 ${preferredIngredients ? `\n${preferredIngredients}` : ''}
-${mealPreferencesInfo ? `\nMEAL PREFERENCES (REQUIRED - HARD CONSTRAINT):\nThe user has REQUIRED preferences for meal types. You MUST generate meals that match these preferences:\n${mealPreferencesInfo}\n\nCRITICAL: For each meal slot, the generated meal MUST match at least one of the specified preferences. The meal name and ingredients MUST clearly reflect the preference.\n` : ''}
+${mealPreferencesInfo ? `\nMEAL PREFERENCES (REQUIRED - HARD CONSTRAINT):\nThe user has REQUIRED preferences for meal types. You MUST generate meals that match these preferences:\n${mealPreferencesInfo}\n\nCRITICAL: For each meal slot, the generated meal MUST match at least one of the specified preferences. If the preference is "eiwitshake" or "eiwit shake", the meal MUST contain protein (eiwitpoeder, whey, protein) – a fruit-only smoothie does NOT satisfy this.\n` : ''}
+${hasShakeSmoothiePreferenceDay ? '\nSHAKES & SMOOTHIES (HARD): Shakes and smoothies must NOT contain egg (ei), meat, chicken, or fish (vlees, kip, vis). Use only dairy, fruit, vegetables, protein powder, nuts, etc.\n' : ''}
 ${shakeSmoothieGuidanceDay}
 
 ${candidates ? `\nAVAILABLE INGREDIENTS (CANDIDATE POOL):\nYou MUST choose ingredients ONLY from this list. Use the exact nevoCode values provided.\n${formatCandidatePool(candidates)}\n` : ''}
@@ -558,12 +574,12 @@ CRITICAL REQUIREMENTS:
 4. All HARD constraints must be followed 100% - violations are not acceptable
 5. ${mealPreferencesInfo ? "MEAL PREFERENCES are REQUIRED - each meal MUST match the user's preferences for that meal slot. This is a HARD constraint." : ''}
 6. SOFT constraints should be optimized where possible, but never at the expense of hard constraints
-6. ${candidates ? 'You MUST use ONLY ingredients from the candidate pool above. Each ingredient must have:' : 'Each ingredient must have:'}
+7. ${candidates ? 'You MUST use ONLY ingredients from the candidate pool above. Each ingredient must have:' : 'Each ingredient must have:'}
    - nevoCode: exact NEVO code from candidate pool (as string)
    - quantityG: amount in grams (minimum 1)
    - displayName: optional display name for UI
    - tags: optional tags for categorization
-7. Each meal must have:
+8. Each meal must have:
    - A unique ID (string)
    - A descriptive name
    - The correct meal slot (breakfast/lunch/dinner/snack)
@@ -572,9 +588,9 @@ CRITICAL REQUIREMENTS:
    - Optional estimatedMacros (informative only - actual calculation happens server-side)
    - Optional prep time in minutes
    - Optional servings count
-${candidates ? '8. DO NOT invent nevoCodes - use ONLY codes from the candidate pool above' : ''}
-${candidates ? '9' : '8'}. Ensure the day's meals together meet calorie/macro targets if specified
-${candidates ? '10' : '9'}. Ensure all meals respect prep time constraints
+${candidates ? '9. DO NOT invent nevoCodes - use ONLY codes from the candidate pool above' : ''}
+${candidates ? '10' : '9'}. Ensure the day's meals together meet calorie/macro targets if specified
+${candidates ? '11' : '10'}. Ensure all meals respect prep time constraints
 
 Generate the meals for ${date} now. Output ONLY the JSON object, nothing else.`;
 

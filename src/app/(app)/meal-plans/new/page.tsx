@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/src/lib/supabase/server';
+import { isAdmin } from '@/src/lib/auth/roles';
 import { CreateMealPlanForm } from './components/CreateMealPlanForm';
 
 export const metadata: Metadata = {
@@ -22,8 +23,10 @@ export default async function NewMealPlanPage() {
     redirect('/login');
   }
 
+  const admin = await isAdmin();
+
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6 px-4 sm:px-6 lg:px-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Nieuw weekmenu</h1>
         <p className="text-muted-foreground">
@@ -31,7 +34,7 @@ export default async function NewMealPlanPage() {
         </p>
       </div>
 
-      <CreateMealPlanForm />
+      <CreateMealPlanForm showDiagnostics={!!admin} />
     </div>
   );
 }

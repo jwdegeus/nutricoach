@@ -5,16 +5,25 @@ import { Input } from '@/components/catalyst/input';
 import { Button } from '@/components/catalyst/button';
 import {
   upsertUserPantryItemAction,
-  deletePantryItemAction,
+  deletePantryItemByIdAction,
 } from '../actions/pantry-ui.actions';
-import { Loader2, Save, X, Trash2 } from 'lucide-react';
+import {
+  ArrowPathIcon,
+  CheckIcon,
+  XMarkIcon,
+  TrashIcon,
+} from '@heroicons/react/16/solid';
 import type { NutriScoreGrade } from '@/src/lib/nevo/nutrition-calculator';
+import type { PantryItemSource } from '@/src/lib/pantry/pantry.types';
 import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
 
 export type PantryItemRowProps = {
   item: {
     id: string;
-    nevoCode: string;
+    nevoCode: string | null;
+    barcode: string | null;
+    source: PantryItemSource | null;
+    displayName: string | null;
     name: string;
     availableG: number | null;
     isAvailable: boolean;
@@ -61,11 +70,28 @@ export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
         return;
       }
 
-      const result = await upsertUserPantryItemAction({
-        nevoCode: item.nevoCode,
-        isAvailable,
-        availableG: parsedG,
-      });
+      const payload =
+        item.nevoCode != null && item.nevoCode.trim() !== ''
+          ? { nevoCode: item.nevoCode, isAvailable, availableG: parsedG }
+          : item.barcode != null &&
+              item.source != null &&
+              item.displayName != null
+            ? {
+                barcode: item.barcode,
+                source: item.source,
+                displayName: item.displayName,
+                isAvailable,
+                availableG: parsedG,
+              }
+            : null;
+
+      if (!payload) {
+        setError('Item heeft geen NEVO-code of barcode/source/naam');
+        setIsSaving(false);
+        return;
+      }
+
+      const result = await upsertUserPantryItemAction(payload);
 
       if (result.ok) {
         setHasChanges(false);
@@ -85,7 +111,7 @@ export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
     setError(null);
 
     try {
-      const result = await deletePantryItemAction(item.nevoCode);
+      const result = await deletePantryItemByIdAction(item.id);
 
       if (result.ok) {
         setShowDeleteDialog(false);
@@ -163,10 +189,10 @@ export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
       {hasChanges && (
         <Button onClick={handleSave} disabled={isSaving}>
           {isSaving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <ArrowPathIcon className="size-4 animate-spin" />
           ) : (
             <>
-              <Save className="h-4 w-4 mr-1" />
+              <CheckIcon className="size-4 mr-1" />
               Opslaan
             </>
           )}
@@ -179,12 +205,12 @@ export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
         disabled={isSaving || isDeleting}
         className="text-destructive hover:text-destructive"
       >
-        <Trash2 className="h-4 w-4" />
+        <TrashIcon className="size-4" />
       </Button>
 
       {error && (
         <div className="text-sm text-destructive flex items-center gap-2">
-          <X className="h-4 w-4" />
+          <XMarkIcon className="size-4" />
           {error}
         </div>
       )}

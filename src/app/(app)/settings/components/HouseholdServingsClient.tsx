@@ -16,6 +16,7 @@ import {
   getHouseholdServingsPrefsAction,
   updateHouseholdServingsPrefsAction,
 } from '../actions/household-servings.actions';
+import type { HouseholdServingsPrefs } from '../actions/household-servings.actions';
 
 const MIN_SIZE = 1;
 const MAX_SIZE = 12;
@@ -24,16 +25,22 @@ function clampSize(n: number): number {
   return Math.min(MAX_SIZE, Math.max(MIN_SIZE, Math.floor(n)));
 }
 
-export function HouseholdServingsClient() {
+export function HouseholdServingsClient({
+  initialPrefs,
+}: {
+  initialPrefs?: HouseholdServingsPrefs;
+} = {}) {
   const t = useTranslations('settings');
   const { showToast } = useToast();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialPrefs);
   const [savePending, setSavePending] = useState(false);
 
-  const [householdSize, setHouseholdSize] = useState<number>(1);
+  const [householdSize, setHouseholdSize] = useState<number>(
+    initialPrefs ? clampSize(initialPrefs.householdSize) : 1,
+  );
   const [servingsPolicy, setServingsPolicy] = useState<
     'scale_to_household' | 'keep_recipe_servings'
-  >('scale_to_household');
+  >(initialPrefs?.servingsPolicy ?? 'scale_to_household');
 
   const loadPrefs = useCallback(async () => {
     setLoading(true);
@@ -48,8 +55,9 @@ export function HouseholdServingsClient() {
   }, [showToast]);
 
   useEffect(() => {
+    if (initialPrefs != null) return;
     queueMicrotask(() => loadPrefs());
-  }, [loadPrefs]);
+  }, [initialPrefs, loadPrefs]);
 
   const isValid =
     householdSize >= MIN_SIZE &&

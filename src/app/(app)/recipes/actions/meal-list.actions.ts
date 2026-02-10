@@ -12,6 +12,13 @@ const MEAL_SLOT_VALUES = [
 ] as const;
 export type MealSlotValue = (typeof MEAL_SLOT_VALUES)[number];
 
+import {
+  computeWeekMenuStatus,
+  effectiveWeekmenuSlots,
+  type WeekMenuStatus,
+} from './weekMenuStatus';
+export type { WeekMenuStatus } from './weekMenuStatus';
+
 const MAX_TAG_LENGTH = 40;
 const MAX_TAG_LABELS = 20;
 const MAX_QUERY_LENGTH = 120;
@@ -28,7 +35,7 @@ type ActionResult<T> =
       };
     };
 
-/** Single meal row for list (minimal columns + tags + isFavorited + userRating). */
+/** Single meal row for list (minimal columns + tags + isFavorited + userRating + weekMenuStatus). */
 export type MealListItem = {
   mealId: string;
   title: string;
@@ -47,6 +54,8 @@ export type MealListItem = {
   isFavorited: boolean;
   /** User rating 1–5 from meal_history (for custom meals). */
   userRating: number | null;
+  /** Weekmenu eligibility: ready, or blocked by slot type and/or missing NEVO refs. */
+  weekMenuStatus: WeekMenuStatus;
 };
 
 export type ListMealsOutput = {
@@ -68,6 +77,12 @@ const listMealsInputSchema = z.object({
     .transform((s) => s.trim())
     .pipe(z.string().max(MAX_QUERY_LENGTH)),
   mealSlot: z.enum(MEAL_SLOT_VALUES).optional(),
+  mealSlotOptionId: z
+    .string()
+    .uuid()
+    .nullable()
+    .optional()
+    .transform((v) => v ?? null),
   maxTotalMinutes: z.number().int().min(0).optional(),
   sourceName: z.string().trim().optional().default(''),
   tagLabelsAny: z
@@ -101,13 +116,14 @@ export type ListMealsInput = z.infer<typeof listMealsInputSchema>;
 
 /** Minimal columns for list (no SELECT *). */
 const CUSTOM_MEALS_LIST_COLUMNS =
-  'id,name,source_image_url,meal_slot,total_minutes,servings,source,source_url,cuisine_option_id,protein_type_option_id,updated_at';
+  'id,name,source_image_url,meal_slot,weekmenu_slots,total_minutes,servings,source,source_url,cuisine_option_id,protein_type_option_id,updated_at';
 
 type CustomMealRow = {
   id: string;
   name: string | null;
   source_image_url: string | null;
   meal_slot: string | null;
+  weekmenu_slots: string[] | null;
   total_minutes: number | null;
   servings: number | null;
   source: string | null;
@@ -121,6 +137,7 @@ type CustomMealRow = {
 function rowToMealListItem(
   row: CustomMealRow,
   favoritedSet: Set<string>,
+  recipesWithIngredientRefs: Set<string>,
 ): MealListItem {
   const tags: string[] = [];
   if (row.recipe_tag_links && Array.isArray(row.recipe_tag_links)) {
@@ -136,6 +153,8 @@ function rowToMealListItem(
     row.meal_slot && MEAL_SLOT_VALUES.includes(row.meal_slot as MealSlotValue)
       ? (row.meal_slot as MealSlotValue)
       : null;
+  const hasIngredientRefs = recipesWithIngredientRefs.has(row.id);
+  const slots = effectiveWeekmenuSlots(row.weekmenu_slots ?? null, mealSlot);
   return {
     mealId: row.id,
     title: row.name ?? '',
@@ -151,6 +170,7 @@ function rowToMealListItem(
     updatedAt: row.updated_at ?? null,
     isFavorited: favoritedSet.has(row.id),
     userRating: null,
+    weekMenuStatus: computeWeekMenuStatus(slots, hasIngredientRefs),
   };
 }
 
@@ -206,6 +226,7 @@ export async function listMealsAction(
       collection,
       q,
       mealSlot,
+      mealSlotOptionId,
       maxTotalMinutes,
       sourceName,
       tagLabelsAny,
@@ -317,7 +338,9 @@ export async function listMealsAction(
     if (idsFilter != null) {
       query = query.in('id', idsFilter);
     }
-    if (mealSlot != null) {
+    if (mealSlotOptionId != null) {
+      query = query.eq('meal_slot_option_id', mealSlotOptionId);
+    } else if (mealSlot != null) {
       query = query.eq('meal_slot', mealSlot);
     }
     if (maxTotalMinutes != null) {
@@ -359,8 +382,9 @@ export async function listMealsAction(
     const mealIds = (rows ?? []).map((r) => (r as unknown as CustomMealRow).id);
     let favoritedSet = new Set<string>();
     const ratingsByMealId: Record<string, number> = {};
+    let recipesWithIngredientRefs = new Set<string>();
     if (mealIds.length > 0) {
-      const [favRes, ratingRes] = await Promise.all([
+      const [favRes, ratingRes, nevoRes, mealDataRes] = await Promise.all([
         supabase
           .from('meal_favorites')
           .select('meal_id')
@@ -371,6 +395,12 @@ export async function listMealsAction(
           .select('meal_id, user_rating')
           .eq('user_id', user.id)
           .in('meal_id', mealIds),
+        supabase
+          .from('recipe_ingredients')
+          .select('recipe_id')
+          .in('recipe_id', mealIds)
+          .not('nevo_food_id', 'is', null),
+        supabase.from('custom_meals').select('id, meal_data').in('id', mealIds),
       ]);
       favoritedSet = new Set(
         (favRes.data ?? []).map((r) => (r as { meal_id: string }).meal_id),
@@ -380,10 +410,40 @@ export async function listMealsAction(
         if (row.user_rating != null)
           ratingsByMealId[row.meal_id] = row.user_rating;
       }
+      const fromRecipeIngredients = new Set(
+        (nevoRes.data ?? []).map((r) => (r as { recipe_id: string }).recipe_id),
+      );
+      const fromMealData = new Set<string>();
+      for (const row of mealDataRes.data ?? []) {
+        const r = row as { id: string; meal_data: unknown };
+        const mealData = (r.meal_data as Record<string, unknown> | null) ?? {};
+        const refs = Array.isArray(mealData.ingredientRefs)
+          ? (mealData.ingredientRefs as Record<string, unknown>[])
+          : [];
+        const hasAnyRef = refs.some(
+          (ref) =>
+            ref != null &&
+            typeof ref === 'object' &&
+            (ref.nevoCode != null ||
+              ref.customFoodId != null ||
+              ref.custom_food_id != null ||
+              ref.fdcId != null ||
+              ref.fdc_id != null),
+        );
+        if (hasAnyRef) fromMealData.add(r.id);
+      }
+      recipesWithIngredientRefs = new Set([
+        ...fromRecipeIngredients,
+        ...fromMealData,
+      ]);
     }
 
     const rawItems = (rows ?? []).map((row) =>
-      rowToMealListItem(row as unknown as CustomMealRow, favoritedSet),
+      rowToMealListItem(
+        row as unknown as CustomMealRow,
+        favoritedSet,
+        recipesWithIngredientRefs,
+      ),
     );
     const items = attachUserRatings(rawItems, ratingsByMealId);
 

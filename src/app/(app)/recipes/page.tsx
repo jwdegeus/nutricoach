@@ -109,6 +109,18 @@ function parseListMealsInput(
     )
       ? proteinParam
       : undefined;
+  const mealSlotOptionIdParam =
+    typeof params.mealSlotOptionId === 'string'
+      ? params.mealSlotOptionId
+      : Array.isArray(params.mealSlotOptionId)
+        ? (params.mealSlotOptionId[0] ?? '')
+        : '';
+  const mealSlotOptionId =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      mealSlotOptionIdParam,
+    )
+      ? mealSlotOptionIdParam
+      : undefined;
   const limit =
     typeof params.limit === 'string' && params.limit.trim() !== ''
       ? parseInt(params.limit, 10)
@@ -122,7 +134,8 @@ function parseListMealsInput(
   return {
     collection: listCollection,
     q: q.trim(),
-    mealSlot,
+    mealSlot: mealSlotOptionId ? undefined : mealSlot,
+    mealSlotOptionId: mealSlotOptionId ?? null,
     maxTotalMinutes:
       Number.isFinite(maxTotalMinutes) && maxTotalMinutes! >= 0
         ? maxTotalMinutes
@@ -190,26 +203,33 @@ async function RecipesListContent({
         })()
       : listMealsAction(parseListMealsInput(params));
 
-  const [t, cuisineRes, proteinRes, listResult] = await Promise.all([
-    getTranslations('recipes'),
-    getCatalogOptionsForPickerAction({
-      dimension: 'cuisine',
-      selectedId: cuisineParam || undefined,
-    }),
-    getCatalogOptionsForPickerAction({
-      dimension: 'protein_type',
-      selectedId: proteinParam || undefined,
-    }),
-    listPromise,
-  ]);
+  const [t, cuisineRes, proteinRes, mealSlotRes, listResult] =
+    await Promise.all([
+      getTranslations('recipes'),
+      getCatalogOptionsForPickerAction({
+        dimension: 'cuisine',
+        selectedId: cuisineParam || undefined,
+      }),
+      getCatalogOptionsForPickerAction({
+        dimension: 'protein_type',
+        selectedId: proteinParam || undefined,
+      }),
+      getCatalogOptionsForPickerAction({
+        dimension: 'meal_slot',
+      }),
+      listPromise,
+    ]);
 
   const cuisineOptions = cuisineRes.ok ? cuisineRes.data : [];
   const proteinTypeOptions = proteinRes.ok ? proteinRes.data : [];
+  const mealSlotOptions = mealSlotRes.ok ? mealSlotRes.data : [];
   const catalogLoadError = !cuisineRes.ok
     ? cuisineRes.error.message
     : !proteinRes.ok
       ? proteinRes.error.message
-      : undefined;
+      : !mealSlotRes.ok
+        ? mealSlotRes.error.message
+        : undefined;
 
   if (!listResult.ok) {
     return (
@@ -235,6 +255,7 @@ async function RecipesListContent({
       searchParams={params}
       cuisineOptions={cuisineOptions}
       proteinTypeOptions={proteinTypeOptions}
+      mealSlotOptions={mealSlotOptions}
       catalogLoadError={catalogLoadError}
     />
   );

@@ -268,6 +268,8 @@ export type MealPlanRequest = {
   excludeIngredients?: string[]; // Additional exclusions for this request
   preferIngredients?: string[]; // Preferred ingredients for this request
   maxPrepTime?: number; // Override global prep time
+  /** Therapeutic targets snapshot (optional; for calculator/planner). */
+  therapeuticTargets?: TherapeuticTargetsSnapshot;
 };
 
 /**
@@ -321,6 +323,170 @@ export type MealPlanDay = {
     saturatedFat?: number;
   };
 };
+
+// ---------------------------------------------------------------------------
+// Therapeutic Targets & Coverage (snapshot contract – types only)
+// ---------------------------------------------------------------------------
+
+/** User physiology snapshot for target calculation (JSON-safe). */
+export type UserPhysiologySnapshot = {
+  birthDate?: string; // ISO date
+  ageYears?: number;
+  sex?: 'female' | 'male' | 'other' | 'unknown';
+  heightCm?: number;
+  weightKg?: number;
+};
+
+/** Admin-defined therapeutic protocol reference. */
+export type TherapeuticProtocolRef = {
+  protocolKey: string; // stable key, e.g. 'ms_v1'
+  version?: string;
+  labelNl?: string;
+  sourceRefs?: Array<{ title: string; url?: string }>;
+};
+
+/** Gram/mass units for targets and coverage. */
+export type GramUnit = 'g' | 'mg' | 'µg';
+
+/** Energy unit. */
+export type EnergyUnit = 'kcal';
+
+/** Percent of adequate intake (ADH). */
+export type PercentUnit = '%_adh';
+
+/** Macro nutrient keys. */
+export type MacroKey = 'protein' | 'carbs' | 'fat' | 'fiber' | 'energy';
+
+/** Micro nutrient keys (extensible; start set for UI/calculator). */
+export type MicroKey =
+  | 'vitamin_d'
+  | 'vitamin_b12'
+  | 'magnesium'
+  | 'zinc'
+  | 'selenium'
+  | 'iodine'
+  | 'iron'
+  | 'folate'
+  | 'calcium'
+  | 'vitamin_a'
+  | 'vitamin_c'
+  | 'vitamin_e'
+  | 'omega_3'
+  | (string & {}); // extensible
+
+/** Single therapeutic target: absolute value or % ADH. */
+export type TherapeuticTargetValue =
+  | { kind: 'absolute'; value: number; unit: GramUnit | EnergyUnit }
+  | { kind: 'adh_percent'; value: number; unit: PercentUnit };
+
+/** Daily therapeutic targets (macros, micros, food groups). */
+export type TherapeuticTargetsDaily = {
+  macros?: Partial<Record<MacroKey, TherapeuticTargetValue>>;
+  micros?: Partial<Record<MicroKey, TherapeuticTargetValue>>;
+  foodGroups?: { vegetablesG?: number; fruitG?: number };
+};
+
+/** Weekly therapeutic targets (variety, frequency). */
+export type TherapeuticTargetsWeekly = {
+  variety?: { uniqueVegetablesMin?: number; uniqueProteinsMin?: number };
+  frequency?: { fishMinPerWeek?: number; legumesMinPerWeek?: number };
+};
+
+/** Full therapeutic targets snapshot (protocol + physiology + daily/weekly + supplements). */
+export type TherapeuticTargetsSnapshot = {
+  protocol?: TherapeuticProtocolRef;
+  physiology?: UserPhysiologySnapshot;
+  daily?: TherapeuticTargetsDaily;
+  weekly?: TherapeuticTargetsWeekly;
+  supplements?: Array<{
+    key: string;
+    labelNl: string;
+    dosageText?: string;
+    notesNl?: string;
+  }>;
+  computedAt?: string; // ISO datetime
+};
+
+/** Daily coverage (what plan/intake delivers). */
+export type TherapeuticCoverageDaily = {
+  macros?: Partial<
+    Record<MacroKey, { value: number; unit: GramUnit | EnergyUnit }>
+  >;
+  micros?: Partial<Record<MicroKey, { value: number; unit: GramUnit }>>;
+  foodGroups?: { vegetablesG?: number; fruitG?: number };
+};
+
+/** Weekly coverage (rollup: sum/avg over plan days + variety/frequency). */
+export type TherapeuticCoverageWeekly = {
+  /** Week total (sum of days); unit always 'g' for v1. */
+  foodGroups?: {
+    vegetablesG?: { value: number; unit: 'g' };
+    fruitG?: { value: number; unit: 'g' };
+  };
+  /** Week total per macro key (sum of daily actuals); key-driven. */
+  macros?: Record<string, { value: number; unit: string }>;
+  variety?: { uniqueVegetables?: number; uniqueProteins?: number };
+  frequency?: { fishCount?: number; legumesCount?: number };
+};
+
+/** Severity for therapeutic action suggestions (no error in suggestions). */
+export type TherapeuticActionSeverity = 'info' | 'warn';
+
+/** Kind of concrete action suggested to address a deficit. */
+export type TherapeuticActionKind =
+  | 'add_side'
+  | 'add_snack'
+  | 'increase_portion'
+  | 'swap_meal';
+
+/** Worst-day context for a deficit (JSON-safe). */
+export type TherapeuticWorstContext = {
+  date?: string;
+  actual?: number;
+  target?: number;
+  unit?: string;
+  ratio?: number;
+};
+
+/** One concrete action suggestion (key-driven, JSON-safe payload). */
+export type TherapeuticActionSuggestion = {
+  kind: TherapeuticActionKind;
+  severity: TherapeuticActionSeverity;
+  titleNl: string;
+  whyNl?: string;
+  appliesTo?: {
+    date?: string;
+    slot?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  };
+  /** Worst-day metrics when suggestion is tied to a deficit (optional). */
+  metrics?: {
+    actual?: number;
+    target?: number;
+    unit?: string;
+    ratio?: number;
+  };
+  payload?: Record<string, unknown>;
+};
+
+/** Compact deficit summary for UI (alerts + optional action suggestions). */
+export type TherapeuticDeficitSummary = {
+  alerts?: Array<{
+    code: string;
+    severity: 'info' | 'warn' | 'error';
+    messageNl: string;
+  }>;
+  suggestions?: TherapeuticActionSuggestion[];
+};
+
+/** Full therapeutic coverage snapshot (daily by date, weekly, deficits). */
+export type TherapeuticCoverageSnapshot = {
+  dailyByDate?: Record<string, TherapeuticCoverageDaily>; // key = ISO date
+  weekly?: TherapeuticCoverageWeekly;
+  deficits?: TherapeuticDeficitSummary;
+  computedAt?: string; // ISO datetime
+};
+
+// ---------------------------------------------------------------------------
 
 /**
  * Guard Rails vNext diagnostics (shadow mode)
@@ -420,5 +586,55 @@ export type MealPlanResponse = {
     guardrailsVnext?: GuardrailsVNextDiagnostics;
     /** Generator path + retries (observability; backwards-compatible) */
     generator?: GeneratorMeta;
+    /** Therapeutic targets snapshot (optional; stored with plan for UI). */
+    therapeuticTargets?: TherapeuticTargetsSnapshot;
+    /** Therapeutic coverage snapshot (optional; what plan delivers vs targets). */
+    therapeuticCoverage?: TherapeuticCoverageSnapshot;
+    /** Supplement-advies samenvatting (optioneel; alleen agent-pad, geen when_json). */
+    therapeuticSupplementsSummary?: TherapeuticSupplementsSummary;
+    /** Variety scorecard (counts + targets); set before persist for UI/debug. */
+    varietyScorecard?: MealPlanVarietyScorecard;
+    /** True when plan was accepted despite DB recipe ratio below target (AI filled more slots). */
+    dbCoverageBelowTarget?: boolean;
+    /** DB-first KPI: slots filled from DB vs total (only when MEAL_PLANNER_DB_FIRST=true). */
+    dbCoverage?: { dbSlots: number; totalSlots: number; percent: number };
+    /** Top AI fallback reasons (source=ai with reason), sorted by count desc, max 3. */
+    fallbackReasons?: { reason: string; count: number }[];
   };
+};
+
+/** Variety scorecard: metrics + DB targets echo + meets flags (no PII). */
+export type MealPlanVarietyScorecard = {
+  status: 'ok' | 'unavailable';
+  uniqueVegCount: number;
+  uniqueFruitCount: number;
+  proteinUniqueCount: number;
+  maxRepeatWithinDays: number;
+  /** Sliding-window size used for repeat metric (from DB target). */
+  repeatWindowDays: number;
+  targets: {
+    unique_veg_min: number;
+    unique_fruit_min: number;
+    protein_rotation_min_categories: number;
+    max_repeat_same_recipe_within_days: number;
+  };
+  meetsTargets: {
+    meetsUniqueVegMin: boolean;
+    meetsUniqueFruitMin: boolean;
+    meetsProteinRotation: boolean;
+    /** True if no repeat within window; false if repeat found; unknown if not computable. */
+    meetsRepeatWindow: boolean | 'unknown';
+  };
+  /** Top repeated meal names (max 10) for debug. */
+  topRepeats?: { name: string; count: number }[];
+};
+
+/** Supplement-advies samenvatting in plan metadata (counts + max 3 NL zinnen, geen JSON). */
+export type TherapeuticSupplementsSummary = {
+  totalSupplements: number;
+  totalApplicableRules: number;
+  warnCount: number;
+  errorCount: number;
+  /** Max 3 plain strings (message_nl), voorkeur error > warn > info. */
+  topMessagesNl: string[];
 };

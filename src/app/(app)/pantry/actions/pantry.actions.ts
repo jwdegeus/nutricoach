@@ -2,11 +2,18 @@
 
 import { createClient } from '@/src/lib/supabase/server';
 import { PantryService } from '@/src/lib/pantry/pantry.service';
-import type { PantryAvailability } from '@/src/lib/pantry/pantry.types';
+import type {
+  PantryAvailability,
+  UpsertPantryItemInput,
+} from '@/src/lib/pantry/pantry.types';
 import {
   upsertPantryItemInputSchema,
   bulkUpsertPantryItemsInputSchema,
 } from '@/src/lib/pantry/pantry.schemas';
+import {
+  storageService,
+  isVercelBlobUrl,
+} from '@/src/lib/storage/storage.service';
 
 /**
  * Action result type
@@ -116,9 +123,33 @@ export async function upsertPantryItemAction(
       };
     }
 
-    // Upsert item
+    // Mirror external product image (OFF/AH) to Vercel Blob so we store it in our CDN
+    if (
+      input.imageUrl &&
+      input.imageUrl.trim() !== '' &&
+      !isVercelBlobUrl(input.imageUrl)
+    ) {
+      const slug =
+        input.barcode && input.source
+          ? `${input.barcode}-${input.source}`
+              .replace(/[^a-zA-Z0-9-_]/g, '_')
+              .slice(0, 80)
+          : (input.nevoCode ?? `item-${Date.now()}`)
+              .replace(/[^a-zA-Z0-9-_]/g, '_')
+              .slice(0, 80);
+      const blobResult = await storageService.uploadPantryProductImageFromUrl(
+        input.imageUrl,
+        user.id,
+        slug,
+      );
+      if (blobResult.url) {
+        input = { ...input, imageUrl: blobResult.url };
+      }
+    }
+
+    // Upsert item (schema output matches union at runtime; assert for type compatibility)
     const service = new PantryService();
-    await service.upsertItem(user.id, input);
+    await service.upsertItem(user.id, input as UpsertPantryItemInput);
 
     return {
       ok: true,
@@ -182,9 +213,44 @@ export async function bulkUpsertPantryItemsAction(
       };
     }
 
-    // Bulk upsert items
+    // Mirror external product images to Vercel Blob per item
+    const itemsWithBlobImages = await Promise.all(
+      input.items.map(async (item) => {
+        if (
+          !item.imageUrl ||
+          item.imageUrl.trim() === '' ||
+          isVercelBlobUrl(item.imageUrl)
+        ) {
+          return item;
+        }
+        const slug =
+          item.barcode && item.source
+            ? `${item.barcode}-${item.source}`
+                .replace(/[^a-zA-Z0-9-_]/g, '_')
+                .slice(0, 80)
+            : (
+                item.nevoCode ??
+                `item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+              )
+                .replace(/[^a-zA-Z0-9-_]/g, '_')
+                .slice(0, 80);
+        const blobResult = await storageService.uploadPantryProductImageFromUrl(
+          item.imageUrl,
+          user.id,
+          slug,
+        );
+        if (blobResult.url) {
+          return { ...item, imageUrl: blobResult.url };
+        }
+        return item;
+      }),
+    );
+
+    // Bulk upsert items (schema output matches union at runtime; assert for type compatibility)
     const service = new PantryService();
-    await service.bulkUpsert(user.id, input);
+    await service.bulkUpsert(user.id, {
+      items: itemsWithBlobImages as UpsertPantryItemInput[],
+    });
 
     return {
       ok: true,

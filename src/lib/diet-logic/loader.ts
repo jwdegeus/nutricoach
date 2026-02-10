@@ -228,14 +228,34 @@ async function loadNightshadeDropConstraints(
 }
 
 /**
- * Laadt Dieetregels (Diet Logic) voor de actieve user-diet-profiel.
- * Gebruikt diet_type_id en is_inflamed uit user_diet_profiles.
+ * Laadt Dieetregels (Diet Logic) voor de actieve gebruiker.
+ * Bron: default familielid (family_member_diet_profiles), anders user_diet_profiles.
  */
 export async function loadDietLogicRulesetForUser(
   userId: string,
 ): Promise<DietLogicRuleset | null> {
   const { createClient } = await import('@/src/lib/supabase/server');
+  const { getDefaultFamilyMemberId } =
+    await import('@/src/lib/family/defaultFamilyMember');
   const supabase = await createClient();
+
+  const familyMemberId = await getDefaultFamilyMemberId(supabase, userId);
+
+  if (familyMemberId) {
+    const { data: profile } = await supabase
+      .from('family_member_diet_profiles')
+      .select('diet_type_id, is_inflamed')
+      .eq('family_member_id', familyMemberId)
+      .is('ends_on', null)
+      .maybeSingle();
+
+    const dietTypeId = profile?.diet_type_id ?? null;
+    if (dietTypeId) {
+      const isInflamed =
+        (profile as { is_inflamed?: boolean } | null)?.is_inflamed ?? false;
+      return loadDietLogicRuleset(dietTypeId, { isInflamed });
+    }
+  }
 
   const { data: profile } = await supabase
     .from('user_diet_profiles')

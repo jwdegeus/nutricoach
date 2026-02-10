@@ -20,7 +20,10 @@ import {
   Dropdown,
   DropdownButton,
   DropdownMenu,
+  DropdownItem,
 } from '@/components/catalyst/dropdown';
+import { Checkbox } from '@/components/catalyst/checkbox';
+import { Switch } from '@/components/catalyst/switch';
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -33,6 +36,7 @@ import {
   Square3Stack3DIcon,
   PhotoIcon,
   StarIcon,
+  Squares2X2Icon,
 } from '@heroicons/react/20/solid';
 import { BookmarkIcon as BookmarkIconSolid } from '@heroicons/react/16/solid';
 import { BookmarkIcon as BookmarkIconOutline } from '@heroicons/react/24/outline';
@@ -41,10 +45,12 @@ import { useToast } from '@/src/components/app/ToastContext';
 import { setMealFavoritedAction } from '../actions/meal-favorites.actions';
 import { listMealsAction } from '../actions/meal-list.actions';
 import { listRecentMealsAction } from '../actions/meal-recent.actions';
+import { bulkUpdateMealSlotAction } from '../actions/meal-bulk.actions';
 import type {
   MealListItem,
   ListMealsOutput,
   MealSlotValue,
+  WeekMenuStatus,
 } from '../actions/meal-list.actions';
 
 const MEAL_SLOT_OPTIONS: { value: MealSlotValue; label: string }[] = [
@@ -53,6 +59,15 @@ const MEAL_SLOT_OPTIONS: { value: MealSlotValue; label: string }[] = [
   { value: 'dinner', label: 'Diner' },
   { value: 'snack', label: 'Snack' },
   { value: 'other', label: 'Overig' },
+];
+
+const BULK_SLOT_OPTIONS: {
+  value: 'breakfast' | 'lunch' | 'dinner';
+  label: string;
+}[] = [
+  { value: 'breakfast', label: 'Ontbijt' },
+  { value: 'lunch', label: 'Lunch' },
+  { value: 'dinner', label: 'Avondeten' },
 ];
 
 const TIME_PRESETS: { value: number | null; label: string }[] = [
@@ -65,6 +80,32 @@ const TIME_PRESETS: { value: number | null; label: string }[] = [
 function formatMealSlot(slot: MealSlotValue | null): string {
   if (!slot) return '';
   return MEAL_SLOT_OPTIONS.find((o) => o.value === slot)?.label ?? slot;
+}
+
+function weekMenuStatusLabel(s: WeekMenuStatus): string {
+  switch (s) {
+    case 'ready':
+      return 'Weekmenu-klaar';
+    case 'blocked_slot':
+      return 'Soort blokkeert weekmenu';
+    case 'blocked_refs':
+      return 'Ingrediëntkoppelingen ontbreken';
+    case 'blocked_both':
+      return 'Niet klaar';
+  }
+}
+
+function weekMenuStatusTitle(s: WeekMenuStatus): string {
+  switch (s) {
+    case 'ready':
+      return 'Dit recept is geschikt voor het weekmenu (soort ontbijt/lunch/diner en ingrediënten gekoppeld aan de database voor nutriënten).';
+    case 'blocked_slot':
+      return 'Soort is geen ontbijt, lunch of diner. Alleen die soorten worden gebruikt in het weekmenu.';
+    case 'blocked_refs':
+      return 'Er zijn geen ingrediënten gekoppeld aan de database voor nutriënten. Koppel ingrediënten (NEVO, eigen of FNDDS) om dit recept in het weekmenu te gebruiken.';
+    case 'blocked_both':
+      return '• Soort blokkeert weekmenu\n• Ingrediëntkoppelingen ontbreken';
+  }
 }
 
 type CollectionValue = 'all' | 'saved' | 'recent';
@@ -89,7 +130,18 @@ function buildQueryString(
     params.delete('collection');
   }
   set('q', updates.q);
-  set('mealSlot', updates.mealSlot);
+  if (
+    updates.mealSlotOptionId !== undefined &&
+    updates.mealSlotOptionId !== null &&
+    updates.mealSlotOptionId !== ''
+  ) {
+    params.set('mealSlotOptionId', String(updates.mealSlotOptionId));
+    params.delete('mealSlot');
+  } else {
+    set('mealSlot', updates.mealSlot);
+    if (updates.mealSlotOptionId === null || updates.mealSlotOptionId === '')
+      params.delete('mealSlotOptionId');
+  }
   set('maxTotalMinutes', updates.maxTotalMinutes);
   set('sourceName', updates.sourceName);
   if (updates.cuisine !== undefined) {
@@ -150,14 +202,22 @@ type RecipesIndexClientProps = {
   searchParams: Record<string, string | string[] | undefined>;
   cuisineOptions?: CatalogOptionItem[];
   proteinTypeOptions?: CatalogOptionItem[];
+  mealSlotOptions?: CatalogOptionItem[];
   catalogLoadError?: string;
 };
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(s: string): boolean {
+  return UUID_REGEX.test(s);
+}
 
 export function RecipesIndexClient({
   listResult,
   searchParams,
   cuisineOptions = [],
   proteinTypeOptions = [],
+  mealSlotOptions = [],
   catalogLoadError,
 }: RecipesIndexClientProps) {
   const router = useRouter();
@@ -186,6 +246,17 @@ export function RecipesIndexClient({
     setFilterCloseKeys((k) => ({ ...k, [filter]: k[filter] + 1 }));
   }, []);
 
+  const [bulkSelectMode, setBulkSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkTargetSlot, setBulkTargetSlot] = useState<
+    'breakfast' | 'lunch' | 'dinner' | null
+  >(null);
+  const [bulkApplyLoading, setBulkApplyLoading] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [filterNevoMissingOnly, setFilterNevoMissingOnly] = useState(
+    () => getParam(searchParams, 'filter') === 'nevo-missing',
+  );
+
   const [extraItems, setExtraItems] = useState<MealListItem[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
@@ -194,6 +265,13 @@ export function RecipesIndexClient({
   useEffect(() => {
     setExtraItems([]);
   }, [listResult]);
+
+  // Deep link: /recipes?filter=nevo-missing → turn NEVO filter on when URL has it
+  useEffect(() => {
+    if (getParam(searchParams, 'filter') === 'nevo-missing') {
+      setFilterNevoMissingOnly(true);
+    }
+  }, [searchParams]);
 
   const collectionParam = getParam(searchParams, 'collection');
   const activeCollection: CollectionValue =
@@ -205,6 +283,11 @@ export function RecipesIndexClient({
   const q = getParam(searchParams, 'q');
   const mealSlot =
     (getParam(searchParams, 'mealSlot') as MealSlotValue | '') || undefined;
+  const mealSlotOptionIdParam = getParam(searchParams, 'mealSlotOptionId');
+  const mealSlotOptionId =
+    mealSlotOptionIdParam && isUuid(mealSlotOptionIdParam)
+      ? mealSlotOptionIdParam
+      : undefined;
   const maxTotalMinutesParam = getParam(searchParams, 'maxTotalMinutes');
   const maxTotalMinutes =
     maxTotalMinutesParam === ''
@@ -218,6 +301,7 @@ export function RecipesIndexClient({
   const hasAnyFilter =
     q !== '' ||
     mealSlot != null ||
+    mealSlotOptionId != null ||
     (maxTotalMinutes != null && Number.isFinite(maxTotalMinutes)) ||
     sourceName !== '' ||
     tags.length > 0 ||
@@ -229,7 +313,8 @@ export function RecipesIndexClient({
       const nextUrl = buildQueryString({
         collection: next,
         q,
-        mealSlot: mealSlot || undefined,
+        mealSlot: mealSlotOptionId ? undefined : mealSlot || undefined,
+        mealSlotOptionId: mealSlotOptionId ?? null,
         maxTotalMinutes,
         sourceName,
         cuisine: cuisineParam || undefined,
@@ -244,6 +329,7 @@ export function RecipesIndexClient({
       router,
       q,
       mealSlot,
+      mealSlotOptionId,
       maxTotalMinutes,
       sourceName,
       cuisineParam,
@@ -305,10 +391,22 @@ export function RecipesIndexClient({
     (
       updates: Record<string, string | number | string[] | null | undefined>,
     ) => {
+      const clearMealSlotWhenOptionId =
+        updates.mealSlotOptionId !== undefined &&
+        updates.mealSlotOptionId !== null &&
+        String(updates.mealSlotOptionId).trim() !== '';
+      const clearMealSlotOptionIdWhenSlot = updates.mealSlot !== undefined;
       const next = buildQueryString({
         collection: (updates.collection as CollectionValue) ?? activeCollection,
         q: updates.q ?? q,
-        mealSlot: updates.mealSlot ?? mealSlot ?? undefined,
+        mealSlot: clearMealSlotWhenOptionId
+          ? undefined
+          : (updates.mealSlot ?? mealSlot ?? undefined),
+        mealSlotOptionId: clearMealSlotOptionIdWhenSlot
+          ? null
+          : updates.mealSlotOptionId !== undefined
+            ? updates.mealSlotOptionId
+            : (mealSlotOptionId ?? null),
         maxTotalMinutes:
           updates.maxTotalMinutes !== undefined
             ? updates.maxTotalMinutes
@@ -333,6 +431,7 @@ export function RecipesIndexClient({
       activeCollection,
       q,
       mealSlot,
+      mealSlotOptionId,
       maxTotalMinutes,
       sourceName,
       cuisineParam,
@@ -366,6 +465,7 @@ export function RecipesIndexClient({
       key:
         | 'q'
         | 'mealSlot'
+        | 'mealSlotOptionId'
         | 'maxTotalMinutes'
         | 'sourceName'
         | 'tag'
@@ -374,7 +474,10 @@ export function RecipesIndexClient({
       value?: string,
     ) => {
       if (key === 'q') pushParams({ q: '' });
-      else if (key === 'mealSlot') pushParams({ mealSlot: undefined });
+      else if (key === 'mealSlot')
+        pushParams({ mealSlot: undefined, mealSlotOptionId: null });
+      else if (key === 'mealSlotOptionId')
+        pushParams({ mealSlotOptionId: null, mealSlot: undefined });
       else if (key === 'maxTotalMinutes')
         pushParams({ maxTotalMinutes: undefined });
       else if (key === 'sourceName') pushParams({ sourceName: '' });
@@ -436,6 +539,61 @@ export function RecipesIndexClient({
     });
   }, [listResult.items, extraItems]);
 
+  const filteredItems = useMemo(() => {
+    if (!filterNevoMissingOnly) return items;
+    return items.filter(
+      (i) =>
+        i.weekMenuStatus === 'blocked_refs' ||
+        i.weekMenuStatus === 'blocked_both',
+    );
+  }, [items, filterNevoMissingOnly]);
+
+  const selectableIds = useMemo(
+    () =>
+      new Set(
+        filteredItems
+          .filter(
+            (i) =>
+              i.weekMenuStatus === 'blocked_slot' ||
+              i.weekMenuStatus === 'blocked_both' ||
+              i.weekMenuStatus === 'blocked_refs',
+          )
+          .map((i) => i.mealId),
+      ),
+    [filteredItems],
+  );
+
+  const handleBulkSelectAll = useCallback(() => {
+    setSelectedIds(new Set(selectableIds));
+  }, [selectableIds]);
+
+  const handleBulkApply = useCallback(async () => {
+    if (selectedIds.size === 0 || bulkTargetSlot == null) return;
+    setBulkError(null);
+    setBulkApplyLoading(true);
+    try {
+      const result = await bulkUpdateMealSlotAction({
+        ids: Array.from(selectedIds),
+        mealSlot: bulkTargetSlot,
+      });
+      if (result.ok) {
+        showToast({
+          type: 'success',
+          title: 'Soort bijgewerkt',
+          description: `${result.data.updatedCount} recept(en) gezet op ${BULK_SLOT_OPTIONS.find((o) => o.value === bulkTargetSlot)?.label ?? bulkTargetSlot}.`,
+        });
+        setSelectedIds(new Set());
+        setBulkTargetSlot(null);
+        setBulkSelectMode(false);
+        router.refresh();
+      } else {
+        setBulkError(result.error.message);
+      }
+    } finally {
+      setBulkApplyLoading(false);
+    }
+  }, [selectedIds, bulkTargetSlot, showToast, router]);
+
   const loadMore = useCallback(async () => {
     if (loadingMore || totalCount == null || items.length >= totalCount) return;
     setLoadingMore(true);
@@ -457,7 +615,8 @@ export function RecipesIndexClient({
         const result = await listMealsAction({
           collection: activeCollection === 'saved' ? 'saved' : 'all',
           q,
-          mealSlot: mealSlot || undefined,
+          mealSlot: mealSlotOptionId ? undefined : mealSlot || undefined,
+          mealSlotOptionId: mealSlotOptionId ?? null,
           maxTotalMinutes: Number.isFinite(maxTotalMinutes)
             ? maxTotalMinutes
             : undefined,
@@ -576,16 +735,31 @@ export function RecipesIndexClient({
           </div>
           <div className="hidden sm:flex flex-wrap items-center gap-2">
             <FilterChipDropdown
-              key={`soort-${mealSlot}-${filterCloseKeys.soort}`}
+              key={`soort-${mealSlot}-${mealSlotOptionId}-${filterCloseKeys.soort}`}
               label="Soort"
               summary={
-                mealSlot ? formatMealSlot(mealSlot as MealSlotValue) : 'Alle'
+                mealSlotOptionId
+                  ? (mealSlotOptions.find((o) => o.id === mealSlotOptionId)
+                      ?.label ?? 'Soort')
+                  : mealSlot
+                    ? formatMealSlot(mealSlot as MealSlotValue)
+                    : 'Alle'
               }
               icon={<QueueListIcon className="h-4 w-4" />}
               panel={
                 <FilterSoortPanel
-                  value={mealSlot || ''}
-                  onApply={(v) => pushParams({ mealSlot: v || undefined })}
+                  value={mealSlotOptionId || mealSlot || ''}
+                  mealSlotOptions={mealSlotOptions}
+                  onApply={(v) => {
+                    if (isUuid(v)) {
+                      pushParams({ mealSlotOptionId: v, mealSlot: undefined });
+                    } else {
+                      pushParams({
+                        mealSlot: v || undefined,
+                        mealSlotOptionId: null,
+                      });
+                    }
+                  }}
                   onCancel={() => closeFilter('soort')}
                 />
               }
@@ -743,9 +917,12 @@ export function RecipesIndexClient({
                 </button>
               </span>
             )}
-            {mealSlot && (
+            {(mealSlot || mealSlotOptionId) && (
               <span className="inline-flex items-center gap-1.5 rounded-lg border border-transparent bg-zinc-100 px-2.5 py-1 text-sm text-zinc-950 dark:bg-zinc-800 dark:text-white">
-                {formatMealSlot(mealSlot as MealSlotValue)}
+                {mealSlotOptionId
+                  ? (mealSlotOptions.find((o) => o.id === mealSlotOptionId)
+                      ?.label ?? 'Soort')
+                  : formatMealSlot(mealSlot as MealSlotValue)}
                 <button
                   type="button"
                   onClick={() => removeFilter('mealSlot')}
@@ -880,15 +1057,120 @@ export function RecipesIndexClient({
         </DialogActions>
       </Dialog>
 
+      {/* Bulk slot toolbar + NEVO filter */}
+      {!bulkSelectMode ? (
+        <div className="flex flex-wrap items-center gap-4">
+          <Button
+            outline
+            onClick={() => {
+              setBulkSelectMode(true);
+              setBulkError(null);
+            }}
+          >
+            <Squares2X2Icon className="h-4 w-4" />
+            Selecteer
+          </Button>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Switch
+              checked={filterNevoMissingOnly}
+              onChange={setFilterNevoMissingOnly}
+            />
+            <span className="text-sm text-foreground">
+              Toon alleen: NEVO ontbreekt
+            </span>
+          </label>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl bg-muted/20 px-4 py-3 shadow-sm">
+          <Button plain onClick={() => setBulkSelectMode(false)}>
+            Annuleren
+          </Button>
+          <Button outline onClick={handleBulkSelectAll}>
+            Alles selecteren
+          </Button>
+          <Dropdown>
+            <DropdownButton
+              className="inline-flex items-center gap-2 rounded-lg bg-background px-3 py-2 text-sm font-medium shadow-sm"
+              as="button"
+            >
+              Zet soort naar:{' '}
+              {bulkTargetSlot
+                ? (BULK_SLOT_OPTIONS.find((o) => o.value === bulkTargetSlot)
+                    ?.label ?? bulkTargetSlot)
+                : '…'}
+              <ChevronDownIcon className="h-4 w-4" />
+            </DropdownButton>
+            <DropdownMenu>
+              {BULK_SLOT_OPTIONS.map((opt) => (
+                <DropdownItem
+                  key={opt.value}
+                  onClick={() => setBulkTargetSlot(opt.value)}
+                >
+                  {opt.label}
+                </DropdownItem>
+              ))}
+            </DropdownMenu>
+          </Dropdown>
+          <Button
+            color="primary"
+            disabled={
+              selectedIds.size === 0 ||
+              bulkTargetSlot == null ||
+              bulkApplyLoading
+            }
+            onClick={handleBulkApply}
+          >
+            {bulkApplyLoading ? 'Bezig…' : 'Toepassen'}
+          </Button>
+          <Button
+            outline
+            disabled={selectedIds.size === 0 || selectedIds.size > 10}
+            onClick={() => {
+              const ids = Array.from(selectedIds).slice(0, 10);
+              ids.forEach((id) =>
+                window.open(`/recipes/${id}`, '_blank', 'noopener,noreferrer'),
+              );
+            }}
+          >
+            Open NEVO koppeling ({Math.min(selectedIds.size, 10)} tabs)
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {selectedIds.size} geselecteerd
+          </span>
+        </div>
+      )}
+      {bulkSelectMode && selectedIds.size > 10 && (
+        <div className="rounded-xl bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-300 shadow-sm">
+          Selecteer max 10 recepten om in tabs te openen.
+        </div>
+      )}
+      {bulkSelectMode && (
+        <Text className="text-sm text-muted-foreground">
+          Tip: start met recepten waarbij &quot;Soort blokkeert weekmenu&quot;.
+        </Text>
+      )}
+      {bulkError && (
+        <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300 shadow-sm">
+          {bulkError}
+        </div>
+      )}
+
       {/* Results */}
-      {items.length === 0 ? (
+      {filteredItems.length === 0 ? (
         <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 p-8 text-center space-y-4">
           <Text className="text-zinc-600 dark:text-zinc-400">
-            Geen recepten gevonden.
+            {filterNevoMissingOnly
+              ? 'Geen recepten met ontbrekende NEVO-koppelingen.'
+              : 'Geen recepten gevonden.'}
           </Text>
-          {hasAnyFilter && (
+          {hasAnyFilter && !filterNevoMissingOnly && (
             <Button outline onClick={clearFilters}>
               Wis filters
+            </Button>
+          )}
+          {filterNevoMissingOnly && (
+            <Button plain onClick={() => setFilterNevoMissingOnly(false)}>
+              Toon alle recepten
             </Button>
           )}
         </div>
@@ -896,17 +1178,34 @@ export function RecipesIndexClient({
         <>
           {totalCount != null && (
             <Text className="text-sm text-zinc-500 dark:text-zinc-400">
-              {totalCount} recepten
+              {filterNevoMissingOnly
+                ? `${filteredItems.length} recepten (NEVO ontbreekt)`
+                : `${totalCount} recepten`}
             </Text>
           )}
           <ul className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:gap-x-8">
-            {items.map((item) => (
+            {filteredItems.map((item) => (
               <MealCard
                 key={item.mealId}
                 item={item}
                 isFavorited={favoritedByMealId[item.mealId] ?? item.isFavorited}
                 isSaving={favoriteSavingByMealId[item.mealId] ?? false}
                 onToggleFavorite={handleToggleFavorite}
+                bulkSelectMode={bulkSelectMode}
+                isBulkSelectable={
+                  item.weekMenuStatus === 'blocked_slot' ||
+                  item.weekMenuStatus === 'blocked_both' ||
+                  item.weekMenuStatus === 'blocked_refs'
+                }
+                isBulkSelected={selectedIds.has(item.mealId)}
+                onBulkToggleSelect={() => {
+                  setSelectedIds((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(item.mealId)) next.delete(item.mealId);
+                    else next.add(item.mealId);
+                    return next;
+                  });
+                }}
               />
             ))}
           </ul>
@@ -969,17 +1268,19 @@ function FilterChipDropdown({
 
 function FilterSoortPanel({
   value,
+  mealSlotOptions = [],
   onApply,
   onCancel,
 }: {
   value: string;
+  mealSlotOptions?: CatalogOptionItem[];
   onApply: (v: string) => void;
   onCancel: () => void;
 }) {
   const [selected, setSelected] = useState(value);
   return (
     <>
-      <div className="space-y-0 max-h-[200px] overflow-y-auto [scrollbar-gutter:stable]">
+      <div className="space-y-0 max-h-[280px] overflow-y-auto [scrollbar-gutter:stable]">
         <label className="flex w-full items-center gap-2 rounded-lg py-2 text-sm cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700/50">
           <input
             type="radio"
@@ -1005,6 +1306,29 @@ function FilterSoortPanel({
             <span className="min-w-0">{opt.label}</span>
           </label>
         ))}
+        {mealSlotOptions.length > 0 && (
+          <>
+            {mealSlotOptions.map((opt) => (
+              <label
+                key={opt.id}
+                className="flex w-full items-center gap-2 rounded-lg py-2 text-sm cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700/50"
+              >
+                <input
+                  type="radio"
+                  name="mealSlot"
+                  checked={selected === opt.id}
+                  onChange={() => setSelected(opt.id)}
+                  className="shrink-0 rounded-full border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                />
+                <span className="min-w-0">
+                  {opt.isActive === false
+                    ? `${opt.label} (inactief)`
+                    : opt.label}
+                </span>
+              </label>
+            ))}
+          </>
+        )}
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-600">
         <Button
@@ -1313,110 +1637,168 @@ function MealCard({
   isFavorited,
   isSaving,
   onToggleFavorite,
+  bulkSelectMode = false,
+  isBulkSelectable = false,
+  isBulkSelected = false,
+  onBulkToggleSelect,
 }: {
   item: MealListItem;
   isFavorited: boolean;
   isSaving: boolean;
   onToggleFavorite: (mealId: string) => void;
+  bulkSelectMode?: boolean;
+  isBulkSelectable?: boolean;
+  isBulkSelected?: boolean;
+  onBulkToggleSelect?: () => void;
 }) {
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     onToggleFavorite(item.mealId);
   };
+  const showNevoCta =
+    item.weekMenuStatus === 'blocked_refs' ||
+    item.weekMenuStatus === 'blocked_both';
   return (
-    <li className="h-[320px]">
-      <Link
-        href={`/recipes/${item.mealId}`}
-        className="relative flex h-full flex-col overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xs hover:ring-2 hover:ring-zinc-950/10 dark:hover:ring-white/10"
-      >
-        <MealCardThumbnail
-          imageUrl={item.imageUrl}
-          alt={item.title || 'Recept'}
+    <li className="h-[320px] flex flex-col">
+      <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xs">
+        <Link
+          href={`/recipes/${item.mealId}`}
+          className="relative flex flex-1 min-h-0 flex-col hover:ring-2 hover:ring-zinc-950/10 dark:hover:ring-white/10 rounded-lg"
         >
-          <Button
-            type="button"
-            plain
-            className="rounded-full p-1.5 text-zinc-400 hover:text-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200"
-            onClick={handleFavoriteClick}
-            disabled={isSaving}
-            aria-label={isFavorited ? 'Verwijder uit opgeslagen' : 'Opslaan'}
-            title={isFavorited ? 'Verwijder uit opgeslagen' : 'Opslaan'}
-          >
-            {isFavorited ? (
-              <BookmarkIconSolid
-                className="h-5 w-5 text-amber-400 dark:text-amber-300"
-                aria-hidden
+          {bulkSelectMode && (
+            <div
+              className="absolute left-2 top-2 z-10"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              title={
+                isBulkSelectable
+                  ? isBulkSelected
+                    ? 'Deselecteer'
+                    : 'Selecteer'
+                  : 'Alleen recepten met weekmenu-blokkade (soort of NEVO) zijn selecteerbaar'
+              }
+            >
+              <Checkbox
+                color="zinc"
+                checked={isBulkSelected}
+                disabled={!isBulkSelectable}
+                onChange={() => {
+                  if (isBulkSelectable && onBulkToggleSelect)
+                    onBulkToggleSelect();
+                }}
               />
-            ) : (
-              <BookmarkIconOutline className="h-5 w-5" aria-hidden />
-            )}
-          </Button>
-        </MealCardThumbnail>
-        <div className="flex min-h-0 flex-1 flex-col p-4">
-          <h3 className="truncate font-semibold text-zinc-950 dark:text-white pr-8">
-            {item.title || 'Zonder titel'}
-          </h3>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {item.mealSlot && (
-              <Badge color="zinc" className="text-xs">
-                {formatMealSlot(item.mealSlot)}
-              </Badge>
-            )}
-            {item.totalMinutes != null && item.totalMinutes > 0 && (
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {item.totalMinutes} min
-              </span>
-            )}
-            {item.servings != null && item.servings > 0 && (
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {item.servings} porties
-              </span>
-            )}
-            {item.userRating != null && item.userRating >= 1 && (
-              <div
-                className="flex items-center gap-0.5"
-                title={`Beoordeling: ${item.userRating}/5`}
-              >
-                <div className="flex gap-0.5">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <StarIcon
-                      key={star}
-                      className={`h-3.5 w-3.5 ${
-                        star <= item.userRating!
-                          ? 'text-yellow-400 fill-yellow-400'
-                          : 'text-zinc-300 dark:text-zinc-600 fill-zinc-300 dark:fill-zinc-600'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {item.userRating}/5
-                </span>
-              </div>
-            )}
-          </div>
-          {item.tags.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {item.tags.slice(0, 3).map((tag) => (
-                <Badge key={tag} color="zinc" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
-              {item.tags.length > 3 && (
-                <Badge color="zinc" className="text-xs">
-                  +{item.tags.length - 3}
-                </Badge>
-              )}
             </div>
           )}
-          {item.sourceName && (
-            <p className="mt-auto pt-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">
-              Bron: {item.sourceName}
-            </p>
-          )}
-        </div>
-      </Link>
+          <MealCardThumbnail
+            imageUrl={item.imageUrl}
+            alt={item.title || 'Recept'}
+          >
+            <Button
+              type="button"
+              plain
+              className="rounded-full p-1.5 text-zinc-400 hover:text-zinc-100 dark:text-zinc-500 dark:hover:text-zinc-200"
+              onClick={handleFavoriteClick}
+              disabled={isSaving}
+              aria-label={isFavorited ? 'Verwijder uit opgeslagen' : 'Opslaan'}
+              title={isFavorited ? 'Verwijder uit opgeslagen' : 'Opslaan'}
+            >
+              {isFavorited ? (
+                <BookmarkIconSolid
+                  className="h-5 w-5 text-amber-400 dark:text-amber-300"
+                  aria-hidden
+                />
+              ) : (
+                <BookmarkIconOutline className="h-5 w-5" aria-hidden />
+              )}
+            </Button>
+          </MealCardThumbnail>
+          <div className="flex min-h-0 flex-1 flex-col p-4">
+            <h3 className="truncate font-semibold text-zinc-950 dark:text-white pr-8">
+              {item.title || 'Zonder titel'}
+            </h3>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {item.weekMenuStatus && (
+                <Badge
+                  color={item.weekMenuStatus === 'ready' ? 'green' : 'amber'}
+                  className="text-xs"
+                  title={weekMenuStatusTitle(item.weekMenuStatus)}
+                >
+                  {weekMenuStatusLabel(item.weekMenuStatus)}
+                </Badge>
+              )}
+              {item.mealSlot && (
+                <Badge color="zinc" className="text-xs">
+                  {formatMealSlot(item.mealSlot)}
+                </Badge>
+              )}
+              {item.totalMinutes != null && item.totalMinutes > 0 && (
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {item.totalMinutes} min
+                </span>
+              )}
+              {item.servings != null && item.servings > 0 && (
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {item.servings} porties
+                </span>
+              )}
+              {item.userRating != null && item.userRating >= 1 && (
+                <div
+                  className="flex items-center gap-0.5"
+                  title={`Beoordeling: ${item.userRating}/5`}
+                >
+                  <div className="flex gap-0.5">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <StarIcon
+                        key={star}
+                        className={`h-3.5 w-3.5 ${
+                          star <= item.userRating!
+                            ? 'text-yellow-400 fill-yellow-400'
+                            : 'text-zinc-300 dark:text-zinc-600 fill-zinc-300 dark:fill-zinc-600'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {item.userRating}/5
+                  </span>
+                </div>
+              )}
+            </div>
+            {item.tags.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {item.tags.slice(0, 3).map((tag) => (
+                  <Badge key={tag} color="zinc" className="text-xs">
+                    {tag}
+                  </Badge>
+                ))}
+                {item.tags.length > 3 && (
+                  <Badge color="zinc" className="text-xs">
+                    +{item.tags.length - 3}
+                  </Badge>
+                )}
+              </div>
+            )}
+            {item.sourceName && (
+              <p className="mt-auto pt-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                Bron: {item.sourceName}
+              </p>
+            )}
+          </div>
+        </Link>
+        {showNevoCta && (
+          <div className="shrink-0 px-4 pb-3 pt-1">
+            <Link
+              href={`/recipes/${item.mealId}`}
+              className="inline-flex items-center text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+            >
+              Koppel ingrediënten
+            </Link>
+          </div>
+        )}
+      </div>
     </li>
   );
 }

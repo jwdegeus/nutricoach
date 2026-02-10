@@ -1,6 +1,7 @@
 'use server';
 
 import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
 import { createClient } from '@/src/lib/supabase/server';
 
 /** Minimal columns for user_preferences (no SELECT *) */
@@ -243,6 +244,8 @@ export async function createHouseholdAvoidRuleAction(
     }
 
     const id = (data as { id: string }).id;
+    revalidatePath('/familie/edit');
+    revalidatePath('/familie');
     return { ok: true, data: { id } };
   } catch (err) {
     return {
@@ -317,6 +320,8 @@ export async function deleteHouseholdAvoidRuleAction(
       };
     }
 
+    revalidatePath('/familie/edit');
+    revalidatePath('/familie');
     return { ok: true, data: undefined };
   } catch (err) {
     return {

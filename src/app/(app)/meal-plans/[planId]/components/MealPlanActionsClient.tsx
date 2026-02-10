@@ -50,7 +50,7 @@ export function MealPlanActionsClient({
   // This prevents hydration mismatches
   if (!mounted) {
     return (
-      <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+      <div className="rounded-2xl bg-muted/20 p-6 shadow-sm">
         <div className="h-6 w-24 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse mb-4" />
         <div className="space-y-4">
           <div className="h-10 w-full bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />

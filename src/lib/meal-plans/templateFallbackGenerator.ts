@@ -13,6 +13,7 @@ import type {
   MealIngredientRef,
 } from '@/src/lib/diets';
 import type { MealQualityEntry } from '@/src/lib/diets/diet.types';
+import { estimateTherapeuticCoverage } from '@/src/lib/therapeutic/therapeuticCoverageEstimator';
 import type {
   CandidatePool,
   NevoFoodCandidate,
@@ -444,7 +445,7 @@ export async function buildMealFromDraft(
   };
 }
 
-/** Config passed from loader: templates + settings (caps/limits) + optional name patterns. */
+/** Config passed from loader: templates + settings (caps/limits + veg scoring) + optional name patterns. */
 export type MealPlanGeneratorConfig = {
   templates: RecipeTemplate[];
   settings: {
@@ -453,6 +454,12 @@ export type MealPlanGeneratorConfig = {
     protein_repeat_cap_7d: number;
     template_repeat_cap_7d: number;
     signature_retry_limit: number;
+    veg_threshold_low_g: number;
+    veg_threshold_mid_g: number;
+    veg_threshold_high_g: number;
+    veg_score_low: number;
+    veg_score_mid: number;
+    veg_score_high: number;
   };
   /** Name patterns for meal naming (from meal_plan_name_patterns). */
   namePatterns?: NamePatternForGenerator[];
@@ -469,9 +476,41 @@ export type GenerateTemplatePlanResult = {
   };
 };
 
+/** Veg scoring config (thresholds in g, scores 0..20). From generator settings. */
+export type VegScoring = {
+  thresholds: { low: number; mid: number; high: number };
+  scores: { low: number; mid: number; high: number };
+};
+
+/**
+ * Veg-target score component: when therapeutic vegetablesG target exists, score bonus for drafts that help meet remaining need.
+ * Returns delta to add to candidate score and grams from this meal (for quality reason).
+ * Uses vegScoring from config (thresholds + scores).
+ */
+function getVegDeltaScoreAndG(
+  draft: TemplateMealDraft,
+  vegNeededG: number,
+  vegTargetG: number,
+  vegScoring: VegScoring,
+): { vegDeltaScore: number; vegThisMealG: number } {
+  if (vegTargetG <= 0) return { vegDeltaScore: 0, vegThisMealG: 0 };
+  const refs = draft.ingredientRefs;
+  const vegThisMealG = (refs[1]?.quantityG ?? 0) + (refs[2]?.quantityG ?? 0);
+  const { thresholds, scores } = vegScoring;
+  const t1 = Math.min(vegNeededG, thresholds.low);
+  const t2 = Math.min(vegNeededG, thresholds.mid);
+  const t4 = Math.min(vegNeededG, thresholds.high);
+  let vegDeltaScore = 0;
+  if (vegThisMealG >= t4) vegDeltaScore = scores.high;
+  else if (vegThisMealG >= t2) vegDeltaScore = scores.mid;
+  else if (vegThisMealG >= t1) vegDeltaScore = scores.low;
+  return { vegDeltaScore, vegThisMealG };
+}
+
 /**
  * Score a candidate draft for plan-level balance.
  * +2 protein not used this week, +1 template used less, -3 protein cap exceeded, -2 template cap exceeded.
+ * When vegContext is present, vegScoring is required and adds vegDeltaScore (veg-first bias toward meeting daily target).
  */
 function scoreCandidate(
   draft: TemplateMealDraft,
@@ -479,6 +518,8 @@ function scoreCandidate(
   proteinCounts: Map<string, number>,
   templateCounts: Map<string, number>,
   caps: { proteinRepeatCap7d: number; templateRepeatCap7d: number },
+  vegContext: { vegNeededG: number; vegTargetG: number } | undefined,
+  vegScoring: VegScoring | undefined,
 ): number {
   const protein = draft.ingredientRefs[0]?.nevoCode ?? '';
   const currentProtein = proteinCounts.get(protein) ?? 0;
@@ -488,6 +529,15 @@ function scoreCandidate(
   if (currentTemplate < caps.templateRepeatCap7d) score += 1;
   if (currentProtein >= caps.proteinRepeatCap7d) score -= 3;
   if (currentTemplate >= caps.templateRepeatCap7d) score -= 2;
+  if (vegContext && vegScoring) {
+    const { vegDeltaScore } = getVegDeltaScoreAndG(
+      draft,
+      vegContext.vegNeededG,
+      vegContext.vegTargetG,
+      vegScoring,
+    );
+    score += vegDeltaScore;
+  }
   return score;
 }
 
@@ -545,12 +595,43 @@ export async function generateTemplatePlan(
     proteinRepeatCap7d: settings.protein_repeat_cap_7d,
     templateRepeatCap7d: settings.template_repeat_cap_7d,
   };
+  const vegScoring: VegScoring = {
+    thresholds: {
+      low: settings.veg_threshold_low_g,
+      mid: settings.veg_threshold_mid_g,
+      high: settings.veg_threshold_high_g,
+    },
+    scores: {
+      low: settings.veg_score_low,
+      mid: settings.veg_score_mid,
+      high: settings.veg_score_high,
+    },
+  };
+
+  const vegTargetG =
+    typeof request.therapeuticTargets?.daily?.foodGroups?.vegetablesG ===
+    'number'
+      ? request.therapeuticTargets.daily.foodGroups.vegetablesG
+      : undefined;
 
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     const dateStr = d.toISOString().split('T')[0];
     const meals: Meal[] = [];
 
     for (const slot of slots) {
+      let vegPlannedSoFarG = 0;
+      for (const m of meals) {
+        const refs = m.ingredientRefs ?? [];
+        vegPlannedSoFarG +=
+          (refs[1]?.quantityG ?? 0) + (refs[2]?.quantityG ?? 0);
+      }
+      const vegNeededG =
+        vegTargetG != null ? Math.max(0, vegTargetG - vegPlannedSoFarG) : 0;
+      const vegContext: { vegNeededG: number; vegTargetG: number } | undefined =
+        vegTargetG != null && vegTargetG > 0
+          ? { vegNeededG, vegTargetG }
+          : undefined;
+
       const template = templates[templateIndex % templates.length]!;
       templateIndex += 1;
       usedTemplateIds.add(template.id);
@@ -592,6 +673,8 @@ export async function generateTemplatePlan(
         proteinCounts,
         templateCounts,
         caps,
+        vegContext,
+        vegScoring,
       );
       for (let c = 1; c < candidateDrafts.length; c++) {
         const s = scoreCandidate(
@@ -600,6 +683,8 @@ export async function generateTemplatePlan(
           proteinCounts,
           templateCounts,
           caps,
+          vegContext,
+          vegScoring,
         );
         if (s > bestScore) {
           bestScore = s;
@@ -647,6 +732,17 @@ export async function generateTemplatePlan(
         reasons.push('Veg met lage week-usage gekozen');
       }
       if (usedSignatures.size > 0) reasons.push('Vermijdt herhaalde signature');
+      if (vegContext) {
+        const { vegDeltaScore, vegThisMealG } = getVegDeltaScoreAndG(
+          chosen,
+          vegContext.vegNeededG,
+          vegContext.vegTargetG,
+          vegScoring,
+        );
+        if (vegDeltaScore > 0) {
+          reasons.push(`Stuurt op groente-doel (${vegThisMealG}g)`);
+        }
+      }
       mealQualities.push({
         date: dateStr,
         slot,
@@ -697,6 +793,14 @@ export async function generateTemplatePlan(
       totalMeals,
     },
   };
+
+  const therapeuticCoverage = estimateTherapeuticCoverage(plan, request);
+  if (therapeuticCoverage) {
+    plan.metadata = {
+      ...plan.metadata,
+      therapeuticCoverage,
+    } as MealPlanResponse['metadata'];
+  }
 
   return {
     plan,

@@ -39,6 +39,12 @@ export type GeneratorSettingsFromDb = {
   protein_repeat_cap_7d: number;
   template_repeat_cap_7d: number;
   signature_retry_limit: number;
+  veg_threshold_low_g: number;
+  veg_threshold_mid_g: number;
+  veg_threshold_high_g: number;
+  veg_score_low: number;
+  veg_score_mid: number;
+  veg_score_high: number;
 };
 
 /** Name pattern row (diet_key, template_key, slot, pattern). */
@@ -69,6 +75,12 @@ const DEFAULT_SETTINGS: GeneratorSettingsFromDb = {
   protein_repeat_cap_7d: 2,
   template_repeat_cap_7d: 3,
   signature_retry_limit: 8,
+  veg_threshold_low_g: 80,
+  veg_threshold_mid_g: 150,
+  veg_threshold_high_g: 250,
+  veg_score_low: 1,
+  veg_score_mid: 2,
+  veg_score_high: 4,
 };
 
 /**
@@ -219,7 +231,7 @@ export async function loadMealPlanGeneratorConfig(
   const { data: settingsRows, error: settingsError } = await supabase
     .from('meal_plan_generator_settings')
     .select(
-      'diet_key, max_ingredients, max_flavor_items, protein_repeat_cap_7d, template_repeat_cap_7d, signature_retry_limit',
+      'diet_key, max_ingredients, max_flavor_items, protein_repeat_cap_7d, template_repeat_cap_7d, signature_retry_limit, veg_threshold_low_g, veg_threshold_mid_g, veg_threshold_high_g, veg_score_low, veg_score_mid, veg_score_high',
     )
     .in('diet_key', [effectiveDietKey, 'default']);
 
@@ -253,6 +265,21 @@ export async function loadMealPlanGeneratorConfig(
         signature_retry_limit:
           Number(row.signature_retry_limit) ??
           DEFAULT_SETTINGS.signature_retry_limit,
+        veg_threshold_low_g:
+          Number(row.veg_threshold_low_g) ??
+          DEFAULT_SETTINGS.veg_threshold_low_g,
+        veg_threshold_mid_g:
+          Number(row.veg_threshold_mid_g) ??
+          DEFAULT_SETTINGS.veg_threshold_mid_g,
+        veg_threshold_high_g:
+          Number(row.veg_threshold_high_g) ??
+          DEFAULT_SETTINGS.veg_threshold_high_g,
+        veg_score_low:
+          Number(row.veg_score_low) ?? DEFAULT_SETTINGS.veg_score_low,
+        veg_score_mid:
+          Number(row.veg_score_mid) ?? DEFAULT_SETTINGS.veg_score_mid,
+        veg_score_high:
+          Number(row.veg_score_high) ?? DEFAULT_SETTINGS.veg_score_high,
       }
     : { ...DEFAULT_SETTINGS };
 

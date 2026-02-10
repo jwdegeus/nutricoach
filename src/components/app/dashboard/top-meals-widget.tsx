@@ -11,50 +11,48 @@ export function TopMealsWidget({ initialMeals }: TopMealsWidgetProps) {
   const meals = initialMeals;
 
   return (
-    <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-      <div className="flex items-center gap-2 mb-4">
-        <ChartBarIcon className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
-        <h2 className="text-lg font-semibold text-zinc-950 dark:text-white">
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <ChartBarIcon className="size-5 text-muted-foreground" />
+        <h2 className="text-lg font-semibold text-foreground">
           Top 5 Meest Geconsumeerde Maaltijden
         </h2>
       </div>
 
       {meals.length === 0 ? (
-        <div className="text-zinc-500 dark:text-zinc-400 text-sm py-4">
+        <p className="py-4 text-sm text-muted-foreground">
           Nog geen maaltijden geconsumeerd. Begin met het toevoegen van
           maaltijden!
-        </div>
+        </p>
       ) : (
-        <div className="space-y-3">
+        <ul className="space-y-2">
           {meals.map((meal, index) => (
-            <div
+            <li
               key={meal.id}
-              className="flex items-center justify-between p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50"
+              className="flex items-center justify-between gap-3 rounded-lg bg-muted/30 px-3 py-2.5"
             >
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-sm font-semibold text-blue-600 dark:text-blue-400">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
                   {index + 1}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-zinc-950 dark:text-white truncate">
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-foreground">
                     {meal.name}
-                  </div>
-                  <div className="text-sm text-zinc-500 dark:text-zinc-400 capitalize">
+                  </p>
+                  <p className="text-xs capitalize text-muted-foreground">
                     {meal.mealSlot}
-                  </div>
+                  </p>
                 </div>
               </div>
-              <div className="flex-shrink-0 ml-4">
-                <div className="text-lg font-semibold text-zinc-950 dark:text-white">
-                  {meal.consumptionCount}x
-                </div>
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                  geconsumeerd
-                </div>
+              <div className="shrink-0 text-right">
+                <p className="font-semibold tabular-nums text-foreground">
+                  {meal.consumptionCount}×
+                </p>
+                <p className="text-xs text-muted-foreground">geconsumeerd</p>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

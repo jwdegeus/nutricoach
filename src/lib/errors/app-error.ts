@@ -17,7 +17,13 @@ export type AppErrorCode =
   | 'MEAL_LOCKED'
   | 'INSUFFICIENT_ALLOWED_INGREDIENTS'
   | 'MEAL_PLAN_SANITY_FAILED'
-  | 'MEAL_PLAN_CONFIG_INVALID';
+  | 'MEAL_PLAN_CONFIG_INVALID'
+  | 'MEAL_PLAN_AI_BUDGET_EXCEEDED'
+  | 'MEAL_PLAN_INSUFFICIENT_CANDIDATES'
+  | 'MEAL_PLAN_CULINARY_VIOLATION'
+  | 'MEAL_PLAN_DB_COVERAGE_TOO_LOW'
+  | 'MEAL_PLAN_VARIETY_TARGETS_NOT_MET'
+  | 'INTERNAL';
 
 /** Ontbrekende FORCE-categorie bij quotum-falen (voor substitutie/“voeg toe”-feedback) */
 export type ForceDeficitItem = {

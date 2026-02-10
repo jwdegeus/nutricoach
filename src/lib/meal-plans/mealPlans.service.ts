@@ -22,6 +22,7 @@ import type {
   DietRuleSet,
   MealIngredientRef,
 } from '@/src/lib/diets';
+import type { TherapeuticSupplementsSummary } from '@/src/lib/diets/diet.types';
 import { deriveDietRuleSet, mealPlanResponseSchema } from '@/src/lib/diets';
 import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner';
 import {
@@ -33,12 +34,28 @@ import type {
   CreateMealPlanInput,
   RegenerateMealPlanInput,
 } from './mealPlans.types';
+import { buildTherapeuticTargetsSnapshot } from '@/src/lib/therapeutic/buildTherapeuticTargetsSnapshot';
+import {
+  getActiveTherapeuticProfileForUser,
+  getProtocolSupplements,
+  getApplicableProtocolSupplementRules,
+  getHealthProfileForUser,
+  getActiveTherapeuticOverridesForUser,
+  ageYearsFromBirthDate,
+} from '@/src/lib/therapeutic/therapeuticProfile.service';
 import {
   createMealPlanInputSchema,
   regenerateMealPlanInputSchema,
 } from './mealPlans.schemas';
 import { getMealPlannerConfig } from './mealPlans.config';
+import { validateHardConstraints } from '@/src/lib/agents/meal-planner';
 import { getSlotStylePromptLabels } from '@/src/lib/messages.server';
+import { loadMealPlanGeneratorDbConfig } from '@/src/lib/meal-planner/config/mealPlanGeneratorDbConfig';
+import {
+  buildMealPlanVarietyScorecard,
+  throwIfVarietyTargetsNotMet,
+  scaleVarietyTargetsForPlanDays,
+} from '@/src/lib/meal-planner/metrics/mealPlanVarietyScorecard';
 
 /** Explicit columns for meal_plans list (overview) — keeps return shape compatible with MealPlanRecord */
 const MEAL_PLAN_LIST_COLUMNS =
@@ -54,7 +71,7 @@ const MEAL_HISTORY_CANDIDATE_COLUMNS =
 
 /** Explicit columns for custom_meals (recipe candidates for prefilledBySlot) — no SELECT * */
 const CUSTOM_MEALS_CANDIDATE_COLUMNS =
-  'id,name,meal_slot,meal_data,consumption_count,updated_at';
+  'id,name,meal_slot,weekmenu_slots,meal_data,consumption_count,updated_at';
 
 /** Columns for recipe_ingredients when building ingredientRefs for prefill (imported recipes have empty meal_data.ingredientRefs) */
 const RECIPE_INGREDIENTS_NEVO_COLUMNS =
@@ -102,6 +119,35 @@ function normalizeWeekendDays(v: number[] | null | undefined): number[] {
 type HouseholdBlockRules = {
   blockedNevoCodes: Set<string>;
   blockedTerms: Set<string>;
+};
+
+/** Per-slot provenance: source and reason when AI was used (DB-first flow only). */
+export type SlotProvenanceReason =
+  | 'no_candidates'
+  | 'repeat_window_blocked'
+  | 'missing_ingredient_refs'
+  | 'all_candidates_blocked_by_constraints'
+  | 'ai_candidate_blocked_by_constraints';
+
+export type SlotProvenanceEntry = {
+  source: 'db' | 'ai';
+  reason?: SlotProvenanceReason;
+};
+
+/**
+ * Minimal settings for DB-first plan generation. Template/pool/naming config is never read or passed.
+ * Future: may be loaded from DB (admin); for now defaults only.
+ */
+export type DbFirstPlanSettings = {
+  /** Same meal not repeated within this many days for the same slot (default 7). */
+  repeatWindowDays: number;
+  /** 'strict': no AI fill — throw MEAL_PLAN_INSUFFICIENT_CANDIDATES when any slot is missing. 'normal': AI fills missing slots (default). */
+  aiFillMode: 'strict' | 'normal';
+};
+
+const DEFAULT_DB_FIRST_SETTINGS: DbFirstPlanSettings = {
+  repeatWindowDays: 7,
+  aiFillMode: 'normal',
 };
 
 /**
@@ -192,6 +238,92 @@ function scaleMealPlanToHousehold(
     ...plan,
     days: scaledDays,
     metadata: metadata as MealPlanResponse['metadata'],
+  };
+}
+
+const SEVERITY_ORDER = { error: 0, warn: 1, info: 2 } as const;
+
+/**
+ * Build therapeutic supplements summary for plan metadata (agent path only).
+ * Uses active profile + applicable rules; no when_json in output, only counts + max 3 message_nl.
+ */
+async function buildTherapeuticSupplementsSummary(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<TherapeuticSupplementsSummary | null> {
+  const active = await getActiveTherapeuticProfileForUser(supabase, userId);
+  if (!active) return null;
+
+  const protocolId = active.profile.protocol_id;
+  const protocolRow = active.protocol;
+
+  const [supplements, healthRow, overrides] = await Promise.all([
+    getProtocolSupplements(supabase, protocolId),
+    getHealthProfileForUser(supabase, userId),
+    getActiveTherapeuticOverridesForUser(supabase, userId),
+  ]);
+
+  const rawVersion =
+    protocolRow.version != null && protocolRow.version !== ''
+      ? protocolRow.version
+      : null;
+  const protocolVersion =
+    rawVersion != null
+      ? (() => {
+          const n = Number(rawVersion);
+          return Number.isNaN(n) ? undefined : n;
+        })()
+      : undefined;
+  const sex =
+    healthRow?.sex &&
+    ['female', 'male', 'other', 'unknown'].includes(healthRow.sex)
+      ? (healthRow.sex as 'female' | 'male' | 'other' | 'unknown')
+      : undefined;
+  const ctx = {
+    sex,
+    ageYears: ageYearsFromBirthDate(healthRow?.birth_date ?? null),
+    heightCm: healthRow?.height_cm ?? undefined,
+    weightKg:
+      healthRow?.weight_kg != null ? Number(healthRow.weight_kg) : undefined,
+    overrides: overrides ?? undefined,
+    dietKey: undefined as string | undefined,
+    protocolKey: protocolRow.protocol_key ?? undefined,
+    protocolVersion,
+  };
+
+  const { rules: applicableRules } = await getApplicableProtocolSupplementRules(
+    supabase,
+    protocolId,
+    ctx,
+  );
+
+  const totalSupplements = supplements.length;
+  const totalApplicableRules = applicableRules.length;
+  const warnCount = applicableRules.filter((r) => r.severity === 'warn').length;
+  const errorCount = applicableRules.filter(
+    (r) => r.severity === 'error',
+  ).length;
+
+  const sortedBySeverity = [...applicableRules].sort(
+    (a, b) =>
+      (SEVERITY_ORDER[a.severity as keyof typeof SEVERITY_ORDER] ?? 3) -
+      (SEVERITY_ORDER[b.severity as keyof typeof SEVERITY_ORDER] ?? 3),
+  );
+  const topMessagesNl = sortedBySeverity
+    .slice(0, 3)
+    .map((r) =>
+      typeof r.message_nl === 'string' && r.message_nl.trim() !== ''
+        ? r.message_nl.trim()
+        : null,
+    )
+    .filter((m): m is string => m != null);
+
+  return {
+    totalSupplements,
+    totalApplicableRules,
+    warnCount,
+    errorCount,
+    topMessagesNl,
   };
 }
 
@@ -529,7 +661,7 @@ export class MealPlansService {
       }
 
       // Build meal plan request
-      const request: MealPlanRequest & {
+      let request: MealPlanRequest & {
         slotPreferences?: {
           breakfast?: string;
           lunch?: string;
@@ -546,6 +678,17 @@ export class MealPlansService {
         profile: profileWithSlotPrefs,
         ...(Object.keys(slotPreferences).length > 0 && { slotPreferences }),
       };
+
+      if (!supabaseAdmin) {
+        const therapeuticTargets = await buildTherapeuticTargetsSnapshot(
+          supabase,
+          userId,
+          userLanguage === 'nl' ? 'nl' : 'en',
+        ).catch(() => undefined);
+        if (therapeuticTargets) {
+          request = { ...request, therapeuticTargets };
+        }
+      }
 
       // Idempotency check: check if plan with same parameters already exists
       const { data: existingPlan } = await supabase
@@ -600,240 +743,448 @@ export class MealPlansService {
       // Derive rules
       const rules = deriveDietRuleSet(profile);
 
-      // Try to reuse meals from history before generating new ones
-      // This reduces Gemini API calls and costs
+      // Load DB-configured generator settings once (reuse + AI cap); RLS: user context
+      const generatorDbConfig = await loadMealPlanGeneratorDbConfig(
+        supabase,
+        profile.dietKey,
+      );
+
+      // Try to reuse meals from history before generating new ones; max 1 retry on variety-targets fail
       let plan: MealPlanResponse;
       let reusedMealsCount = 0;
 
-      try {
-        const { MealHistoryService } =
-          await import('@/src/lib/meal-history/mealHistory.service');
-        const historyService = new MealHistoryService();
-
-        // Try to build plan from history
-        const reuseResult = await this.tryReuseMealsFromHistory(
-          userId,
-          request,
-          profile.dietKey,
-          historyService,
-        );
-
-        if (reuseResult.canReuse) {
-          // Use reused plan (partially or fully from history)
-          plan = reuseResult.plan;
-          reusedMealsCount = reuseResult.reusedCount;
-          console.log(
-            `Reused ${reusedMealsCount} meals from history for user ${userId}`,
-          );
-        } else {
-          // Generate new plan with prefilled candidates (~80% from DB)
-          const prefilledBySlot = await this.loadPrefilledBySlot(
-            userId,
-            request,
-            profile.dietKey,
-            supabase,
-          );
-          const agentService = new MealPlannerAgentService();
-          plan = await agentService.generateMealPlan(request, userLanguage, {
-            prefilledBySlot,
+      retryLoop: for (let attempt = 1; attempt <= 2; attempt++) {
+        const isRetry = attempt === 2;
+        if (isRetry) {
+          console.log({
+            attempt: 2,
+            retryReason: 'variety_targets_not_met',
           });
         }
-      } catch (reuseError) {
-        // If reuse fails, fall back to generation (with prefilled if available)
-        console.warn(
-          'Meal reuse failed, generating new plan:',
-          reuseError instanceof Error ? reuseError.message : 'Unknown error',
-        );
-        const prefilledBySlot = await this.loadPrefilledBySlot(
-          userId,
-          request,
-          profile.dietKey,
-          supabase,
-        );
-        const agentService = new MealPlannerAgentService();
-        plan = await agentService.generateMealPlan(request, userLanguage, {
-          prefilledBySlot,
-        });
-      }
 
-      // Try to enrich plan (pragmatic: if enrichment fails, keep plan without enrichment)
-      let enrichment = null;
-      const enrichmentStartTime = Date.now();
-      try {
-        const enrichmentService = new MealPlannerEnrichmentService();
-        enrichment = await enrichmentService.enrichPlan(
-          plan,
-          {
-            allowPantryStaples: false,
-          },
-          userLanguage,
-        );
-        const enrichmentDurationMs = Date.now() - enrichmentStartTime;
+        try {
+          if (!isRetry) {
+            try {
+              const { MealHistoryService } =
+                await import('@/src/lib/meal-history/mealHistory.service');
+              const historyService = new MealHistoryService();
 
-        // Log successful enrichment
-        await logMealPlanRun(
-          {
+              // Try to build plan from history (uses min_history_reuse_ratio + recency_window_days)
+              const reuseResult = await this.tryReuseMealsFromHistory(
+                userId,
+                request,
+                profile.dietKey,
+                historyService,
+                {
+                  minHistoryReuseRatio:
+                    generatorDbConfig.settings.min_history_reuse_ratio,
+                  recencyWindowDays:
+                    generatorDbConfig.settings.recency_window_days,
+                },
+              );
+
+              if (reuseResult.canReuse) {
+                // Use reused plan (partially or fully from history)
+                plan = reuseResult.plan;
+                reusedMealsCount = reuseResult.reusedCount;
+                if (process.env.MEAL_PLANNER_DB_FIRST === 'true') {
+                  const slotProv: Record<string, SlotProvenanceEntry> = {};
+                  for (const day of plan.days) {
+                    for (const meal of day.meals) {
+                      slotProv[`${day.date}-${meal.slot}`] = { source: 'db' };
+                    }
+                  }
+                  const meta = (plan.metadata ?? {}) as Record<string, unknown>;
+                  meta.slotProvenance = slotProv;
+                  const total = Object.keys(slotProv).length;
+                  meta.dbCoverage = {
+                    dbSlots: total,
+                    totalSlots: total,
+                    percent: total > 0 ? 100 : 0,
+                  };
+                  meta.fallbackReasons = [];
+                  plan.metadata = meta as MealPlanResponse['metadata'];
+                }
+                console.log(
+                  `Reused ${reusedMealsCount} meals from history for user ${userId}`,
+                );
+              } else {
+                // Generate new plan: DB-first (when flag) or prefilled + AI with cap
+                const prefilledBySlot = await this.loadPrefilledBySlot(
+                  userId,
+                  request,
+                  profile.dietKey,
+                  supabase,
+                );
+                if (process.env.MEAL_PLANNER_DB_FIRST === 'true') {
+                  plan = await this.generatePlanDbFirst(
+                    request,
+                    userLanguage,
+                    prefilledBySlot,
+                    rules,
+                    {
+                      culinaryRules: generatorDbConfig.culinaryRules,
+                      dbFirstSettings: validated.dbFirstSettings,
+                    },
+                  );
+                } else {
+                  const totalSlots = validated.days * request.slots.length;
+                  const maxAiSlotsForPlan = Math.min(
+                    generatorDbConfig.settings.max_ai_generated_slots_per_week,
+                    totalSlots,
+                  );
+                  const agentService = new MealPlannerAgentService();
+                  plan = await agentService.generateMealPlan(
+                    request,
+                    userLanguage,
+                    {
+                      prefilledBySlot,
+                      maxAiSlotsForPlan,
+                      culinaryRules: generatorDbConfig.culinaryRules,
+                      minDbRecipeCoverageRatio:
+                        generatorDbConfig.settings.min_db_recipe_coverage_ratio,
+                      allowDbCoverageFallback: true,
+                    },
+                  );
+                }
+              }
+            } catch (reuseError) {
+              // No retry for structural/config errors: same options would fail again.
+              const noRetryCodes = [
+                'MEAL_PLAN_DB_COVERAGE_TOO_LOW',
+                'MEAL_PLAN_AI_BUDGET_EXCEEDED',
+                'MEAL_PLAN_INSUFFICIENT_CANDIDATES',
+                'MEAL_PLAN_CONFIG_INVALID',
+              ] as const;
+              if (
+                reuseError instanceof AppError &&
+                noRetryCodes.includes(
+                  reuseError.code as (typeof noRetryCodes)[number],
+                )
+              ) {
+                throw reuseError;
+              }
+              // No retry when agent threw validation error (FORBIDDEN_IN_SHAKE_SMOOTHIE etc.) – fail fast.
+              const msg = reuseError instanceof Error ? reuseError.message : '';
+              if (msg.includes('FORBIDDEN_IN_SHAKE_SMOOTHIE')) {
+                throw reuseError;
+              }
+              // Reuse path threw (rare) or first generateMealPlan failed (e.g. validation/repair); retry once.
+              console.warn(
+                'Plan generation failed, retrying:',
+                reuseError instanceof Error
+                  ? reuseError.message
+                  : 'Unknown error',
+              );
+              const prefilledBySlot = await this.loadPrefilledBySlot(
+                userId,
+                request,
+                profile.dietKey,
+                supabase,
+              );
+              if (process.env.MEAL_PLANNER_DB_FIRST === 'true') {
+                plan = await this.generatePlanDbFirst(
+                  request,
+                  userLanguage,
+                  prefilledBySlot,
+                  rules,
+                  {
+                    culinaryRules: generatorDbConfig.culinaryRules,
+                    dbFirstSettings: validated.dbFirstSettings,
+                  },
+                );
+              } else {
+                const totalSlots = validated.days * request.slots.length;
+                const maxAiSlotsForPlan = Math.min(
+                  generatorDbConfig.settings.max_ai_generated_slots_per_week,
+                  totalSlots,
+                );
+                const agentService = new MealPlannerAgentService();
+                plan = await agentService.generateMealPlan(
+                  request,
+                  userLanguage,
+                  {
+                    prefilledBySlot,
+                    maxAiSlotsForPlan,
+                    culinaryRules: generatorDbConfig.culinaryRules,
+                    minDbRecipeCoverageRatio:
+                      generatorDbConfig.settings.min_db_recipe_coverage_ratio,
+                    allowDbCoverageFallback: true,
+                  },
+                );
+              }
+            }
+          } else {
+            // Retry (attempt 2): skip history-only path; DB-first or generate with variety targets
+            const prefilledBySlot = await this.loadPrefilledBySlot(
+              userId,
+              request,
+              profile.dietKey,
+              supabase,
+            );
+            if (process.env.MEAL_PLANNER_DB_FIRST === 'true') {
+              plan = await this.generatePlanDbFirst(
+                request,
+                userLanguage,
+                prefilledBySlot,
+                rules,
+                {
+                  culinaryRules: generatorDbConfig.culinaryRules,
+                  dbFirstSettings: validated.dbFirstSettings,
+                },
+              );
+            } else {
+              const totalSlots = validated.days * request.slots.length;
+              const maxAiSlotsForPlan = Math.min(
+                generatorDbConfig.settings.max_ai_generated_slots_per_week,
+                totalSlots,
+              );
+              const scaledVariety = scaleVarietyTargetsForPlanDays(
+                validated.days,
+                generatorDbConfig.varietyTargets,
+              );
+              const agentService = new MealPlannerAgentService();
+              plan = await agentService.generateMealPlan(
+                request,
+                userLanguage,
+                {
+                  prefilledBySlot,
+                  maxAiSlotsForPlan,
+                  culinaryRules: generatorDbConfig.culinaryRules,
+                  minDbRecipeCoverageRatio:
+                    generatorDbConfig.settings.min_db_recipe_coverage_ratio,
+                  allowDbCoverageFallback: true,
+                  varietyTargetsForPrompt: {
+                    unique_veg_min: scaledVariety.unique_veg_min,
+                    unique_fruit_min: scaledVariety.unique_fruit_min,
+                    protein_rotation_min_categories:
+                      scaledVariety.protein_rotation_min_categories,
+                    max_repeat_same_recipe_within_days:
+                      scaledVariety.max_repeat_same_recipe_within_days,
+                  },
+                },
+              );
+            }
+          }
+          // Supplement-advies samenvatting in metadata wanneer gebruiker een actief therapeutisch profiel heeft
+          // (onafhankelijk van request.therapeuticTargets, zodat het blok altijd verschijnt bij actief protocol)
+          const summary = await buildTherapeuticSupplementsSummary(
+            supabase,
             userId,
-            mealPlanId: null, // Will be set after insert
-            runType: 'enrich',
-            status: 'success',
-            durationMs: enrichmentDurationMs,
-          },
-          supabaseAdmin,
-        );
-      } catch (enrichmentError) {
-        // Enrichment failed - log error but continue with plan
-        const enrichmentDurationMs = Date.now() - enrichmentStartTime;
-        const enrichmentErrorMessage =
-          enrichmentError instanceof Error
-            ? enrichmentError.message
-            : 'Unknown enrichment error';
+          ).catch(() => null);
+          if (summary) {
+            plan = {
+              ...plan,
+              metadata: {
+                ...plan.metadata,
+                therapeuticSupplementsSummary: summary,
+              },
+            } as MealPlanResponse;
+          }
 
-        await logMealPlanRun(
-          {
-            userId,
-            mealPlanId: null,
-            runType: 'enrich',
-            status: 'error',
-            durationMs: enrichmentDurationMs,
-            errorCode: 'AGENT_ERROR',
-            errorMessage: enrichmentErrorMessage.substring(0, 500),
-          },
-          supabaseAdmin,
-        );
+          // Try to enrich plan (pragmatic: if enrichment fails, keep plan without enrichment)
+          let enrichment = null;
+          const enrichmentStartTime = Date.now();
+          try {
+            const enrichmentService = new MealPlannerEnrichmentService();
+            enrichment = await enrichmentService.enrichPlan(
+              plan,
+              {
+                allowPantryStaples: false,
+              },
+              userLanguage,
+            );
+            const enrichmentDurationMs = Date.now() - enrichmentStartTime;
 
-        // Continue without enrichment
-        console.warn(
-          'Enrichment failed, continuing with plan:',
-          enrichmentErrorMessage,
-        );
-      }
+            // Log successful enrichment
+            await logMealPlanRun(
+              {
+                userId,
+                mealPlanId: null, // Will be set after insert
+                runType: 'enrich',
+                status: 'success',
+                durationMs: enrichmentDurationMs,
+              },
+              supabaseAdmin,
+            );
+          } catch (enrichmentError) {
+            // Enrichment failed - log error but continue with plan
+            const enrichmentDurationMs = Date.now() - enrichmentStartTime;
+            const enrichmentErrorMessage =
+              enrichmentError instanceof Error
+                ? enrichmentError.message
+                : 'Unknown enrichment error';
 
-      // Scale plan to household size when policy is scale_to_household
-      let planToPersist = plan;
-      const { data: prefsRow } = await supabase
-        .from('user_preferences')
-        .select(USER_PREFS_HOUSEHOLD_COLUMN)
-        .eq('user_id', userId)
-        .maybeSingle();
-      const householdId =
-        prefsRow != null &&
-        typeof (prefsRow as { household_id?: string | null }).household_id ===
-          'string' &&
-        (prefsRow as { household_id: string }).household_id.trim() !== ''
-          ? (prefsRow as { household_id: string }).household_id.trim()
-          : null;
+            await logMealPlanRun(
+              {
+                userId,
+                mealPlanId: null,
+                runType: 'enrich',
+                status: 'error',
+                durationMs: enrichmentDurationMs,
+                errorCode: 'AGENT_ERROR',
+                errorMessage: enrichmentErrorMessage.substring(0, 500),
+              },
+              supabaseAdmin,
+            );
 
-      if (householdId) {
-        const { data: householdRow } = await supabase
-          .from('households')
-          .select(HOUSEHOLDS_SERVINGS_COLUMNS)
-          .eq('id', householdId)
-          .maybeSingle();
+            // Continue without enrichment
+            console.warn(
+              'Enrichment failed, continuing with plan:',
+              enrichmentErrorMessage,
+            );
+          }
 
-        const row = householdRow as {
-          household_size?: number;
-          servings_policy?: string;
-        } | null;
-        const policy = row?.servings_policy ?? 'scale_to_household';
-        const rawSize = row?.household_size;
+          // Scale plan to household size when policy is scale_to_household
+          let planToPersist = plan;
+          const { data: prefsRow } = await supabase
+            .from('user_preferences')
+            .select(USER_PREFS_HOUSEHOLD_COLUMN)
+            .eq('user_id', userId)
+            .maybeSingle();
+          const householdId =
+            prefsRow != null &&
+            typeof (prefsRow as { household_id?: string | null })
+              .household_id === 'string' &&
+            (prefsRow as { household_id: string }).household_id.trim() !== ''
+              ? (prefsRow as { household_id: string }).household_id.trim()
+              : null;
 
-        const householdSize =
-          typeof rawSize === 'number' &&
-          Number.isInteger(rawSize) &&
-          rawSize >= 1 &&
-          rawSize <= 12
-            ? rawSize
-            : null;
+          if (householdId) {
+            const { data: householdRow } = await supabase
+              .from('households')
+              .select(HOUSEHOLDS_SERVINGS_COLUMNS)
+              .eq('id', householdId)
+              .maybeSingle();
 
-        if (
-          policy === 'scale_to_household' &&
-          householdSize != null &&
-          householdSize >= 2
-        ) {
-          planToPersist = scaleMealPlanToHousehold(
-            planToPersist,
-            householdSize,
-            policy,
-          );
+            const row = householdRow as {
+              household_size?: number;
+              servings_policy?: string;
+            } | null;
+            const policy = row?.servings_policy ?? 'scale_to_household';
+            const rawSize = row?.household_size;
+
+            const householdSize =
+              typeof rawSize === 'number' &&
+              Number.isInteger(rawSize) &&
+              rawSize >= 1 &&
+              rawSize <= 12
+                ? rawSize
+                : null;
+
+            if (
+              policy === 'scale_to_household' &&
+              householdSize != null &&
+              householdSize >= 2
+            ) {
+              planToPersist = scaleMealPlanToHousehold(
+                planToPersist,
+                householdSize,
+                policy,
+              );
+            }
+          }
+
+          // Variety scorecard (metrics + targets) for UI/debug; enforce targets before persist
+          planToPersist = {
+            ...planToPersist,
+            metadata: {
+              ...planToPersist.metadata,
+              varietyScorecard: buildMealPlanVarietyScorecard(
+                planToPersist,
+                generatorDbConfig.varietyTargets,
+              ),
+            },
+          } as MealPlanResponse;
+          throwIfVarietyTargetsNotMet(planToPersist.metadata!.varietyScorecard);
+
+          // Persist to database
+          const { data, error } = await supabase
+            .from('meal_plans')
+            .insert({
+              user_id: userId,
+              diet_key: profile.dietKey,
+              date_from: validated.dateFrom,
+              days: validated.days,
+              request_snapshot: request,
+              rules_snapshot: rules,
+              plan_snapshot: planToPersist,
+              enrichment_snapshot: enrichment,
+            })
+            .select('id')
+            .single();
+
+          if (error || !data) {
+            throw new Error(
+              `Failed to persist meal plan: ${error?.message || 'Unknown error'}`,
+            );
+          }
+
+          const durationMs = Date.now() - startTime;
+
+          // Extract and store meals in history (for reuse and rating)
+          try {
+            const { MealHistoryService } =
+              await import('@/src/lib/meal-history/mealHistory.service');
+            const historyService = new MealHistoryService();
+            await historyService.extractAndStoreMeals(
+              userId,
+              planToPersist,
+              profile.dietKey,
+            );
+          } catch (historyError) {
+            // Log but don't fail - meal history is optional
+            console.warn(
+              'Failed to store meals in history:',
+              historyError instanceof Error
+                ? historyError.message
+                : 'Unknown error',
+            );
+          }
+
+          // Update run status to success (with guardrails meta from plan, no PII)
+          const guardrailsMeta = getGuardrailsRunMeta(planToPersist);
+          if (runId) {
+            await supabase
+              .from('meal_plan_runs')
+              .update({
+                status: 'success',
+                meal_plan_id: data.id,
+                duration_ms: durationMs,
+                constraints_in_prompt: guardrailsMeta.constraintsInPrompt,
+                guardrails_content_hash: guardrailsMeta.guardrailsContentHash,
+                guardrails_version: guardrailsMeta.guardrailsVersion,
+              })
+              .eq('id', runId)
+              .eq('user_id', userId);
+          } else {
+            // Fallback: log new run if update failed
+            await logMealPlanRun(
+              {
+                userId,
+                mealPlanId: data.id,
+                runType: 'generate',
+                status: 'success',
+                durationMs,
+                ...guardrailsMeta,
+              },
+              supabaseAdmin,
+            );
+          }
+
+          return { planId: data.id };
+        } catch (e) {
+          if (
+            !isRetry &&
+            e instanceof AppError &&
+            e.code === 'MEAL_PLAN_VARIETY_TARGETS_NOT_MET'
+          ) {
+            continue retryLoop;
+          }
+          throw e;
         }
       }
-
-      // Persist to database
-      const { data, error } = await supabase
-        .from('meal_plans')
-        .insert({
-          user_id: userId,
-          diet_key: profile.dietKey,
-          date_from: validated.dateFrom,
-          days: validated.days,
-          request_snapshot: request,
-          rules_snapshot: rules,
-          plan_snapshot: planToPersist,
-          enrichment_snapshot: enrichment,
-        })
-        .select('id')
-        .single();
-
-      if (error || !data) {
-        throw new Error(
-          `Failed to persist meal plan: ${error?.message || 'Unknown error'}`,
-        );
-      }
-
-      const durationMs = Date.now() - startTime;
-
-      // Extract and store meals in history (for reuse and rating)
-      try {
-        const { MealHistoryService } =
-          await import('@/src/lib/meal-history/mealHistory.service');
-        const historyService = new MealHistoryService();
-        await historyService.extractAndStoreMeals(
-          userId,
-          planToPersist,
-          profile.dietKey,
-        );
-      } catch (historyError) {
-        // Log but don't fail - meal history is optional
-        console.warn(
-          'Failed to store meals in history:',
-          historyError instanceof Error
-            ? historyError.message
-            : 'Unknown error',
-        );
-      }
-
-      // Update run status to success (with guardrails meta from plan, no PII)
-      const guardrailsMeta = getGuardrailsRunMeta(planToPersist);
-      if (runId) {
-        await supabase
-          .from('meal_plan_runs')
-          .update({
-            status: 'success',
-            meal_plan_id: data.id,
-            duration_ms: durationMs,
-            constraints_in_prompt: guardrailsMeta.constraintsInPrompt,
-            guardrails_content_hash: guardrailsMeta.guardrailsContentHash,
-            guardrails_version: guardrailsMeta.guardrailsVersion,
-          })
-          .eq('id', runId)
-          .eq('user_id', userId);
-      } else {
-        // Fallback: log new run if update failed
-        await logMealPlanRun(
-          {
-            userId,
-            mealPlanId: data.id,
-            runType: 'generate',
-            status: 'success',
-            durationMs,
-            ...guardrailsMeta,
-          },
-          supabaseAdmin,
-        );
-      }
-
-      return { planId: data.id };
+      throw new Error('createPlanForUser: unreachable');
     } catch (error) {
       const durationMs = Date.now() - startTime;
 
@@ -846,9 +1197,19 @@ export class MealPlansService {
         errorMessage = error.safeMessage;
       } else if (error instanceof Error) {
         errorMessage = error.message;
-        if (errorMessage.includes('validation')) {
+        if (
+          errorMessage.includes('validation') ||
+          errorMessage.includes('Invalid')
+        ) {
           errorCode = 'VALIDATION_ERROR';
-        } else if (errorMessage.includes('Gemini')) {
+        } else if (
+          errorMessage.includes('Gemini') ||
+          errorMessage.includes('agent') ||
+          errorMessage.includes('Meal plan generation failed after repair') ||
+          errorMessage.includes('MEAL_PREFERENCE_MISS') ||
+          errorMessage.includes('ALLERGEN_PRESENT') ||
+          errorMessage.includes('FORBIDDEN_IN_SHAKE_SMOOTHIE')
+        ) {
           errorCode = 'AGENT_ERROR';
         }
       }
@@ -891,7 +1252,6 @@ export class MealPlansService {
       );
     }
   }
-
   /**
    * Load a meal plan for a user
    *
@@ -1411,9 +1771,19 @@ export class MealPlansService {
         errorMessage = error.safeMessage;
       } else if (error instanceof Error) {
         errorMessage = error.message;
-        if (errorMessage.includes('validation')) {
+        if (
+          errorMessage.includes('validation') ||
+          errorMessage.includes('Invalid')
+        ) {
           errorCode = 'VALIDATION_ERROR';
-        } else if (errorMessage.includes('Gemini')) {
+        } else if (
+          errorMessage.includes('Gemini') ||
+          errorMessage.includes('agent') ||
+          errorMessage.includes('Meal plan generation failed after repair') ||
+          errorMessage.includes('MEAL_PREFERENCE_MISS') ||
+          errorMessage.includes('ALLERGEN_PRESENT') ||
+          errorMessage.includes('FORBIDDEN_IN_SHAKE_SMOOTHIE')
+        ) {
           errorCode = 'AGENT_ERROR';
         }
       }
@@ -1452,6 +1822,291 @@ export class MealPlansService {
         errorMessage,
       );
     }
+  }
+
+  /**
+   * True if meal is a placeholder (empty name and no ingredientRefs). Used to never return placeholders from DB-first.
+   */
+  private static isPlaceholderMeal(meal: Meal): boolean {
+    const nameEmpty = meal.name == null || String(meal.name).trim() === '';
+    const noRefs =
+      !Array.isArray(meal.ingredientRefs) || meal.ingredientRefs.length === 0;
+    return nameEmpty && noRefs;
+  }
+
+  /**
+   * DB-first orchestrator: build skeleton, fill from DB per (day, slot), then call AI only for missing slots (unless aiFillMode='strict').
+   * Does not read or pass template/pool/naming config; only culinaryRules and DbFirstPlanSettings apply.
+   */
+  private async generatePlanDbFirst(
+    request: MealPlanRequest,
+    userLanguage: 'nl' | 'en',
+    prefilledBySlot: Partial<Record<MealSlot, Meal[]>>,
+    rules: DietRuleSet,
+    options: {
+      /** Only DB-first-relevant: culinary rules for AI fill validation. No template/pool config. */
+      culinaryRules: Awaited<
+        ReturnType<typeof loadMealPlanGeneratorDbConfig>
+      >['culinaryRules'];
+      dbFirstSettings?: Partial<DbFirstPlanSettings>;
+    },
+  ): Promise<MealPlanResponse> {
+    const settings: DbFirstPlanSettings = {
+      ...DEFAULT_DB_FIRST_SETTINGS,
+      ...options.dbFirstSettings,
+    };
+    const slots = request.slots;
+    const startDate = new Date(request.dateRange.start);
+    const endDate = new Date(request.dateRange.end);
+    const numDays =
+      Math.ceil(
+        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+      ) + 1;
+
+    // 1) Build skeleton plan: all days/slots with placeholder meals
+    const days: MealPlanDay[] = [];
+    for (let dayIndex = 0; dayIndex < numDays; dayIndex++) {
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + dayIndex);
+      const dateStr = d.toISOString().split('T')[0];
+      const meals: Meal[] = slots.map((slot) => ({
+        id: `placeholder-${dateStr}-${slot}`,
+        name: '',
+        slot,
+        date: dateStr,
+        ingredientRefs: [],
+      }));
+      days.push({ date: dateStr, meals });
+    }
+    const plan: MealPlanResponse = {
+      requestId: `db-first-${Date.now()}`,
+      days,
+    };
+
+    const usedPerDay = new Map<number, Set<string>>();
+    const baseIdByDayAndSlot = new Map<string, string>();
+    const slotProvenance: Record<string, SlotProvenanceEntry> = {};
+    const missingSlots: {
+      dayIndex: number;
+      slotIndex: number;
+      date: string;
+      slot: MealSlot;
+      reason: SlotProvenanceReason;
+    }[] = [];
+    let reusedRecipeCount = 0;
+
+    function clonePlan(p: MealPlanResponse): MealPlanResponse {
+      return JSON.parse(JSON.stringify(p)) as MealPlanResponse;
+    }
+
+    // 2) Fill each (day, slot) from DB where a candidate passes hard constraints
+    for (let dayIndex = 0; dayIndex < numDays; dayIndex++) {
+      const dateStr = plan.days[dayIndex].date;
+      if (!usedPerDay.has(dayIndex)) {
+        usedPerDay.set(dayIndex, new Set<string>());
+      }
+      const usedOnDay = usedPerDay.get(dayIndex)!;
+
+      for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
+        const slot = slots[slotIndex];
+        const key = `${dateStr}-${slot}`;
+        const pool = prefilledBySlot[slot] ?? [];
+        // repeatWindowDays: same meal not used in last N days for this slot
+        const usedInWindow = (mealId: string): boolean => {
+          const windowStart = Math.max(0, dayIndex - settings.repeatWindowDays);
+          for (let d = dayIndex - 1; d >= windowStart; d--) {
+            if (baseIdByDayAndSlot.get(`${d}-${slot}`) === mealId) return true;
+          }
+          return false;
+        };
+
+        const hasRefs = (m: Meal): boolean =>
+          Array.isArray(m.ingredientRefs) && m.ingredientRefs.length > 0;
+        const available = pool.filter(
+          (m) => !usedOnDay.has(m.id) && !usedInWindow(m.id),
+        );
+        const availableWithRefs = available.filter(hasRefs);
+
+        if (pool.length === 0) {
+          missingSlots.push({
+            dayIndex,
+            slotIndex,
+            date: dateStr,
+            slot,
+            reason: 'no_candidates',
+          });
+          slotProvenance[key] = { source: 'ai', reason: 'no_candidates' };
+          continue;
+        }
+        if (available.length === 0) {
+          missingSlots.push({
+            dayIndex,
+            slotIndex,
+            date: dateStr,
+            slot,
+            reason: 'repeat_window_blocked',
+          });
+          slotProvenance[key] = {
+            source: 'ai',
+            reason: 'repeat_window_blocked',
+          };
+          continue;
+        }
+        if (availableWithRefs.length === 0) {
+          missingSlots.push({
+            dayIndex,
+            slotIndex,
+            date: dateStr,
+            slot,
+            reason: 'missing_ingredient_refs',
+          });
+          slotProvenance[key] = {
+            source: 'ai',
+            reason: 'missing_ingredient_refs',
+          };
+          continue;
+        }
+
+        let placed = false;
+        for (const candidate of availableWithRefs) {
+          const replacedMeal: Meal = {
+            ...candidate,
+            date: dateStr,
+            id: `${candidate.id}-${dateStr}-${slot}`,
+          };
+          const candidatePlan = clonePlan(plan);
+          candidatePlan.days[dayIndex].meals[slotIndex] = replacedMeal;
+          const issues = await validateHardConstraints({
+            plan: candidatePlan,
+            rules,
+            request,
+          });
+          if (issues.length === 0) {
+            plan.days[dayIndex].meals[slotIndex] = replacedMeal;
+            usedOnDay.add(candidate.id);
+            baseIdByDayAndSlot.set(`${dayIndex}-${slot}`, candidate.id);
+            slotProvenance[key] = { source: 'db' };
+            reusedRecipeCount++;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          missingSlots.push({
+            dayIndex,
+            slotIndex,
+            date: dateStr,
+            slot,
+            reason: 'all_candidates_blocked_by_constraints',
+          });
+          slotProvenance[key] = {
+            source: 'ai',
+            reason: 'all_candidates_blocked_by_constraints',
+          };
+        }
+      }
+    }
+
+    // 3) strict: no AI fill — throw when any slot is missing. normal: AI fills missing slots
+    if (missingSlots.length > 0 && settings.aiFillMode === 'strict') {
+      throw new AppError(
+        'MEAL_PLAN_INSUFFICIENT_CANDIDATES',
+        'Het weekmenu kon niet volledig worden gevuld binnen je dieet-/huisregels. Voeg meer recepten toe of versoepel je regels.',
+        { unfilledSlotsCount: missingSlots.length },
+      );
+    }
+
+    if (missingSlots.length > 0) {
+      const agentService = new MealPlannerAgentService();
+      const onlySlots = missingSlots.map((m) => ({
+        date: m.date,
+        slot: m.slot,
+      }));
+      const aiPlan = await agentService.generateMealPlan(
+        request,
+        userLanguage,
+        {
+          dbFirstFillMissing: true,
+          onlySlots,
+          culinaryRules: options.culinaryRules,
+        },
+      );
+      for (const m of missingSlots) {
+        const aiMeal = aiPlan.days[m.dayIndex]?.meals[m.slotIndex];
+        const key = `${m.date}-${m.slot}`;
+        if (!aiMeal || MealPlansService.isPlaceholderMeal(aiMeal)) {
+          slotProvenance[key] = {
+            source: 'ai',
+            reason: 'ai_candidate_blocked_by_constraints',
+          };
+          continue;
+        }
+        const candidatePlan = clonePlan(plan);
+        candidatePlan.days[m.dayIndex].meals[m.slotIndex] = aiMeal;
+        const issues = await validateHardConstraints({
+          plan: candidatePlan,
+          rules,
+          request,
+        });
+        if (issues.length > 0) {
+          slotProvenance[key] = {
+            source: 'ai',
+            reason: 'ai_candidate_blocked_by_constraints',
+          };
+          continue;
+        }
+        plan.days[m.dayIndex].meals[m.slotIndex] = aiMeal;
+        slotProvenance[key] = { source: 'ai', reason: m.reason };
+      }
+
+      // 4) No placeholders in output: if any slot is still a placeholder, throw controlled error
+      let unfilledSlotsCount = 0;
+      for (const day of plan.days) {
+        for (const meal of day.meals) {
+          if (MealPlansService.isPlaceholderMeal(meal)) {
+            unfilledSlotsCount++;
+          }
+        }
+      }
+      if (unfilledSlotsCount > 0) {
+        throw new AppError(
+          'MEAL_PLAN_INSUFFICIENT_CANDIDATES',
+          'Het weekmenu kon niet volledig worden gevuld binnen je dieet-/huisregels. Voeg meer recepten toe of versoepel je regels.',
+          { unfilledSlotsCount },
+        );
+      }
+    }
+
+    const totalMeals = plan.days.reduce((s, d) => s + d.meals.length, 0);
+    const meta = (plan.metadata ?? {}) as Record<string, unknown>;
+    meta.provenance = {
+      reusedRecipeCount,
+      generatedRecipeCount: totalMeals - reusedRecipeCount,
+    };
+    meta.slotProvenance = slotProvenance;
+
+    const totalSlots = totalMeals;
+    const entries = Object.values(slotProvenance);
+    const dbSlots = entries.filter((e) => e.source === 'db').length;
+    const percent =
+      totalSlots > 0 ? Math.round((dbSlots / totalSlots) * 100) : 0;
+    meta.dbCoverage = { dbSlots, totalSlots, percent };
+
+    const aiWithReason = entries.filter(
+      (e): e is SlotProvenanceEntry & { reason: SlotProvenanceReason } =>
+        e.source === 'ai' && e.reason != null,
+    );
+    const reasonCounts = new Map<SlotProvenanceReason, number>();
+    for (const e of aiWithReason) {
+      reasonCounts.set(e.reason, (reasonCounts.get(e.reason) ?? 0) + 1);
+    }
+    meta.fallbackReasons = Array.from(reasonCounts.entries())
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+
+    plan.metadata = meta as MealPlanResponse['metadata'];
+    return plan;
   }
 
   /**
@@ -1547,83 +2202,58 @@ export class MealPlansService {
       };
     };
 
-    const { data: historyRowsRaw } = await supabase
-      .from('meal_history')
-      .select(MEAL_HISTORY_CANDIDATE_COLUMNS)
-      .eq('user_id', userId)
-      .eq('diet_key', dietKey)
-      .in('meal_slot', slots)
-      .order('combined_score', { ascending: false, nullsFirst: false })
-      .order('user_rating', { ascending: false, nullsFirst: false })
-      .order('last_used_at', { ascending: false, nullsFirst: true })
-      .limit(perSlotLimit * slots.length);
-
-    const historyRows = (historyRowsRaw ?? []).slice().sort((a, b) => {
-      const aId = (a.meal_id as string) ?? (a.id as string);
-      const bId = (b.meal_id as string) ?? (b.id as string);
-      const aIdx = favoriteOrder.get(aId) ?? Infinity;
-      const bIdx = favoriteOrder.get(bId) ?? Infinity;
-      return aIdx - bIdx;
-    });
-
-    for (const row of historyRows) {
-      const slot = row.meal_slot as MealSlot;
-      if (!slots.includes(slot) || !result[slot]) continue;
-      const meal = toMeal(
-        row.meal_data,
-        (row.meal_id as string) ?? row.id,
-        (row.meal_name as string) ?? '',
-        slot,
-      );
-      if (
-        meal &&
-        result[slot]!.length < perSlotLimit &&
-        !isMealBlockedByHouseholdRules(meal, meal.name, blockRules) &&
-        !isMealBlockedByAllergiesOrDislikes(
-          meal,
-          request.profile.allergies ?? [],
-          request.profile.dislikes ?? [],
-        )
-      ) {
-        result[slot]!.push(meal);
-      }
-    }
-
-    // Collect custom_meals per slot; then enrich meal_data from recipe_ingredients where ingredientRefs is empty (imported recipes)
+    // Prefer user's recipe database (custom_meals) over meal_history. Pool per slot by weekmenu_slots (or meal_slot fallback).
     type CustomRow = {
       id: string;
       name: string;
       meal_slot: string;
+      weekmenu_slots: string[] | null;
       meal_data: Record<string, unknown>;
+      consumption_count: number | null;
+      updated_at: string | null;
     };
-    const customBySlot: { slot: MealSlot; rows: CustomRow[] }[] = [];
+    const fetchLimitTotal = Math.max(
+      perSlotLimit * slots.length,
+      Math.min(
+        perSlotLimit * slots.length * 2,
+        config.prefillFetchLimitMax * slots.length,
+      ),
+    );
+    const { data: customRowsRaw } = await supabase
+      .from('custom_meals')
+      .select(CUSTOM_MEALS_CANDIDATE_COLUMNS)
+      .eq('user_id', userId)
+      .or('meal_slot.in.(breakfast,lunch,dinner),weekmenu_slots.not.is.null')
+      .order('consumption_count', { ascending: false })
+      .order('updated_at', { ascending: false })
+      .limit(fetchLimitTotal);
 
-    for (const slot of slots) {
-      if (result[slot]!.length >= perSlotLimit) continue;
-      const need = perSlotLimit - result[slot]!.length;
-      // Fetch more than need so we have spare after filtering (empty ingredientRefs, block rules)
-      const fetchLimit = Math.max(
-        need,
-        Math.min(need * 2, config.prefillFetchLimitMax),
-      );
-      const { data: customRowsRaw } = await supabase
-        .from('custom_meals')
-        .select(CUSTOM_MEALS_CANDIDATE_COLUMNS)
-        .eq('user_id', userId)
-        .eq('meal_slot', slot)
-        .order('consumption_count', { ascending: false })
-        .order('updated_at', { ascending: false })
-        .limit(fetchLimit);
+    const allCustomRows = (customRowsRaw ?? []).slice().sort((a, b) => {
+      const aIdx = favoriteOrder.get(a.id as string) ?? Infinity;
+      const bIdx = favoriteOrder.get(b.id as string) ?? Infinity;
+      return aIdx - bIdx;
+    }) as CustomRow[];
 
-      const rows = (customRowsRaw ?? []).slice().sort((a, b) => {
-        const aIdx = favoriteOrder.get(a.id as string) ?? Infinity;
-        const bIdx = favoriteOrder.get(b.id as string) ?? Infinity;
-        return aIdx - bIdx;
-      }) as CustomRow[];
-      customBySlot.push({ slot: slot as MealSlot, rows });
-    }
+    const belongsToSlot = (row: CustomRow, slot: MealSlot): boolean => {
+      const wm = row.weekmenu_slots;
+      if (Array.isArray(wm) && wm.length > 0) return wm.includes(slot);
+      return row.meal_slot === slot;
+    };
+    const customBySlot: { slot: MealSlot; rows: CustomRow[] }[] = slots.map(
+      (slot) => ({
+        slot: slot as MealSlot,
+        rows: allCustomRows
+          .filter((row) => belongsToSlot(row, slot as MealSlot))
+          .slice(
+            0,
+            Math.max(
+              perSlotLimit,
+              Math.min(perSlotLimit * 2, config.prefillFetchLimitMax),
+            ),
+          ),
+      }),
+    );
 
-    // Recipe IDs that have empty ingredientRefs (e.g. imported recipes store ingredients in recipe_ingredients only)
     const recipeIdsNeedingRefs = customBySlot
       .flatMap(({ rows }) =>
         rows.filter((row) => {
@@ -1664,6 +2294,7 @@ export class MealPlansService {
       }
     }
 
+    // 1) Fill each slot from custom_meals first (user's recipe database)
     for (const { slot, rows } of customBySlot) {
       for (const row of rows) {
         if (result[slot]!.length >= perSlotLimit) break;
@@ -1684,17 +2315,78 @@ export class MealPlansService {
           (row.name as string) ?? (mealData.name as string) ?? '',
           slot,
         );
+        const id = (row.id as string) ?? (mealData.id as string);
+        const name = (row.name as string) ?? (mealData.name as string) ?? '';
+        const stub: Meal = { id, name, slot, date: '', ingredientRefs: [] };
+        const toPush = meal ?? stub;
         if (
-          meal &&
-          !isMealBlockedByHouseholdRules(meal, meal.name, blockRules) &&
+          !isMealBlockedByHouseholdRules(toPush, toPush.name, blockRules) &&
           !isMealBlockedByAllergiesOrDislikes(
-            meal,
+            toPush,
             request.profile.allergies ?? [],
             request.profile.dislikes ?? [],
           )
         ) {
-          result[slot]!.push(meal);
+          result[slot]!.push(toPush);
         }
+      }
+    }
+
+    // 2) Top up from meal_history so we still hit perSlotLimit when user has few custom recipes
+    const { data: historyRowsRaw } = await supabase
+      .from('meal_history')
+      .select(MEAL_HISTORY_CANDIDATE_COLUMNS)
+      .eq('user_id', userId)
+      .eq('diet_key', dietKey)
+      .in('meal_slot', slots)
+      .order('combined_score', { ascending: false, nullsFirst: false })
+      .order('user_rating', { ascending: false, nullsFirst: false })
+      .order('last_used_at', { ascending: false, nullsFirst: true })
+      .limit(perSlotLimit * slots.length);
+
+    const historyRows = (historyRowsRaw ?? []).slice().sort((a, b) => {
+      const aId = (a.meal_id as string) ?? (a.id as string);
+      const bId = (b.meal_id as string) ?? (b.id as string);
+      const aIdx = favoriteOrder.get(aId) ?? Infinity;
+      const bIdx = favoriteOrder.get(bId) ?? Infinity;
+      return aIdx - bIdx;
+    });
+
+    const usedIdsBySlot = new Map<MealSlot, Set<string>>();
+    for (const slot of slots) {
+      usedIdsBySlot.set(slot, new Set(result[slot]!.map((m) => m.id)));
+    }
+
+    for (const row of historyRows) {
+      const slot = row.meal_slot as MealSlot;
+      if (!slots.includes(slot) || !result[slot]) continue;
+      if (result[slot]!.length >= perSlotLimit) continue;
+      const mealId = (row.meal_id as string) ?? row.id;
+      if (usedIdsBySlot.get(slot)?.has(mealId)) continue;
+      const meal = toMeal(
+        row.meal_data,
+        mealId,
+        (row.meal_name as string) ?? '',
+        slot,
+      );
+      const stub: Meal = {
+        id: mealId,
+        name: (row.meal_name as string) ?? '',
+        slot,
+        date: '',
+        ingredientRefs: [],
+      };
+      const toPush = meal ?? stub;
+      if (
+        !isMealBlockedByHouseholdRules(toPush, toPush.name, blockRules) &&
+        !isMealBlockedByAllergiesOrDislikes(
+          toPush,
+          request.profile.allergies ?? [],
+          request.profile.dislikes ?? [],
+        )
+      ) {
+        result[slot]!.push(toPush);
+        usedIdsBySlot.get(slot)?.add(mealId);
       }
     }
 
@@ -1702,15 +2394,15 @@ export class MealPlansService {
   }
 
   /**
-   * Try to reuse meals from history instead of generating new ones
-   *
-   * This reduces Gemini API calls by reusing rated meals.
-   * Only reuses if we can fill at least 50% of slots from history.
+   * Try to reuse meals from history instead of generating new ones.
+   * History-only path when filledSlots/totalSlots >= minHistoryReuseRatio (DB-configured).
+   * Recency filter uses recencyWindowDays (DB-configured); 0 = no recency restriction.
    *
    * @param userId - User ID
    * @param request - Meal plan request
    * @param dietKey - Diet key
    * @param historyService - Meal history service
+   * @param historyReuseConfig - minHistoryReuseRatio and recencyWindowDays from loadMealPlanGeneratorDbConfig
    * @returns Reuse result with plan and count
    */
   private async tryReuseMealsFromHistory(
@@ -1718,12 +2410,17 @@ export class MealPlansService {
     request: MealPlanRequest,
     dietKey: DietKey,
     historyService: import('@/src/lib/meal-history/mealHistory.service').MealHistoryService,
+    historyReuseConfig: {
+      minHistoryReuseRatio: number;
+      recencyWindowDays: number;
+    },
   ): Promise<{
     canReuse: boolean;
     plan: MealPlanResponse;
     reusedCount: number;
   }> {
     const { dateRange, slots } = request;
+    const { minHistoryReuseRatio, recencyWindowDays } = historyReuseConfig;
 
     // Calculate total number of meal slots needed
     const startDate = new Date(dateRange.start);
@@ -1734,8 +2431,8 @@ export class MealPlansService {
       ) + 1;
     const totalSlots = numDays * slots.length;
 
-    // Minimum threshold: need at least 50% of slots from history to reuse
-    const minReuseThreshold = Math.ceil(totalSlots * 0.5);
+    // DB-configured threshold: history-only when filledSlots/totalSlots >= minHistoryReuseRatio
+    const minReuseThreshold = Math.ceil(totalSlots * minHistoryReuseRatio);
 
     // Collect meals from history for each day/slot
     const reusedMeals: Meal[] = [];
@@ -1763,7 +2460,9 @@ export class MealPlansService {
           excludeMealIds: Array.from(usedMealIds),
           limit: 20, // Get more candidates to filter by preferences
           maxUsageCount: 10, // Don't reuse meals used more than 10 times
-          daysSinceLastUse: 7, // Prefer meals not used in last 7 days
+          // DB-configured recency window; 0 = no recency filter
+          daysSinceLastUse:
+            recencyWindowDays > 0 ? recencyWindowDays : undefined,
         });
 
         // Filter candidates by meal preferences if preferences exist

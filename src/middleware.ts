@@ -53,9 +53,20 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh session if expired - required for Server Components
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: { id: string } | null = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch (err) {
+    // AuthRetryableFetchError / "Failed to fetch" = transient network failure
+    // Let the request through so the app still loads; next request may succeed
+    const isRetryable =
+      err instanceof Error &&
+      (err.name === 'AuthRetryableFetchError' ||
+        err.message === 'Failed to fetch');
+    if (isRetryable) return supabaseResponse;
+    throw err;
+  }
 
   const { pathname } = request.nextUrl;
 

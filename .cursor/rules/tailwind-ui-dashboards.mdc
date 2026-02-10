@@ -1,0 +1,24 @@
+---
+description: Always consult Tailwind UI / Tailwind Plus for layout and dashboard design (bento grids, application UI). Ensures modern look-and-feel.
+globs: **/*.tsx
+alwaysApply: true
+---
+
+# Tailwind UI & dashboards
+
+When designing or changing **any page layout, dashboard, or overview**:
+
+1. **Check Tailwind UI / Tailwind Plus first**
+   - **Bento grids:** https://tailwindcss.com/plus/ui-blocks/marketing/sections/bento-grids  
+     Use bento-style card grids (varied cell sizes, rounded corners, clear hierarchy).
+   - **Application UI:** https://tailwindcss.com/plus/ui-blocks/application-ui  
+     Tables, feeds, form layouts, navbars.
+   - **UI Blocks index:** https://tailwindcss.com/plus/ui-blocks  
+
+2. **Dashboard layout**
+   - Prefer a **bento grid**: mix of compact KPI/summary cards and larger content cards.
+   - Use semantic spacing: `gap-4` / `gap-6`, `rounded-2xl`, **shadow** (`shadow-sm`), and **background contrast** (`bg-muted/20`, `bg-background`). **NEVER use borders** (no `border`, no `ring` as outline) — see AGENTS.md 4.0.
+   - Use theme tokens: `bg-background`, `text-foreground`, `text-muted-foreground`, `bg-muted/30`.
+   - Avoid long single-column dumps; use grids with `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4` or asymmetric `col-span-2` for visual interest.
+
+3. **AGENTS.md** (section 4.1) has the full guideline; this rule is a reminder to always look at Tailwind UI for inspiration before implementing.

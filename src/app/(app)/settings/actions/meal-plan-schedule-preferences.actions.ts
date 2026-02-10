@@ -157,6 +157,8 @@ export async function updateMealPlanSchedulePreferencesAction(
     }
 
     revalidatePath('/settings');
+    revalidatePath('/familie/edit');
+    revalidatePath('/familie');
 
     // Best-effort reschedule: preferences save stays ok if scheduling fails
     try {

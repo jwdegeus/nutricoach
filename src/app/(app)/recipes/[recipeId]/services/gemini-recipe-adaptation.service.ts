@@ -469,6 +469,8 @@ Alleen objecten met confidence >= ${AI_SUGGESTION_MIN_CONFIDENCE} opnemen.`;
       'sojamelk',
       'rijstmelk',
       'plantaardige melk',
+      'rijstazijn',
+      'rice vinegar',
     ];
     const isDairyFalsePositive = (ingredient: string, ruleLabel: string) => {
       if (!isDairyRule(ruleLabel)) return false;
@@ -500,10 +502,130 @@ Alleen objecten met confidence >= ${AI_SUGGESTION_MIN_CONFIDENCE} opnemen.`;
         ruleCode: rule?.ruleCode ?? 'AI_SUGGESTED',
         ruleLabel: s.ruleLabel,
         suggestion,
+        substitutionSuggestions: rule?.substitutionSuggestions,
       };
     });
   } catch (err) {
     console.warn('[GeminiRecipeAdaptation] AI suggestViolations failed:', err);
     return [];
+  }
+}
+
+/** Generieke adviestekst die nooit als ingrediëntnaam mag worden gebruikt. */
+const GENERIC_SUGGESTION_PATTERNS = [
+  'dieet-compatibele variant',
+  'vervang dit ingrediënt voor een',
+  'vervang voor een dieet-compatibele',
+];
+
+export function isGenericSuggestionText(text: string): boolean {
+  if (!text || typeof text !== 'string') return true;
+  const t = text.trim().toLowerCase();
+  return GENERIC_SUGGESTION_PATTERNS.some((p) => t.includes(p));
+}
+
+/**
+ * Vraagt aan de AI een concreet, bij het gerecht passend alternatief per ingrediënt.
+ * Gebruik wanneer de dieetregel alleen "Vervang door een dieet-compatibele variant" geeft.
+ */
+export async function suggestConcreteSubstitutes(
+  recipe: RecipeData,
+  violations: ViolationDetail[],
+  indices: number[],
+  ruleset: DietRuleset,
+  dietName: string,
+): Promise<Map<number, string>> {
+  if (indices.length === 0) return new Map();
+  const toAsk = indices
+    .map((j) => ({ j, v: violations[j] }))
+    .filter((x) => x.v);
+  if (toAsk.length === 0) return new Map();
+
+  const ingredientList = (
+    Array.isArray(recipe.mealData?.ingredientRefs)
+      ? recipe.mealData.ingredientRefs
+      : Array.isArray(recipe.mealData?.ingredients)
+        ? recipe.mealData.ingredients
+        : []
+  )
+    .filter((ing: unknown) => ing != null)
+    .map(
+      (ing: { displayName?: string; name?: string; original_line?: string }) =>
+        ing?.displayName ?? ing?.name ?? ing?.original_line ?? String(ing),
+    )
+    .filter(Boolean);
+  const stepsPreview = (recipe.steps ?? [])
+    .slice(0, 5)
+    .map((s, i) => `${i + 1}. ${typeof s === 'string' ? s : String(s)}`)
+    .join('\n');
+
+  const lines = toAsk.map(
+    (x) =>
+      `- "${x.v.ingredientName}" (regel: ${x.v.ruleLabel}) → geef één concreet vervangingsingrediënt`,
+  );
+  const prompt = `Je bent een culinaire expert. Gegeven dit recept en dieet, kies voor elk van de onderstaande ingrediënten EÉN concreet vervangingsingrediënt dat past bij het gerecht en bij het dieet. Antwoord in het Nederlands met alleen de ingrediëntnaam (bijv. "appelazijn", "kokosamandel", "paprikapoeder").
+
+DIET: ${dietName}
+
+RECEPT: ${recipe.mealName}
+Ingrediënten:
+${ingredientList.slice(0, 30).join('\n')}
+
+Bereidingswijze (fragment):
+${stepsPreview}
+
+Te vervangen ingrediënten (geef voor elk exact één alternatief):
+${lines.join('\n')}
+
+Antwoord in JSON: { "substitutes": [ { "originalName": "exacte naam uit de lijst", "suggestedSubstitute": "één ingrediënt in het Nederlands" } ] }`;
+
+  try {
+    const gemini = getGeminiClient();
+    const raw = await gemini.generateJson({
+      prompt,
+      jsonSchema: {
+        type: 'object',
+        properties: {
+          substitutes: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                originalName: { type: 'string' },
+                suggestedSubstitute: { type: 'string' },
+              },
+              required: ['originalName', 'suggestedSubstitute'],
+            },
+          },
+        },
+        required: ['substitutes'],
+      },
+      temperature: 0.3,
+      purpose: 'repair',
+    });
+    const parsed = JSON.parse(raw);
+    const substitutes = parsed.substitutes ?? [];
+    const byOriginal = new Map(
+      substitutes.map(
+        (s: { originalName: string; suggestedSubstitute: string }) => [
+          (s.originalName ?? '').trim().toLowerCase(),
+          (s.suggestedSubstitute ?? '').trim(),
+        ],
+      ),
+    );
+    const result = new Map<number, string>();
+    for (const { j, v } of toAsk) {
+      const key = v.ingredientName.trim().toLowerCase();
+      const sub = byOriginal.get(key);
+      if (typeof sub === 'string' && sub && !isGenericSuggestionText(sub))
+        result.set(j, sub);
+    }
+    return result;
+  } catch (err) {
+    console.warn(
+      '[GeminiRecipeAdaptation] suggestConcreteSubstitutes failed:',
+      err,
+    );
+    return new Map();
   }
 }

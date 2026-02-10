@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/src/lib/supabase/server';
+import { getDefaultFamilyMemberId } from '@/src/lib/family/defaultFamilyMember';
 import { getDietRules } from '@/src/app/(app)/onboarding/queries/diet-rules.queries';
 import {
   validateRecipeAgainstDiet,
@@ -12,6 +13,35 @@ import {
 } from '@/src/lib/diet-validation/validation-engine';
 import type { ActionResult } from '@/src/lib/types';
 
+/** Resolve current user's diet_type_id (family as source of truth, then user_diet_profiles). */
+async function getCurrentUserDietTypeId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const familyMemberId = await getDefaultFamilyMemberId(supabase, user.id);
+  if (familyMemberId) {
+    const { data: fm } = await supabase
+      .from('family_member_diet_profiles')
+      .select('diet_type_id')
+      .eq('family_member_id', familyMemberId)
+      .is('ends_on', null)
+      .maybeSingle();
+    if (fm?.diet_type_id) return fm.diet_type_id;
+  }
+
+  const { data: profile } = await supabase
+    .from('user_diet_profiles')
+    .select('diet_type_id')
+    .eq('user_id', user.id)
+    .is('ends_on', null)
+    .maybeSingle();
+  return profile?.diet_type_id ?? null;
+}
+
 /**
  * Validates a recipe against the user's selected diet
  */
@@ -22,35 +52,14 @@ export async function validateRecipeAction(
   try {
     const supabase = await createClient();
 
-    // Get user's diet type if not provided
     if (!dietTypeId) {
-      const { data: profile, error: profileError } = await supabase
-        .from('user_diet_profiles')
-        .select('diet_type_id')
-        .eq('ends_on', null) // Active profile
-        .maybeSingle();
-
-      if (profileError) {
-        return {
-          error: 'Fout bij ophalen dieetprofiel',
-        };
-      }
-
-      if (!profile?.diet_type_id) {
+      dietTypeId = (await getCurrentUserDietTypeId(supabase)) ?? undefined;
+      if (!dietTypeId) {
         return {
           error:
-            'Geen actief dieetprofiel gevonden. Voltooi eerst de onboarding.',
+            'Geen actief dieetprofiel gevonden. Voeg een familielid toe en stel dieet in onder Familie.',
         };
       }
-
-      dietTypeId = profile.diet_type_id;
-    }
-
-    if (!dietTypeId) {
-      return {
-        error:
-          'Geen actief dieetprofiel gevonden. Voltooi eerst de onboarding.',
-      };
     }
 
     // Get diet rules
@@ -87,38 +96,16 @@ export async function validateIngredientAction(
   try {
     const supabase = await createClient();
 
-    // Get user's diet type if not provided
     if (!dietTypeId) {
-      const { data: profile, error: profileError } = await supabase
-        .from('user_diet_profiles')
-        .select('diet_type_id')
-        .eq('ends_on', null) // Active profile
-        .maybeSingle();
-
-      if (profileError) {
-        return {
-          error: 'Fout bij ophalen dieetprofiel',
-        };
-      }
-
-      if (!profile?.diet_type_id) {
+      dietTypeId = (await getCurrentUserDietTypeId(supabase)) ?? undefined;
+      if (!dietTypeId) {
         return {
           error:
-            'Geen actief dieetprofiel gevonden. Voltooi eerst de onboarding.',
+            'Geen actief dieetprofiel gevonden. Voeg een familielid toe en stel dieet in onder Familie.',
         };
       }
-
-      dietTypeId = profile.diet_type_id;
     }
 
-    if (!dietTypeId) {
-      return {
-        error:
-          'Geen actief dieetprofiel gevonden. Voltooi eerst de onboarding.',
-      };
-    }
-
-    // Get diet rules
     const dietRules = await getDietRules(dietTypeId);
 
     if (dietRules.length === 0) {
@@ -157,38 +144,16 @@ export async function validateIngredientsAction(
   try {
     const supabase = await createClient();
 
-    // Get user's diet type if not provided
     if (!dietTypeId) {
-      const { data: profile, error: profileError } = await supabase
-        .from('user_diet_profiles')
-        .select('diet_type_id')
-        .eq('ends_on', null) // Active profile
-        .maybeSingle();
-
-      if (profileError) {
-        return {
-          error: 'Fout bij ophalen dieetprofiel',
-        };
-      }
-
-      if (!profile?.diet_type_id) {
+      dietTypeId = (await getCurrentUserDietTypeId(supabase)) ?? undefined;
+      if (!dietTypeId) {
         return {
           error:
-            'Geen actief dieetprofiel gevonden. Voltooi eerst de onboarding.',
+            'Geen actief dieetprofiel gevonden. Voeg een familielid toe en stel dieet in onder Familie.',
         };
       }
-
-      dietTypeId = profile.diet_type_id;
     }
 
-    if (!dietTypeId) {
-      return {
-        error:
-          'Geen actief dieetprofiel gevonden. Voltooi eerst de onboarding.',
-      };
-    }
-
-    // Get diet rules
     const dietRules = await getDietRules(dietTypeId);
 
     if (dietRules.length === 0) {
@@ -217,42 +182,34 @@ export async function validateIngredientsAction(
 }
 
 /**
- * Gets the user's current diet type name
+ * Gets the user's current diet type (id + name). Family as source of truth.
  */
 export async function getCurrentDietTypeAction(): Promise<
   ActionResult<{ id: string; name: string }>
 > {
   try {
     const supabase = await createClient();
+    const dietTypeId = await getCurrentUserDietTypeId(supabase);
+    if (!dietTypeId) {
+      return { error: 'Geen actief dieetprofiel gevonden' };
+    }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('user_diet_profiles')
-      .select('diet_type_id, diet_types!inner(name)')
-      .eq('ends_on', null) // Active profile
+    const { data: dietType, error } = await supabase
+      .from('diet_types')
+      .select('id, name')
+      .eq('id', dietTypeId)
       .maybeSingle();
 
-    if (profileError) {
+    if (error || !dietType) {
       return {
-        error: 'Fout bij ophalen dieetprofiel',
+        error: 'Fout bij ophalen dieettype',
       };
     }
-
-    if (!profile?.diet_type_id) {
-      return {
-        error: 'Geen actief dieetprofiel gevonden',
-      };
-    }
-
-    const dietTypesRow = profile.diet_types as { name: string }[] | null;
-    const dietTypeName =
-      Array.isArray(dietTypesRow) && dietTypesRow[0]
-        ? dietTypesRow[0].name
-        : (dietTypesRow as { name: string } | null)?.name;
 
     return {
       data: {
-        id: profile.diet_type_id,
-        name: dietTypeName || 'Onbekend',
+        id: dietType.id,
+        name: (dietType as { name: string }).name || 'Onbekend',
       },
     };
   } catch (error) {

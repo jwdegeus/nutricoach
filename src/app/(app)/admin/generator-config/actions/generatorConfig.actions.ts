@@ -27,7 +27,11 @@ import { AppError } from '@/src/lib/errors/app-error';
 import type { GuardrailsViolationDetails } from '@/src/lib/errors/app-error';
 import { enforceMealPlannerGuardrails } from '@/src/lib/agents/meal-planner/enforceMealPlannerGuardrails';
 import type { MealPlanRequest, MealPlanResponse } from '@/src/lib/diets';
-import type { GeneratorMeta } from '@/src/lib/diets/diet.types';
+import type {
+  GeneratorMeta,
+  TherapeuticTargetsSnapshot,
+} from '@/src/lib/diets/diet.types';
+import { buildTherapeuticTargetsSnapshot } from '@/src/lib/therapeutic/buildTherapeuticTargetsSnapshot';
 
 export type GeneratorConfigTemplatesRow = {
   id: string;
@@ -59,6 +63,12 @@ export type GeneratorConfigSettingsRow = {
   protein_repeat_cap_7d: number;
   template_repeat_cap_7d: number;
   signature_retry_limit: number;
+  veg_threshold_low_g: number;
+  veg_threshold_mid_g: number;
+  veg_threshold_high_g: number;
+  veg_score_low: number;
+  veg_score_mid: number;
+  veg_score_high: number;
   updated_at: string;
 };
 
@@ -118,7 +128,7 @@ export async function getGeneratorConfigAdmin(): Promise<
       supabase
         .from('meal_plan_generator_settings')
         .select(
-          'diet_key, max_ingredients, max_flavor_items, protein_repeat_cap_7d, template_repeat_cap_7d, signature_retry_limit, updated_at',
+          'diet_key, max_ingredients, max_flavor_items, protein_repeat_cap_7d, template_repeat_cap_7d, signature_retry_limit, veg_threshold_low_g, veg_threshold_mid_g, veg_threshold_high_g, veg_score_low, veg_score_mid, veg_score_high, updated_at',
         )
         .order('diet_key'),
       supabase
@@ -183,6 +193,12 @@ export async function getGeneratorConfigAdmin(): Promise<
         protein_repeat_cap_7d: Number(r.protein_repeat_cap_7d),
         template_repeat_cap_7d: Number(r.template_repeat_cap_7d),
         signature_retry_limit: Number(r.signature_retry_limit),
+        veg_threshold_low_g: Number(r.veg_threshold_low_g),
+        veg_threshold_mid_g: Number(r.veg_threshold_mid_g),
+        veg_threshold_high_g: Number(r.veg_threshold_high_g),
+        veg_score_low: Number(r.veg_score_low),
+        veg_score_mid: Number(r.veg_score_mid),
+        veg_score_high: Number(r.veg_score_high),
         updated_at: r.updated_at ?? '',
       })),
       slots: (slotsRes.data ?? []).map((r) => ({
@@ -243,6 +259,12 @@ export type GeneratorConfigSnapshot = {
     protein_repeat_cap_7d: number;
     template_repeat_cap_7d: number;
     signature_retry_limit: number;
+    veg_threshold_low_g: number;
+    veg_threshold_mid_g: number;
+    veg_threshold_high_g: number;
+    veg_score_low: number;
+    veg_score_mid: number;
+    veg_score_high: number;
   }>;
 };
 
@@ -329,6 +351,12 @@ function buildConfigFromSnapshot(
         protein_repeat_cap_7d: row.protein_repeat_cap_7d,
         template_repeat_cap_7d: row.template_repeat_cap_7d,
         signature_retry_limit: row.signature_retry_limit,
+        veg_threshold_low_g: row.veg_threshold_low_g,
+        veg_threshold_mid_g: row.veg_threshold_mid_g,
+        veg_threshold_high_g: row.veg_threshold_high_g,
+        veg_score_low: row.veg_score_low,
+        veg_score_mid: row.veg_score_mid,
+        veg_score_high: row.veg_score_high,
       }
     : {
         max_ingredients: 10,
@@ -336,6 +364,12 @@ function buildConfigFromSnapshot(
         protein_repeat_cap_7d: 2,
         template_repeat_cap_7d: 3,
         signature_retry_limit: 8,
+        veg_threshold_low_g: 80,
+        veg_threshold_mid_g: 150,
+        veg_threshold_high_g: 250,
+        veg_score_low: 1,
+        veg_score_mid: 2,
+        veg_score_high: 4,
       };
 
   return { templates, poolItems: poolByCategory, settings, namePatterns: [] };
@@ -405,6 +439,12 @@ export async function exportGeneratorConfigSnapshotAction(input: {
         protein_repeat_cap_7d: s.protein_repeat_cap_7d,
         template_repeat_cap_7d: s.template_repeat_cap_7d,
         signature_retry_limit: s.signature_retry_limit,
+        veg_threshold_low_g: s.veg_threshold_low_g,
+        veg_threshold_mid_g: s.veg_threshold_mid_g,
+        veg_threshold_high_g: s.veg_threshold_high_g,
+        veg_score_low: s.veg_score_low,
+        veg_score_mid: s.veg_score_mid,
+        veg_score_high: s.veg_score_high,
       })),
   };
   return { data: snapshot };
@@ -452,14 +492,32 @@ const snapshotPoolItemSchema = z
         'flavor: min/default/max all set and min≤default≤max; non-flavor: all null',
     },
   );
-const snapshotSettingsSchema = z.object({
-  diet_key: z.string().min(1),
-  max_ingredients: z.number().int().min(1).max(20),
-  max_flavor_items: z.number().int().min(0).max(5),
-  protein_repeat_cap_7d: z.number().int().min(1).max(14),
-  template_repeat_cap_7d: z.number().int().min(1).max(21),
-  signature_retry_limit: z.number().int().min(1).max(20),
-});
+const snapshotSettingsSchema = z
+  .object({
+    diet_key: z.string().min(1),
+    max_ingredients: z.number().int().min(1).max(20),
+    max_flavor_items: z.number().int().min(0).max(5),
+    protein_repeat_cap_7d: z.number().int().min(1).max(14),
+    template_repeat_cap_7d: z.number().int().min(1).max(21),
+    signature_retry_limit: z.number().int().min(1).max(20),
+    veg_threshold_low_g: z.number().int().min(1).max(2000),
+    veg_threshold_mid_g: z.number().int().min(1).max(2000),
+    veg_threshold_high_g: z.number().int().min(1).max(2000),
+    veg_score_low: z.number().int().min(0).max(20),
+    veg_score_mid: z.number().int().min(0).max(20),
+    veg_score_high: z.number().int().min(0).max(20),
+  })
+  .refine(
+    (d) =>
+      d.veg_threshold_low_g <= d.veg_threshold_mid_g &&
+      d.veg_threshold_mid_g <= d.veg_threshold_high_g,
+    { message: 'Veg thresholds: low ≤ mid ≤ high' },
+  )
+  .refine(
+    (d) =>
+      d.veg_score_low <= d.veg_score_mid && d.veg_score_mid <= d.veg_score_high,
+    { message: 'Veg scores: low ≤ mid ≤ high' },
+  );
 
 const importSnapshotSchema = z
   .object({
@@ -607,6 +665,12 @@ export async function importGeneratorConfigSnapshotAction(input: {
     protein_repeat_cap_7d: s.protein_repeat_cap_7d,
     template_repeat_cap_7d: s.template_repeat_cap_7d,
     signature_retry_limit: s.signature_retry_limit,
+    veg_threshold_low_g: s.veg_threshold_low_g,
+    veg_threshold_mid_g: s.veg_threshold_mid_g,
+    veg_threshold_high_g: s.veg_threshold_high_g,
+    veg_score_low: s.veg_score_low,
+    veg_score_mid: s.veg_score_mid,
+    veg_score_high: s.veg_score_high,
   }));
   const { error: errSettings } = await supabase
     .from('meal_plan_generator_settings')
@@ -767,14 +831,32 @@ export async function createNamePatternAction(
   return { data: null };
 }
 
-const updateSettingsSchema = z.object({
-  dietKey: z.string().min(1),
-  max_ingredients: z.number().int().min(1).max(20),
-  max_flavor_items: z.number().int().min(0).max(5),
-  protein_repeat_cap_7d: z.number().int().min(1).max(14),
-  template_repeat_cap_7d: z.number().int().min(1).max(21),
-  signature_retry_limit: z.number().int().min(1).max(20),
-});
+const updateSettingsSchema = z
+  .object({
+    dietKey: z.string().min(1),
+    max_ingredients: z.number().int().min(1).max(20),
+    max_flavor_items: z.number().int().min(0).max(5),
+    protein_repeat_cap_7d: z.number().int().min(1).max(14),
+    template_repeat_cap_7d: z.number().int().min(1).max(21),
+    signature_retry_limit: z.number().int().min(1).max(20),
+    veg_threshold_low_g: z.number().int().min(1).max(2000),
+    veg_threshold_mid_g: z.number().int().min(1).max(2000),
+    veg_threshold_high_g: z.number().int().min(1).max(2000),
+    veg_score_low: z.number().int().min(0).max(20),
+    veg_score_mid: z.number().int().min(0).max(20),
+    veg_score_high: z.number().int().min(0).max(20),
+  })
+  .refine(
+    (d) =>
+      d.veg_threshold_low_g <= d.veg_threshold_mid_g &&
+      d.veg_threshold_mid_g <= d.veg_threshold_high_g,
+    { message: 'Veg thresholds: low ≤ mid ≤ high' },
+  )
+  .refine(
+    (d) =>
+      d.veg_score_low <= d.veg_score_mid && d.veg_score_mid <= d.veg_score_high,
+    { message: 'Veg scores: low ≤ mid ≤ high' },
+  );
 
 export async function updateGeneratorSettingsAction(
   input: z.infer<typeof updateSettingsSchema>,
@@ -800,6 +882,12 @@ export async function updateGeneratorSettingsAction(
         protein_repeat_cap_7d: parsed.data.protein_repeat_cap_7d,
         template_repeat_cap_7d: parsed.data.template_repeat_cap_7d,
         signature_retry_limit: parsed.data.signature_retry_limit,
+        veg_threshold_low_g: parsed.data.veg_threshold_low_g,
+        veg_threshold_mid_g: parsed.data.veg_threshold_mid_g,
+        veg_threshold_high_g: parsed.data.veg_threshold_high_g,
+        veg_score_low: parsed.data.veg_score_low,
+        veg_score_mid: parsed.data.veg_score_mid,
+        veg_score_high: parsed.data.veg_score_high,
       },
       { onConflict: 'diet_key' },
     )
@@ -1212,7 +1300,11 @@ const previewInputSchema = z.object({
 });
 
 export type PreviewMealPlanResult =
-  | { ok: true; preview: MealPlanResponse }
+  | {
+      ok: true;
+      preview: MealPlanResponse;
+      therapeuticTargets: TherapeuticTargetsSnapshot | null;
+    }
   | {
       ok: false;
       error: string;
@@ -1347,7 +1439,20 @@ export async function previewMealPlanWithCurrentConfigAction(
     meta.generator = generator;
     plan.metadata = meta as MealPlanResponse['metadata'];
 
-    return { ok: true, preview: plan };
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const therapeuticTargets = user
+      ? await buildTherapeuticTargetsSnapshot(supabase, user.id, 'nl').catch(
+          () => undefined,
+        )
+      : undefined;
+
+    return {
+      ok: true,
+      preview: plan,
+      therapeuticTargets: therapeuticTargets ?? null,
+    };
   } catch (e) {
     if (e instanceof AppError) {
       return {
@@ -1391,7 +1496,13 @@ export type PreviewDiff = {
 };
 
 export type ComparePreviewsResult =
-  | { ok: true; a: MealPlanResponse; b: MealPlanResponse; diff: PreviewDiff }
+  | {
+      ok: true;
+      a: MealPlanResponse;
+      b: MealPlanResponse;
+      diff: PreviewDiff;
+      therapeuticTargets: TherapeuticTargetsSnapshot | null;
+    }
   | { ok: false; error: string };
 
 const compareInputSchema = z.object({
@@ -1618,7 +1729,24 @@ export async function compareMealPlanPreviewsAction(
       repeatsForcedDelta: repeatsB - repeatsA,
       byDay,
     };
-    return { ok: true, a: planA, b: planB, diff };
+    const supabaseCompare = await createClient();
+    const {
+      data: { user: compareUser },
+    } = await supabaseCompare.auth.getUser();
+    const therapeuticTargetsCompare = compareUser
+      ? await buildTherapeuticTargetsSnapshot(
+          supabaseCompare,
+          compareUser.id,
+          'nl',
+        ).catch(() => undefined)
+      : undefined;
+    return {
+      ok: true,
+      a: planA,
+      b: planB,
+      diff,
+      therapeuticTargets: therapeuticTargetsCompare ?? null,
+    };
   } catch (e) {
     if (e instanceof AppError) {
       return { ok: false, error: e.message };

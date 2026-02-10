@@ -16,6 +16,7 @@
  * @param args.badOutput - The malformed or invalid output (raw text or stringified JSON)
  * @param args.issues - Summary of issues found (parse errors, schema violations, constraint violations)
  * @param args.responseJsonSchema - The JSON schema that the output must conform to
+ * @param args.hasShakeSmoothiePreference - When true, always add reminder: no meat/kip/vis in shakes/smoothies (so every repair respects this)
  * @returns Formatted repair prompt
  */
 export function buildRepairPrompt(args: {
@@ -23,8 +24,26 @@ export function buildRepairPrompt(args: {
   badOutput: string;
   issues: string;
   responseJsonSchema: object;
+  hasShakeSmoothiePreference?: boolean;
 }): string {
-  const { originalPrompt, badOutput, issues, responseJsonSchema } = args;
+  const {
+    originalPrompt,
+    badOutput,
+    issues,
+    responseJsonSchema,
+    hasShakeSmoothiePreference,
+  } = args;
+  const issuesLower = issues.toLowerCase();
+  const eiwitshakeRepairHint =
+    issuesLower.includes('meal_preference_miss') &&
+    (issuesLower.includes('eiwitshake') || issuesLower.includes('eiwit shake'))
+      ? `\nCRITICAL FIX for MEAL_PREFERENCE_MISS: The user requires "eiwitshake" at breakfast (or the slot mentioned). You MUST replace any fruit-only smoothie (e.g. "Appel Sinaasappel Smoothie", "Granaatappel Smoothie") with a protein shake: the meal name and ingredients MUST include a protein source (eiwitpoeder, whey, protein). A smoothie that only has fruit/drink does NOT satisfy eiwitshake.\n`
+      : '';
+  const shakeNoMeatRepairHint =
+    issuesLower.includes('forbidden_in_shake_smoothie') ||
+    hasShakeSmoothiePreference
+      ? `\nCRITICAL FIX for SHAKES/SMOOTHIES: Shakes and smoothies must NOT contain meat, chicken, or fish (vlees, kip, vis). Remove any such ingredients from the affected meals and replace with dairy, fruit, vegetables, or protein powder only.\n`
+      : '';
 
   return `You previously generated a meal plan, but the output had issues that need to be fixed.
 
@@ -33,7 +52,8 @@ ${originalPrompt}
 
 ISSUES FOUND:
 ${issues}
-
+${eiwitshakeRepairHint}
+${shakeNoMeatRepairHint}
 INVALID OUTPUT (to be repaired):
 ${badOutput}
 

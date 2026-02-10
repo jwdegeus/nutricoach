@@ -16,6 +16,7 @@ export type {
   Meal,
   MealSlot,
   MealIngredientRef,
+  MealPlanVarietyScorecard,
   ConstraintType,
   MacroRange,
   PrepTimePreference,

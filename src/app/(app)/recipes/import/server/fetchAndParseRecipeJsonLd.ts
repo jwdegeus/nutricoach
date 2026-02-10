@@ -6,7 +6,8 @@
  */
 
 import 'server-only';
-import { promises as dns } from 'dns';
+import dns from 'dns';
+import { promises as dnsPromises } from 'dns';
 import type {
   RecipeDraft,
   RecipeExtractionDiagnostics,
@@ -40,6 +41,17 @@ const FETCH_TIMEOUT_MS =
   typeof process !== 'undefined' && process.env.RECIPE_FETCH_TIMEOUT_MS
     ? parseInt(process.env.RECIPE_FETCH_TIMEOUT_MS, 10)
     : 35_000; // 35s standaard; veel receptensites zijn traag (DNS + TTFB)
+/** DNS resolution timeout; Node's dns.resolve4 has no built-in timeout and can hang 60s+ */
+const DNS_TIMEOUT_MS =
+  typeof process !== 'undefined' && process.env.RECIPE_DNS_TIMEOUT_MS
+    ? parseInt(process.env.RECIPE_DNS_TIMEOUT_MS, 10)
+    : 10_000; // 10s max for DNS so total wait is bounded
+
+// Prefer IPv4 so Node's resolver doesn't hang on IPv6; fetch may still work when our DNS is slow
+if (typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder('ipv4first');
+}
+
 const MAX_RESPONSE_SIZE = 3 * 1024 * 1024; // 3MB
 /** Stop met body lezen na deze grootte. Verhoogd zodat JSON-LD (vaak in footer bij WordPress/WPRM) niet wordt afgekapt. */
 const MAX_BODY_READ_SIZE = 2.5 * 1024 * 1024; // 2.5MB
@@ -134,7 +146,7 @@ async function validateHostname(hostname: string): Promise<void> {
   if (isHostnameCached(hostname)) return;
 
   try {
-    const addresses4 = await dns.resolve4(hostname);
+    const addresses4 = await dnsPromises.resolve4(hostname);
     for (const addr of addresses4) {
       if (isPrivateIP(addr)) {
         throw new Error(`Hostname resolves to private IP: ${addr}`);
@@ -147,6 +159,24 @@ async function validateHostname(hostname: string): Promise<void> {
     }
     // DNS resolution failed - allow it to fail at fetch time
   }
+}
+
+/** Run validateHostname with a timeout; Node's dns has no built-in timeout. */
+async function validateHostnameWithTimeout(hostname: string): Promise<void> {
+  await Promise.race([
+    validateHostname(hostname),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `DNS resolution timeout after ${DNS_TIMEOUT_MS}ms. De website is niet bereikbaar.`,
+            ),
+          ),
+        DNS_TIMEOUT_MS,
+      ),
+    ),
+  ]);
 }
 
 /**
@@ -221,17 +251,28 @@ export async function fetchHtml(url: string): Promise<string> {
   }
 
   // Validate hostname and check for private IPs (SSRF)
+  // DNS has no built-in timeout in Node; cap it so we don't wait 60s+.
+  // On timeout we proceed with fetch anyway — fetch uses its own resolver and the site may be reachable.
   const hostname = getHostname(url);
   const dnsStart = Date.now();
   try {
-    await validateHostname(hostname);
+    await validateHostnameWithTimeout(hostname);
     const dnsMs = Date.now() - dnsStart;
     console.log(
       `[fetchHtml] DNS validation passed${dnsMs > 0 ? ` in ${dnsMs}ms` : ''}`,
     );
   } catch (error) {
-    console.error(`[fetchHtml] DNS validation failed:`, error);
-    throw error;
+    const isDnsTimeout =
+      error instanceof Error &&
+      error.message.includes('DNS resolution timeout');
+    if (isDnsTimeout) {
+      console.warn(
+        `[fetchHtml] DNS validation timed out (${hostname}), proceeding with fetch anyway`,
+      );
+    } else {
+      console.error(`[fetchHtml] DNS validation failed:`, error);
+      throw error;
+    }
   }
 
   const fetchStart = Date.now();
@@ -244,19 +285,21 @@ export async function fetchHtml(url: string): Promise<string> {
     let redirectCount = 0;
 
     while (redirectCount <= MAX_REDIRECTS) {
-      // Re-validate hostname for redirects
       const currentHostname = getHostname(currentUrl);
       console.log(
         `[fetchHtml] Attempt ${redirectCount + 1}: Fetching ${currentUrl}`,
       );
-      try {
-        await validateHostname(currentHostname);
-      } catch (error) {
-        console.error(
-          `[fetchHtml] Hostname validation failed for ${currentHostname}:`,
-          error,
-        );
-        throw error;
+      // Only re-validate hostname when following a redirect (new hostname). Initial URL was already validated before the loop (or we proceeded on DNS timeout).
+      if (redirectCount > 0) {
+        try {
+          await validateHostnameWithTimeout(currentHostname);
+        } catch (error) {
+          console.error(
+            `[fetchHtml] Hostname validation failed for ${currentHostname}:`,
+            error,
+          );
+          throw error;
+        }
       }
 
       // Use realistic browser headers to avoid bot detection

@@ -35,12 +35,23 @@ function isValidMealSlotKey(k: string): k is MealSlotValue {
   return (MEAL_SLOT_KEYS as readonly string[]).includes(k);
 }
 
+/** Weekmenu slots: ontbijt, lunch, diner (voor weekmenu inzetten als). */
+export type WeekmenuSlotKey = 'breakfast' | 'lunch' | 'dinner';
+
+const WEEKMENU_SLOT_OPTIONS: { value: WeekmenuSlotKey; label: string }[] = [
+  { value: 'breakfast', label: 'Ontbijt' },
+  { value: 'lunch', label: 'Lunch' },
+  { value: 'dinner', label: 'Diner' },
+];
+
 /** Classification draft: local state for the Classificeren modal (no DB in this step). */
 export type RecipeClassificationDraft = {
   mealSlot: MealSlotValue;
   /** Display label when custom option (e.g. Bijgerecht); overrides formatMealSlot(mealSlot). */
   mealSlotLabel?: string | null;
   mealSlotOptionId: string | null;
+  /** Voor weekmenu inzetten als: ontbijt, lunch en/of diner. Empty = niet voor weekmenu (of fallback op soort). */
+  weekmenuSlots: WeekmenuSlotKey[];
   totalMinutes: number | null;
   servings: number | null;
   sourceName: string;
@@ -343,6 +354,42 @@ export function RecipeClassificationDialog({
                 Laden…
               </Text>
             )}
+          </Field>
+
+          {/* 1b) Voor weekmenu inzetten als (ontbijt, lunch, diner) */}
+          <Field>
+            <Label>Voor weekmenu inzetten als</Label>
+            <Text className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+              Kies in welke maaltijdmomenten dit recept mag verschijnen in het
+              weekmenu. Soort hierboven blijft voor overige weergave.
+            </Text>
+            <div className="mt-2 flex flex-wrap gap-4">
+              {WEEKMENU_SLOT_OPTIONS.map((opt) => {
+                const checked = (value.weekmenuSlots ?? []).includes(opt.value);
+                return (
+                  <label
+                    key={opt.value}
+                    className="flex cursor-pointer items-center gap-2"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        const next = checked
+                          ? (value.weekmenuSlots ?? []).filter(
+                              (s) => s !== opt.value,
+                            )
+                          : [...(value.weekmenuSlots ?? []), opt.value];
+                        update({ weekmenuSlots: next });
+                      }}
+                      disabled={isSaving}
+                      className="rounded border-zinc-300 text-primary-600 focus:ring-primary-500 dark:border-zinc-600 dark:bg-zinc-800"
+                    />
+                    <span className="text-sm text-foreground">{opt.label}</span>
+                  </label>
+                );
+              })}
+            </div>
           </Field>
 
           {/* 2) Bereidingstijd */}

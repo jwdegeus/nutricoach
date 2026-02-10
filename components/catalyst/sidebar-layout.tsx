@@ -74,8 +74,8 @@ export function SidebarLayout({
         {sidebar}
       </MobileSidebar>
 
-      {/* Navbar on mobile - same background as sidebar */}
-      <header className="sticky top-0 z-10 flex flex-col border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900 lg:hidden">
+      {/* Navbar on mobile - same background as sidebar, vaste hoogte voor sticky tabs */}
+      <header className="sticky top-0 z-20 flex h-16 shrink-0 flex-col justify-center border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900 lg:hidden">
         <div className="flex items-center">
           <div className="py-2.5">
             <NavbarItem
@@ -91,8 +91,8 @@ export function SidebarLayout({
 
       {/* Content – geen aparte kaart; vult de breedte enzelfde achtergrond als pagina */}
       <main className="flex flex-1 flex-col pb-2 lg:min-w-0 lg:pr-2 lg:pl-64">
-        {/* Navbar on desktop - same background as sidebar */}
-        <header className="sticky top-0 z-10 hidden border-b border-zinc-200 bg-white px-4 pt-2.5 dark:border-zinc-800 dark:bg-zinc-900 lg:block">
+        {/* Navbar on desktop - vaste hoogte (h-16) zodat AccountSectionTabs (top-16) netjes eronder plakt */}
+        <header className="sticky top-0 z-20 hidden h-16 shrink-0 items-center border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900 lg:flex">
           {navbar}
         </header>
         <div className="flex flex-1 flex-col gap-4 p-6 lg:p-8">

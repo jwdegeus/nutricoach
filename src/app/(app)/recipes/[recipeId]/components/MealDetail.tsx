@@ -281,6 +281,7 @@ export function MealDetail({
     useState<RecipeClassificationDraft>(() => ({
       mealSlot: 'dinner',
       mealSlotOptionId: null,
+      weekmenuSlots: [],
       totalMinutes: null,
       servings: null,
       sourceName: '',
@@ -360,6 +361,7 @@ export function MealDetail({
       return {
         mealSlot,
         mealSlotOptionId: null,
+        weekmenuSlots: [],
         totalMinutes,
         servings,
         sourceName,
@@ -393,6 +395,7 @@ export function MealDetail({
       mealSlot: data.mealSlot,
       mealSlotLabel: data.mealSlotLabel ?? null,
       mealSlotOptionId: data.mealSlotOptionId ?? null,
+      weekmenuSlots: data.weekmenuSlots ?? [],
       totalMinutes: data.totalMinutes,
       servings: data.servings,
       sourceName: data.sourceName ?? '',
@@ -518,6 +521,8 @@ export function MealDetail({
         classification: {
           mealSlot: draft.mealSlot,
           mealSlotOptionId: draft.mealSlotOptionId,
+          weekmenuSlots:
+            draft.weekmenuSlots?.length > 0 ? draft.weekmenuSlots : null,
           totalMinutes: draft.totalMinutes,
           servings: draft.servings,
           sourceName: draft.sourceName ?? null,

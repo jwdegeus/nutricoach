@@ -260,16 +260,28 @@ export function PasswordSection() {
   );
 }
 
-export function HouseholdAvoidRulesSection() {
-  return <HouseholdAvoidRulesClient />;
+export function HouseholdAvoidRulesSection({
+  initialRules,
+}: {
+  initialRules?: import('./actions/household-avoid-rules.actions').HouseholdAvoidRuleRecord[];
+}) {
+  return <HouseholdAvoidRulesClient initialRules={initialRules} />;
 }
 
-export function HouseholdServingsSection() {
-  return <HouseholdServingsClient />;
+export function HouseholdServingsSection({
+  initialPrefs,
+}: {
+  initialPrefs?: import('./actions/household-servings.actions').HouseholdServingsPrefs;
+}) {
+  return <HouseholdServingsClient initialPrefs={initialPrefs} />;
 }
 
-export function MealSlotStylePreferencesSection() {
-  return <MealSlotStylePreferencesClient />;
+export function MealSlotStylePreferencesSection({
+  initialPrefs,
+}: {
+  initialPrefs?: import('./actions/meal-slot-style-preferences.actions').MealSlotStylePreferences;
+}) {
+  return <MealSlotStylePreferencesClient initialPrefs={initialPrefs} />;
 }
 
 export function AccountActionsSection() {

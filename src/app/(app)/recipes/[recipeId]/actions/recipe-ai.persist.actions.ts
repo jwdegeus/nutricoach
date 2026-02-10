@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/src/lib/supabase/server';
+import { getDefaultFamilyMemberId } from '@/src/lib/family/defaultFamilyMember';
 import { RecipeAdaptationDbService } from '../services/recipe-adaptation-db.service';
 import type {
   RecipeAdaptationDraft,
@@ -68,29 +69,41 @@ export async function getCurrentDietIdAction(): Promise<
       };
     }
 
-    // Get active diet profile
-    const { data: profile, error: profileError } = await supabase
-      .from('user_diet_profiles')
-      .select('diet_type_id, diet_types!inner(name)')
-      .eq('user_id', user.id)
-      .is('ends_on', null)
-      .maybeSingle();
+    // Get active diet profile (family as source of truth, then user_diet_profiles)
+    let profile: {
+      diet_type_id: string;
+      diet_types: { name: string } | { name: string }[];
+    } | null = null;
+    const familyMemberId = await getDefaultFamilyMemberId(supabase, user.id);
 
-    if (profileError) {
-      return {
-        ok: false,
-        error: {
-          code: 'DB_ERROR',
-          message: 'Fout bij ophalen dieetprofiel',
-        },
-      };
+    if (familyMemberId) {
+      const { data: fmProfile } = await supabase
+        .from('family_member_diet_profiles')
+        .select('diet_type_id, diet_types!inner(name)')
+        .eq('family_member_id', familyMemberId)
+        .is('ends_on', null)
+        .maybeSingle();
+      profile = fmProfile;
+    }
+
+    if (!profile) {
+      const { data: userProfile, error: profileError } = await supabase
+        .from('user_diet_profiles')
+        .select('diet_type_id, diet_types!inner(name)')
+        .eq('user_id', user.id)
+        .is('ends_on', null)
+        .maybeSingle();
+      if (profileError) {
+        return {
+          ok: false,
+          error: { code: 'DB_ERROR', message: 'Fout bij ophalen dieetprofiel' },
+        };
+      }
+      profile = userProfile;
     }
 
     if (!profile?.diet_type_id) {
-      return {
-        ok: true,
-        data: null, // No diet selected
-      };
+      return { ok: true, data: null };
     }
 
     const dietTypesRow = profile.diet_types as

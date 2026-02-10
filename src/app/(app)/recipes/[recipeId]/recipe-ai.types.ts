@@ -75,9 +75,9 @@ export type RecipeAIState =
 // ============================================================================
 
 /**
- * Keuze per violation: toegestaan alternatief gebruiken, vervangen door substitute, of schrappen.
+ * Keuze per violation: toegestaan alternatief gebruiken, vervangen door substitute, schrappen, of behouden (alleen bij niet gewenst).
  */
-export type ViolationChoice = 'use_allowed' | 'substitute' | 'remove';
+export type ViolationChoice = 'use_allowed' | 'substitute' | 'remove' | 'keep';
 
 /**
  * Input for requesting recipe adaptation
@@ -133,6 +133,8 @@ export type ViolationDetail = {
   allowedAlternativeInText?: string;
   /** Verboden term die gematcht is (bv. "butter") – voor weergave en substitutie */
   matchedForbiddenTerm?: string;
+  /** Concreet vervangingsopties (bv. ["coconut aminos", "sea salt"]) – voor selecteerbare alternatieven in de UI */
+  substitutionSuggestions?: string[];
 };
 
 /**

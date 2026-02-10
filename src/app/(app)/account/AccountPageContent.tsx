@@ -2,7 +2,6 @@
 
 import { AccountSectionTabs } from '@/src/components/app/AccountSectionTabs';
 import { AccountProfile } from './account-profile';
-import { DietPreferencesForm } from './diet-preferences-form';
 import { LanguageSelector } from './language-selector';
 import type { User } from '@supabase/supabase-js';
 import { useTranslations } from 'next-intl';
@@ -38,28 +37,6 @@ export function AccountPageContent({ user }: AccountPageContentProps) {
           </div>
           <div className="md:col-span-2">
             <AccountProfile user={user} hideSectionHeading />
-          </div>
-        </section>
-
-        <section
-          id="diet"
-          className="grid max-w-7xl grid-cols-1 gap-x-8 gap-y-10 px-4 py-16 sm:px-6 md:grid-cols-3 lg:px-8"
-          aria-labelledby="diet-heading"
-        >
-          <div>
-            <h2
-              id="diet-heading"
-              className="text-base/7 font-semibold text-zinc-950 dark:text-white"
-            >
-              {t('dietPreferences')}
-            </h2>
-            <p className="mt-1 text-sm/6 text-zinc-500 dark:text-zinc-400">
-              Pas je dieetvoorkeuren aan. Deze instellingen worden gebruikt voor
-              het plannen van je maaltijden.
-            </p>
-          </div>
-          <div className="md:col-span-2">
-            <DietPreferencesForm hideSectionHeading />
           </div>
         </section>
 

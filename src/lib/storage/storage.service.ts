@@ -10,10 +10,92 @@
  */
 
 import 'server-only';
+import { promises as dnsPromises } from 'dns';
 import { put } from '@vercel/blob';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
+
+/** SSRF: only allow this many redirects when fetching pantry product images */
+const MAX_PANTRY_IMAGE_REDIRECTS = 3;
+/** DNS resolution timeout for hostname validation (Node dns has no built-in timeout) */
+const DNS_TIMEOUT_MS = 10_000;
+
+/** Private / loopback / link-local / CGNAT / multicast (IPv4 + IPv6) */
+const PRIVATE_IP_RANGES: { start: string; end: string }[] = [
+  { start: '10.0.0.0', end: '10.255.255.255' },
+  { start: '172.16.0.0', end: '172.31.255.255' },
+  { start: '192.168.0.0', end: '192.168.255.255' },
+  { start: '127.0.0.0', end: '127.255.255.255' },
+  { start: '169.254.0.0', end: '169.254.255.255' },
+  { start: '100.64.0.0', end: '100.127.255.255' }, // CGNAT
+  { start: '224.0.0.0', end: '239.255.255.255' }, // IPv4 multicast
+  { start: '::1', end: '::1' },
+  { start: 'fc00::', end: 'fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff' },
+  { start: 'fe80::', end: 'febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff' },
+];
+
+function isPrivateIp(ip: string): boolean {
+  const trimmed = ip.trim().toLowerCase();
+  if (trimmed.includes(':')) {
+    if (trimmed === '::1') return true;
+    if (trimmed.startsWith('fe80:')) return true;
+    if (trimmed.startsWith('fc') || trimmed.startsWith('fd')) return true;
+    if (trimmed.startsWith('ff')) return true; // IPv6 multicast
+    return false;
+  }
+  const parts = trimmed.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((p) => Number.isNaN(p))) return false;
+  for (const range of PRIVATE_IP_RANGES) {
+    if (range.start.includes(':')) continue;
+    const [s1, s2, s3, s4] = range.start.split('.').map(Number);
+    const [e1, e2, e3, e4] = range.end.split('.').map(Number);
+    if (
+      parts[0] >= s1 &&
+      parts[0] <= e1 &&
+      parts[1] >= s2 &&
+      parts[1] <= e2 &&
+      parts[2] >= s3 &&
+      parts[2] <= e3 &&
+      parts[3] >= s4 &&
+      parts[3] <= e4
+    )
+      return true;
+  }
+  return false;
+}
+
+/** Resolve hostname (A + AAAA) and reject if any address is private/loopback/multicast. */
+async function resolveAndValidateHostname(host: string): Promise<void> {
+  const [addrs4, addrs6] = await Promise.all([
+    dnsPromises.resolve4(host).catch(() => [] as string[]),
+    dnsPromises.resolve6(host).catch(() => [] as string[]),
+  ]);
+  const all = [...addrs4, ...addrs6];
+  for (const addr of all) {
+    if (isPrivateIp(addr)) {
+      throw new Error(`SSRF: host resolves to private IP`);
+    }
+  }
+}
+
+/** Run resolveAndValidateHostname with a timeout. */
+function resolveAndValidateHostnameWithTimeout(host: string): Promise<void> {
+  return Promise.race([
+    resolveAndValidateHostname(host),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('DNS_TIMEOUT')), DNS_TIMEOUT_MS),
+    ),
+  ]);
+}
+
+/** Reject if URL is not absolute HTTPS or host resolves to private IP. */
+async function assertSafePublicUrl(url: URL): Promise<void> {
+  if (url.protocol !== 'https:') {
+    throw new Error('NOT_HTTPS');
+  }
+  await resolveAndValidateHostnameWithTimeout(url.hostname);
+}
 
 export type StorageProvider = 'blob' | 'local' | 'cdn' | 's3';
 
@@ -26,6 +108,35 @@ export interface StorageConfig {
 export interface UploadResult {
   url: string;
   path: string;
+}
+
+/** Structured failure codes for pantry product image mirroring (no PII in payload). */
+export type MirrorFailCode =
+  | 'INVALID_URL'
+  | 'NOT_HTTPS'
+  | 'DNS_TIMEOUT'
+  | 'DNS_UNSAFE_IP'
+  | 'TOO_MANY_REDIRECTS'
+  | 'INVALID_REDIRECT'
+  | 'FETCH_ERROR'
+  | 'NOT_IMAGE'
+  | 'TOO_LARGE'
+  | 'UPLOAD_ERROR';
+
+export type UploadPantryProductImageResult =
+  | UploadResult
+  | { url: null; code: MirrorFailCode };
+
+function mirrorFailCodeFromError(err: unknown): MirrorFailCode {
+  const msg = err instanceof Error ? err.message : '';
+  if (msg === 'NOT_HTTPS') return 'NOT_HTTPS';
+  if (msg === 'DNS_TIMEOUT') return 'DNS_TIMEOUT';
+  if (msg.includes('private IP')) return 'DNS_UNSAFE_IP';
+  return 'INVALID_REDIRECT';
+}
+
+function logMirrorFail(code: MirrorFailCode, host: string): void {
+  console.warn(`mirror_fail code=${code} host=${host}`);
 }
 
 /** Check if a path or URL is a Vercel Blob URL (for delete/display logic). */
@@ -99,7 +210,253 @@ export class StorageService {
     filename: string,
     userId: string,
   ): Promise<UploadResult> {
-    return this.uploadBlob(file, filename, userId);
+    return this.uploadBlob(file, filename, userId, 'recipe-images');
+  }
+
+  /**
+   * Upload pantry product image to Vercel Blob.
+   * Path: pantry-images/{userId}/{timestamp}-{filename}
+   */
+  async uploadPantryImageToBlob(
+    file: Buffer | string,
+    filename: string,
+    userId: string,
+    pantryItemId?: string,
+  ): Promise<UploadResult> {
+    const prefix = pantryItemId
+      ? `pantry-images/${userId}/${pantryItemId}`
+      : `pantry-images/${userId}`;
+    return this.uploadBlob(file, filename, userId, prefix, pantryItemId);
+  }
+
+  /**
+   * Fetch an image from an external URL (e.g. Open Food Facts, Albert Heijn)
+   * and upload it to Vercel Blob under a dedicated prefix so product images
+   * stay separate from user-uploaded pantry images.
+   * Path: pantry-product-images/{userId}/{timestamp}-{slug}.{ext}
+   * SSRF-hardened: https-only, DNS/private-IP block, redirects re-validated (max 3).
+   * Returns structured result; on failure logs mirror_fail code= host= (no PII/URL).
+   *
+   * @param externalUrl - Full URL of the product image
+   * @param userId - Current user id for path
+   * @param slug - Safe filename segment (e.g. barcode-source)
+   * @returns UploadResult on success, or { url: null, code: MirrorFailCode } on failure
+   */
+  async uploadPantryProductImageFromUrl(
+    externalUrl: string,
+    userId: string,
+    slug: string,
+  ): Promise<UploadPantryProductImageResult> {
+    const maxBytes = 5 * 1024 * 1024; // 5MB
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(externalUrl);
+    } catch {
+      logMirrorFail('INVALID_URL', '?');
+      return { url: null, code: 'INVALID_URL' };
+    }
+    if (!parsedUrl.protocol || parsedUrl.hostname === '') {
+      logMirrorFail('INVALID_URL', parsedUrl.hostname || '?');
+      return { url: null, code: 'INVALID_URL' };
+    }
+    const safeHostForLog = parsedUrl.hostname;
+
+    try {
+      await assertSafePublicUrl(parsedUrl);
+    } catch (err) {
+      const code = mirrorFailCodeFromError(err);
+      logMirrorFail(code, safeHostForLog);
+      return { url: null, code };
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    let currentUrl = externalUrl;
+    let res: Response | null = null;
+
+    try {
+      for (
+        let redirectCount = 0;
+        redirectCount <= MAX_PANTRY_IMAGE_REDIRECTS;
+        redirectCount++
+      ) {
+        try {
+          await assertSafePublicUrl(new URL(currentUrl));
+        } catch (err) {
+          clearTimeout(timeout);
+          const code = mirrorFailCodeFromError(err);
+          const redirectHost = (() => {
+            try {
+              return new URL(currentUrl).hostname;
+            } catch {
+              return '?';
+            }
+          })();
+          logMirrorFail(code, redirectHost);
+          return { url: null, code: 'INVALID_REDIRECT' };
+        }
+
+        const response = await fetch(currentUrl, {
+          signal: controller.signal,
+          headers: { Accept: 'image/*' },
+          redirect: 'manual',
+        });
+
+        if (response.status >= 300 && response.status < 400) {
+          if (redirectCount === MAX_PANTRY_IMAGE_REDIRECTS) {
+            clearTimeout(timeout);
+            logMirrorFail('TOO_MANY_REDIRECTS', new URL(currentUrl).hostname);
+            return { url: null, code: 'TOO_MANY_REDIRECTS' };
+          }
+          const location = response.headers.get('location');
+          if (!location || location.trim() === '') {
+            clearTimeout(timeout);
+            logMirrorFail('INVALID_REDIRECT', new URL(currentUrl).hostname);
+            return { url: null, code: 'INVALID_REDIRECT' };
+          }
+          let nextUrl: URL;
+          try {
+            nextUrl = new URL(location, currentUrl);
+          } catch {
+            clearTimeout(timeout);
+            logMirrorFail('INVALID_REDIRECT', new URL(currentUrl).hostname);
+            return { url: null, code: 'INVALID_REDIRECT' };
+          }
+          if (nextUrl.hostname === '') {
+            clearTimeout(timeout);
+            logMirrorFail('INVALID_REDIRECT', '?');
+            return { url: null, code: 'INVALID_REDIRECT' };
+          }
+          try {
+            await assertSafePublicUrl(nextUrl);
+          } catch (err) {
+            clearTimeout(timeout);
+            const code = mirrorFailCodeFromError(err);
+            logMirrorFail(code, nextUrl.hostname);
+            return { url: null, code: 'INVALID_REDIRECT' };
+          }
+          currentUrl = nextUrl.href;
+          continue;
+        }
+
+        if (!response.ok || !response.body) {
+          clearTimeout(timeout);
+          logMirrorFail('FETCH_ERROR', new URL(currentUrl).hostname);
+          return { url: null, code: 'FETCH_ERROR' };
+        }
+        res = response;
+        break;
+      }
+
+      clearTimeout(timeout);
+      if (!res || !res.body) {
+        logMirrorFail('FETCH_ERROR', safeHostForLog);
+        return { url: null, code: 'FETCH_ERROR' };
+      }
+
+      const contentType = (res.headers.get('content-type') ?? '').toLowerCase();
+      if (!contentType.startsWith('image/')) {
+        logMirrorFail('NOT_IMAGE', safeHostForLog);
+        return { url: null, code: 'NOT_IMAGE' };
+      }
+
+      const ext = contentType.includes('png')
+        ? 'png'
+        : contentType.includes('webp')
+          ? 'webp'
+          : contentType.includes('gif')
+            ? 'gif'
+            : 'jpg';
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      const reader = res.body.getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.length;
+        if (total > maxBytes) {
+          logMirrorFail('TOO_LARGE', safeHostForLog);
+          return { url: null, code: 'TOO_LARGE' };
+        }
+        chunks.push(value);
+      }
+      const buffer = Buffer.concat(chunks);
+      const filename = `${this.sanitizeFilename(slug)}.${ext}`;
+      try {
+        return await this.uploadBlob(
+          buffer,
+          filename,
+          userId,
+          'pantry-product-images',
+          userId,
+        );
+      } catch {
+        logMirrorFail('UPLOAD_ERROR', safeHostForLog);
+        return { url: null, code: 'UPLOAD_ERROR' };
+      }
+    } catch (err) {
+      clearTimeout(timeout);
+      const host = (() => {
+        try {
+          return new URL(currentUrl).hostname;
+        } catch {
+          return '?';
+        }
+      })();
+      logMirrorFail('FETCH_ERROR', host);
+      return { url: null, code: 'FETCH_ERROR' };
+    }
+  }
+
+  /**
+   * Legacy wrapper: returns blob URL string or null. Prefer uploadPantryProductImageFromUrl for observability.
+   */
+  async uploadPantryProductImageFromUrlLegacy(
+    externalUrl: string,
+    userId: string,
+    slug: string,
+  ): Promise<string | null> {
+    const res = await this.uploadPantryProductImageFromUrl(
+      externalUrl,
+      userId,
+      slug,
+    );
+    return res.url;
+  }
+
+  /**
+   * Upload avatar for account (user). Path: avatars/account/{userId}/...
+   */
+  async uploadAvatarForAccount(
+    file: Buffer | string,
+    filename: string,
+    userId: string,
+  ): Promise<UploadResult> {
+    if (this.provider === 'blob') {
+      return this.uploadBlob(file, filename, userId, 'avatars/account', userId);
+    }
+    return this.uploadLocalAvatar(file, filename, 'account', userId);
+  }
+
+  /**
+   * Upload avatar for a family member. Path: avatars/family/{memberId}/...
+   */
+  async uploadAvatarForFamilyMember(
+    file: Buffer | string,
+    filename: string,
+    userId: string,
+    familyMemberId: string,
+  ): Promise<UploadResult> {
+    if (this.provider === 'blob') {
+      return this.uploadBlob(
+        file,
+        filename,
+        userId,
+        'avatars/family',
+        familyMemberId,
+      );
+    }
+    return this.uploadLocalAvatar(file, filename, 'family', familyMemberId);
   }
 
   /**
@@ -117,7 +474,7 @@ export class StorageService {
   ): Promise<UploadResult> {
     switch (this.provider) {
       case 'blob':
-        return this.uploadBlob(file, filename, userId);
+        return this.uploadBlob(file, filename, userId, 'recipe-images');
       case 'local':
         return this.uploadLocal(file, filename, userId);
       case 'cdn':
@@ -162,15 +519,20 @@ export class StorageService {
 
   /**
    * Upload to Vercel Blob storage (public access).
+   * @param pathPrefix - e.g. 'recipe-images', 'avatars/account', 'avatars/family'
+   * @param ownerId - user_id or family_member_id for path segment
    */
   private async uploadBlob(
     file: Buffer | string,
     filename: string,
     userId: string,
+    pathPrefix = 'recipe-images',
+    ownerId?: string,
   ): Promise<UploadResult> {
     const sanitizedFilename = this.sanitizeFilename(filename);
     const timestamp = Date.now();
-    const pathname = `recipe-images/${userId}/${timestamp}-${sanitizedFilename}`;
+    const id = ownerId ?? userId;
+    const pathname = `${pathPrefix}/${id}/${timestamp}-${sanitizedFilename}`;
     const fileBuffer =
       typeof file === 'string' ? Buffer.from(file, 'base64') : file;
 
@@ -184,6 +546,38 @@ export class StorageService {
       url: blob.url,
       path: blob.url,
     };
+  }
+
+  /** Base dir for local avatar uploads (sibling of recipe-images). */
+  private get avatarLocalPath(): string {
+    const base =
+      this.config.localPath ?? join(process.cwd(), 'public', 'uploads');
+    return join(base, '..', 'avatars');
+  }
+
+  /**
+   * Upload avatar to local filesystem (account or family subdir).
+   */
+  private async uploadLocalAvatar(
+    file: Buffer | string,
+    filename: string,
+    scope: 'account' | 'family',
+    ownerId: string,
+  ): Promise<UploadResult> {
+    const sanitizedFilename = this.sanitizeFilename(filename);
+    const timestamp = Date.now();
+    const finalFilename = `${timestamp}-${sanitizedFilename}`;
+    const dir = join(this.avatarLocalPath, scope, ownerId);
+    if (!existsSync(dir)) {
+      await mkdir(dir, { recursive: true });
+    }
+    const filePath = join(dir, finalFilename);
+    const fileBuffer =
+      typeof file === 'string' ? Buffer.from(file, 'base64') : file;
+    await writeFile(filePath, fileBuffer);
+    const publicPath = filePath.replace(join(process.cwd(), 'public'), '');
+    const url = publicPath.startsWith('/') ? publicPath : `/${publicPath}`;
+    return { url, path: filePath };
   }
 
   /**

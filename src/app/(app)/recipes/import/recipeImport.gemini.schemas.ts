@@ -104,10 +104,14 @@ export const geminiExtractedRecipeSchema = z.object({
   language_detected: z
     .string()
     .nullable()
+    .optional()
+    .default(null)
     .describe("Detected source language code (e.g., 'en', 'nl', 'de')"),
   translated_to: z
     .string()
     .nullable()
+    .optional()
+    .default(null)
     .describe(
       'Target language code for translation (null if not translated yet)',
     ),

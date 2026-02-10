@@ -34,6 +34,7 @@ import type {
   EvaluationContext,
   Locale,
 } from '@/src/lib/guardrails-vnext/types';
+import { suggestConcreteSubstitutes } from './gemini-recipe-adaptation.service';
 
 /** Haal eerste voorgestelde alternatief uit suggestion-tekst (bijv. "Vervang door X of Y" → "X"). */
 function firstSuggestedAlternativeFromSuggestion(
@@ -46,6 +47,17 @@ function firstSuggestedAlternativeFromSuggestion(
     .map((s) => s.trim())
     .filter(Boolean)[0];
   return first || null;
+}
+
+/** Of de suggestie een generieke placeholder is (geen concreet ingrediënt om te gebruiken). */
+function isGenericSuggestion(text: string): boolean {
+  if (!text || typeof text !== 'string') return true;
+  const t = text.trim().toLowerCase();
+  return (
+    t.includes('dieet-compatibele variant') ||
+    t.includes('vervang dit ingrediënt voor een') ||
+    t.includes('vervang voor een dieet-compatibele')
+  );
 }
 
 /**
@@ -1556,14 +1568,25 @@ export class RecipeAdaptationService {
 
       if (matches.length > 0) {
         const match = matches[0];
-        const substitution =
-          match.substitutionSuggestions &&
-          match.substitutionSuggestions.length > 0
-            ? match.substitutionSuggestions[0] +
-              (match.substitutionSuggestions.length > 1
-                ? ` of ${match.substitutionSuggestions.slice(1, 3).join(', ')}`
-                : '')
-            : null;
+        const isLegumesRule = (code: string, label: string) =>
+          /legumes?|peulvruchten/i.test(code) ||
+          /peulvruchten|legumes?/i.test(label);
+        const defaultLegumeAlternatives = [
+          'meer groente (bijv. sperziebonen, courgette)',
+          'extra eiwit (ei, vis)',
+          'paprika of broccoli',
+        ];
+        const substitutionSuggestions = match.substitutionSuggestions?.length
+          ? match.substitutionSuggestions
+          : isLegumesRule(match.ruleCode, match.ruleLabel)
+            ? defaultLegumeAlternatives
+            : undefined;
+        const substitution = substitutionSuggestions?.length
+          ? substitutionSuggestions[0] +
+            (substitutionSuggestions.length > 1
+              ? ` of ${substitutionSuggestions.slice(1, 3).join(', ')}`
+              : '')
+          : null;
         const suggestion =
           match.allowedAlternativeInText && substitution
             ? `Kies ${match.allowedAlternativeInText}, of vervang ${match.matched} door ${substitution}`
@@ -1579,6 +1602,7 @@ export class RecipeAdaptationService {
           suggestion,
           allowedAlternativeInText: match.allowedAlternativeInText ?? undefined,
           matchedForbiddenTerm: match.matched,
+          substitutionSuggestions,
         });
         foundIngredients.add(lowerName);
 
@@ -1685,6 +1709,7 @@ export class RecipeAdaptationService {
                 match.substitutionSuggestions.length > 0
                   ? `Vervang door ${match.substitutionSuggestions[0]} of verminder de hoeveelheid`
                   : `Verminder of vervang dit ingrediënt`,
+              substitutionSuggestions: match.substitutionSuggestions,
             });
             console.log(
               `[RecipeAdaptation] ✓ Found sugar violation in step: ${match.matched}`,
@@ -1700,6 +1725,7 @@ export class RecipeAdaptationService {
                 match.substitutionSuggestions.length > 0
                   ? `Vervang door ${match.substitutionSuggestions[0]}${match.substitutionSuggestions.length > 1 ? ` of ${match.substitutionSuggestions.slice(1, 3).join(', ')}` : ''}`
                   : `Vervang dit ingrediënt voor een dieet-compatibele variant`,
+              substitutionSuggestions: match.substitutionSuggestions,
             });
             console.log(
               `[RecipeAdaptation] ✓ Found ingredient violation in step: ${match.matched} (${match.ruleCode})`,
@@ -1855,10 +1881,19 @@ export class RecipeAdaptationService {
           continue;
         }
 
-        const substitute =
+        if (choice === 'keep') {
+          continue;
+        }
+
+        let substitute: string | undefined =
           choice === 'use_allowed' && violation.allowedAlternativeInText
             ? violation.allowedAlternativeInText.trim()
-            : (violationChoices?.[j]?.substitute ?? defaultSubstitute);
+            : (violationChoices?.[j]?.substitute ??
+              defaultSubstitute ??
+              undefined);
+        if (substitute && isGenericSuggestion(substitute)) {
+          substitute = undefined;
+        }
 
         if (substitute) {
           const key = violation.ingredientName.toLowerCase().trim();
@@ -2114,7 +2149,7 @@ export class RecipeAdaptationService {
       throw new Error('User not authenticated');
     }
 
-    const [recipe, ruleset, _dietName] = await Promise.all([
+    const [recipe, ruleset, dietName] = await Promise.all([
       this.loadRecipe(recipeId, user.id),
       this.loadDietRuleset(dietId),
       this.getDietName(dietId),
@@ -2201,7 +2236,7 @@ export class RecipeAdaptationService {
 
     if (violations.length > 0) {
       // Alleen niet-conforme ingredienten vervangen; recept en volgorde behouden (geen volledige herschrijving).
-      const defaultChoices: Array<{
+      let defaultChoices: Array<{
         choice: ViolationChoice;
         substitute?: string;
       }> =
@@ -2216,6 +2251,32 @@ export class RecipeAdaptationService {
             substitute: sub ?? undefined,
           };
         });
+      const indicesNeedingAISubstitute = defaultChoices
+        .map((c, j) =>
+          c.choice === 'substitute' &&
+          (!c.substitute || isGenericSuggestion(c.substitute))
+            ? j
+            : -1,
+        )
+        .filter((j) => j >= 0);
+      if (indicesNeedingAISubstitute.length > 0 && dietName) {
+        const aiSubs = await suggestConcreteSubstitutes(
+          {
+            mealData: recipe.mealData,
+            mealName: recipe.mealName,
+            steps: recipe.steps,
+          },
+          violations,
+          indicesNeedingAISubstitute,
+          ruleset,
+          dietName,
+        );
+        defaultChoices = defaultChoices.map((c, j) => {
+          const sub = aiSubs.get(j);
+          if (sub != null) return { ...c, substitute: sub };
+          return c;
+        });
+      }
       const {
         ingredients: rewriteIngredients,
         steps: rewriteSteps,

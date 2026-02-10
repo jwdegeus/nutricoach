@@ -1,17 +1,23 @@
 import type { Metadata } from 'next';
 import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/src/lib/supabase/server';
+import { getDefaultFamilyMemberId } from '@/src/lib/family/defaultFamilyMember';
 import { loadMealPlanAction } from '../actions/mealPlans.actions';
 import { getNevoFoodByCode } from '@/src/lib/nevo/nutrition-calculator';
-import { MealPlanSummary } from './components/MealPlanSummary';
 import { MealPlanActionsClient } from './components/MealPlanActionsClient';
 import { MealPlanPageWrapper } from './components/MealPlanPageWrapper';
 import { MealPlanPageClient } from './components/MealPlanPageClient';
 import { MealPlanDraftBannerClient } from './components/MealPlanDraftBannerClient';
 import { MealPlanHeaderMeta } from '../components/MealPlanHeaderMeta';
+import { TherapeuticSummaryCard } from '../components/TherapeuticSummaryCard';
 import { Heading } from '@/components/catalyst/heading';
 import { Text } from '@/components/catalyst/text';
 import { Link } from '@/components/catalyst/link';
+import type {
+  TherapeuticTargetsSnapshot,
+  TherapeuticCoverageSnapshot,
+  TherapeuticSupplementsSummary,
+} from '@/src/lib/diets/diet.types';
 
 export const metadata: Metadata = {
   title: 'Weekmenu | NutriCoach',
@@ -60,27 +66,47 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
     .maybeSingle();
   const cronJobId = (cronJob as { id: string } | null)?.id ?? null;
 
-  // Get diet type name - first try from user's active profile, then from diet_types table by name
+  // Get diet type name - from default family member or user's active profile, then diet_types table
   let dietTypeName = plan.dietKey.replace(/_/g, ' '); // Fallback
 
-  // First, try to get from user's active profile
-  const { data: dietProfile } = await supabase
-    .from('user_diet_profiles')
-    .select('diet_type_id, diet_types(name)')
-    .eq('user_id', user.id)
-    .is('ends_on', null) // Active profile
-    .maybeSingle();
-
   let dietTypeNameFromDB: string | null = null;
+  const familyMemberId = await getDefaultFamilyMemberId(supabase, user.id);
 
-  if (dietProfile?.diet_types) {
-    const dietTypesRow = dietProfile.diet_types as
-      | { name: string }[]
-      | { name: string }
-      | null;
-    dietTypeNameFromDB = Array.isArray(dietTypesRow)
-      ? (dietTypesRow[0]?.name ?? null)
-      : ((dietTypesRow as { name: string } | null)?.name ?? null);
+  if (familyMemberId) {
+    const { data: fmDiet } = await supabase
+      .from('family_member_diet_profiles')
+      .select('diet_type_id, diet_types(name)')
+      .eq('family_member_id', familyMemberId)
+      .is('ends_on', null)
+      .maybeSingle();
+    if (fmDiet?.diet_types) {
+      const dt = fmDiet.diet_types as
+        | { name: string }[]
+        | { name: string }
+        | null;
+      dietTypeNameFromDB = Array.isArray(dt)
+        ? (dt[0]?.name ?? null)
+        : (dt?.name ?? null);
+    }
+  }
+
+  if (!dietTypeNameFromDB) {
+    const { data: dietProfile } = await supabase
+      .from('user_diet_profiles')
+      .select('diet_type_id, diet_types(name)')
+      .eq('user_id', user.id)
+      .is('ends_on', null)
+      .maybeSingle();
+
+    if (dietProfile?.diet_types) {
+      const dietTypesRow = dietProfile.diet_types as
+        | { name: string }[]
+        | { name: string }
+        | null;
+      dietTypeNameFromDB = Array.isArray(dietTypesRow)
+        ? (dietTypesRow[0]?.name ?? null)
+        : ((dietTypesRow as { name: string } | null)?.name ?? null);
+    }
   }
 
   // If not found in profile, try to find by name in diet_types table (using plan.dietKey)
@@ -162,6 +188,64 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
     totalProvenance > 0 && reused != null
       ? Math.round((reused / totalProvenance) * 100)
       : 0;
+
+  const dbCoverageMeta = currentSnapshot?.metadata?.dbCoverage as
+    | { dbSlots: number; totalSlots: number; percent: number }
+    | undefined;
+  const fallbackReasonsMeta = currentSnapshot?.metadata?.fallbackReasons as
+    | { reason: string; count: number }[]
+    | undefined;
+  const showDbCoveragePanel =
+    dbCoverageMeta != null &&
+    typeof dbCoverageMeta.dbSlots === 'number' &&
+    typeof dbCoverageMeta.totalSlots === 'number';
+
+  const slotProvenance = (
+    currentSnapshot?.metadata as Record<string, unknown> | undefined
+  )?.slotProvenance as
+    | Record<string, { source: string; reason?: string }>
+    | undefined;
+  const SLOT_LABELS: Record<string, string> = {
+    breakfast: 'Ontbijt',
+    lunch: 'Lunch',
+    dinner: 'Avondeten',
+  };
+  const REASON_LABELS: Record<string, string> = {
+    no_candidates: 'Geen passende recepten',
+    repeat_window_blocked: 'Variatie-venster te streng',
+    missing_ingredient_refs: 'NEVO ontbreekt',
+    all_candidates_blocked_by_constraints: 'Geblokkeerd door regels',
+    ai_candidate_blocked_by_constraints: 'AI voorstel geblokkeerd',
+  };
+  const reasonLabelFor = (reason: string) =>
+    REASON_LABELS[reason] ?? 'Onbekende reden';
+  let hasMissingRefs = false;
+  const aiSlotsList: {
+    date: string;
+    slotLabel: string;
+    reasonLabel: string;
+  }[] = [];
+  if (
+    slotProvenance &&
+    showDbCoveragePanel &&
+    dbCoverageMeta &&
+    dbCoverageMeta.dbSlots < dbCoverageMeta.totalSlots
+  ) {
+    for (const [key, entry] of Object.entries(slotProvenance)) {
+      if (entry?.source !== 'ai' || !entry.reason) continue;
+      if (entry.reason === 'missing_ingredient_refs') hasMissingRefs = true;
+      const date = key.slice(0, 10);
+      const slot = key.slice(11);
+      const slotLabel = SLOT_LABELS[slot] ?? slot;
+      const reasonLabel = reasonLabelFor(entry.reason);
+      aiSlotsList.push({ date, slotLabel, reasonLabel });
+    }
+    aiSlotsList.sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) || a.slotLabel.localeCompare(b.slotLabel),
+    );
+  }
+  const aiSlotsDisplay = aiSlotsList.slice(0, 10);
 
   // Servings metadata (defensive: plan may have been scaled to household)
   const servingsMeta = (
@@ -256,6 +340,46 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
   const showGuardrailsMeta =
     constraintsInPrompt === true || contentHash != null || version != null;
 
+  // Therapeutic: from snapshot metadata, fallback to request (no extra fetch)
+  const meta = currentSnapshot?.metadata as
+    | {
+        therapeuticTargets?: TherapeuticTargetsSnapshot;
+        therapeuticCoverage?: TherapeuticCoverageSnapshot;
+      }
+    | undefined;
+  const requestTargets = (
+    plan.requestSnapshot as
+      | { therapeuticTargets?: TherapeuticTargetsSnapshot }
+      | undefined
+  )?.therapeuticTargets;
+  const therapeuticTargets =
+    meta != null && typeof meta.therapeuticTargets === 'object'
+      ? (meta.therapeuticTargets as TherapeuticTargetsSnapshot)
+      : typeof requestTargets === 'object' && requestTargets != null
+        ? requestTargets
+        : null;
+  const therapeuticCoverage =
+    meta != null && typeof meta.therapeuticCoverage === 'object'
+      ? (meta.therapeuticCoverage as TherapeuticCoverageSnapshot)
+      : null;
+  const hasTherapeuticTargets =
+    therapeuticTargets != null &&
+    (therapeuticTargets.protocol != null ||
+      (therapeuticTargets.daily != null &&
+        typeof therapeuticTargets.daily === 'object'));
+
+  // Supplementen samenvatting uit plan metadata (geen extra fetch)
+  const supplementsSummary =
+    meta != null &&
+    typeof (meta as { therapeuticSupplementsSummary?: unknown })
+      .therapeuticSupplementsSummary === 'object'
+      ? (
+          meta as {
+            therapeuticSupplementsSummary: TherapeuticSupplementsSummary;
+          }
+        ).therapeuticSupplementsSummary
+      : null;
+
   // Build NEVO food names map for client components
   const nevoCodes = new Set<string>();
   for (const day of plan.planSnapshot.days) {
@@ -336,6 +460,7 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
         contentHash={contentHash}
         version={version}
         showGuardrailsMeta={showGuardrailsMeta}
+        hasTherapeuticTargets={hasTherapeuticTargets}
         reuse={
           showProvenanceCounters && reused !== null && generated !== null
             ? { reused, generated, reusePct }
@@ -343,9 +468,75 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
         }
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <MealPlanSummary plan={plan} dietTypeName={dietTypeName} />
-        <div id="acties">
+      {showDbCoveragePanel && dbCoverageMeta && (
+        <div className="rounded-xl bg-muted/20 px-4 py-3 shadow-sm">
+          <p className="text-sm font-medium text-foreground">
+            DB coverage: {dbCoverageMeta.dbSlots}/{dbCoverageMeta.totalSlots} (
+            {dbCoverageMeta.percent}%)
+          </p>
+          {dbCoverageMeta.dbSlots < dbCoverageMeta.totalSlots &&
+            Array.isArray(fallbackReasonsMeta) &&
+            fallbackReasonsMeta.length > 0 && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                AI redenen:{' '}
+                {fallbackReasonsMeta
+                  .map((r) => `${reasonLabelFor(r.reason)} (${r.count})`)
+                  .join(', ')}
+              </p>
+            )}
+        </div>
+      )}
+
+      {showDbCoveragePanel &&
+        dbCoverageMeta &&
+        dbCoverageMeta.dbSlots < dbCoverageMeta.totalSlots &&
+        aiSlotsDisplay.length > 0 && (
+          <div className="space-y-2 rounded-xl bg-muted/20 px-4 py-3 shadow-sm">
+            <p className="text-sm font-medium text-foreground">AI ingevuld</p>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {aiSlotsDisplay.map((item) => (
+                <li key={`${item.date}-${item.slotLabel}`}>
+                  {item.date} – {item.slotLabel}: {item.reasonLabel}
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              {hasMissingRefs && (
+                <Link
+                  href="/recipes?filter=nevo-missing"
+                  className="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                >
+                  Fix NEVO ontbreekt
+                </Link>
+              )}
+              <Link
+                href="/recipes"
+                className="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+              >
+                Open receptenbank
+              </Link>
+            </div>
+          </div>
+        )}
+
+      <div
+        className={
+          hasTherapeuticTargets
+            ? 'grid grid-cols-1 gap-6 lg:grid-cols-[1fr,20rem]'
+            : 'flex justify-end'
+        }
+      >
+        {hasTherapeuticTargets && (
+          <TherapeuticSummaryCard
+            targets={therapeuticTargets}
+            coverage={therapeuticCoverage}
+            supplementsSummary={supplementsSummary}
+          />
+        )}
+        <div
+          id="acties"
+          className={hasTherapeuticTargets ? 'lg:w-80' : 'w-full max-w-sm'}
+        >
           <MealPlanActionsClient
             planId={plan.id}
             plan={plan.planSnapshot}
@@ -363,7 +554,7 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
         planStatus={plan.status}
       >
         {isEmptyPlan ? (
-          <div className="rounded-lg border border-border bg-card p-6 shadow-xs">
+          <div className="rounded-2xl bg-muted/20 p-6 shadow-sm">
             <Heading level={2}>Geen maaltijden in dit weekmenu</Heading>
             <Text className="mt-2 text-muted-foreground">
               Dit plan bevat nog geen maaltijden. Gebruik het Acties-paneel om

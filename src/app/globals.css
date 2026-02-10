@@ -60,6 +60,33 @@
   --color-background-900: oklch(0.216 0.006 56.043);
   --color-background-950: oklch(0.147 0.004 49.25);
 
+  /* Gray (Tailwind default scale) — used for dark mode semantic tokens so dark mode matches Tailwind’s softer look */
+  --color-gray-50: oklch(0.985 0.002 247.839);
+  --color-gray-100: oklch(0.967 0.003 264.542);
+  --color-gray-200: oklch(0.928 0.006 264.531);
+  --color-gray-300: oklch(0.872 0.01 258.338);
+  --color-gray-400: oklch(0.707 0.022 261.325);
+  --color-gray-500: oklch(0.551 0.027 264.364);
+  --color-gray-600: oklch(0.446 0.03 256.802);
+  --color-gray-700: oklch(0.373 0.034 259.733);
+  --color-gray-800: oklch(0.278 0.033 256.848);
+  --color-gray-900: oklch(0.21 0.034 264.665);
+  --color-gray-950: oklch(0.13 0.028 261.692);
+
+  /* Semantic tokens — light mode (Stone/background palette) */
+  --color-background: var(--color-background-50);
+  --color-foreground: var(--color-background-950);
+  --color-muted: var(--color-background-100);
+  --color-muted-foreground: var(--color-background-500);
+  --color-primary-foreground: var(--color-white);
+  --color-accent: var(--color-background-200);
+  --color-accent-foreground: var(--color-background-950);
+  --color-popover: var(--color-background-50);
+  --color-popover-foreground: var(--color-background-950);
+  --color-card: var(--color-background-50);
+  --color-card-foreground: var(--color-background-950);
+  --color-ring: var(--color-primary-500);
+
   /* Zinc colors - Required for Catalyst UI components (Tailwind default) */
   --color-zinc-50: oklch(0.985 0 0);
   --color-zinc-100: oklch(0.967 0.001 286.375);
@@ -104,6 +131,48 @@
   --color-black: oklch(0 0 0);
 }
 
+/* Dark mode: Midnight (navy/slate) palette — Tailwind UI Blocks–style premium dark.
+   Semantic tokens + zinc override zodat de hele app (incl. Catalyst) één thema volgt. */
+.dark {
+  /* Midnight ramp — navy/slate (hue ~258), low chroma, duidelijke surface-ladder */
+  --color-midnight-50: oklch(0.98 0.006 255);
+  --color-midnight-100: oklch(0.95 0.01 256);
+  --color-midnight-200: oklch(0.88 0.014 257);
+  --color-midnight-300: oklch(0.76 0.02 257);
+  --color-midnight-400: oklch(0.64 0.024 258);
+  --color-midnight-500: oklch(0.52 0.026 258);
+  --color-midnight-600: oklch(0.42 0.026 258);
+  --color-midnight-700: oklch(0.32 0.024 259);
+  --color-midnight-800: oklch(0.24 0.022 259);
+  --color-midnight-900: oklch(0.16 0.02 260);
+  --color-midnight-950: oklch(0.1 0.02 260);
+
+  /* Semantic tokens — surface ladder: background (deepest) < card/muted < popover, accent voor hover/selected */
+  --color-background: var(--color-midnight-950);
+  --color-foreground: var(--color-midnight-50);
+  --color-muted: var(--color-midnight-900);
+  --color-muted-foreground: var(--color-midnight-400);
+  --color-card: var(--color-midnight-900);
+  --color-card-foreground: var(--color-midnight-50);
+  --color-popover: var(--color-midnight-900);
+  --color-popover-foreground: var(--color-midnight-50);
+  --color-accent: var(--color-midnight-800);
+  --color-accent-foreground: var(--color-midnight-50);
+
+  /* Zinc → midnight zodat Catalyst (sidebar, modals, table, button) hetzelfde dark theme volgt */
+  --color-zinc-50: var(--color-midnight-50);
+  --color-zinc-100: var(--color-midnight-100);
+  --color-zinc-200: var(--color-midnight-200);
+  --color-zinc-300: var(--color-midnight-300);
+  --color-zinc-400: var(--color-midnight-400);
+  --color-zinc-500: var(--color-midnight-500);
+  --color-zinc-600: var(--color-midnight-600);
+  --color-zinc-700: var(--color-midnight-700);
+  --color-zinc-800: var(--color-midnight-800);
+  --color-zinc-900: var(--color-midnight-900);
+  --color-zinc-950: var(--color-midnight-950);
+}
+
 /* Remove hover background for ellipsis button */
 .no-hover-bg,
 .no-hover-bg:hover,
@@ -113,4 +182,18 @@
 .dark .no-hover-bg[data-hover],
 .dark .no-hover-bg[data-active] {
   background-color: transparent !important;
+}
+
+/* Barcode scanner: moving scan line */
+@keyframes scan-line {
+  0%,
+  100% {
+    top: 10%;
+  }
+  50% {
+    top: 90%;
+  }
+}
+.animate-scan-line {
+  animation: scan-line 2s ease-in-out infinite;
 }

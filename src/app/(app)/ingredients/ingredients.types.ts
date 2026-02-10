@@ -1,5 +1,5 @@
 /**
- * Types for ingredient overview (view ingredient_overview_v1).
+ * Types for ingredient overview (get_ingredient_overview_v1 / get_ingredient_overview_paginated).
  * NEVO rank 1, AI 2, custom 3, FNDDS Survey 4.
  */
 

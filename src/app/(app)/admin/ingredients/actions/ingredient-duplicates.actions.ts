@@ -51,7 +51,7 @@ const MAX_Q_LENGTH = 200;
 
 /**
  * Find duplicate candidates between NEVO and FNDDS (admin-only).
- * Uses ingredient_overview_v1 via RPC find_ingredient_duplicate_candidates.
+ * Uses get_ingredient_overview_v1() via RPC find_ingredient_duplicate_candidates.
  * Returns pairs with score and match method; recommendedDisableUid is always FNDDS.
  */
 export async function findIngredientDuplicatesAction(

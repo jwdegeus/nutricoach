@@ -2,12 +2,16 @@
  * Profile Service
  *
  * Server-side service for loading user diet profiles from database.
- * Maps database schema (user_preferences + user_diet_profiles) to DietProfile type.
+ * - Diet: family-level (user_preferences.diet_type_id) so one diet for the whole household.
+ * - Allergies/dislikes: merged from all family members for generator warnings/exclusions.
+ * - Other prefs: from default family member or user_preferences.
+ * See docs/settings-user-vs-family.md.
  */
 
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/src/lib/supabase/server';
+import { getDefaultFamilyMemberId } from '@/src/lib/family/defaultFamilyMember';
 import type { DietProfile } from '@/src/lib/diets';
 import { dietProfileSchema } from '@/src/lib/diets';
 import type { DietKey } from '@/src/lib/diets';
@@ -16,18 +20,107 @@ import {
   mapDaysToVarietyLevel,
 } from '@/src/app/(app)/onboarding/onboarding.types';
 
+const DIET_NAME_TO_KEY: Record<string, DietKey> = {
+  balanced: 'balanced',
+  keto: 'keto',
+  ketogenic: 'keto',
+  mediterranean: 'mediterranean',
+  vegan: 'vegan',
+  wahls_paleo_plus: 'wahls_paleo_plus',
+  'wahls-paleo-plus': 'wahls_paleo_plus',
+  'wahls paleo plus': 'wahls_paleo_plus',
+};
+
+function dietTypeNameToKey(name: string | null | undefined): DietKey {
+  if (!name || typeof name !== 'string') return 'balanced';
+  return DIET_NAME_TO_KEY[name.toLowerCase()] ?? 'balanced';
+}
+
+/** Preferences-like row (user_preferences or family_member_preferences shape). */
+type PrefsRow = {
+  max_prep_minutes?: number;
+  servings_default?: number;
+  kcal_target?: number | null;
+  variety_window_days?: number;
+  allergies?: string[] | null;
+  dislikes?: string[] | null;
+  breakfast_preference?: string[] | string | null;
+  lunch_preference?: string[] | string | null;
+  dinner_preference?: string[] | string | null;
+};
+
+/** Diet profile row with optional diet_types join. */
+type DietProfileRow = {
+  strictness: number;
+  diet_type_id?: string | null;
+  diet_types?: { name: string } | null;
+};
+
+/** user_preferences with optional family diet columns. */
+type UserPrefsRow = PrefsRow & {
+  diet_type_id?: string | null;
+  diet_strictness?: number | null;
+  diet_is_inflamed?: boolean | null;
+};
+
+function mapPrefsAndDietToProfile(
+  prefs: PrefsRow,
+  dietProfile: DietProfileRow,
+  mergedAllergies?: string[],
+  mergedDislikes?: string[],
+): DietProfile {
+  const dietKey =
+    dietProfile.diet_type_id && dietProfile.diet_types
+      ? dietTypeNameToKey((dietProfile.diet_types as { name: string }).name)
+      : 'balanced';
+  const strictness = mapNumberToStrictness(dietProfile.strictness);
+  const varietyLevel = mapDaysToVarietyLevel(prefs.variety_window_days ?? 7);
+
+  const norm = (
+    v: string | string[] | null | undefined,
+  ): string[] | undefined => {
+    if (!v) return undefined;
+    if (Array.isArray(v)) return v.length > 0 ? v : undefined;
+    if (typeof v === 'string' && v.trim()) return [v.trim()];
+    return undefined;
+  };
+
+  const profile: DietProfile = {
+    dietKey,
+    allergies: mergedAllergies ?? prefs.allergies ?? [],
+    dislikes: mergedDislikes ?? prefs.dislikes ?? [],
+    calorieTarget: prefs.kcal_target ? { target: prefs.kcal_target } : {},
+    prepPreferences: {
+      maxPrepMinutes: prefs.max_prep_minutes ?? 30,
+    },
+    servingsDefault: prefs.servings_default ?? 1,
+    varietyLevel,
+    strictness,
+    ...(norm(prefs.breakfast_preference) ||
+    norm(prefs.lunch_preference) ||
+    norm(prefs.dinner_preference)
+      ? {
+          mealPreferences: {
+            breakfast: norm(prefs.breakfast_preference),
+            lunch: norm(prefs.lunch_preference),
+            dinner: norm(prefs.dinner_preference),
+          },
+        }
+      : {}),
+  };
+
+  return dietProfileSchema.parse(profile);
+}
+
 /**
  * Profile Service
  */
 export class ProfileService {
   /**
    * Load DietProfile for a user.
-   * When supabaseAdmin is provided (e.g. system/cron path), uses that client.
-   *
-   * @param userId - User ID
-   * @param supabaseAdmin - Optional; when provided uses this client instead of createClient()
-   * @returns DietProfile
-   * @throws Error if profile not found or incomplete
+   * - Family diet: user_preferences.diet_type_id (one diet for the whole household).
+   * - Allergies/dislikes: merged from all family members for generator warnings.
+   * - Other prefs: default family member or user_preferences.
    */
   async loadDietProfileForUser(
     userId: string,
@@ -35,135 +128,161 @@ export class ProfileService {
   ): Promise<DietProfile> {
     const supabase = supabaseAdmin ?? (await createClient());
 
-    // Load user preferences
-    const { data: preferences, error: prefsError } = await supabase
+    const { data: userPrefs, error: userPrefsError } = await supabase
       .from('user_preferences')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
-    if (prefsError || !preferences) {
+    if (!userPrefsError && userPrefs) {
+      const up = userPrefs as UserPrefsRow & { onboarding_completed?: boolean };
+      if (up.diet_type_id) {
+        const { data: dietType, error: dtError } = await supabase
+          .from('diet_types')
+          .select('name')
+          .eq('id', up.diet_type_id)
+          .maybeSingle();
+        if (!dtError && dietType?.name) {
+          const dietKey = dietTypeNameToKey(
+            (dietType as { name: string }).name,
+          );
+          const strictness =
+            up.diet_strictness != null
+              ? mapNumberToStrictness(up.diet_strictness)
+              : 'flexible';
+          const varietyLevel = mapDaysToVarietyLevel(
+            up.variety_window_days ?? 7,
+          );
+          const merged = await this.mergeAllFamilyMemberAllergiesAndDislikes(
+            supabase,
+            userId,
+          );
+          const prefs: PrefsRow = {
+            max_prep_minutes: up.max_prep_minutes,
+            servings_default: up.servings_default,
+            kcal_target: up.kcal_target,
+            variety_window_days: up.variety_window_days,
+            breakfast_preference: up.breakfast_preference,
+            lunch_preference: up.lunch_preference,
+            dinner_preference: up.dinner_preference,
+          };
+          const dietProfileRow: DietProfileRow & {
+            diet_types?: { name: string } | null;
+          } = {
+            strictness: up.diet_strictness ?? 5,
+            diet_type_id: up.diet_type_id,
+            diet_types: { name: (dietType as { name: string }).name },
+          };
+          return mapPrefsAndDietToProfile(
+            prefs,
+            dietProfileRow,
+            merged.allergies,
+            merged.dislikes,
+          );
+        }
+      }
+    }
+
+    const familyMemberId = await getDefaultFamilyMemberId(supabase, userId);
+    if (familyMemberId) {
+      const { data: prefs, error: prefsError } = await supabase
+        .from('family_member_preferences')
+        .select('*')
+        .eq('family_member_id', familyMemberId)
+        .maybeSingle();
+
+      const { data: dietProfile, error: profileError } = await supabase
+        .from('family_member_diet_profiles')
+        .select('*, diet_types(name)')
+        .eq('family_member_id', familyMemberId)
+        .is('ends_on', null)
+        .maybeSingle();
+
+      if (!prefsError && prefs && !profileError && dietProfile) {
+        const merged = await this.mergeAllFamilyMemberAllergiesAndDislikes(
+          supabase,
+          userId,
+        );
+        return mapPrefsAndDietToProfile(
+          prefs as PrefsRow,
+          dietProfile as DietProfileRow & {
+            diet_types?: { name: string } | null;
+          },
+          merged.allergies,
+          merged.dislikes,
+        );
+      }
+    }
+
+    if (!userPrefs) {
       throw new Error(
-        'Diet profile not found for user; complete onboarding first.',
+        'Diet profile not found for user; add a family member or set Gezinsdieet in Familie → Bewerken.',
       );
     }
 
-    // Check if onboarding is completed
-    if (!preferences.onboarding_completed) {
+    const prefs = userPrefs as PrefsRow & { onboarding_completed?: boolean };
+    if (prefs.onboarding_completed === false) {
       throw new Error(
-        'Onboarding not completed; please complete onboarding first.',
+        'Onboarding not completed; complete onboarding or set Gezinsdieet in Familie → Bewerken.',
       );
     }
 
-    // Load active diet profile
     const { data: dietProfile, error: profileError } = await supabase
       .from('user_diet_profiles')
       .select('*, diet_types(name)')
       .eq('user_id', userId)
-      .is('ends_on', null) // Active profile
+      .is('ends_on', null)
       .maybeSingle();
 
     if (profileError || !dietProfile) {
       throw new Error(
-        'Active diet profile not found for user; complete onboarding first.',
+        'Active diet not found; set Gezinsdieet in Familie → Bewerken or add a family member with diet.',
       );
     }
 
-    // Map diet_type.name to DietKey
-    // diet_types.name should match DietKey values (e.g., "balanced", "keto")
-    let dietKey: DietKey = 'balanced'; // Fallback
-    if (dietProfile.diet_type_id && dietProfile.diet_types) {
-      const dietTypeName = (dietProfile.diet_types as { name: string }).name;
-      // Map common names to DietKey
-      const nameToKey: Record<string, DietKey> = {
-        balanced: 'balanced',
-        keto: 'keto',
-        ketogenic: 'keto',
-        mediterranean: 'mediterranean',
-        vegan: 'vegan',
-        wahls_paleo_plus: 'wahls_paleo_plus',
-        'wahls-paleo-plus': 'wahls_paleo_plus',
-        'wahls paleo plus': 'wahls_paleo_plus',
+    return mapPrefsAndDietToProfile(
+      prefs,
+      dietProfile as DietProfileRow & { diet_types?: { name: string } | null },
+    );
+  }
+
+  /** Merge allergies and dislikes from all family members (for generator exclusions/warnings). */
+  private async mergeAllFamilyMemberAllergiesAndDislikes(
+    supabase: SupabaseClient,
+    userId: string,
+  ): Promise<{ allergies: string[]; dislikes: string[] }> {
+    const { data: members } = await supabase
+      .from('family_members')
+      .select('id')
+      .eq('user_id', userId);
+    if (!members?.length) return { allergies: [], dislikes: [] };
+
+    const memberIds = members.map((m) => (m as { id: string }).id);
+    const { data: prefsList } = await supabase
+      .from('family_member_preferences')
+      .select('allergies, dislikes')
+      .in('family_member_id', memberIds);
+
+    const allergySet = new Set<string>();
+    const dislikeSet = new Set<string>();
+    for (const row of prefsList ?? []) {
+      const r = row as {
+        allergies?: string[] | null;
+        dislikes?: string[] | null;
       };
-      dietKey = nameToKey[dietTypeName.toLowerCase()] || 'balanced';
+      for (const a of r.allergies ?? [])
+        if (a?.trim()) allergySet.add(a.trim().toLowerCase());
+      for (const d of r.dislikes ?? [])
+        if (d?.trim()) dislikeSet.add(d.trim().toLowerCase());
     }
-
-    // Map strictness (1-10) to "strict" | "flexible"
-    const strictness = mapNumberToStrictness(dietProfile.strictness);
-
-    // Map variety_window_days to varietyLevel
-    const varietyLevel = mapDaysToVarietyLevel(preferences.variety_window_days);
-
-    // Build DietProfile
-    const profile: DietProfile = {
-      dietKey,
-      allergies: preferences.allergies || [],
-      dislikes: preferences.dislikes || [],
-      calorieTarget: preferences.kcal_target
-        ? { target: preferences.kcal_target }
-        : {},
-      prepPreferences: {
-        maxPrepMinutes: preferences.max_prep_minutes,
-      },
-      servingsDefault: preferences.servings_default,
-      varietyLevel,
-      strictness,
-      ...((Array.isArray(preferences.breakfast_preference) &&
-        preferences.breakfast_preference.length > 0) ||
-      (Array.isArray(preferences.lunch_preference) &&
-        preferences.lunch_preference.length > 0) ||
-      (Array.isArray(preferences.dinner_preference) &&
-        preferences.dinner_preference.length > 0) ||
-      (typeof preferences.breakfast_preference === 'string' &&
-        preferences.breakfast_preference.trim()) ||
-      (typeof preferences.lunch_preference === 'string' &&
-        preferences.lunch_preference.trim()) ||
-      (typeof preferences.dinner_preference === 'string' &&
-        preferences.dinner_preference.trim())
-        ? {
-            mealPreferences: {
-              breakfast:
-                Array.isArray(preferences.breakfast_preference) &&
-                preferences.breakfast_preference.length > 0
-                  ? preferences.breakfast_preference
-                  : typeof preferences.breakfast_preference === 'string' &&
-                      preferences.breakfast_preference.trim()
-                    ? [preferences.breakfast_preference.trim()]
-                    : undefined,
-              lunch:
-                Array.isArray(preferences.lunch_preference) &&
-                preferences.lunch_preference.length > 0
-                  ? preferences.lunch_preference
-                  : typeof preferences.lunch_preference === 'string' &&
-                      preferences.lunch_preference.trim()
-                    ? [preferences.lunch_preference.trim()]
-                    : undefined,
-              dinner:
-                Array.isArray(preferences.dinner_preference) &&
-                preferences.dinner_preference.length > 0
-                  ? preferences.dinner_preference
-                  : typeof preferences.dinner_preference === 'string' &&
-                      preferences.dinner_preference.trim()
-                    ? [preferences.dinner_preference.trim()]
-                    : undefined,
-            },
-          }
-        : {}),
+    return {
+      allergies: [...allergySet],
+      dislikes: [...dislikeSet],
     };
-
-    // Validate with Zod schema
-    const validated = dietProfileSchema.parse(profile);
-
-    return validated;
   }
 
   /**
-   * Get user language preference.
-   * When supabaseAdmin is provided (e.g. system/cron path), uses that client.
-   *
-   * @param userId - User ID
-   * @param supabaseAdmin - Optional; when provided uses this client
-   * @returns Language code ('nl' or 'en'), defaults to 'nl'
+   * Get user language preference (stays on user_preferences – user-level).
    */
   async getUserLanguage(
     userId: string,
@@ -178,16 +297,13 @@ export class ProfileService {
       .maybeSingle();
 
     if (error || !preferences) {
-      // Default to Dutch if not found
       return 'nl';
     }
 
-    // Validate language is 'nl' or 'en'
     if (preferences.language === 'nl' || preferences.language === 'en') {
       return preferences.language;
     }
 
-    // Default to Dutch
     return 'nl';
   }
 }

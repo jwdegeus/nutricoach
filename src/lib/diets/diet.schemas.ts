@@ -241,6 +241,81 @@ export const dietRuleSetSchema = z.object({
 export type DietRuleSetInput = z.infer<typeof dietRuleSetSchema>;
 
 // ============================================================================
+// Therapeutic Targets Snapshot (optional request field; JSON-safe)
+// ============================================================================
+
+const therapeuticTargetValueSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('absolute'),
+    value: z.number(),
+    unit: z.string(), // g, mg, µg, kcal or other (DB-driven)
+  }),
+  z.object({
+    kind: z.literal('adh_percent'),
+    value: z.number(),
+    unit: z.literal('%_adh'),
+  }),
+]);
+
+const therapeuticProtocolRefSchema = z.object({
+  protocolKey: z.string(),
+  version: z.string().optional(),
+  labelNl: z.string().optional(),
+  sourceRefs: z
+    .array(z.object({ title: z.string(), url: z.string().optional() }))
+    .optional(),
+});
+
+const userPhysiologySnapshotSchema = z.object({
+  birthDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  ageYears: z.number().min(0).optional(),
+  sex: z.enum(['female', 'male', 'other', 'unknown']).optional(),
+  heightCm: z.number().int().min(50).max(250).optional(),
+  weightKg: z.number().min(10).max(400).optional(),
+});
+
+const therapeuticTargetsDailySchema = z
+  .object({
+    macros: z.record(z.string(), therapeuticTargetValueSchema).optional(),
+    micros: z.record(z.string(), therapeuticTargetValueSchema).optional(),
+    foodGroups: z
+      .object({
+        vegetablesG: z.number().min(0).optional(),
+        fruitG: z.number().min(0).optional(),
+      })
+      .optional(),
+  })
+  .passthrough();
+
+const therapeuticTargetsWeeklySchema = z
+  .object({
+    variety: z.record(z.string(), z.number()).optional(),
+    frequency: z.record(z.string(), z.number()).optional(),
+  })
+  .passthrough();
+
+const therapeuticTargetsSnapshotSchema = z.object({
+  protocol: therapeuticProtocolRefSchema.optional(),
+  physiology: userPhysiologySnapshotSchema.optional(),
+  daily: therapeuticTargetsDailySchema.optional(),
+  weekly: therapeuticTargetsWeeklySchema.optional(),
+  supplements: z
+    .array(
+      z.object({
+        key: z.string(),
+        labelNl: z.string(),
+        dosageText: z.string().optional(),
+        notesNl: z.string().optional(),
+      }),
+    )
+    .optional(),
+  computedAt: z.string().optional(), // ISO datetime
+});
+
+// ============================================================================
 // Meal Plan Request Schema
 // ============================================================================
 
@@ -254,6 +329,7 @@ export const mealPlanRequestSchema = z.object({
   excludeIngredients: z.array(z.string()).optional(),
   preferIngredients: z.array(z.string()).optional(),
   maxPrepTime: z.number().min(0).optional(),
+  therapeuticTargets: therapeuticTargetsSnapshotSchema.optional(),
 });
 
 export type MealPlanRequestInput = z.infer<typeof mealPlanRequestSchema>;

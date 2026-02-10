@@ -3,6 +3,10 @@
 import { z } from 'zod';
 import { createClient } from '@/src/lib/supabase/server';
 import type { MealListItem, MealSlotValue } from './meal-list.actions';
+import {
+  computeWeekMenuStatus,
+  effectiveWeekmenuSlots,
+} from './weekMenuStatus';
 
 const DEFAULT_LIMIT = 24;
 const MAX_LIMIT = 50;
@@ -48,12 +52,13 @@ export type ListRecentMealsInput = z.infer<typeof listRecentMealsSchema>;
 
 /** Minimal columns for custom_meals list (no SELECT *). */
 const CUSTOM_MEALS_LIST_COLUMNS =
-  'id,name,meal_slot,total_minutes,servings,source,source_url,updated_at';
+  'id,name,meal_slot,weekmenu_slots,total_minutes,servings,source,source_url,updated_at';
 
 type CustomMealRow = {
   id: string;
   name: string | null;
   meal_slot: string | null;
+  weekmenu_slots: string[] | null;
   total_minutes: number | null;
   servings: number | null;
   source: string | null;
@@ -66,6 +71,7 @@ function rowToRecentMealListItem(
   row: CustomMealRow,
   favoritedSet: Set<string>,
   lastViewedAt: string,
+  recipesWithIngredientRefs: Set<string>,
 ): RecentMealListItem {
   const tags: string[] = [];
   if (row.recipe_tag_links && Array.isArray(row.recipe_tag_links)) {
@@ -81,6 +87,8 @@ function rowToRecentMealListItem(
     row.meal_slot && MEAL_SLOT_VALUES.includes(row.meal_slot as MealSlotValue)
       ? (row.meal_slot as MealSlotValue)
       : null;
+  const hasIngredientRefs = recipesWithIngredientRefs.has(row.id);
+  const slots = effectiveWeekmenuSlots(row.weekmenu_slots ?? null, mealSlot);
   return {
     mealId: row.id,
     title: row.name ?? '',
@@ -96,6 +104,7 @@ function rowToRecentMealListItem(
     updatedAt: row.updated_at ?? null,
     isFavorited: favoritedSet.has(row.id),
     userRating: null,
+    weekMenuStatus: computeWeekMenuStatus(slots, hasIngredientRefs),
     lastViewedAt,
   };
 }
@@ -279,8 +288,9 @@ export async function listRecentMealsAction(
 
     let favoritedSet = new Set<string>();
     const ratingsByMealId: Record<string, number> = {};
+    let recipesWithIngredientRefs = new Set<string>();
     if (mealIdsOrdered.length > 0) {
-      const [favRes, ratingRes] = await Promise.all([
+      const [favRes, ratingRes, nevoRes, mealDataRes] = await Promise.all([
         supabase
           .from('meal_favorites')
           .select('meal_id')
@@ -291,6 +301,15 @@ export async function listRecentMealsAction(
           .select('meal_id, user_rating')
           .eq('user_id', user.id)
           .in('meal_id', mealIdsOrdered),
+        supabase
+          .from('recipe_ingredients')
+          .select('recipe_id')
+          .in('recipe_id', mealIdsOrdered)
+          .not('nevo_food_id', 'is', null),
+        supabase
+          .from('custom_meals')
+          .select('id, meal_data')
+          .in('id', mealIdsOrdered),
       ]);
       favoritedSet = new Set(
         (favRes.data ?? []).map((r) => (r as { meal_id: string }).meal_id),
@@ -300,6 +319,32 @@ export async function listRecentMealsAction(
         if (row.user_rating != null)
           ratingsByMealId[row.meal_id] = row.user_rating;
       }
+      const fromRecipeIngredients = new Set(
+        (nevoRes.data ?? []).map((r) => (r as { recipe_id: string }).recipe_id),
+      );
+      const fromMealData = new Set<string>();
+      for (const row of mealDataRes.data ?? []) {
+        const r = row as { id: string; meal_data: unknown };
+        const mealData = (r.meal_data as Record<string, unknown> | null) ?? {};
+        const refs = Array.isArray(mealData.ingredientRefs)
+          ? (mealData.ingredientRefs as Record<string, unknown>[])
+          : [];
+        const hasAnyRef = refs.some(
+          (ref) =>
+            ref != null &&
+            typeof ref === 'object' &&
+            (ref.nevoCode != null ||
+              ref.customFoodId != null ||
+              ref.custom_food_id != null ||
+              ref.fdcId != null ||
+              ref.fdc_id != null),
+        );
+        if (hasAnyRef) fromMealData.add(r.id);
+      }
+      recipesWithIngredientRefs = new Set([
+        ...fromRecipeIngredients,
+        ...fromMealData,
+      ]);
     }
 
     const rawItems: RecentMealListItem[] = [];
@@ -307,7 +352,14 @@ export async function listRecentMealsAction(
       const row = mealRowsById.get(mealId);
       const lastViewedAt = lastViewedByMealId.get(mealId);
       if (row && lastViewedAt) {
-        rawItems.push(rowToRecentMealListItem(row, favoritedSet, lastViewedAt));
+        rawItems.push(
+          rowToRecentMealListItem(
+            row,
+            favoritedSet,
+            lastViewedAt,
+            recipesWithIngredientRefs,
+          ),
+        );
       }
     }
     const items = rawItems.map((item) => ({

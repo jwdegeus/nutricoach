@@ -1,6 +1,7 @@
 'use server';
 
 import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
 import { createClient } from '@/src/lib/supabase/server';
 
 /** Minimal columns for meal-slot style prefs (no SELECT *) — 5 columns total */
@@ -193,6 +194,8 @@ export async function updateMealSlotStylePreferencesAction(
       };
     }
 
+    revalidatePath('/familie/edit');
+    revalidatePath('/familie');
     return {
       ok: true,
       data: {

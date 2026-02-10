@@ -1,0 +1,17 @@
+---
+description: Prefer shadow and background contrast; light borders allowed only for contrast (e.g. outline-white/10, divide-white/10).
+globs: "**/*.tsx"
+alwaysApply: true
+---
+
+# Borders — minimal; light borders allowed for contrast
+
+**Prefer shadow and background contrast for separation.**
+
+- **Default:** Use **shadow** (`shadow-sm`, `shadow`) and **background contrast** (`bg-muted/20`, `bg-muted/30`, `bg-background`) and **spacing** to separate content.
+- **Avoid** heavy or prominent borders (thick borders, dark rings) for cards or sections.
+- **Allowed for contrast:** Light, subtle borders when needed (e.g. dark theme, card grids):
+  - Card outline: `outline outline-1 -outline-offset-1 outline-white/10`
+  - Section divider: `border-b border-white/10`
+  - List dividers: `divide-y divide-white/10`
+- See **AGENTS.md** section **4.0** for the full rule.

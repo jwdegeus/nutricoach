@@ -49,11 +49,17 @@ const STRICTNESS_LABELS: Record<string, string> = {
 /** NEVO code: alleen cijfers (simple regex) */
 const NEVO_CODE_REGEX = /^\d+$/;
 
-export function HouseholdAvoidRulesClient() {
+export function HouseholdAvoidRulesClient({
+  initialRules,
+}: {
+  initialRules?: HouseholdAvoidRuleRecord[];
+} = {}) {
   const t = useTranslations('settings');
   const { showToast } = useToast();
-  const [rules, setRules] = useState<HouseholdAvoidRuleRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [rules, setRules] = useState<HouseholdAvoidRuleRecord[]>(
+    initialRules ?? [],
+  );
+  const [loading, setLoading] = useState(!initialRules);
   const [addPending, setAddPending] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [valueError, setValueError] = useState<string | null>(null);
@@ -78,8 +84,9 @@ export function HouseholdAvoidRulesClient() {
   }, [showToast]);
 
   useEffect(() => {
+    if (initialRules != null) return;
     queueMicrotask(() => loadRules());
-  }, [loadRules]);
+  }, [initialRules, loadRules]);
 
   const validateValue = useCallback((): boolean => {
     const v = matchValue.trim();

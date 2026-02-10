@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Link } from '@/components/catalyst/link';
 import { Text } from '@/components/catalyst/text';
 import type { ComponentType, SVGProps } from 'react';
@@ -12,6 +13,8 @@ import {
   ChartBarIcon,
   BeakerIcon,
   Cog6ToothIcon,
+  ClipboardDocumentListIcon,
+  ShoppingBagIcon,
 } from '@heroicons/react/20/solid';
 
 type StatItem = {
@@ -46,6 +49,15 @@ type AdminStats = {
     templatesActive: number;
     poolItems: number;
   };
+  therapeuticProtocols: {
+    total: number;
+    active: number;
+    inactive: number;
+  };
+  productSources: {
+    total: number;
+    enabled: number;
+  };
 };
 
 type AdminDashboardClientProps = {
@@ -53,6 +65,8 @@ type AdminDashboardClientProps = {
 };
 
 export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
+  const t = useTranslations('admin');
+  const tProtocols = useTranslations('admin.therapeuticProtocols');
   const adminSections: Array<{
     name: string;
     description: string;
@@ -84,6 +98,23 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
         {
           label: 'Totaal gebruik',
           value: stats.recipeSources.totalUsage.toLocaleString(),
+        },
+      ],
+    },
+    {
+      name: 'Productbronnen voorraad',
+      description:
+        'Beheer bronnen voor productlookup (barcode/zoeken) in de voorraad: Open Food Facts, Albert Heijn.',
+      href: '/admin/product-sources',
+      icon: ShoppingBagIcon,
+      iconBackground: 'bg-sky-500',
+      stats: [
+        { label: 'Bronnen', value: stats.productSources.total },
+        {
+          label: 'Actief',
+          value: stats.productSources.enabled,
+          icon: CheckCircleIcon,
+          iconColor: 'text-green-600 dark:text-green-400',
         },
       ],
     },
@@ -158,16 +189,41 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
         { label: 'Pool items', value: stats.generator.poolItems },
       ],
     },
+    {
+      name: tProtocols('name'),
+      description: tProtocols('description'),
+      href: '/admin/therapeutic-protocols',
+      icon: ClipboardDocumentListIcon,
+      iconBackground: 'bg-violet-500',
+      stats: [
+        {
+          label: tProtocols('totalProtocols'),
+          value: stats.therapeuticProtocols.total,
+        },
+        {
+          label: tProtocols('active'),
+          value: stats.therapeuticProtocols.active,
+          icon: CheckCircleIcon,
+          iconColor: 'text-green-600 dark:text-green-400',
+        },
+        {
+          label: tProtocols('inactive'),
+          value: stats.therapeuticProtocols.inactive,
+          icon: XCircleIcon,
+          iconColor: 'text-zinc-400',
+        },
+      ],
+    },
   ];
 
   return (
     <div className="space-y-8 p-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white">
-          Admin Dashboard
+          {t('dashboardTitle')}
         </h1>
         <p className="mt-2 text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
-          Beheer systeem instellingen en data
+          {t('dashboardDescription')}
         </p>
       </div>
 
@@ -242,17 +298,17 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
           </div>
           <div>
             <h3 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
-              Systeem Overzicht
+              {t('systemOverviewTitle')}
             </h3>
             <Text className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Algemene statistieken en informatie
+              {t('systemOverviewDescription')}
             </Text>
           </div>
         </div>
         <dl className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
           <div>
             <dt className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-              Totaal beheer items
+              {t('totalManageItems')}
             </dt>
             <dd className="mt-1 text-2xl font-semibold text-zinc-950 dark:text-white">
               {stats.dietTypes.total + stats.recipeSources.total}
@@ -260,7 +316,7 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
           </div>
           <div>
             <dt className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-              Actieve dieettypes
+              {t('activeDietTypes')}
             </dt>
             <dd className="mt-1 text-2xl font-semibold text-zinc-950 dark:text-white">
               {stats.dietTypes.active}
@@ -268,7 +324,7 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
           </div>
           <div>
             <dt className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-              Totaal recept gebruik
+              {t('totalRecipeUsage')}
             </dt>
             <dd className="mt-1 text-2xl font-semibold text-zinc-950 dark:text-white">
               {stats.recipeSources.totalUsage.toLocaleString()}

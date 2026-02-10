@@ -194,4 +194,79 @@ Bij violation: acties returnen `GUARDRAILS_VIOLATION` met `details` (reasonCodes
 
 ---
 
-_Document: nulmeting Weekmenu Generator. Geen code gewijzigd behalve dit doc._
+## 9) Recipe-first generator (toekomst) – Inventarisatie
+
+**Doel:** Nulmeting voor een toekomstige recipe-first weekmenu-generator (recepten eerst, template/Gemini alleen als fallback). Alleen inventarisatie + contract-typen; geen nieuwe tabellen, geen gedragswijziging.
+
+### 9.1 Bronnen voor “recepten”
+
+| Bron                 | Tabel(s)             | Rol                                                                                                                                                                                            |
+| -------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **User recipes**     | `custom_meals`       | Recepten van de gebruiker (foto/import/meal_plan). `id` = recipe_id; `meal_slot`, `meal_data` (JSONB), `total_minutes`, `servings`, `diet_key` (nullable), `consumption_count`, `source_type`. |
+| **Historical meals** | `meal_history`       | Maaltijden uit eerdere weekmenu’s; hergebruik. `meal_id`, `meal_name`, `meal_slot`, `diet_key`, `meal_data`, `user_rating`, `combined_score`, `last_used_at`.                                  |
+| **Ingrediënten**     | `recipe_ingredients` | Koppeling aan `custom_meals.id`; `nevo_food_id`, `quantity`, `unit`, `name`. Gebruikt om `meal_data.ingredientRefs` aan te vullen als die leeg zijn (geïmporteerde recepten).                  |
+
+Er is **geen aparte `recipes`-tabel**; “recept” = een rij in `custom_meals` of een opgeslagen maaltijd in `meal_history`. Receptenlijst in de app komt uit `custom_meals` (o.a. `meal-list.actions.ts`); prefill voor de generator gebruikt zowel `meal_history` als `custom_meals` (`mealPlans.service.ts` → `loadPrefilledBySlot`).
+
+### 9.2 Koppeling recept ↔ slot
+
+- **`meal_slot`** op zowel `custom_meals` als `meal_history`: `'breakfast' | 'lunch' | 'dinner' | 'snack'`; op `custom_meals` ook `'other'` (migratie recipe_classification).
+- Geen aparte “category” of “tags” voor slot in de generator; slot komt direct uit `meal_slot`. Tags bestaan wel: `recipe_tags` + `recipe_tag_links` (many-to-many met `custom_meals`) voor gebruikerslabels (bijv. “vegetarisch”, “snel”), niet voor slot.
+
+### 9.3 Velden beschikbaar voor ranking/selectie
+
+| Veld            | custom_meals                                            | meal_history                                    | Opmerking                                                                                                          |
+| --------------- | ------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Prep time       | `total_minutes`                                         | —                                               | Optioneel; gebruikt in receptenlijst (filter maxTotalMinutes).                                                     |
+| Macros          | In `meal_data.estimatedMacros` of `meal_data.nutrition` | In `meal_data`                                  | Template-generator berekent zelf uit NEVO; niet altijd aanwezig op recept.                                         |
+| Rating          | Via `meal_history` (meal_id = custom_meals.id)          | `user_rating` (1–5)                             | Geen rating-kolom op custom_meals.                                                                                 |
+| Usage / recency | `consumption_count`, `updated_at`                       | `usage_count`, `last_used_at`, `combined_score` | Prefill sorteert op combined_score, user_rating, last_used_at (history) en consumption_count, updated_at (custom). |
+| Created         | `created_at`                                            | `created_at`                                    | Aanwezig maar niet leidend in huidige prefill.                                                                     |
+
+### 9.4 Ingredient refs-structuur en coverage
+
+- **Contract:** `MealIngredientRef` in `@/src/lib/diets` (diet.types.ts): `nevoCode`, `quantityG`, `displayName?`, `tags?`. Maaltijden in het plan hebben `ingredientRefs: MealIngredientRef[]`.
+- **Opslag:** In `meal_data` (JSONB) als `meal_data.ingredientRefs`. Voor custom_meals zonder refs wordt aangevuld uit `recipe_ingredients`: selectie `recipe_id, nevo_food_id, quantity, unit, name` (RECIPE_INGREDIENTS_NEVO_COLUMNS in mealPlans.service.ts); `nevo_food_id` kan null zijn (niet alle ingrediënten hebben NEVO-mapping).
+- **Coverage:** Geïmporteerde recepten hebben vaak lege `meal_data.ingredientRefs` tot ze gematcht zijn; dan vullen we uit `recipe_ingredients`. Geen expliciete “minCoverageScore” of dekkingsgraad in de huidige code.
+
+### 9.5 Diet compliance vandaag
+
+- **meal_history:** Gefilterd op `diet_key` in `loadPrefilledBySlot` (zelfde dieet als request).
+- **custom_meals:** Geen filter op `diet_key` bij prefill (alleen `user_id`, `meal_slot`); `diet_key` op custom_meals is nullable.
+- **Hard blocks:** `household_avoid_rules` (strictness = 'hard'): `match_mode` + `match_value` (nevo_code of term); gebruikt in `isMealBlockedByHouseholdRules` (NEVO + term in naam).
+- **Profiel:** `request.profile.allergies` en `dislikes` in `isMealBlockedByAllergiesOrDislikes` (naam/ingrediënten).
+- **Guardrails:** `loadHardBlockTermsForDiet` (guardrails-vnext) levert termen voor template-pool filtering; `enforceMealPlannerGuardrails` valideert het volledige plan (na generatie). Geen aparte “recipe-level compliance”-check voor custom_meals in de prefill.
+
+### 9.6 Gaten voor recipe-first
+
+1. **Geen eenduidige “recipe”-entiteit:** Recepten zitten in custom_meals en meal_history; meal_id in history kan naar custom_meals of naar een gegenereerde maaltijd-ID verwijzen. Een recipe-first query moet beide bronnen kunnen bevragen met een uniform contract.
+2. **meal_slot “other”:** custom_meals kan `meal_slot = 'other'` hebben; voor plan-slots (breakfast/lunch/dinner/snack) moet beslist worden of “other” bij alle slots mag of bij geen.
+3. **diet_key op custom_meals:** Optioneel; er is geen afdwinging “dit recept voldoet aan dieet X”. Compliance is nu vooral: history op diet_key, custom_meals ongefilterd, en ex-post guardrails op het plan.
+4. **ingredientRefs niet overal:** Veel custom_meals hebben lege refs tot recipe_ingredients/NEVO-matching is gedaan. Recipe-first heeft behoefte aan “requireIngredientRefs” en eventueel minCoverageScore om alleen recepten met voldoende NEVO-dekking te gebruiken.
+5. **Rating alleen via meal_history:** Voor “recepten” die alleen in custom_meals staan bestaat geen rating tenzij ze ooit in een plan hebben gestaan en in meal_history zijn opgeslagen.
+6. **Expliciete kolommen:** Overal waar queries staan (mealPlans.service, meal-list.actions, etc.) worden expliciete kolommen gebruikt (geen SELECT \*). Een recipe-first query moet hetzelfde doen, bijv. voor custom_meals: `id, name, meal_slot, diet_key, meal_data, total_minutes, servings, consumption_count, updated_at` en voor meal_history: `id, meal_id, meal_name, meal_slot, diet_key, meal_data, user_rating, combined_score, last_used_at`.
+
+### 9.7 Aanbevelingen (zonder implementatie)
+
+- **Contract:** Types `RecipeCandidate`, `RecipeCandidateQuery`, `RecipeCandidateResult` zijn vastgelegd in `src/lib/meal-plans/mealPlans.types.ts` als contract voor de toekomstige recipe-first selectie.
+- **Inprikpunten:**
+  - **mealPlans.service.ts:** Nieuwe methode (bijv. `loadRecipeCandidatesForSlots`) die op basis van `RecipeCandidateQuery` uit custom_meals + meal_history candidates per slot teruggeeft, met expliciete kolommen en bestaande filters (household rules, allergies/dislikes, excludeTerms).
+  - **mealPlannerAgent.service.ts:** Bovenstrooms: eerst recipe-first pad proberen (candidates ophalen, plaatsen per slot); alleen bij te weinig candidates of op expliciete fallback template/Gemini aanroepen. Geen gedragswijziging in bestaande template- of Gemini-paden.
+- **Compliance:** Duidelijk maken of custom_meals op diet_key gefilterd moet worden voor recipe-first, en of een expliciete “compliant”-vlag (bijv. na guardrails-check op receptniveau) gewenst is.
+- **Slot “other”:** Beleid vastleggen: uitsluiten voor slot-specifieke vulling of mappen naar een default-slot.
+
+### 9.8 Samenvatting (NL)
+
+- **Waar zitten recepten:** In `custom_meals` (eigen recepten) en `meal_history` (hergebruik uit plannen). Geen aparte recipes-tabel. Ingrediënten voor custom_meals zonder refs komen uit `recipe_ingredients` (nevo_food_id, quantity, unit, name).
+- **Compliance:** History wordt op `diet_key` gefilterd; custom_meals niet. Hard blocks via `household_avoid_rules` (nevo_code/term) en profiel allergies/dislikes. Guardrails op planniveau (na generatie); geen receptniveau-compliance voor custom_meals.
+- **Slot/ranking:** `meal_slot` op beide tabellen (breakfast/lunch/dinner/snack; custom_meals ook `other`). Ranking: history op combined_score, user_rating, last_used_at; custom_meals op consumption_count, updated_at. Prep time = custom_meals.total_minutes; rating voor custom_meals alleen via meal_history (meal_id = id).
+- **Gaten:** Geen uniforme “recipe”-entiteit; ingredientRefs vaak leeg bij geïmporteerde recepten; diet_key op custom_meals optioneel; slot “other” onduidelijk voor plan-vulling.
+- **Inprikken recipe-first:** In **mealPlans.service.ts** een nieuwe loader die op basis van `RecipeCandidateQuery` candidates uit custom_meals + meal_history haalt (expliciete kolommen, bestaande filters). In **mealPlannerAgent.service.ts** eerst dit recipe-first pad (candidates plaatsen), bij te weinig resultaat of expliciete fallback → bestaand template/Gemini-pad. Bestaand generator-gedrag blijft ongewijzigd.
+
+### 9.9 Therapeutic coverage en deficits
+
+- **Deficits → Suggestions:** De therapeutic coverage estimator vult bij deficits optioneel `deficits.suggestions` (concrete acties: add_side, add_snack, etc.). De UI (TherapeuticSummaryCard) toont deze suggesties onder Deficits; max 3, met severity-badge, titel en optioneel richtlijn (bijv. grams). Geen message-parsing: alles code-driven vanuit `alert.code`.
+
+---
+
+_Document: nulmeting Weekmenu Generator. Sectie 9 + types in mealPlans.types.ts toegevoegd voor recipe-first contract._

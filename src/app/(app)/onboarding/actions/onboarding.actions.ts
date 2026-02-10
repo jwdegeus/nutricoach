@@ -2,6 +2,7 @@
 
 import { createClient } from '@/src/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { getDefaultFamilyMemberId } from '@/src/lib/family/defaultFamilyMember';
 import type { OnboardingInput, OnboardingStatus } from '../onboarding.types';
 import {
   mapVarietyLevelToDays,
@@ -90,66 +91,98 @@ export async function loadOnboardingStatusAction(): Promise<
     };
   }
 
-  // Load user preferences
-  const { data: preferences, error: prefsError } = await supabase
+  const familyMemberId = await getDefaultFamilyMemberId(supabase, user.id);
+
+  let preferences: Record<string, unknown> | null = null;
+  let activeProfile: Record<string, unknown> | null = null;
+
+  if (familyMemberId) {
+    const { data: fmPrefs } = await supabase
+      .from('family_member_preferences')
+      .select('*')
+      .eq('family_member_id', familyMemberId)
+      .maybeSingle();
+    const { data: fmDiet } = await supabase
+      .from('family_member_diet_profiles')
+      .select('*')
+      .eq('family_member_id', familyMemberId)
+      .is('ends_on', null)
+      .maybeSingle();
+    if (fmPrefs) preferences = fmPrefs as Record<string, unknown>;
+    if (fmDiet) activeProfile = fmDiet as Record<string, unknown>;
+  }
+
+  if (!preferences || !activeProfile) {
+    const { data: userPrefs } = await supabase
+      .from('user_preferences')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    const { data: userDiet } = await supabase
+      .from('user_diet_profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .is('ends_on', null)
+      .maybeSingle();
+    if (userPrefs) preferences = userPrefs as Record<string, unknown>;
+    if (userDiet) activeProfile = userDiet as Record<string, unknown>;
+  }
+
+  const userPrefsRow = await supabase
     .from('user_preferences')
-    .select('*')
+    .select('onboarding_completed, onboarding_completed_at')
     .eq('user_id', user.id)
     .maybeSingle();
+  const completed =
+    (userPrefsRow.data as { onboarding_completed?: boolean } | null)
+      ?.onboarding_completed ?? false;
+  const completedAt =
+    (userPrefsRow.data as { onboarding_completed_at?: string | null } | null)
+      ?.onboarding_completed_at ?? null;
 
-  if (prefsError) {
-    return {
-      error: `Fout bij ophalen voorkeuren: ${prefsError.message}`,
-    };
-  }
+  const normalizeToArray = (
+    value: string | string[] | null | undefined,
+  ): string[] | undefined => {
+    if (!value) return undefined;
+    if (Array.isArray(value)) return value.length > 0 ? value : undefined;
+    if (typeof value === 'string' && value.trim()) return [value.trim()];
+    return undefined;
+  };
 
-  // Load active diet profile (ends_on is null)
-  const { data: activeProfile, error: profileError } = await supabase
-    .from('user_diet_profiles')
-    .select('*')
-    .eq('user_id', user.id)
-    .is('ends_on', null)
-    .maybeSingle();
-
-  if (profileError) {
-    return {
-      error: `Fout bij ophalen dieetprofiel: ${profileError.message}`,
-    };
-  }
-
-  // Build status response
   const status: OnboardingStatus = {
-    completed: preferences?.onboarding_completed ?? false,
-    completedAt: preferences?.onboarding_completed_at ?? null,
+    completed,
+    completedAt,
     summary: {
-      maxPrepMinutes: preferences?.max_prep_minutes,
-      servingsDefault: preferences?.servings_default,
-      kcalTarget: preferences?.kcal_target ?? null,
-      dietTypeId: activeProfile?.diet_type_id ?? undefined,
+      maxPrepMinutes: preferences?.max_prep_minutes as number | undefined,
+      servingsDefault: preferences?.servings_default as number | undefined,
+      kcalTarget: (preferences?.kcal_target ?? null) as number | null,
+      dietTypeId: activeProfile?.diet_type_id as string | undefined,
       strictness: activeProfile?.strictness
-        ? mapNumberToStrictness(activeProfile.strictness)
+        ? mapNumberToStrictness(activeProfile.strictness as number)
         : undefined,
       varietyLevel: preferences?.variety_window_days
-        ? mapDaysToVarietyLevel(preferences.variety_window_days)
+        ? mapDaysToVarietyLevel(preferences.variety_window_days as number)
         : undefined,
-      allergies: preferences?.allergies ?? [],
-      dislikes: preferences?.dislikes ?? [],
+      allergies: (preferences?.allergies ?? []) as string[],
+      dislikes: (preferences?.dislikes ?? []) as string[],
       mealPreferences: (() => {
-        // Normalize to arrays, handling both string (legacy) and array values
-        const normalizeToArray = (
-          value: string | string[] | null | undefined,
-        ): string[] | undefined => {
-          if (!value) return undefined;
-          if (Array.isArray(value)) return value.length > 0 ? value : undefined;
-          if (typeof value === 'string' && value.trim()) return [value.trim()];
-          return undefined;
-        };
-
-        const breakfast = normalizeToArray(preferences?.breakfast_preference);
-        const lunch = normalizeToArray(preferences?.lunch_preference);
-        const dinner = normalizeToArray(preferences?.dinner_preference);
-
-        // Only include mealPreferences if at least one has values
+        const breakfast = normalizeToArray(
+          preferences?.breakfast_preference as
+            | string
+            | string[]
+            | null
+            | undefined,
+        );
+        const lunch = normalizeToArray(
+          preferences?.lunch_preference as string | string[] | null | undefined,
+        );
+        const dinner = normalizeToArray(
+          preferences?.dinner_preference as
+            | string
+            | string[]
+            | null
+            | undefined,
+        );
         if (breakfast || lunch || dinner) {
           return { breakfast, lunch, dinner };
         }
@@ -187,36 +220,54 @@ export async function saveOnboardingAction(
     };
   }
 
-  // Map variety level to days
   const varietyWindowDays =
     input.varietyLevel !== undefined
       ? mapVarietyLevelToDays(input.varietyLevel)
-      : 7; // Default to standard
-
-  // Map strictness to number
+      : 7;
   const strictnessNumber = mapStrictnessToNumber(input.strictness);
+  const onboardingCompletedAt = new Date().toISOString();
 
-  // Upsert user_preferences
-  const preferencesData = {
-    user_id: user.id,
-    max_prep_minutes: input.maxPrepMinutes,
-    servings_default: input.servingsDefault,
-    kcal_target: input.kcalTarget ?? null,
-    allergies: input.allergies,
-    dislikes: input.dislikes,
-    variety_window_days: varietyWindowDays,
-    breakfast_preference: input.mealPreferences?.breakfast || [],
-    lunch_preference: input.mealPreferences?.lunch || [],
-    dinner_preference: input.mealPreferences?.dinner || [],
-    onboarding_completed: true,
-    onboarding_completed_at: new Date().toISOString(),
-  };
+  // 1) Family as source of truth: ensure "Ik" exists and write preferences + diet there
+  let familyMemberId = await getDefaultFamilyMemberId(supabase, user.id);
+
+  if (!familyMemberId) {
+    const { data: newMember, error: insertMemberError } = await supabase
+      .from('family_members')
+      .insert({
+        user_id: user.id,
+        name: 'Ik',
+        is_self: true,
+        sort_order: 0,
+      })
+      .select('id')
+      .single();
+
+    if (insertMemberError) {
+      return {
+        error: `Fout bij aanmaken familielid: ${insertMemberError.message}`,
+      };
+    }
+    familyMemberId = (newMember as { id: string }).id;
+  }
 
   const { error: prefsError } = await supabase
-    .from('user_preferences')
-    .upsert(preferencesData, {
-      onConflict: 'user_id',
-    });
+    .from('family_member_preferences')
+    .upsert(
+      {
+        family_member_id: familyMemberId,
+        max_prep_minutes: input.maxPrepMinutes,
+        servings_default: input.servingsDefault,
+        kcal_target: input.kcalTarget ?? null,
+        allergies: input.allergies,
+        dislikes: input.dislikes,
+        variety_window_days: varietyWindowDays,
+        breakfast_preference: input.mealPreferences?.breakfast || [],
+        lunch_preference: input.mealPreferences?.lunch || [],
+        dinner_preference: input.mealPreferences?.dinner || [],
+        updated_at: onboardingCompletedAt,
+      },
+      { onConflict: 'family_member_id' },
+    );
 
   if (prefsError) {
     return {
@@ -224,29 +275,22 @@ export async function saveOnboardingAction(
     };
   }
 
-  // Handle diet profile: update existing active profile or create new one
-  const { data: existingActiveProfile, error: checkError } = await supabase
-    .from('user_diet_profiles')
+  const { data: existingFmDiet } = await supabase
+    .from('family_member_diet_profiles')
     .select('id')
-    .eq('user_id', user.id)
+    .eq('family_member_id', familyMemberId)
     .is('ends_on', null)
     .maybeSingle();
 
-  if (checkError) {
-    return {
-      error: `Fout bij controleren dieetprofiel: ${checkError.message}`,
-    };
-  }
-
-  if (existingActiveProfile) {
-    // Update existing active profile
+  if (existingFmDiet) {
     const { error: updateError } = await supabase
-      .from('user_diet_profiles')
+      .from('family_member_diet_profiles')
       .update({
         diet_type_id: input.dietTypeId || null,
         strictness: strictnessNumber,
+        updated_at: onboardingCompletedAt,
       })
-      .eq('id', existingActiveProfile.id);
+      .eq('id', (existingFmDiet as { id: string }).id);
 
     if (updateError) {
       return {
@@ -254,12 +298,11 @@ export async function saveOnboardingAction(
       };
     }
   } else {
-    // Create new active profile
     const { error: insertError } = await supabase
-      .from('user_diet_profiles')
+      .from('family_member_diet_profiles')
       .insert({
-        user_id: user.id,
-        starts_on: new Date().toISOString().split('T')[0], // Current date as YYYY-MM-DD
+        family_member_id: familyMemberId,
+        starts_on: new Date().toISOString().split('T')[0],
         ends_on: null,
         diet_type_id: input.dietTypeId || null,
         strictness: strictnessNumber,
@@ -272,15 +315,33 @@ export async function saveOnboardingAction(
     }
   }
 
-  // Revalidate paths to ensure middleware picks up the new onboarding status
+  // 2) user_preferences: only set onboarding_completed so middleware/redirects work
+  const { error: userPrefsError } = await supabase
+    .from('user_preferences')
+    .upsert(
+      {
+        user_id: user.id,
+        onboarding_completed: true,
+        onboarding_completed_at: onboardingCompletedAt,
+        updated_at: onboardingCompletedAt,
+      },
+      { onConflict: 'user_id' },
+    );
+
+  if (userPrefsError) {
+    return {
+      error: `Fout bij opslaan onboarding-status: ${userPrefsError.message}`,
+    };
+  }
+
   revalidatePath('/onboarding');
   revalidatePath('/account');
+  revalidatePath('/familie');
   revalidatePath('/', 'layout');
 
-  // Return updated status (construct directly to avoid another query)
   const status: OnboardingStatus = {
     completed: true,
-    completedAt: preferencesData.onboarding_completed_at,
+    completedAt: onboardingCompletedAt,
     summary: {
       dietTypeId: input.dietTypeId || undefined,
       maxPrepMinutes: input.maxPrepMinutes,

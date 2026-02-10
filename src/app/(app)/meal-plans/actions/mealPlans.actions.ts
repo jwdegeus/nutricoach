@@ -13,6 +13,7 @@ import {
   createMealPlanInputSchema,
   regenerateMealPlanInputSchema,
 } from '@/src/lib/meal-plans/mealPlans.schemas';
+import { presentMealPlanError } from '@/src/lib/meal-plans/mealPlanErrorPresenter';
 
 /**
  * Action result type
@@ -22,8 +23,14 @@ type ActionResult<T> =
   | {
       ok: false;
       error: {
-        code: AppErrorCode;
+        code: AppErrorCode | 'UNKNOWN';
         message: string;
+        /** NL user message (same as message when from presenter). */
+        userMessageNl?: string;
+        /** Max 3 suggested follow-up steps. */
+        userActionHints?: string[];
+        /** Safe diagnostics (counts, ratios, codes; no PII). */
+        diagnostics?: Record<string, unknown>;
         details?:
           | {
               outcome: 'blocked';
@@ -53,7 +60,7 @@ type ActionResult<T> =
  */
 export async function createMealPlanAction(
   raw: unknown,
-): Promise<ActionResult<{ planId: string }>> {
+): Promise<ActionResult<{ planId: string; dbCoverageBelowTarget?: boolean }>> {
   try {
     // Get authenticated user
     const supabase = await createClient();
@@ -97,35 +104,34 @@ export async function createMealPlanAction(
       data: result,
     };
   } catch (error) {
-    type ErrorPayload = NonNullable<
-      Extract<ActionResult<{ planId: string }>, { ok: false }>['error']
-    >;
-    let err: ErrorPayload;
-    if (error instanceof AppError) {
-      err = {
-        code: error.code,
-        message: error.safeMessage,
-        ...(error.guardrailsDetails && { details: error.guardrailsDetails }),
-        ...(error.details &&
-          !error.guardrailsDetails && { details: error.details }),
-      };
-    } else {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      let code: 'VALIDATION_ERROR' | 'DB_ERROR' | 'AGENT_ERROR' = 'DB_ERROR';
-      if (
-        errorMessage.includes('validation') ||
-        errorMessage.includes('Invalid')
-      ) {
-        code = 'VALIDATION_ERROR';
-      } else if (
-        errorMessage.includes('Gemini') ||
-        errorMessage.includes('agent')
-      ) {
-        code = 'AGENT_ERROR';
-      }
-      err = { code, message: errorMessage };
+    const presentation = presentMealPlanError(error);
+    if (
+      (presentation.code === 'DB_ERROR' || presentation.code === 'UNKNOWN') &&
+      error instanceof Error
+    ) {
+      console.error(
+        `[createMealPlanAction] ${presentation.code}:`,
+        error.message,
+      );
     }
+    type ErrorPayload = NonNullable<
+      Extract<
+        ActionResult<{ planId: string; dbCoverageBelowTarget?: boolean }>,
+        { ok: false }
+      >['error']
+    >;
+    const err: ErrorPayload = {
+      code: presentation.code,
+      message: presentation.userMessageNl,
+      ...(presentation.userActionHints.length > 0 && {
+        userActionHints: presentation.userActionHints,
+      }),
+      ...(presentation.diagnostics && {
+        diagnostics: presentation.diagnostics,
+      }),
+      ...(error instanceof AppError &&
+        error.guardrailsDetails && { details: error.guardrailsDetails }),
+    };
 
     try {
       await createInboxNotificationAction({

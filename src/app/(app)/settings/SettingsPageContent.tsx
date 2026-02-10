@@ -3,26 +3,16 @@
 import { AccountSectionTabs } from '@/src/components/app/AccountSectionTabs';
 import { useTranslations } from 'next-intl';
 import type { User } from '@supabase/supabase-js';
-import type { MealPlanSchedulePrefs } from './actions/meal-plan-schedule-preferences.actions';
-import {
-  SchedulePreferencesSection,
-  HouseholdAvoidRulesSection,
-  HouseholdServingsSection,
-  MealSlotStylePreferencesSection,
-  PasswordSection,
-  AccountActionsSection,
-} from './settings-form';
+import { PasswordSection, AccountActionsSection } from './settings-form';
 import { AdminLinks } from './components/AdminLinks';
 
 interface SettingsPageContentProps {
   user: User;
-  schedulePrefs: MealPlanSchedulePrefs | null;
   isAdmin: boolean;
 }
 
 export function SettingsPageContent({
   user: _user,
-  schedulePrefs,
   isAdmin,
 }: SettingsPageContentProps) {
   const t = useTranslations('settings');
@@ -33,90 +23,6 @@ export function SettingsPageContent({
       <AccountSectionTabs />
 
       <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
-        <section
-          id="schedule"
-          className="grid max-w-7xl grid-cols-1 gap-x-8 gap-y-10 px-4 py-16 sm:px-6 md:grid-cols-3 lg:px-8"
-          aria-labelledby="schedule-heading"
-        >
-          <div>
-            <h2
-              id="schedule-heading"
-              className="text-base/7 font-semibold text-zinc-950 dark:text-white"
-            >
-              {t('scheduleHeading')}
-            </h2>
-            <p className="mt-1 text-sm/6 text-zinc-500 dark:text-zinc-400">
-              {t('scheduleDescription')}
-            </p>
-          </div>
-          <div className="md:col-span-2">
-            <SchedulePreferencesSection schedulePrefs={schedulePrefs} />
-          </div>
-        </section>
-
-        <section
-          id="household-avoid"
-          className="grid max-w-7xl grid-cols-1 gap-x-8 gap-y-10 px-4 py-16 sm:px-6 md:grid-cols-3 lg:px-8"
-          aria-labelledby="household-avoid-heading"
-        >
-          <div>
-            <h2
-              id="household-avoid-heading"
-              className="text-base/7 font-semibold text-zinc-950 dark:text-white"
-            >
-              {t('householdAvoidHeading')}
-            </h2>
-            <p className="mt-1 text-sm/6 text-zinc-500 dark:text-zinc-400">
-              {t('householdAvoidDescription')}
-            </p>
-          </div>
-          <div className="md:col-span-2">
-            <HouseholdAvoidRulesSection />
-          </div>
-        </section>
-
-        <section
-          id="servings"
-          className="grid max-w-7xl grid-cols-1 gap-x-8 gap-y-10 px-4 py-16 sm:px-6 md:grid-cols-3 lg:px-8"
-          aria-labelledby="servings-heading"
-        >
-          <div>
-            <h2
-              id="servings-heading"
-              className="text-base/7 font-semibold text-zinc-950 dark:text-white"
-            >
-              {t('servingsHeading')}
-            </h2>
-            <p className="mt-1 text-sm/6 text-zinc-500 dark:text-zinc-400">
-              {t('servingsDescription')}
-            </p>
-          </div>
-          <div className="md:col-span-2">
-            <HouseholdServingsSection />
-          </div>
-        </section>
-
-        <section
-          id="meal-slot-styles"
-          className="grid max-w-7xl grid-cols-1 gap-x-8 gap-y-10 px-4 py-16 sm:px-6 md:grid-cols-3 lg:px-8"
-          aria-labelledby="meal-slot-styles-heading"
-        >
-          <div>
-            <h2
-              id="meal-slot-styles-heading"
-              className="text-base/7 font-semibold text-zinc-950 dark:text-white"
-            >
-              {t('mealSlotStyleHeading')}
-            </h2>
-            <p className="mt-1 text-sm/6 text-zinc-500 dark:text-zinc-400">
-              {t('mealSlotStyleDescription')}
-            </p>
-          </div>
-          <div className="md:col-span-2">
-            <MealSlotStylePreferencesSection />
-          </div>
-        </section>
-
         <section
           id="password"
           className="grid max-w-7xl grid-cols-1 gap-x-8 gap-y-10 px-4 py-16 sm:px-6 md:grid-cols-3 lg:px-8"

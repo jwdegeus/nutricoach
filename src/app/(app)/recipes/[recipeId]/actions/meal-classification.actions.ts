@@ -24,6 +24,9 @@ type ActionResult<T> =
       };
     };
 
+const WEEKMENU_SLOT_VALUES = ['breakfast', 'lunch', 'dinner'] as const;
+export type WeekmenuSlotValue = (typeof WEEKMENU_SLOT_VALUES)[number];
+
 /** Output contract: classification returned by load and save (minimal columns). */
 export type MealClassificationData = {
   mealId: string;
@@ -31,6 +34,8 @@ export type MealClassificationData = {
   /** When set, use this for display instead of formatMealSlot(mealSlot) (e.g. custom "Bijgerecht"). */
   mealSlotLabel: string | null;
   mealSlotOptionId: string | null;
+  /** Voor weekmenu inzetten als: ontbijt, lunch en/of diner. Null = fallback op meal_slot. */
+  weekmenuSlots: WeekmenuSlotValue[] | null;
   totalMinutes: number | null;
   servings: number | null;
   sourceName: string | null;
@@ -85,6 +90,17 @@ const saveClassificationSchema = z.object({
     .nullable()
     .optional()
     .transform((v) => v ?? null),
+  weekmenuSlots: z
+    .array(z.enum(WEEKMENU_SLOT_VALUES))
+    .nullable()
+    .optional()
+    .transform((v) => {
+      if (v == null) return null;
+      const arr = [...new Set(v)].filter((s) =>
+        (WEEKMENU_SLOT_VALUES as readonly string[]).includes(s),
+      );
+      return arr.length > 0 ? arr : null;
+    }),
   sourceName: z
     .string()
     .max(500)
@@ -103,7 +119,7 @@ export type SaveMealClassificationInput = z.infer<
 
 /** Minimal columns for custom_meals classification (no SELECT *). */
 const CUSTOM_MEALS_CLASSIFICATION_COLUMNS =
-  'id,meal_slot,meal_slot_option_id,total_minutes,servings,source,source_url,cuisine_option_id,protein_type_option_id,recipe_book_option_id';
+  'id,meal_slot,meal_slot_option_id,weekmenu_slots,total_minutes,servings,source,source_url,cuisine_option_id,protein_type_option_id,recipe_book_option_id';
 
 /**
  * Load classification for a custom meal (custom_meals only; RLS = user context).
@@ -197,12 +213,22 @@ export async function loadMealClassificationAction(args: {
       if (label) mealSlotLabel = label;
     }
 
+    const rawSlots = row.weekmenu_slots as string[] | null | undefined;
+    const weekmenuSlots: MealClassificationData['weekmenuSlots'] =
+      Array.isArray(rawSlots) && rawSlots.length > 0
+        ? (rawSlots.filter((s) =>
+            (WEEKMENU_SLOT_VALUES as readonly string[]).includes(s),
+          ) as WeekmenuSlotValue[])
+        : null;
+
     const data: MealClassificationData = {
       mealId: row.id as string,
       mealSlot:
         (row.meal_slot as MealClassificationData['mealSlot']) ?? 'dinner',
       mealSlotLabel,
       mealSlotOptionId: optionId,
+      weekmenuSlots:
+        weekmenuSlots && weekmenuSlots.length > 0 ? weekmenuSlots : null,
       totalMinutes:
         typeof row.total_minutes === 'number' ? row.total_minutes : null,
       servings: typeof row.servings === 'number' ? row.servings : null,
@@ -279,6 +305,7 @@ export async function saveMealClassificationAction(args: {
     const {
       mealSlot,
       mealSlotOptionId,
+      weekmenuSlots,
       totalMinutes,
       servings,
       tags,
@@ -337,6 +364,8 @@ export async function saveMealClassificationAction(args: {
       .update({
         meal_slot: mealSlotValue,
         meal_slot_option_id: mealSlotOptionId ?? null,
+        weekmenu_slots:
+          weekmenuSlots && weekmenuSlots.length > 0 ? weekmenuSlots : null,
         total_minutes: totalMinutes,
         servings,
         source: sourceName ?? null,

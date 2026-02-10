@@ -147,7 +147,7 @@ export function Step2AllergiesDislikes({
                     onClick={() => {
                       addTag(allergy, allergies, onAllergiesChange);
                     }}
-                    className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                    className="rounded-md bg-white px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                   >
                     + {allergy}
                   </button>
@@ -210,7 +210,7 @@ export function Step2AllergiesDislikes({
                     onClick={() => {
                       addTag(dislike, dislikes, onDislikesChange);
                     }}
-                    className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                    className="rounded-md bg-white px-2 py-1 text-xs text-zinc-700 hover:bg-zinc-50 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                   >
                     + {dislike}
                   </button>

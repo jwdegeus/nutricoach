@@ -1324,9 +1324,10 @@ export function RecipeImportClient({
                       </div>
                     </div>
                     {urlImportError ? (
-                      <ErrorMessage
+                      <div
                         id="recipe-url-inline-error"
-                        className="mt-2"
+                        role="alert"
+                        className="mt-2 text-base/6 text-red-600 data-disabled:opacity-50 sm:text-sm/6 dark:text-red-500"
                       >
                         <div className="space-y-2">
                           <div>{urlImportError}</div>
@@ -1341,7 +1342,7 @@ export function RecipeImportClient({
                             </Link>
                           )}
                         </div>
-                      </ErrorMessage>
+                      </div>
                     ) : (
                       <Description id="recipe-url-inline-hint" className="mt-2">
                         {t('urlImportHint')}

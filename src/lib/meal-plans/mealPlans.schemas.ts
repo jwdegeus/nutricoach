@@ -19,6 +19,12 @@ export const createMealPlanInputSchema = z.object({
       target: z.number().optional(),
     })
     .optional(),
+  dbFirstSettings: z
+    .object({
+      repeatWindowDays: z.number().int().min(1).max(30).optional(),
+      aiFillMode: z.enum(['strict', 'normal']).optional(),
+    })
+    .optional(),
 });
 
 /**

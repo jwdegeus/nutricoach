@@ -111,6 +111,7 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
   const tNav = useTranslations('nav');
   const tMenu = useTranslations('menu');
   const [initials, setInitials] = useState('U');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const mounted = useIsMounted();
@@ -146,6 +147,8 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
 
       setDisplayName(displayNameValue || fullName || userEmail || 'User');
       setEmail(userEmail);
+      const url = metadata.avatar_url;
+      setAvatarUrl(typeof url === 'string' && url.trim() ? url.trim() : null);
     }
 
     async function checkAdminStatus(userId: string) {
@@ -198,14 +201,16 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
   const mainItems = navItems.filter((item) => !item.group);
   const secondaryItems = navItems.filter((item) => item.group === 'secondary');
   const tCommon = useTranslations('common');
+  const tAccount = useTranslations('account');
   const breadcrumbs = getBreadcrumbs(
     pathname,
     (key: string) => {
+      if (key === 'account.title') return tAccount('title');
       if (key.startsWith('common.')) return tCommon(key.slice(7));
       if (key.startsWith('nav.')) return tNav(key.slice(4));
       return key;
     },
-    { tab },
+    { tab, accountLabel: displayName || undefined },
   );
 
   return (
@@ -237,7 +242,12 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
               {mounted && (
                 <Dropdown>
                   <DropdownButton as={NavbarItem}>
-                    <Avatar initials={initials} square />
+                    <Avatar
+                      src={avatarUrl}
+                      initials={!avatarUrl ? initials : undefined}
+                      alt={displayName}
+                      square
+                    />
                   </DropdownButton>
                   <AccountDropdownMenu
                     anchor="bottom end"

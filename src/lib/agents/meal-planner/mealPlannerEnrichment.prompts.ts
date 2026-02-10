@@ -93,10 +93,12 @@ REQUIREMENTS:
 5. For each day in the plan:
    - Generate a cook plan with batch suggestions, order of preparation, and prep-ahead tips
    - Only suggest batch cooking if it makes logical sense (e.g., chopping vegetables for multiple meals)
-   - Estimate total time for the day
-6. Do NOT add any new ingredients - use ONLY the ingredients provided in each meal's ingredient list${pantryStaplesNote}
-7. Instructions should be clear, step-by-step, and reference ingredients by their names (from the ingredient list)
-8. Cook plan steps should be practical and help optimize meal preparation
+   - CRITICAL: For each cook plan step that mentions a specific meal by name, the time in parentheses (e.g. "Bereid de X (5 min)") MUST equal that meal's prepTimeMin + cookTimeMin. Do not use a different time.
+   - Estimate total time for the day as the sum of all step times (or meal times) for that day.
+6. For meals whose title suggests a protein shake (eiwitshake, smoothie met eiwit): if the ingredient list has no protein powder (eiwitpoeder, rijsteiwitpoeder, ei-eiwitpoeder), add one short kitchenNote suggesting optional addition of e.g. rijsteiwitpoeder or ei-eiwitpoeder.
+7. Do NOT add any new ingredients - use ONLY the ingredients provided in each meal's ingredient list${pantryStaplesNote}
+8. Instructions should be clear, step-by-step, and reference ingredients by their names (from the ingredient list)
+9. Cook plan steps should be practical and help optimize meal preparation
 
 Generate the enriched meal plan now. Output ONLY the JSON object, nothing else.`;
 
@@ -196,8 +198,9 @@ REQUIREMENTS:
    - ingredientNevoCodesUsed MUST only contain codes from the meal's ingredient list above
    - Optional: servings count, kitchenNotes (short tips)
 5. Do NOT add any new ingredients - use ONLY the ingredients provided in the meal's ingredient list${pantryStaplesNote}
-6. Instructions should be clear, step-by-step, and reference ingredients by their names (from the ingredient list)
-7. Times must be reasonable (prepTimeMin + cookTimeMin <= 240 minutes)
+6. For meals whose name suggests a protein shake (eiwitshake, smoothie met eiwit): if the ingredient list has no protein powder (eiwitpoeder, rijsteiwitpoeder, ei-eiwitpoeder), add one short kitchenNote suggesting optional addition of e.g. rijsteiwitpoeder or ei-eiwitpoeder.
+7. Instructions should be clear, step-by-step, and reference ingredients by their names (from the ingredient list)
+8. Times must be reasonable (prepTimeMin + cookTimeMin <= 240 minutes)
 
 Generate the enriched meal now. Output ONLY the JSON object, nothing else.`;
 

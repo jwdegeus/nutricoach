@@ -14,7 +14,7 @@ const MAX_LIMIT = 200;
 const MAX_SEARCH_LENGTH = 200;
 
 /**
- * Load paginated ingredient list from view ingredient_overview_v1.
+ * Load paginated ingredient list via get_ingredient_overview_paginated (SECURITY INVOKER).
  * Filter by source and optional search (q); sort by source_rank then display_name.
  * Admin-only.
  */
@@ -29,76 +29,41 @@ export async function loadIngredientOverviewAction(
   const source: IngredientOverviewSource = input.source ?? 'all';
   const limit = Math.min(MAX_LIMIT, Math.max(1, input.limit ?? DEFAULT_LIMIT));
   const offset = Math.max(0, input.offset ?? 0);
-  const q = (input.q ?? '').trim().slice(0, MAX_SEARCH_LENGTH);
-
-  const selectWithGroup =
-    'ingredient_uid, source, source_rank, source_id, display_name, description, created_at, food_group_nl, is_enabled';
-  const selectWithoutGroup =
-    'ingredient_uid, source, source_rank, source_id, display_name, description, created_at, is_enabled';
+  const q = (input.q ?? '').trim().slice(0, MAX_SEARCH_LENGTH) || null;
 
   try {
     const supabase = await createClient();
 
-    const buildQuery = (selectCols: string) => {
-      let query = supabase
-        .from('ingredient_overview_v1')
-        .select(selectCols, { count: 'exact' })
-        .order('source_rank', { ascending: true })
-        .order('display_name', { ascending: true });
-      if (source !== 'all') query = query.eq('source', source);
-      if (q) {
-        const safeQ = q
-          .replace(/%/g, '\\%')
-          .replace(/_/g, '\\_')
-          .replace(/,/g, ' ');
-        query = query.or(
-          `display_name.ilike.%${safeQ}%,description.ilike.%${safeQ}%`,
-        );
-      }
-      return query.range(offset, offset + limit - 1);
-    };
+    const { data, error } = await supabase.rpc(
+      'get_ingredient_overview_paginated',
+      {
+        p_source: source,
+        p_limit: limit,
+        p_offset: offset,
+        p_q: q,
+      },
+    );
 
-    let result = await buildQuery(selectWithGroup);
+    if (error) {
+      return { error: `Fout bij laden overzicht: ${error.message}` };
+    }
 
-    if (result.error) {
-      const msg = result.error.message ?? '';
-      const columnMissing =
-        /food_group_nl|column.*does not exist|unknown column/i.test(msg);
-      if (columnMissing) {
-        result = await buildQuery(selectWithoutGroup);
-        if (result.error) {
-          return { error: `Fout bij laden overzicht: ${result.error.message}` };
-        }
-        const list = (
-          (result.data ?? []) as unknown as Record<string, unknown>[]
-        ).map(
+    const first = Array.isArray(data) ? data[0] : data;
+    const rowsJson = (first as { rows?: unknown } | null)?.rows;
+    const totalCount = (first as { total_count?: number } | null)?.total_count;
+    const list = Array.isArray(rowsJson)
+      ? (rowsJson as Record<string, unknown>[]).map(
           (row) =>
             ({
               ...row,
-              food_group_nl: null,
               is_enabled: (row as { is_enabled?: boolean }).is_enabled ?? true,
             }) as IngredientOverviewRow,
-        );
-        return {
-          rows: list,
-          totalCount: result.count ?? undefined,
-        };
-      }
-      return { error: `Fout bij laden overzicht: ${msg}` };
-    }
+        )
+      : [];
 
-    const list = (
-      (result.data ?? []) as unknown as Record<string, unknown>[]
-    ).map(
-      (row) =>
-        ({
-          ...row,
-          is_enabled: (row as { is_enabled?: boolean }).is_enabled ?? true,
-        }) as IngredientOverviewRow,
-    );
     return {
       rows: list,
-      totalCount: result.count ?? undefined,
+      totalCount: totalCount ?? undefined,
     };
   } catch (err) {
     return {

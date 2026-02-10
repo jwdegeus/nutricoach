@@ -206,31 +206,57 @@ export function MealDetailDialog({
           </div>
         )}
 
-        {/* Cook Plan voor deze dag */}
-        {cookPlanDay && cookPlanDay.steps.length > 0 && (
-          <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white">
-              <ChefHat className="h-4 w-4" />
-              Kookplan voor {formatDate(cookPlanDay.date)}
-            </div>
-            <ul className="pl-6 space-y-2 list-disc list-inside">
-              {cookPlanDay.steps.map((step, idx) => (
-                <li
-                  key={idx}
-                  className="text-sm text-zinc-600 dark:text-zinc-400"
-                >
-                  {step}
-                </li>
-              ))}
-            </ul>
-            {cookPlanDay.estimatedTotalTimeMin > 0 && (
-              <div className="pl-6 text-sm font-medium text-zinc-900 dark:text-white">
-                Geschatte totale tijd: {cookPlanDay.estimatedTotalTimeMin}{' '}
-                minuten
+        {/* Kookplan: alleen stappen die bij deze maaltijd horen, met bereidingstijd van deze maaltijd */}
+        {cookPlanDay &&
+          cookPlanDay.steps.length > 0 &&
+          (() => {
+            const mealTitle = (enrichedMeal?.title || meal.name || '').trim();
+            const stepsForThisMeal = mealTitle
+              ? cookPlanDay.steps.filter((step) =>
+                  step.toLowerCase().includes(mealTitle.toLowerCase()),
+                )
+              : [];
+            const showMealOnly = stepsForThisMeal.length > 0 && enrichedMeal;
+            const totalMin =
+              enrichedMeal &&
+              (enrichedMeal.prepTimeMin > 0 || enrichedMeal.cookTimeMin > 0)
+                ? enrichedMeal.prepTimeMin + enrichedMeal.cookTimeMin
+                : 0;
+            return (
+              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white">
+                  <ChefHat className="h-4 w-4" />
+                  {showMealOnly
+                    ? `Kookplan voor deze maaltijd`
+                    : `Kookplan voor ${formatDate(cookPlanDay.date)}`}
+                </div>
+                <ul className="pl-6 space-y-2 list-disc list-inside">
+                  {(showMealOnly ? stepsForThisMeal : cookPlanDay.steps).map(
+                    (step, idx) => (
+                      <li
+                        key={idx}
+                        className="text-sm text-zinc-600 dark:text-zinc-400"
+                      >
+                        {step}
+                      </li>
+                    ),
+                  )}
+                </ul>
+                {showMealOnly && totalMin > 0 ? (
+                  <div className="pl-6 text-sm font-medium text-zinc-900 dark:text-white">
+                    Geschatte tijd voor deze maaltijd: {totalMin} minuten
+                  </div>
+                ) : (
+                  cookPlanDay.estimatedTotalTimeMin > 0 && (
+                    <div className="pl-6 text-sm font-medium text-zinc-900 dark:text-white">
+                      Geschatte totale tijd: {cookPlanDay.estimatedTotalTimeMin}{' '}
+                      minuten
+                    </div>
+                  )
+                )}
               </div>
-            )}
-          </div>
-        )}
+            );
+          })()}
 
         {/* Ingrediënten */}
         {meal.ingredientRefs && meal.ingredientRefs.length > 0 && (
@@ -254,6 +280,34 @@ export function MealDetailDialog({
                 );
               })}
             </ul>
+            {(() => {
+              const title = (
+                enrichedMeal?.title ||
+                meal.name ||
+                ''
+              ).toLowerCase();
+              const isShake =
+                /eiwit.*(shake|smoothie)|(shake|smoothie).*eiwit/.test(title) ||
+                /\beiwitshake\b/.test(title);
+              const hasProteinPowder = meal.ingredientRefs.some((ref) => {
+                const n = (
+                  ref.displayName ||
+                  nevoFoodNamesByCode[ref.nevoCode] ||
+                  ''
+                ).toLowerCase();
+                return /eiwitpoeder|rijsteiwitpoeder|ei-eiwitpoeder|protein.*poeder/.test(
+                  n,
+                );
+              });
+              if (isShake && !hasProteinPowder) {
+                return (
+                  <p className="pl-6 text-sm text-zinc-500 dark:text-zinc-500 italic">
+                    Optioneel: rijsteiwitpoeder of ei-eiwitpoeder (niet in plan)
+                  </p>
+                );
+              }
+              return null;
+            })()}
           </div>
         )}
 
