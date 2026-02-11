@@ -531,13 +531,21 @@ export class MealPlansService {
    * @param userId - User ID
    * @param input - Create meal plan input
    * @param supabaseAdmin - Optional service-role client for server-only/system runs
-   * @returns Plan ID
+   * @returns Plan ID and optional dbCoverage/dbCoverageBelowTarget from plan metadata
    */
   async createPlanForUser(
     userId: string,
     input: CreateMealPlanInput,
     supabaseAdmin?: SupabaseClient,
-  ): Promise<{ planId: string }> {
+  ): Promise<{
+    planId: string;
+    dbCoverage?: {
+      dbSlots: number;
+      totalSlots: number;
+      percent: number;
+    };
+    dbCoverageBelowTarget?: boolean;
+  }> {
     const startTime = Date.now();
     let runId: string | null = null;
     const supabase = supabaseAdmin ?? (await createClient());
@@ -1172,7 +1180,21 @@ export class MealPlansService {
             );
           }
 
-          return { planId: data.id };
+          const meta = planToPersist.metadata as
+            | {
+                dbCoverage?: {
+                  dbSlots: number;
+                  totalSlots: number;
+                  percent: number;
+                };
+                dbCoverageBelowTarget?: boolean;
+              }
+            | undefined;
+          return {
+            planId: data.id,
+            dbCoverage: meta?.dbCoverage,
+            dbCoverageBelowTarget: meta?.dbCoverageBelowTarget,
+          };
         } catch (e) {
           if (
             !isRetry &&

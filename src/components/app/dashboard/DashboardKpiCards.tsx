@@ -17,7 +17,7 @@ export function DashboardKpiCards() {
   return (
     <>
       <BentoCell
-        round="max-sm:rounded-t-4xl rounded-bl-lg sm:rounded-tl-4xl lg:rounded-tl-4xl lg:rounded-bl-lg lg:rounded-l-4xl"
+        round="max-sm:rounded-t-lg rounded-bl-lg sm:rounded-tl-lg lg:rounded-tl-lg lg:rounded-bl-lg lg:rounded-l-lg"
         bg="bg-muted"
       >
         <div className={kpiContentClass}>
@@ -35,10 +35,7 @@ export function DashboardKpiCards() {
         </div>
       </BentoCell>
 
-      <BentoCell
-        round="max-sm:rounded-none rounded-lg sm:rounded-tr-4xl lg:rounded-lg"
-        bg="bg-muted"
-      >
+      <BentoCell round="rounded-lg" bg="bg-muted">
         <div className={kpiContentClass}>
           <div className="bg-primary/10 text-primary flex size-10 shrink-0 items-center justify-center rounded-xl">
             <ChartBarIcon className="size-5" />
@@ -71,7 +68,7 @@ export function DashboardKpiCards() {
       </BentoCell>
 
       <BentoCell
-        round="max-sm:rounded-b-4xl rounded-br-lg sm:rounded-br-4xl lg:rounded-r-4xl"
+        round="max-sm:rounded-b-lg rounded-br-lg sm:rounded-br-lg lg:rounded-r-lg"
         bg="bg-muted"
       >
         <div className={kpiContentClass}>

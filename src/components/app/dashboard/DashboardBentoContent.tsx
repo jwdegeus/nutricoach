@@ -16,7 +16,7 @@ export function DashboardBentoContent({ topMeals }: Props) {
       {/* Col 1, row-span-2: Inname summary — left edge rounding */}
       <BentoCell
         placement="lg:row-span-2"
-        round="max-lg:rounded-t-4xl lg:rounded-l-4xl"
+        round="max-lg:rounded-t-lg lg:rounded-l-lg"
         bg="bg-muted"
       >
         <div className="flex h-full flex-col p-6 sm:p-8">
@@ -42,7 +42,7 @@ export function DashboardBentoContent({ topMeals }: Props) {
       {/* Col 3, row-span-2: Detail intake — right edge rounding */}
       <BentoCell
         placement="lg:col-start-3 lg:row-span-2 lg:row-start-1"
-        round="max-lg:rounded-b-4xl lg:rounded-r-4xl"
+        round="max-lg:rounded-b-lg lg:rounded-r-lg"
         bg="bg-muted"
       >
         <div className="min-h-0 flex-1 overflow-y-auto p-6 sm:p-8">

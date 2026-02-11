@@ -1216,7 +1216,7 @@ export function RecipesIndexClient({
                   : `${totalCount} recepten`}
             </Text>
           )}
-          <ul className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-8 2xl:grid-cols-6">
+          <ul className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-8">
             {filteredItems.map((item) => (
               <MealCard
                 key={item.mealId}

@@ -71,16 +71,6 @@ export function LoginForm() {
       <Button type="submit" className="w-full" disabled={isPending}>
         {isPending ? 'Inloggen...' : 'Inloggen'}
       </Button>
-
-      <div className="text-center text-sm text-zinc-500 dark:text-zinc-400">
-        Nog geen account?{' '}
-        <Link
-          href="/register"
-          className="font-medium text-blue-600 hover:underline dark:text-blue-400"
-        >
-          Registreer hier
-        </Link>
-      </div>
     </form>
   );
 }

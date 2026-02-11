@@ -9,8 +9,10 @@ import { Field, Label, Description } from '@/components/catalyst/fieldset';
 import { Text } from '@/components/catalyst/text';
 import { Select } from '@/components/catalyst/select';
 import { SwitchField, Switch } from '@/components/catalyst/switch';
-import { createMealPlanAction } from '../../actions/mealPlans.actions';
-import { getLatestRunningRunAction } from '../../../runs/actions/runs.actions';
+import {
+  startMealPlanGenerationJobAction,
+  runMealPlanJobNowAction,
+} from '../../jobs/actions/mealPlanJobs.actions';
 import { getCurrentDietIdAction } from '@/src/app/(app)/recipes/[recipeId]/actions/recipe-ai.persist.actions';
 import { GuardrailsViolationEmptyState } from '../../[planId]/components/GuardrailsViolationEmptyState';
 import { useToast } from '@/src/components/app/ToastContext';
@@ -57,8 +59,7 @@ export function CreateMealPlanForm({
     useState<GuardrailsViolationState | null>(null);
   const [dietTypeId, setDietTypeId] = useState<string | undefined>(undefined);
   const [isRetrying, setIsRetrying] = useState(false);
-  const [progress, setProgress] = useState<string | null>(null);
-  const [elapsedTime, setElapsedTime] = useState<number>(0);
+  const [progress, setProgress] = useState<string>('');
   const [dateFrom, setDateFrom] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
   });
@@ -84,50 +85,6 @@ export function CreateMealPlanForm({
     }
   }, [guardrailsViolation, dietTypeId]);
 
-  // Poll for progress when generating
-  useEffect(() => {
-    if (!isPending) {
-      setProgress(null);
-      setElapsedTime(0);
-      return;
-    }
-
-    const startTime = Date.now();
-
-    const checkProgress = async () => {
-      const result = await getLatestRunningRunAction();
-      if (result.ok && result.data) {
-        const elapsed = Date.now() - startTime;
-        setElapsedTime(elapsed);
-
-        // Estimate progress based on elapsed time
-        // Typical generation takes 10-30 seconds
-        if (elapsed < 5000) {
-          setProgress('Profiel laden...');
-        } else if (elapsed < 15000) {
-          setProgress('Weekmenu genereren...');
-        } else if (elapsed < 25000) {
-          setProgress('Plan valideren...');
-        } else if (elapsed < 35000) {
-          setProgress('Enrichment toevoegen...');
-        } else {
-          setProgress('Bijna klaar...');
-        }
-      } else {
-        // No running run found, might be done or error
-        setProgress(null);
-      }
-    };
-
-    // Check immediately, then every 2 seconds
-    checkProgress();
-    const intervalId = setInterval(checkProgress, 2000);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [isPending]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -152,7 +109,8 @@ export function CreateMealPlanForm({
 
     startTransition(async () => {
       try {
-        const result = await createMealPlanAction({
+        setProgress('Job aanmaken…');
+        const startResult = await startMealPlanGenerationJobAction({
           dateFrom,
           days: daysNum,
           dbFirstSettings: {
@@ -161,47 +119,40 @@ export function CreateMealPlanForm({
           },
         });
 
-        if (result.ok) {
-          if (result.data.dbCoverageBelowTarget) {
-            showToast({
-              type: 'success',
-              title: 'Menu gegenereerd',
-              description:
-                'Er staan meer AI-maaltijden in dan de streefwaarde. Voeg meer recepten toe voor een evenwichtiger menu.',
-            });
-          }
-          window.dispatchEvent(new CustomEvent('meal-plan-changed'));
-          router.replace(`/meal-plans/${result.data.planId}`);
+        if (!startResult.ok) {
+          setCreateError({ message: startResult.error.message });
           return;
         }
-        // Check for guardrails violation
-        if (
-          result.error.code === 'GUARDRAILS_VIOLATION' &&
-          result.error.details &&
-          'reasonCodes' in result.error.details
-        ) {
-          const d = result.error.details;
-          setGuardrailsViolation({
-            reasonCodes: d.reasonCodes,
-            contentHash: d.contentHash,
-            rulesetVersion: d.rulesetVersion,
-            ...('forceDeficits' in d &&
-              Array.isArray(d.forceDeficits) && {
-                forceDeficits: d.forceDeficits,
-              }),
+
+        setProgress('Weekmenu genereren… (dit duurt 20–40 seconden)');
+        const runResult = await runMealPlanJobNowAction({
+          jobId: startResult.data.jobId,
+        });
+
+        if (runResult.ok && runResult.data?.mealPlanId) {
+          showToast({
+            type: 'success',
+            title: 'Weekmenu klaar',
+            description:
+              'Je krijgt ook een bericht in je inbox met info over recepten uit je database.',
           });
-        } else {
-          setCreateError({
-            message: result.error.userMessageNl ?? result.error.message,
-            userActionHints: result.error.userActionHints,
-            diagnostics: result.error.diagnostics,
-          });
+          window.dispatchEvent(new CustomEvent('meal-plan-changed'));
+          router.replace(`/meal-plans/${runResult.data.mealPlanId}`);
+          return;
         }
+        setCreateError({
+          message:
+            runResult.ok === false
+              ? runResult.error.message
+              : 'Generatie mislukt. Check je inbox voor details.',
+        });
+        setProgress('');
       } catch (err) {
         setCreateError({
           message:
             err instanceof Error ? err.message : 'Fout bij aanmaken weekmenu',
         });
+        setProgress('');
       }
     });
   };
@@ -227,7 +178,8 @@ export function CreateMealPlanForm({
 
     startTransition(async () => {
       try {
-        const result = await createMealPlanAction({
+        setProgress('Job aanmaken…');
+        const startResult = await startMealPlanGenerationJobAction({
           dateFrom,
           days: daysNum,
           dbFirstSettings: {
@@ -236,46 +188,41 @@ export function CreateMealPlanForm({
           },
         });
 
-        if (result.ok) {
-          if (result.data.dbCoverageBelowTarget) {
-            showToast({
-              type: 'success',
-              title: 'Menu gegenereerd',
-              description:
-                'Er staan meer AI-maaltijden in dan de streefwaarde. Voeg meer recepten toe voor een evenwichtiger menu.',
-            });
-          }
-          window.dispatchEvent(new CustomEvent('meal-plan-changed'));
-          router.replace(`/meal-plans/${result.data.planId}`);
+        if (!startResult.ok) {
+          setCreateError({ message: startResult.error.message });
+          setIsRetrying(false);
           return;
         }
-        if (
-          result.error.code === 'GUARDRAILS_VIOLATION' &&
-          result.error.details &&
-          'reasonCodes' in result.error.details
-        ) {
-          const d = result.error.details;
-          setGuardrailsViolation({
-            reasonCodes: d.reasonCodes,
-            contentHash: d.contentHash,
-            rulesetVersion: d.rulesetVersion,
-            ...('forceDeficits' in d &&
-              Array.isArray(d.forceDeficits) && {
-                forceDeficits: d.forceDeficits,
-              }),
+
+        setProgress('Weekmenu genereren… (dit duurt 20–40 seconden)');
+        const runResult = await runMealPlanJobNowAction({
+          jobId: startResult.data.jobId,
+        });
+
+        if (runResult.ok && runResult.data?.mealPlanId) {
+          showToast({
+            type: 'success',
+            title: 'Weekmenu klaar',
+            description:
+              'Je krijgt ook een bericht in je inbox met info over recepten uit je database.',
           });
-        } else {
-          setCreateError({
-            message: result.error.userMessageNl ?? result.error.message,
-            userActionHints: result.error.userActionHints,
-            diagnostics: result.error.diagnostics,
-          });
+          window.dispatchEvent(new CustomEvent('meal-plan-changed'));
+          router.replace(`/meal-plans/${runResult.data.mealPlanId}`);
+          return;
         }
+        setCreateError({
+          message:
+            runResult.ok === false
+              ? runResult.error.message
+              : 'Generatie mislukt. Check je inbox voor details.',
+        });
+        setProgress('');
       } catch (err) {
         setCreateError({
           message:
             err instanceof Error ? err.message : 'Fout bij aanmaken weekmenu',
         });
+        setProgress('');
       } finally {
         setIsRetrying(false);
       }
@@ -425,28 +372,13 @@ export function CreateMealPlanForm({
           )}
 
           {isPending && (
-            <div className="flex flex-col items-center justify-center space-y-4 py-8 text-center">
-              <ArrowPathIcon className="h-10 w-10 animate-spin text-primary-600 dark:text-primary-400" />
-              <div className="space-y-1">
-                <Text className="font-medium text-foreground">
-                  {progress ?? 'Weekmenu genereren...'}
-                </Text>
-                {(elapsedTime > 0 || progress) && (
-                  <Text className="text-sm text-muted-foreground">
-                    {elapsedTime > 0 && `${Math.floor(elapsedTime / 1000)}s`}
-                    {elapsedTime > 0 && progress && ' · '}
-                    Dit kan 20–40 seconden duren. Blijf deze pagina open.
-                  </Text>
-                )}
-              </div>
-              <div className="h-2 w-full max-w-xs overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-2 rounded-full bg-primary-500 transition-all duration-500"
-                  style={{
-                    width: `${Math.min(95, Math.max(5, (elapsedTime / 40000) * 100))}%`,
-                  }}
-                />
-              </div>
+            <div className="rounded-lg bg-muted/30 p-4 shadow-sm">
+              <p className="text-sm font-medium text-foreground">
+                {progress || 'Weekmenu genereren…'}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Blijf deze pagina open. Dit duurt 20–40 seconden.
+              </p>
             </div>
           )}
 

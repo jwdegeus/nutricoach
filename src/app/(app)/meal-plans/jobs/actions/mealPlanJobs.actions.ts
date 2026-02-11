@@ -6,6 +6,7 @@ import { createAdminClient } from '@/src/lib/supabase/admin';
 import { createInboxNotificationAction } from '@/src/app/(app)/inbox/actions/inboxNotifications.actions';
 import { MealPlansService } from '@/src/lib/meal-plans/mealPlans.service';
 import { AppError } from '@/src/lib/errors/app-error';
+import { buildInboxMessageFromErrorCode } from '@/src/lib/meal-plans/mealPlanErrorPresenter';
 
 /** Explicit columns for due-job select (no SELECT *) */
 const JOB_CLAIM_SELECT_COLUMNS =
@@ -435,6 +436,123 @@ export async function failMealPlanJobAction(
           error instanceof Error
             ? error.message
             : 'Fout bij markeren van job als mislukt',
+      },
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// startMealPlanGenerationJobAction
+// ---------------------------------------------------------------------------
+
+const startJobInputSchema = z.object({
+  dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  days: z.number().int().min(1).max(30),
+  dbFirstSettings: z
+    .object({
+      repeatWindowDays: z.number().int().min(1).max(30).optional(),
+      aiFillMode: z.enum(['strict', 'normal']).optional(),
+    })
+    .optional(),
+});
+
+type StartJobResult =
+  | { ok: true; data: { jobId: string } }
+  | {
+      ok: false;
+      error: {
+        code: 'AUTH_ERROR' | 'VALIDATION_ERROR' | 'DB_ERROR';
+        message: string;
+      };
+    };
+
+/**
+ * Start an on-demand meal plan generation job. Job runs in background (via cron).
+ * User can leave the page; success/failure is notified via inbox.
+ */
+export async function startMealPlanGenerationJobAction(
+  raw: unknown,
+): Promise<StartJobResult> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: {
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn om een weekmenu te genereren',
+        },
+      };
+    }
+
+    let input: z.infer<typeof startJobInputSchema>;
+    try {
+      input = startJobInputSchema.parse(raw);
+    } catch (error) {
+      return {
+        ok: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Ongeldige input (dateFrom YYYY-MM-DD, days 1-30)',
+        },
+      };
+    }
+
+    const nowIso = new Date().toISOString();
+    const requestSnapshot = {
+      dateFrom: input.dateFrom,
+      days: input.days,
+      ...(input.dbFirstSettings && { dbFirstSettings: input.dbFirstSettings }),
+    };
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('meal_plan_generation_jobs')
+      .insert({
+        user_id: user.id,
+        status: 'scheduled',
+        scheduled_for: nowIso,
+        request_snapshot: requestSnapshot,
+      })
+      .select('id')
+      .single();
+
+    if (insertError) {
+      return {
+        ok: false,
+        error: {
+          code: 'DB_ERROR',
+          message: `Job aanmaken mislukt: ${insertError.message}`,
+        },
+      };
+    }
+
+    if (!inserted?.id) {
+      return {
+        ok: false,
+        error: {
+          code: 'DB_ERROR',
+          message: 'Job aanmaken mislukt: geen id terug',
+        },
+      };
+    }
+
+    return { ok: true, data: { jobId: inserted.id } };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: 'DB_ERROR',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Fout bij starten weekmenu-generatie',
       },
     };
   }
@@ -957,8 +1075,15 @@ export async function runOneDueMealPlanJobSystemAction(): Promise<
       typeof (snapshot as { week_start?: unknown }).week_start === 'string'
         ? (snapshot as { week_start: string }).week_start
         : null;
+    const dateFrom =
+      snapshot &&
+      typeof snapshot === 'object' &&
+      'dateFrom' in snapshot &&
+      typeof (snapshot as { dateFrom?: unknown }).dateFrom === 'string'
+        ? (snapshot as { dateFrom: string }).dateFrom
+        : weekStart;
 
-    if (!weekStart) {
+    if (!dateFrom) {
       await systemFailJob(
         admin,
         claimed.id,
@@ -966,7 +1091,7 @@ export async function runOneDueMealPlanJobSystemAction(): Promise<
         claimed.max_attempts,
         lockId,
         'MEAL_PLAN_JOB_INVALID_STATE',
-        'request_snapshot.week_start ontbreekt',
+        'request_snapshot.week_start of dateFrom ontbreekt',
         claimed.user_id,
       );
       return {
@@ -988,15 +1113,46 @@ export async function runOneDueMealPlanJobSystemAction(): Promise<
         ? (snapshot as { days: number }).days
         : 7;
 
+    const dbFirstSettings =
+      typeof snapshot === 'object' &&
+      snapshot &&
+      'dbFirstSettings' in snapshot &&
+      (snapshot as { dbFirstSettings?: unknown }).dbFirstSettings != null
+        ? (
+            snapshot as {
+              dbFirstSettings: {
+                repeatWindowDays?: number;
+                aiFillMode?: 'strict' | 'normal';
+              };
+            }
+          ).dbFirstSettings
+        : undefined;
+
+    const createInput = {
+      dateFrom,
+      days,
+      ...(dbFirstSettings && { dbFirstSettings }),
+    };
+
     let planId: string;
+    let dbCoverage:
+      | {
+          dbSlots: number;
+          totalSlots: number;
+          percent: number;
+        }
+      | undefined;
+    let dbCoverageBelowTarget: boolean | undefined;
     try {
       const service = new MealPlansService();
       const result = await service.createPlanForUser(
         claimed.user_id,
-        { dateFrom: weekStart, days },
+        createInput,
         admin,
       );
       planId = result.planId;
+      dbCoverage = result.dbCoverage;
+      dbCoverageBelowTarget = result.dbCoverageBelowTarget;
       await ensurePlanIsInDraft(admin, planId);
     } catch (error) {
       const errorCode =
@@ -1054,12 +1210,35 @@ export async function runOneDueMealPlanJobSystemAction(): Promise<
     }
 
     try {
+      const dbSlots = dbCoverage?.dbSlots ?? 0;
+      const totalSlots = dbCoverage?.totalSlots ?? 0;
+      const percent = dbCoverage?.percent ?? 0;
+
+      let message = 'Er staat een nieuw concept-weekmenu klaar om te reviewen.';
+      if (totalSlots > 0) {
+        message += ` ${dbSlots} van ${totalSlots} maaltijden (${percent}%) komen uit je receptendatabase.`;
+      }
+      if (dbSlots <= 3 && totalSlots > 0) {
+        message +=
+          ' Tips om meer recepten uit je database te gebruiken: voeg meer recepten toe die als ontbijt/lunch/diner zijn geclassificeerd, zorg dat alle ingrediënten een NEVO-koppeling hebben, pas eventueel je dieetregels aan (minder restrictief = meer keuze).';
+      }
+
+      const details: Record<string, unknown> = {
+        planId,
+        runId: claimed.id,
+      };
+      if (dbCoverage) {
+        details.dbSlots = dbCoverage.dbSlots;
+        details.totalSlots = dbCoverage.totalSlots;
+        details.percent = dbCoverage.percent;
+      }
+
       await admin.from('user_inbox_notifications').insert({
         user_id: claimed.user_id,
         type: 'meal_plan_ready_for_review',
         title: 'Nieuw weekmenu klaar (concept)',
-        message: 'Er staat een nieuw concept-weekmenu klaar om te reviewen.',
-        details: { planId, runId: claimed.id },
+        message,
+        details,
       });
     } catch {
       // Non-blocking: job stays succeeded
@@ -1117,11 +1296,12 @@ async function systemFailJob(
 
   if (nextStatus === 'failed') {
     try {
+      const message = buildInboxMessageFromErrorCode(errorCode, errorMessage);
       await admin.from('user_inbox_notifications').insert({
         user_id: userId,
         type: 'meal_plan_generation_failed',
         title: 'Weekmenu generatie mislukt',
-        message: 'De automatische generatie is mislukt. Probeer opnieuw.',
+        message,
         details: { runId: jobId, errorCode },
       });
     } catch {
@@ -1239,13 +1419,20 @@ export async function runClaimedMealPlanJobAction(
       typeof (snapshot as { week_start?: unknown }).week_start === 'string'
         ? (snapshot as { week_start: string }).week_start
         : null;
+    const dateFromSnap =
+      snapshot &&
+      typeof snapshot === 'object' &&
+      'dateFrom' in snapshot &&
+      typeof (snapshot as { dateFrom?: unknown }).dateFrom === 'string'
+        ? (snapshot as { dateFrom: string }).dateFrom
+        : weekStart;
 
-    if (!weekStart) {
+    if (!dateFromSnap) {
       return {
         ok: false,
         error: {
           code: 'MEAL_PLAN_JOB_INVALID_STATE',
-          message: 'Job request_snapshot.week_start ontbreekt',
+          message: 'Job request_snapshot.week_start of dateFrom ontbreekt',
         },
       };
     }
@@ -1258,16 +1445,40 @@ export async function runClaimedMealPlanJobAction(
         ? (snapshot as { days: number }).days
         : 7;
 
+    const dbFirstSettings =
+      typeof snapshot === 'object' &&
+      snapshot &&
+      'dbFirstSettings' in snapshot &&
+      (snapshot as { dbFirstSettings?: unknown }).dbFirstSettings != null
+        ? (
+            snapshot as {
+              dbFirstSettings: {
+                repeatWindowDays?: number;
+                aiFillMode?: 'strict' | 'normal';
+              };
+            }
+          ).dbFirstSettings
+        : undefined;
+
     const createInput = {
-      dateFrom: weekStart,
+      dateFrom: dateFromSnap,
       days,
+      ...(dbFirstSettings && { dbFirstSettings }),
     };
 
     let planId: string;
+    let dbCoverage:
+      | {
+          dbSlots: number;
+          totalSlots: number;
+          percent: number;
+        }
+      | undefined;
     try {
       const service = new MealPlansService();
       const result = await service.createPlanForUser(user.id, createInput);
       planId = result.planId;
+      dbCoverage = result.dbCoverage;
     } catch (error) {
       const errorCode =
         error instanceof AppError ? String(error.code).slice(0, 64) : 'UNKNOWN';
@@ -1300,6 +1511,28 @@ export async function runClaimedMealPlanJobAction(
       lockId: input.lockId,
       mealPlanId: planId,
     });
+
+    try {
+      const dbSlots = dbCoverage?.dbSlots ?? 0;
+      const totalSlots = dbCoverage?.totalSlots ?? 0;
+      const percent = dbCoverage?.percent ?? 0;
+      let message = 'Er staat een nieuw concept-weekmenu klaar om te reviewen.';
+      if (totalSlots > 0) {
+        message += ` ${dbSlots} van ${totalSlots} maaltijden (${percent}%) komen uit je receptendatabase.`;
+      }
+      if (dbSlots <= 3 && totalSlots > 0) {
+        message +=
+          ' Tips: voeg meer recepten toe (ontbijt/lunch/diner, met NEVO-koppeling), pas eventueel je dieetregels aan.';
+      }
+      await createInboxNotificationAction({
+        type: 'meal_plan_ready_for_review',
+        title: 'Nieuw weekmenu klaar (concept)',
+        message,
+        details: { planId, runId: input.jobId },
+      });
+    } catch {
+      // Non-blocking
+    }
 
     return {
       ok: true,

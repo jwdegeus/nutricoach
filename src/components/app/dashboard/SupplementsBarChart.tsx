@@ -116,6 +116,10 @@ export function SupplementsBarChart({ data }: Props) {
             />
             <Tooltip
               content={<ChartTooltip />}
+              cursor={{
+                fill: 'var(--color-muted)',
+                radius: 8,
+              }}
               wrapperStyle={{
                 outline: 'none',
                 backgroundColor: 'transparent',

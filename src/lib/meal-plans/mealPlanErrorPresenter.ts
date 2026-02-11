@@ -196,6 +196,50 @@ const MEAL_PLAN_ERROR_MAP: Record<
 
 const MAX_INBOX_MESSAGE_CHARS = 1500;
 
+/** AppErrorCode values that have mapped messages in MEAL_PLAN_ERROR_MAP */
+const KNOWN_ERROR_CODES = new Set(
+  Object.keys(MEAL_PLAN_ERROR_MAP) as (keyof typeof MEAL_PLAN_ERROR_MAP)[],
+);
+
+/**
+ * Build an actionable inbox message from errorCode + errorMessage.
+ * Used when only code/message are available (e.g. from job failure).
+ */
+export function buildInboxMessageFromErrorCode(
+  errorCode: string,
+  errorMessage?: string,
+): string {
+  const mapped =
+    MEAL_PLAN_ERROR_MAP[errorCode as keyof typeof MEAL_PLAN_ERROR_MAP];
+  const userMessageNl =
+    mapped?.userMessageNl ??
+    errorMessage ??
+    'Er ging iets mis. Probeer opnieuw.';
+  const userActionHints = (
+    mapped?.userActionHints ?? [
+      'Probeer opnieuw.',
+      'Voeg indien nodig meer recepten toe of pas je voorkeuren aan.',
+    ]
+  ).slice(0, MAX_HINTS);
+
+  const parts: string[] = [userMessageNl];
+  if (userActionHints.length > 0) {
+    parts.push('', 'Wat je kunt doen:', ...userActionHints);
+  }
+  if (
+    errorMessage &&
+    !KNOWN_ERROR_CODES.has(errorCode as keyof typeof MEAL_PLAN_ERROR_MAP) &&
+    errorMessage.length < 200
+  ) {
+    parts.push('', `Technische info: ${errorMessage}`);
+  }
+
+  const text = parts.join('\n').trim();
+  return text.length > MAX_INBOX_MESSAGE_CHARS
+    ? text.slice(0, MAX_INBOX_MESSAGE_CHARS - 3) + '…'
+    : text;
+}
+
 /**
  * Build an actionable inbox message for failed meal plan generation.
  * Geeft exacte instructies: wat je moet doen om het de volgende keer wel te laten lukken.

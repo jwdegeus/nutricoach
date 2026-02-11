@@ -44,7 +44,7 @@ export default function RecipesIndexLoading() {
       <div className="h-4 w-20 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
 
       {/* Grid:zelfde responsive kolommen als echte lijst; kaarten lijken op MealCard (h-36 image, p-4 content) */}
-      <ul className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-8 2xl:grid-cols-6">
+      <ul className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-8">
         {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
           <li key={i} className="h-[320px]">
             <div className="flex h-full flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-xs dark:border-zinc-700 dark:bg-zinc-900">

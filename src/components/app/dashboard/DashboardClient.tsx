@@ -118,11 +118,7 @@ export function DashboardClient({ members, topMeals }: Props) {
       {/* Chart widgets — bento grid */}
       <div className="mt-6 grid w-full flex-1 gap-4 lg:grid-cols-2">
         {/* Calories — full width on lg (spans 2 cols) */}
-        <BentoCell
-          placement="lg:col-span-2"
-          round="rounded-lg lg:rounded-tl-4xl lg:rounded-tr-4xl"
-          bg="bg-muted"
-        >
+        <BentoCell placement="lg:col-span-2" round="rounded-lg" bg="bg-muted">
           <div className="flex h-full min-h-[320px] flex-col p-6 sm:p-8">
             <CaloriesStackedBarChart data={caloriesData} />
           </div>
@@ -150,11 +146,7 @@ export function DashboardClient({ members, topMeals }: Props) {
         </BentoCell>
 
         {/* Top meals — full width */}
-        <BentoCell
-          placement="lg:col-span-2"
-          round="rounded-lg lg:rounded-bl-4xl lg:rounded-br-4xl"
-          bg="bg-muted"
-        >
+        <BentoCell placement="lg:col-span-2" round="rounded-lg" bg="bg-muted">
           <div className="flex h-full min-h-[240px] flex-col p-6 sm:p-8">
             <TopMealsWidget initialMeals={topMeals} />
           </div>

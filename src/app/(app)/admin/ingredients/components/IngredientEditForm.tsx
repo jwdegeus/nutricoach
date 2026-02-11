@@ -394,7 +394,7 @@ export function IngredientEditForm({
         </div>
       )}
 
-      <div className="mt-8 space-y-10">
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
         {CUSTOM_FOODS_SECTIONS.map((section, _sectionIndex) => {
           const isAlgemeen = section.title === 'Algemeen';
           const fields = isAlgemeen ? algemeenFieldsWithGroup : section.fields;
