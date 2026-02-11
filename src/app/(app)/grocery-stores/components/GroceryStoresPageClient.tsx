@@ -220,7 +220,7 @@ export function GroceryStoresPageClient({
                   <tr>
                     <th
                       scope="col"
-                      className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-foreground sm:pl-0"
+                      className="py-3.5 pr-3 pl-4 text-left text-sm font-semibold text-foreground sm:pl-0"
                     >
                       {t('name')}
                     </th>
@@ -244,7 +244,7 @@ export function GroceryStoresPageClient({
                     </th>
                     <th
                       scope="col"
-                      className="relative py-3.5 pl-3 pr-4 sm:pr-0"
+                      className="relative py-3.5 pr-4 pl-3 sm:pr-0"
                     >
                       <span className="sr-only">{t('edit')}</span>
                     </th>
@@ -253,7 +253,7 @@ export function GroceryStoresPageClient({
                 <tbody className="divide-y divide-white/10 bg-muted/5">
                   {stores.map((store) => (
                     <tr key={store.id}>
-                      <td className="whitespace-nowrap py-5 pl-4 pr-3 text-sm sm:pl-0">
+                      <td className="py-5 pr-3 pl-4 text-sm whitespace-nowrap sm:pl-0">
                         <div className="flex items-center gap-4">
                           <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted/30 text-foreground outline outline-1 -outline-offset-1 outline-white/10">
                             <BuildingStorefrontIcon className="size-5 text-muted-foreground" />
@@ -285,7 +285,7 @@ export function GroceryStoresPageClient({
                           </div>
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-5 text-sm text-muted-foreground">
+                      <td className="px-3 py-5 text-sm whitespace-nowrap text-muted-foreground">
                         {store.websiteUrl ? (
                           <a
                             href={store.websiteUrl}
@@ -299,17 +299,17 @@ export function GroceryStoresPageClient({
                           '—'
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-5 text-sm text-muted-foreground">
+                      <td className="px-3 py-5 text-sm whitespace-nowrap text-muted-foreground">
                         <div className="max-w-[12rem] truncate">
                           {store.cutoffTimes ?? '—'}
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-5 text-sm text-muted-foreground">
+                      <td className="px-3 py-5 text-sm whitespace-nowrap text-muted-foreground">
                         <div className="max-w-[12rem] truncate">
                           {store.address ?? '—'}
                         </div>
                       </td>
-                      <td className="relative whitespace-nowrap py-5 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
+                      <td className="relative py-5 pr-4 pl-3 text-right text-sm font-medium whitespace-nowrap sm:pr-0">
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             plain
@@ -407,7 +407,7 @@ export function GroceryStoresPageClient({
             </FieldGroup>
           ) : (
             <>
-              <p className="text-sm text-muted-foreground mb-4">
+              <p className="mb-4 text-sm text-muted-foreground">
                 Kies een winkel uit de catalogus (aangemaakt in admin). Je
                 koppelt de winkel aan je lijst; je kunt daarna adres en
                 besteltijden bewerken.
@@ -420,7 +420,7 @@ export function GroceryStoresPageClient({
                   toe te voegen in Admin → Winkels &amp; Assortiment.
                 </p>
               ) : (
-                <ul className="rounded-lg bg-muted/20 divide-y divide-white/10 max-h-72 overflow-y-auto">
+                <ul className="max-h-72 divide-y divide-white/10 overflow-y-auto rounded-lg bg-muted/20">
                   {templates.map((template) => (
                     <li
                       key={template.id}
@@ -431,7 +431,7 @@ export function GroceryStoresPageClient({
                           {template.name}
                         </span>
                         <span
-                          className="text-muted-foreground text-sm ml-2 block truncate"
+                          className="ml-2 block truncate text-sm text-muted-foreground"
                           title={template.base_url}
                         >
                           {template.base_url

@@ -43,9 +43,9 @@ export function RecentActivity({
           <div className="space-y-4">
             {[...Array(5)].map((_, i) => (
               <div key={i} className="flex items-center gap-4">
-                <div className="h-4 w-4 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse" />
-                <div className="h-4 flex-1 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                <div className="h-4 w-4 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700" />
+                <div className="h-4 flex-1 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+                <div className="h-4 w-24 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
               </div>
             ))}
           </div>
@@ -62,46 +62,46 @@ export function RecentActivity({
                 <tr>
                   <th
                     scope="col"
-                    className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400"
+                    className="px-3 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
                   >
                     Type
                   </th>
                   <th
                     scope="col"
-                    className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400"
+                    className="px-3 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
                   >
                     Description
                   </th>
                   <th
                     scope="col"
-                    className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400"
+                    className="px-3 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
                   >
                     User
                   </th>
                   <th
                     scope="col"
-                    className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400"
+                    className="px-3 py-3 text-right text-xs font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
                   >
                     Time
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800/75 dark:divide-gray-700">
+              <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800/75">
                 {activities.map((activity) => (
                   <tr
                     key={activity.id}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
                   >
-                    <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                    <td className="px-3 py-4 text-sm font-medium whitespace-nowrap text-gray-900 dark:text-white">
                       {activity.type}
                     </td>
                     <td className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
                       {activity.description}
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <td className="px-3 py-4 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
                       {activity.user || '-'}
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-right text-gray-500 dark:text-gray-400">
+                    <td className="px-3 py-4 text-right text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
                       {formatTimeAgo(activity.timestamp)}
                     </td>
                   </tr>

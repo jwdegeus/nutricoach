@@ -49,16 +49,16 @@ export function NevoIngredientDetailPageClient({
         </div>
 
         <div className="mb-6 rounded-lg bg-muted/20 p-4">
-          <p className="text-sm text-muted-foreground mb-2">
+          <p className="mb-2 text-sm text-muted-foreground">
             Koppel dit ingrediënt aan een winkelproduct voor de
             boodschappenlijst.
           </p>
           <Button onClick={() => setLinkModalOpen(true)}>
-            <LinkIcon className="h-4 w-4 mr-2" />
+            <LinkIcon className="mr-2 h-4 w-4" />
             Koppel aan winkelproduct
           </Button>
           {!canonicalIngredientId && (
-            <p className="text-sm text-muted-foreground mt-2">
+            <p className="mt-2 text-sm text-muted-foreground">
               Geen canonieke koppeling? In de popup kun je eerst het canonieke
               ingrediënt zoeken op naam.
             </p>

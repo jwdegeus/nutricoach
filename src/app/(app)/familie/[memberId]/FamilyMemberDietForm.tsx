@@ -51,7 +51,6 @@ export function FamilyMemberDietForm({ memberId }: { memberId: string }) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only refetch when memberId changes; t/showToast are unstable
   }, [memberId]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -102,16 +101,16 @@ export function FamilyMemberDietForm({ memberId }: { memberId: string }) {
         </div>
       )}
       <FieldGroup>
-        <div className="rounded-lg bg-zinc-100 dark:bg-zinc-800/50 px-4 py-3 text-sm text-zinc-700 dark:text-zinc-300">
+        <div className="rounded-lg bg-zinc-100 px-4 py-3 text-sm text-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300">
           {t('familyPreferencesOnFamilyPage')}{' '}
           <Link
             href="/familie/edit"
-            className="font-medium text-zinc-950 dark:text-white underline hover:no-underline"
+            className="font-medium text-zinc-950 underline hover:no-underline dark:text-white"
           >
             {t('familyDietInSettingsLink')}
           </Link>
         </div>
-        <div className="space-y-4 pt-6 ">
+        <div className="space-y-4 pt-6">
           <Step2AllergiesDislikes
             allergies={allergies}
             dislikes={dislikes}
@@ -119,7 +118,7 @@ export function FamilyMemberDietForm({ memberId }: { memberId: string }) {
             onDislikesChange={setDislikes}
           />
         </div>
-        <div className="space-y-4 pt-6 ">
+        <div className="space-y-4 pt-6">
           <Field>
             <Label htmlFor="kcal-target">{t('familyKcalTargetLabel')}</Label>
             <Input

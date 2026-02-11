@@ -146,7 +146,7 @@ export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
   };
 
   return (
-    <div className="flex items-center gap-4 p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900/50">
+    <div className="flex items-center gap-4 rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900/50">
       <div className="flex-1">
         <div className="font-medium">{item.name}</div>
         {item.nutriscore && (
@@ -162,12 +162,12 @@ export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        <label className="flex items-center gap-2 cursor-pointer">
+        <label className="flex cursor-pointer items-center gap-2">
           <input
             type="checkbox"
             checked={isAvailable}
             onChange={handleToggle}
-            className="w-4 h-4"
+            className="h-4 w-4"
           />
           <span className="text-sm">Aanwezig</span>
         </label>
@@ -182,7 +182,7 @@ export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
           min="0"
           step="1"
           disabled={isSaving}
-          className="border-0 bg-white dark:bg-zinc-800 focus-visible:ring-0"
+          className="border-0 bg-white focus-visible:ring-0 dark:bg-zinc-800"
         />
       </div>
 
@@ -192,7 +192,7 @@ export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
             <ArrowPathIcon className="size-4 animate-spin" />
           ) : (
             <>
-              <CheckIcon className="size-4 mr-1" />
+              <CheckIcon className="mr-1 size-4" />
               Opslaan
             </>
           )}
@@ -209,7 +209,7 @@ export function PantryItemRow({ item, onUpdate }: PantryItemRowProps) {
       </Button>
 
       {error && (
-        <div className="text-sm text-destructive flex items-center gap-2">
+        <div className="text-destructive flex items-center gap-2 text-sm">
           <XMarkIcon className="size-4" />
           {error}
         </div>

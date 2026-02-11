@@ -394,7 +394,7 @@ export class StorageService {
         logMirrorFail('UPLOAD_ERROR', safeHostForLog);
         return { url: null, code: 'UPLOAD_ERROR' };
       }
-    } catch (err) {
+    } catch (_err) {
       clearTimeout(timeout);
       const host = (() => {
         try {

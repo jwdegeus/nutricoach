@@ -126,7 +126,7 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
               setActiveTab('diet');
               router.replace(`/settings/diets/${dietType.id}/edit?tab=diet`);
             }}
-            className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium ${
+            className={`border-b-2 px-1 py-4 text-sm font-medium whitespace-nowrap ${
               activeTab === 'diet'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
@@ -141,7 +141,7 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
                 `/settings/diets/${dietType.id}/edit?tab=guardrails`,
               );
             }}
-            className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium ${
+            className={`border-b-2 px-1 py-4 text-sm font-medium whitespace-nowrap ${
               activeTab === 'guardrails'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
@@ -156,7 +156,7 @@ export function DietEditPage({ dietType: initialDietType }: DietEditPageProps) {
                 `/settings/diets/${dietType.id}/edit?tab=test-rules`,
               );
             }}
-            className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium ${
+            className={`border-b-2 px-1 py-4 text-sm font-medium whitespace-nowrap ${
               activeTab === 'test-rules'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'

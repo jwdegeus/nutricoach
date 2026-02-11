@@ -84,7 +84,7 @@ export function HeadlessUserMenu() {
       <MenuButton className="relative flex items-center">
         <span className="absolute -inset-1.5" />
         <span className="sr-only">Open user menu</span>
-        <div className="size-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
+        <div className="bg-primary flex size-8 items-center justify-center rounded-full text-sm font-medium text-primary-foreground">
           {initials}
         </div>
         <span className="hidden lg:flex lg:items-center">

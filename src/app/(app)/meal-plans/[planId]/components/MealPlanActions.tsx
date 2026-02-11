@@ -333,12 +333,12 @@ export function MealPlanActions({
                 >
                   {isApplyingDraft ? (
                     <>
-                      <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                      <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
                       Bezig met toepassen...
                     </>
                   ) : (
                     <>
-                      <CheckCircleIcon className="h-4 w-4 mr-2" />
+                      <CheckCircleIcon className="mr-2 h-4 w-4" />
                       Pas draft toe
                     </>
                   )}
@@ -357,12 +357,12 @@ export function MealPlanActions({
                 >
                   {isStartingReview ? (
                     <>
-                      <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                      <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
                       Bezig met starten...
                     </>
                   ) : (
                     <>
-                      <PencilSquareIcon className="h-4 w-4 mr-2" />
+                      <PencilSquareIcon className="mr-2 h-4 w-4" />
                       Start review
                     </>
                   )}
@@ -389,12 +389,12 @@ export function MealPlanActions({
             >
               {isRegenerating ? (
                 <>
-                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                  <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
                   Regenereren...
                 </>
               ) : (
                 <>
-                  <ArrowPathIcon className="h-4 w-4 mr-2" />
+                  <ArrowPathIcon className="mr-2 h-4 w-4" />
                   Regenereren Volledig Plan
                 </>
               )}
@@ -438,12 +438,12 @@ export function MealPlanActions({
               >
                 {isRegeneratingDay ? (
                   <>
-                    <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                    <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
                     Regenereren...
                   </>
                 ) : (
                   <>
-                    <CalendarIcon className="h-4 w-4 mr-2" />
+                    <CalendarIcon className="mr-2 h-4 w-4" />
                     Regenereren dag
                   </>
                 )}
@@ -454,7 +454,7 @@ export function MealPlanActions({
             </p>
           </div>
 
-          <div className="pt-4 mt-4">
+          <div className="mt-4 pt-4">
             <Button
               onClick={() => {
                 setError(null);
@@ -470,22 +470,22 @@ export function MealPlanActions({
               outline
               className="w-full"
             >
-              <TrashIcon className="h-4 w-4 mr-2" />
+              <TrashIcon className="mr-2 h-4 w-4" />
               Verwijderen
             </Button>
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="mt-2 text-xs text-muted-foreground">
               Verwijder dit weekmenu permanent
             </p>
           </div>
 
           {error && errorCode === 'INSUFFICIENT_ALLOWED_INGREDIENTS' && (
             <div
-              className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4"
+              className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/50"
               role="alert"
             >
               <div className="flex items-start gap-3">
                 <ExclamationTriangleIcon
-                  className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5"
+                  className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-400"
                   aria-hidden
                 />
                 <div className="flex-1 space-y-3">
@@ -504,7 +504,7 @@ export function MealPlanActions({
                       </>
                     )}
                   </Text>
-                  <ul className="list-disc list-inside text-sm text-red-700 dark:text-red-300 space-y-1">
+                  <ul className="list-inside list-disc space-y-1 text-sm text-red-700 dark:text-red-300">
                     <li>Verruim je dieetregels (Guardrails)</li>
                     <li>Verwijder enkele uitsluitingen of voorkeuren</li>
                     <li>
@@ -515,14 +515,14 @@ export function MealPlanActions({
                     {plan.metadata?.dietKey && (
                       <Link
                         href={`/settings/diets/${plan.metadata.dietKey}/edit`}
-                        className="text-sm font-medium text-red-800 dark:text-red-200 underline hover:no-underline"
+                        className="text-sm font-medium text-red-800 underline hover:no-underline dark:text-red-200"
                       >
                         Open dieetinstellingen
                       </Link>
                     )}
                     <Link
                       href="/admin/ingredients"
-                      className="text-sm font-medium text-red-800 dark:text-red-200 underline hover:no-underline"
+                      className="text-sm font-medium text-red-800 underline hover:no-underline dark:text-red-200"
                     >
                       Ingrediënten beheren
                     </Link>
@@ -533,12 +533,12 @@ export function MealPlanActions({
           )}
           {error && errorCode === 'MEAL_PLAN_SANITY_FAILED' && (
             <div
-              className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4"
+              className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/50"
               role="alert"
             >
               <div className="flex items-start gap-3">
                 <ExclamationTriangleIcon
-                  className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5"
+                  className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-400"
                   aria-hidden
                 />
                 <div className="flex-1 space-y-3">
@@ -553,7 +553,7 @@ export function MealPlanActions({
                   </Text>
                   {Array.isArray(errorDetails?.issues) &&
                     errorDetails.issues.length > 0 && (
-                      <ul className="list-disc list-inside text-sm text-red-700 dark:text-red-300 space-y-1">
+                      <ul className="list-inside list-disc space-y-1 text-sm text-red-700 dark:text-red-300">
                         {errorDetails.issues
                           .slice(0, 3)
                           .map((item: Record<string, unknown>, idx: number) => {
@@ -583,7 +583,7 @@ export function MealPlanActions({
                         )}
                       </ul>
                     )}
-                  <ul className="list-disc list-inside text-sm text-red-700 dark:text-red-300 space-y-1">
+                  <ul className="list-inside list-disc space-y-1 text-sm text-red-700 dark:text-red-300">
                     <li>
                       Klik op &apos;Regenereren volledig plan&apos; of
                       &apos;Regenereren dag&apos;.
@@ -601,14 +601,14 @@ export function MealPlanActions({
                     {plan.metadata?.dietKey && (
                       <Link
                         href={`/settings/diets/${plan.metadata.dietKey}/edit`}
-                        className="text-sm font-medium text-red-800 dark:text-red-200 underline hover:no-underline"
+                        className="text-sm font-medium text-red-800 underline hover:no-underline dark:text-red-200"
                       >
                         Open dieetinstellingen
                       </Link>
                     )}
                     <Link
                       href="/admin/ingredients"
-                      className="text-sm font-medium text-red-800 dark:text-red-200 underline hover:no-underline"
+                      className="text-sm font-medium text-red-800 underline hover:no-underline dark:text-red-200"
                     >
                       Ingrediënten beheren
                     </Link>
@@ -621,7 +621,7 @@ export function MealPlanActions({
             errorCode !== 'INSUFFICIENT_ALLOWED_INGREDIENTS' &&
             errorCode !== 'MEAL_PLAN_SANITY_FAILED' && (
               <div
-                className="p-3 rounded-lg border border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/30 text-red-800 dark:text-red-200 text-sm"
+                className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200"
                 role="alert"
               >
                 <p className="font-medium">

@@ -109,7 +109,7 @@ export function MealDetailDialog({
 
       <DialogBody className="space-y-6">
         {linkedRecipe?.imageUrl && (
-          <div className="rounded-lg overflow-hidden aspect-video bg-zinc-100 dark:bg-zinc-800">
+          <div className="aspect-video overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
             <img
               src={linkedRecipe.imageUrl}
               alt=""
@@ -127,7 +127,7 @@ export function MealDetailDialog({
                   <Clock className="h-4 w-4" />
                   Bereidingstijd
                 </div>
-                <div className="pl-6 space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+                <div className="space-y-1 pl-6 text-sm text-zinc-600 dark:text-zinc-400">
                   {enrichedMeal.prepTimeMin > 0 && (
                     <div>Voorbereiding: {enrichedMeal.prepTimeMin} minuten</div>
                   )}
@@ -167,7 +167,7 @@ export function MealDetailDialog({
                     <UtensilsCrossed className="h-4 w-4" />
                     Bereidingsinstructies
                   </div>
-                  <ol className="pl-6 space-y-2 list-decimal list-inside">
+                  <ol className="list-inside list-decimal space-y-2 pl-6">
                     {enrichedMeal.instructions.map((instruction, idx) => (
                       <li
                         key={idx}
@@ -187,7 +187,7 @@ export function MealDetailDialog({
                   <div className="text-sm font-medium text-zinc-900 dark:text-white">
                     Keukentips
                   </div>
-                  <ul className="pl-6 space-y-1 list-disc list-inside">
+                  <ul className="list-inside list-disc space-y-1 pl-6">
                     {enrichedMeal.kitchenNotes.map((note, idx) => (
                       <li
                         key={idx}
@@ -223,14 +223,14 @@ export function MealDetailDialog({
                 ? enrichedMeal.prepTimeMin + enrichedMeal.cookTimeMin
                 : 0;
             return (
-              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
+              <div className="space-y-3 border-t border-zinc-200 pt-4 dark:border-zinc-800">
                 <div className="flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white">
                   <ChefHat className="h-4 w-4" />
                   {showMealOnly
                     ? `Kookplan voor deze maaltijd`
                     : `Kookplan voor ${formatDate(cookPlanDay.date)}`}
                 </div>
-                <ul className="pl-6 space-y-2 list-disc list-inside">
+                <ul className="list-inside list-disc space-y-2 pl-6">
                   {(showMealOnly ? stepsForThisMeal : cookPlanDay.steps).map(
                     (step, idx) => (
                       <li
@@ -260,11 +260,11 @@ export function MealDetailDialog({
 
         {/* Ingrediënten */}
         {meal.ingredientRefs && meal.ingredientRefs.length > 0 && (
-          <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
+          <div className="space-y-3 border-t border-zinc-200 pt-4 dark:border-zinc-800">
             <div className="text-sm font-medium text-zinc-900 dark:text-white">
               Ingrediënten
             </div>
-            <ul className="pl-6 space-y-1 list-disc list-inside">
+            <ul className="list-inside list-disc space-y-1 pl-6">
               {meal.ingredientRefs.map((ref, idx) => {
                 const name =
                   ref.displayName ||
@@ -301,7 +301,7 @@ export function MealDetailDialog({
               });
               if (isShake && !hasProteinPowder) {
                 return (
-                  <p className="pl-6 text-sm text-zinc-500 dark:text-zinc-500 italic">
+                  <p className="pl-6 text-sm text-zinc-500 italic dark:text-zinc-500">
                     Optioneel: rijsteiwitpoeder of ei-eiwitpoeder (niet in plan)
                   </p>
                 );
@@ -313,11 +313,11 @@ export function MealDetailDialog({
 
         {/* Voedingswaarden */}
         {meal.estimatedMacros && (
-          <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
+          <div className="space-y-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
             <div className="text-sm font-medium text-zinc-900 dark:text-white">
               Voedingswaarden (geschat)
             </div>
-            <div className="pl-6 grid grid-cols-2 gap-2 text-sm">
+            <div className="grid grid-cols-2 gap-2 pl-6 text-sm">
               {meal.estimatedMacros.calories !== undefined && (
                 <div>
                   <span className="text-zinc-600 dark:text-zinc-400">
@@ -371,7 +371,7 @@ export function MealDetailDialog({
         )}
 
         {/* Beoordeel maaltijd */}
-        <div className="pt-4 border-t border-border space-y-2">
+        <div className="space-y-2 border-t border-border pt-4">
           <Text className="text-sm font-medium text-foreground">
             Beoordeel maaltijd
           </Text>

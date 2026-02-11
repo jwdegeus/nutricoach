@@ -7,7 +7,6 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { z } from 'zod';
 import { AppError } from '@/src/lib/errors/app-error';
 import type { TherapeuticProtocolRef } from '@/src/lib/diets/diet.types';
 import { whenJsonSchema } from '@/src/lib/therapeutic/whenJson.schema';

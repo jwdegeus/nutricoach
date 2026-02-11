@@ -233,13 +233,13 @@ async function RecipesListContent({
 
   if (!listResult.ok) {
     return (
-      <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4">
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/50">
         <p className="text-red-800 dark:text-red-200">
           {t('error')}: {listResult.error.message}
         </p>
         <Link
           href="/recipes"
-          className="mt-2 inline-block text-sm font-medium text-red-700 dark:text-red-300 hover:underline"
+          className="mt-2 inline-block text-sm font-medium text-red-700 hover:underline dark:text-red-300"
         >
           Opnieuw proberen
         </Link>
@@ -279,12 +279,12 @@ export default async function RecipesPage({ searchParams }: RecipesPageProps) {
   const resolvedParams = await params;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+    <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">{t('pageTitle')}</h1>
         <Link href="/recipes/import">
           <Button color="primary">
-            <PlusIcon className="h-4 w-4 mr-2" />
+            <PlusIcon className="mr-2 h-4 w-4" />
             {t('addRecipe')}
           </Button>
         </Link>

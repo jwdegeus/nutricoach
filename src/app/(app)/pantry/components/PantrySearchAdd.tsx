@@ -52,7 +52,7 @@ function SourceLogo({
     if (imgFailed) {
       return (
         <span
-          className={`inline-flex items-center justify-center rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-700 dark:text-amber-400 ${className}`}
+          className={`inline-flex items-center justify-center rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 uppercase dark:text-amber-400 ${className}`}
           title="Open Food Facts"
         >
           OFF
@@ -74,7 +74,7 @@ function SourceLogo({
     if (imgFailed) {
       return (
         <span
-          className={`inline-flex items-center justify-center rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-blue-700 dark:text-blue-400 ${className}`}
+          className={`inline-flex items-center justify-center rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 uppercase dark:text-blue-400 ${className}`}
           title="Albert Heijn"
         >
           AH
@@ -620,7 +620,7 @@ export function PantrySearchAdd() {
                   className="w-full rounded-xl bg-muted/30 shadow-sm outline outline-1 -outline-offset-1 outline-white/10 focus-visible:ring-2"
                 />
                 {isSearching && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="absolute top-1/2 right-3 -translate-y-1/2">
                     <ArrowPathIcon className="size-4 animate-spin text-muted-foreground" />
                   </div>
                 )}

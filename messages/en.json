@@ -279,7 +279,15 @@
       "nutrient": "Nutrient",
       "value": "Value",
       "target": "Target",
-      "staticNotice": "This is a static overview with sample data. Real intake will be connected later, after the calendar allows indicating per family member whether they deviated from the meal plan."
+      "staticNotice": "This is a static overview with sample data. Real intake will be connected later, after the calendar allows indicating per family member whether they deviated from the meal plan.",
+      "caloriesConsumed": "Calories consumed",
+      "protein": "Protein",
+      "carbs": "Carbs",
+      "fat": "Fat",
+      "alcohol": "Alcohol",
+      "vitaminsPercent": "Vitamins (% of target)",
+      "mineralsPercent": "Minerals (% of target)",
+      "supplementsCompliance": "Supplements (on plan)"
     },
     "intakeDashboard": "Intake overview",
     "familyPracticalHeading": "Practical preferences",

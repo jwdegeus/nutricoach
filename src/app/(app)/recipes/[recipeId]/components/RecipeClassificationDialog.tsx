@@ -316,7 +316,7 @@ export function RecipeClassificationDialog({
         hierop filteren en navigeren.
       </DialogDescription>
       <DialogBody>
-        <div className="max-h-[60vh] overflow-y-auto space-y-6 pr-1">
+        <div className="max-h-[60vh] space-y-6 overflow-y-auto pr-1">
           {/* 1) Soort (meal_slot from catalog) — Catalyst Listbox (non-native) */}
           <Field>
             <Label>Soort</Label>
@@ -486,7 +486,7 @@ export function RecipeClassificationDialog({
                 </div>
                 {cuisineAddError && (
                   <div
-                    className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 px-3 py-2 text-sm text-red-700 dark:text-red-300"
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300"
                     role="alert"
                   >
                     {cuisineAddError}
@@ -554,7 +554,7 @@ export function RecipeClassificationDialog({
                 </div>
                 {proteinAddError && (
                   <div
-                    className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 px-3 py-2 text-sm text-red-700 dark:text-red-300"
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300"
                     role="alert"
                   >
                     {proteinAddError}
@@ -652,7 +652,7 @@ export function RecipeClassificationDialog({
                 </div>
                 {sourceAddError && (
                   <div
-                    className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 px-3 py-2 text-sm text-red-700 dark:text-red-300"
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300"
                     role="alert"
                   >
                     {sourceAddError}
@@ -735,7 +735,7 @@ export function RecipeClassificationDialog({
                 </div>
                 {recipeBookAddError && (
                   <div
-                    className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 px-3 py-2 text-sm text-red-700 dark:text-red-300"
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300"
                     role="alert"
                   >
                     {recipeBookAddError}
@@ -773,7 +773,7 @@ export function RecipeClassificationDialog({
                   {value.tags.map((tag, idx) => (
                     <span
                       key={`${tag}-${idx}`}
-                      className="inline-flex items-center gap-1 rounded-full bg-zinc-100 dark:bg-zinc-800 px-2.5 py-0.5 text-sm text-zinc-800 dark:text-zinc-200"
+                      className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-0.5 text-sm text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200"
                     >
                       {tag}
                       <button
@@ -794,11 +794,11 @@ export function RecipeClassificationDialog({
           {/* Error callout (from parent save error) */}
           {errorMessage && (
             <div
-              className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4"
+              className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/50"
               role="alert"
             >
               <div className="flex items-start gap-3">
-                <ExclamationTriangleIcon className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-400" />
                 <div>
                   <Text className="font-semibold text-red-900 dark:text-red-100">
                     Opslaan mislukt

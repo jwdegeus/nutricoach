@@ -182,13 +182,13 @@ export function GuardrailsPreviewPanel({
                 <summary className="cursor-pointer p-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">
                   Ontleed als ingrediënten, stappen en metadata
                 </summary>
-                <div className="grid grid-cols-1 gap-3 border-t border-zinc-200 p-3 dark:border-zinc-700 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 border-t border-zinc-200 p-3 md:grid-cols-3 dark:border-zinc-700">
                   {result.parsedRecipe.ingredients ? (
                     <div>
                       <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
                         Ingrediënten
                       </Text>
-                      <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-zinc-700 dark:text-zinc-300">
+                      <pre className="mt-1 max-h-32 overflow-auto font-mono text-xs break-words whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
                         {result.parsedRecipe.ingredients}
                       </pre>
                     </div>
@@ -198,7 +198,7 @@ export function GuardrailsPreviewPanel({
                       <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
                         Stappen
                       </Text>
-                      <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-zinc-700 dark:text-zinc-300">
+                      <pre className="mt-1 max-h-32 overflow-auto font-mono text-xs break-words whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
                         {result.parsedRecipe.steps}
                       </pre>
                     </div>
@@ -208,7 +208,7 @@ export function GuardrailsPreviewPanel({
                       <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
                         Metadata
                       </Text>
-                      <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-zinc-700 dark:text-zinc-300">
+                      <pre className="mt-1 max-h-32 overflow-auto font-mono text-xs break-words whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
                         {result.parsedRecipe.metadata}
                       </pre>
                     </div>
@@ -280,7 +280,7 @@ export function GuardrailsPreviewPanel({
             <Text className="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
               Match Samenvatting:
             </Text>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
               <div>
                 <Text className="text-xs text-zinc-500 dark:text-zinc-400">
                   Totaal Matches

@@ -119,12 +119,12 @@ export function MissingIngredientsPanel({
           ))}
         </div>
 
-        <div className="flex gap-3 pt-4 border-t border-zinc-950/5 dark:border-white/5">
+        <div className="flex gap-3 border-t border-zinc-950/5 pt-4 dark:border-white/5">
           <Button onClick={handleBulkAddBinary} disabled={isBulkAdding}>
             {isBulkAdding ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <ShoppingCart className="h-4 w-4 mr-2" />
+              <ShoppingCart className="mr-2 h-4 w-4" />
             )}
             Markeer alles als aanwezig
           </Button>
@@ -135,9 +135,9 @@ export function MissingIngredientsPanel({
             outline
           >
             {isBulkAdding ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <ShoppingCart className="h-4 w-4 mr-2" />
+              <ShoppingCart className="mr-2 h-4 w-4" />
             )}
             Zet hoeveelheid op ontbrekend (
             {missingItems

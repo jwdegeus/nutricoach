@@ -303,3 +303,117 @@ export async function markInboxNotificationReadAction(
     };
   }
 }
+
+const deleteInputSchema = z.object({
+  id: z.string().uuid(),
+});
+
+/**
+ * Delete one inbox notification.
+ * RLS: user-context; only own rows.
+ */
+export async function deleteInboxNotificationAction(
+  raw: unknown,
+): Promise<ActionResult<Record<string, never>>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: {
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
+        },
+      };
+    }
+
+    const input = deleteInputSchema.parse(raw);
+
+    const { error } = await supabase
+      .from('user_inbox_notifications')
+      .delete()
+      .eq('id', input.id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      return {
+        ok: false,
+        error: {
+          code: 'DB_ERROR',
+          message: `Verwijderen mislukt: ${error.message}`,
+        },
+      };
+    }
+
+    return { ok: true, data: {} };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        ok: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message:
+            error.errors.map((e) => e.message).join('; ') || 'Ongeldige id',
+        },
+      };
+    }
+    return {
+      ok: false,
+      error: {
+        code: 'DB_ERROR',
+        message:
+          error instanceof Error ? error.message : 'Fout bij verwijderen',
+      },
+    };
+  }
+}
+
+/**
+ * Get unread count for current user's inbox notifications.
+ * RLS: user-context; only own rows.
+ */
+export async function getInboxUnreadCountAction(): Promise<
+  ActionResult<number>
+> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: { code: 'AUTH_ERROR', message: 'Niet ingelogd' },
+      };
+    }
+
+    const { count, error } = await supabase
+      .from('user_inbox_notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false);
+
+    if (error) {
+      return {
+        ok: false,
+        error: { code: 'DB_ERROR', message: error.message },
+      };
+    }
+
+    return { ok: true, data: count ?? 0 };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: 'DB_ERROR',
+        message:
+          error instanceof Error ? error.message : 'Fout bij ophalen teller',
+      },
+    };
+  }
+}

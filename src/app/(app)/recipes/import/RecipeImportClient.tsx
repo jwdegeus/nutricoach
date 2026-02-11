@@ -376,7 +376,6 @@ export function RecipeImportClient({
 
     loadedJobIdRef.current = jobId;
     loadJob(jobId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
   // Load URL-import diagnostics from sessionStorage when job is set (only when RECIPE_IMPORT_DEBUG was on)
@@ -1138,8 +1137,8 @@ export function RecipeImportClient({
   if ((loadingJob && jobId) || (processingJob && !remoteJob)) {
     return (
       <div className="space-y-6">
-        <div className="flex flex-col items-center justify-center text-center space-y-4 py-12">
-          <ArrowPathIcon className="h-8 w-8 text-primary-600 dark:text-primary-400 animate-spin" />
+        <div className="flex flex-col items-center justify-center space-y-4 py-12 text-center">
+          <ArrowPathIcon className="h-8 w-8 animate-spin text-primary-600 dark:text-primary-400" />
           <Text>{processingJob ? t('processing') : t('loading')}</Text>
           {processingJob && (
             <Text className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -1185,7 +1184,7 @@ export function RecipeImportClient({
             <Text>{t('uploadDescription')}</Text>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
             {/* Left column: image upload + URL import */}
             <div className="space-y-6">
               {/* Dropzone */}
@@ -1194,7 +1193,7 @@ export function RecipeImportClient({
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                className="relative border-2 border-dashed rounded-lg p-8 transition-colors border-zinc-300 dark:border-zinc-700 hover:border-primary-400 dark:hover:border-primary-600 min-h-[280px] flex flex-col justify-center"
+                className="relative flex min-h-[280px] flex-col justify-center rounded-lg border-2 border-dashed border-zinc-300 p-8 transition-colors hover:border-primary-400 dark:border-zinc-700 dark:hover:border-primary-600"
               >
                 <input
                   ref={fileInputRef}
@@ -1207,11 +1206,11 @@ export function RecipeImportClient({
                   aria-label={t('selectFile')}
                 />
 
-                <div className="flex flex-col items-center justify-center text-center space-y-4">
-                  <div className="rounded-full bg-primary-100 dark:bg-primary-900/30 p-4">
+                <div className="flex flex-col items-center justify-center space-y-4 text-center">
+                  <div className="rounded-full bg-primary-100 p-4 dark:bg-primary-900/30">
                     <PhotoIcon className="h-8 w-8 text-primary-600 dark:text-primary-400" />
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                  <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
                     <label
                       htmlFor="recipe-upload-input"
                       className="cursor-pointer"
@@ -1222,7 +1221,7 @@ export function RecipeImportClient({
                         disabled={isPending}
                         className="w-full sm:w-auto"
                       >
-                        <PhotoIcon className="h-4 w-4 mr-2" />
+                        <PhotoIcon className="mr-2 h-4 w-4" />
                         {isPending ? t('uploading') : t('selectFile')}
                       </Button>
                     </label>
@@ -1232,7 +1231,7 @@ export function RecipeImportClient({
                       color="primary"
                       className="w-full sm:w-auto"
                     >
-                      <CameraIcon className="h-4 w-4 mr-2" />
+                      <CameraIcon className="mr-2 h-4 w-4" />
                       {t('takePhoto')}
                     </Button>
                     <Button
@@ -1276,7 +1275,7 @@ export function RecipeImportClient({
                       color="primary"
                       className="w-full sm:w-auto"
                     >
-                      <ClipboardDocumentIcon className="h-4 w-4 mr-2" />
+                      <ClipboardDocumentIcon className="mr-2 h-4 w-4" />
                       {t('pasteImage')}
                     </Button>
                   </div>
@@ -1288,10 +1287,10 @@ export function RecipeImportClient({
               </div>
 
               {/* URL import block */}
-              <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/80 dark:bg-zinc-800/40 p-6 shadow-sm">
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40">
                 <form
                   onSubmit={handleUrlImportSubmit}
-                  className="flex flex-col items-center text-center space-y-4"
+                  className="flex flex-col items-center space-y-4 text-center"
                 >
                   <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                     {t('importViaUrlOr')}
@@ -1301,8 +1300,8 @@ export function RecipeImportClient({
                       {t('recipeUrlLabel')}
                     </Label>
                     <div className="mt-2">
-                      <div className="flex items-center rounded-md bg-white dark:bg-zinc-800/80 pl-3 shadow-sm ring-1 ring-zinc-950/10 dark:ring-white/10 focus-within:ring-2 focus-within:ring-primary-500 dark:focus-within:ring-primary-400 focus-within:ring-offset-0">
-                        <span className="shrink-0 text-base text-zinc-500 dark:text-zinc-400 select-none sm:text-sm/6">
+                      <div className="flex items-center rounded-md bg-white pl-3 shadow-sm ring-1 ring-zinc-950/10 focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-0 dark:bg-zinc-800/80 dark:ring-white/10 dark:focus-within:ring-primary-400">
+                        <span className="shrink-0 text-base text-zinc-500 select-none sm:text-sm/6 dark:text-zinc-400">
                           https://
                         </span>
                         <input
@@ -1313,7 +1312,7 @@ export function RecipeImportClient({
                           onChange={(e) => setUrlImportValue(e.target.value)}
                           placeholder={t('recipeUrlPlaceholder')}
                           disabled={isUrlImportPending || isPending}
-                          className="block min-w-0 grow py-2.5 pr-3 pl-2 text-base text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 dark:placeholder:text-zinc-400 bg-transparent border-0 outline-none focus:ring-0 rounded-r-md sm:text-sm/6"
+                          className="block min-w-0 grow rounded-r-md border-0 bg-transparent py-2.5 pr-3 pl-2 text-base text-zinc-900 outline-none placeholder:text-zinc-500 focus:ring-0 sm:text-sm/6 dark:text-zinc-100 dark:placeholder:text-zinc-400"
                           aria-invalid={urlImportError ? 'true' : 'false'}
                           aria-describedby={
                             urlImportError
@@ -1353,11 +1352,11 @@ export function RecipeImportClient({
                     type="submit"
                     color="primary"
                     disabled={isUrlImportPending || isPending}
-                    className="w-full sm:w-auto min-w-[8rem]"
+                    className="w-full min-w-[8rem] sm:w-auto"
                   >
                     {isUrlImportPending ? (
                       <>
-                        <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                        <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
                         {t('processing')}
                       </>
                     ) : (
@@ -1371,7 +1370,7 @@ export function RecipeImportClient({
             {/* Right column: text paste + from scratch */}
             <div className="space-y-6">
               {/* Text paste import */}
-              <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/80 dark:bg-zinc-800/40 p-6 shadow-sm">
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40">
                 <form
                   onSubmit={handleTextImportSubmit}
                   className="flex flex-col space-y-4"
@@ -1420,16 +1419,16 @@ export function RecipeImportClient({
                       isPending ||
                       textImportValue.trim().length < 10
                     }
-                    className="w-full sm:w-auto min-w-[8rem]"
+                    className="w-full min-w-[8rem] sm:w-auto"
                   >
                     {isTextImportPending ? (
                       <>
-                        <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                        <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
                         {t('processing')}
                       </>
                     ) : (
                       <>
-                        <DocumentTextIcon className="h-4 w-4 mr-2" />
+                        <DocumentTextIcon className="mr-2 h-4 w-4" />
                         {t('textImportButton')}
                       </>
                     )}
@@ -1438,11 +1437,11 @@ export function RecipeImportClient({
               </div>
 
               {/* From scratch */}
-              <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/80 dark:bg-zinc-800/40 p-6 shadow-sm">
-                <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/40">
+                <Text className="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
                   {t('fromScratchHeading')}
                 </Text>
-                <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                <Text className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
                   {t('fromScratchDescription')}
                 </Text>
                 <Button
@@ -1454,12 +1453,12 @@ export function RecipeImportClient({
                 >
                   {isFromScratchPending ? (
                     <>
-                      <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                      <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
                       {t('loading')}
                     </>
                   ) : (
                     <>
-                      <PencilSquareIcon className="h-4 w-4 mr-2" />
+                      <PencilSquareIcon className="mr-2 h-4 w-4" />
                       {t('fromScratchButton')}
                     </>
                   )}
@@ -1482,7 +1481,7 @@ export function RecipeImportClient({
             {localPages.map((page, index) => (
               <div
                 key={index}
-                className="relative rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden w-32 h-40 bg-zinc-50 dark:bg-zinc-900 flex-shrink-0 group"
+                className="group relative h-40 w-32 flex-shrink-0 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900"
               >
                 <Image
                   src={page.previewUrl}
@@ -1492,14 +1491,14 @@ export function RecipeImportClient({
                   sizes="128px"
                   unoptimized
                 />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5 flex items-center justify-between">
+                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5">
                   <span className="text-xs font-medium text-white">
                     {t('pageNumber', { number: index + 1 })}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleRemovePage(index)}
-                    className="p-1 rounded text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white"
+                    className="rounded p-1 text-white hover:bg-white/20 focus:ring-2 focus:ring-white focus:outline-none"
                     aria-label={t('removePage')}
                   >
                     <XMarkIcon className="h-4 w-4" />
@@ -1517,19 +1516,19 @@ export function RecipeImportClient({
         !processingJob &&
         localPages.length >= 1 &&
         localPages.length < MAX_RECIPE_PAGES && (
-          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 bg-zinc-50/80 dark:bg-zinc-800/40">
-            <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-800/40">
+            <Text className="mb-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">
               {t('addAnotherPage')}
             </Text>
             <div className="flex flex-wrap gap-2">
               <label htmlFor="recipe-upload-input" className="cursor-pointer">
                 <Button as="span" outline className="text-sm">
-                  <PhotoIcon className="h-4 w-4 mr-1.5" />
+                  <PhotoIcon className="mr-1.5 h-4 w-4" />
                   {t('selectFile')}
                 </Button>
               </label>
               <Button onClick={handleOpenCamera} outline className="text-sm">
-                <CameraIcon className="h-4 w-4 mr-1.5" />
+                <CameraIcon className="mr-1.5 h-4 w-4" />
                 {t('takePhoto')}
               </Button>
               <Button
@@ -1564,12 +1563,12 @@ export function RecipeImportClient({
                 outline
                 className="text-sm"
               >
-                <ClipboardDocumentIcon className="h-4 w-4 mr-1.5" />
+                <ClipboardDocumentIcon className="mr-1.5 h-4 w-4" />
                 {t('pasteImage')}
               </Button>
             </div>
             {localPages.length >= MAX_RECIPE_PAGES - 1 && (
-              <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
+              <Text className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
                 {t('maxPagesHint')}
               </Text>
             )}
@@ -1578,10 +1577,10 @@ export function RecipeImportClient({
 
       {/* Error Display */}
       {error && (
-        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/50">
           <div className="flex items-center gap-2">
             <ExclamationTriangleIcon className="h-5 w-5 text-red-600 dark:text-red-400" />
-            <Text className="text-red-600 dark:text-red-400 font-medium">
+            <Text className="font-medium text-red-600 dark:text-red-400">
               {error}
             </Text>
           </div>
@@ -1613,7 +1612,7 @@ export function RecipeImportClient({
           {/* Start Processing Button - Only show if not already processing and file is available */}
           {(remoteJob.status === 'uploaded' || remoteJob.status === 'failed') &&
             !processingJob && (
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 bg-white dark:bg-zinc-900">
+              <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
                 {localPages.length === 0 ? (
                   <div className="space-y-3">
                     <Text className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -1637,7 +1636,7 @@ export function RecipeImportClient({
                   >
                     {processingJob ? (
                       <>
-                        <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                        <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
                         {t('processing')}
                       </>
                     ) : (
@@ -1652,10 +1651,10 @@ export function RecipeImportClient({
           {(remoteJob.status === 'processing' || processingJob) && (
             <div className="space-y-6">
               {/* Processing Header with Magic Icon */}
-              <div className="flex flex-col items-center justify-center text-center space-y-4 py-6 rounded-lg border border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-950/30">
+              <div className="flex flex-col items-center justify-center space-y-4 rounded-lg border border-primary-200 bg-primary-50 py-6 text-center dark:border-primary-800 dark:bg-primary-950/30">
                 <div className="relative">
-                  <SparklesIcon className="h-12 w-12 text-primary-600 dark:text-primary-400 animate-pulse" />
-                  <div className="absolute inset-0 bg-primary-400/20 rounded-full blur-xl animate-pulse" />
+                  <SparklesIcon className="h-12 w-12 animate-pulse text-primary-600 dark:text-primary-400" />
+                  <div className="absolute inset-0 animate-pulse rounded-full bg-primary-400/20 blur-xl" />
                 </div>
                 <div className="space-y-2">
                   <Text className="text-lg font-semibold text-primary-900 dark:text-primary-100">
@@ -1665,7 +1664,7 @@ export function RecipeImportClient({
                     {t('processingDescription')}
                   </Text>
                   {error && (
-                    <div className="mt-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800">
+                    <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950/50">
                       <Text className="text-sm text-red-600 dark:text-red-400">
                         {error}
                       </Text>
@@ -1693,43 +1692,43 @@ export function RecipeImportClient({
               </div>
 
               {/* Skeleton Loader for Recipe Preview */}
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 bg-white dark:bg-zinc-900 space-y-6">
+              <div className="space-y-6 rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
                 {/* Title Skeleton */}
                 <div className="space-y-2">
-                  <div className="h-4 w-24 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
-                  <div className="h-8 w-64 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+                  <div className="h-4 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+                  <div className="h-8 w-64 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
                 </div>
 
                 {/* Language Info Skeleton */}
                 <div className="space-y-2">
-                  <div className="h-4 w-20 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
-                  <div className="h-5 w-32 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+                  <div className="h-4 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+                  <div className="h-5 w-32 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
                 </div>
 
                 {/* Servings Skeleton */}
                 <div className="space-y-2">
-                  <div className="h-4 w-16 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
-                  <div className="h-5 w-12 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+                  <div className="h-4 w-16 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+                  <div className="h-5 w-12 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
                 </div>
 
                 {/* Times Skeleton */}
                 <div className="space-y-2">
-                  <div className="h-4 w-16 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+                  <div className="h-4 w-16 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
                   <div className="space-y-2">
-                    <div className="h-5 w-40 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
-                    <div className="h-5 w-36 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+                    <div className="h-5 w-40 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+                    <div className="h-5 w-36 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
                   </div>
                 </div>
 
                 {/* Ingredients Skeleton */}
                 <div className="space-y-3">
-                  <div className="h-4 w-24 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+                  <div className="h-4 w-24 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
                   <ul className="space-y-2">
                     {[65, 80, 55, 70, 60].map((width, i) => (
                       <li key={i} className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full bg-zinc-300 dark:bg-zinc-700" />
                         <div
-                          className={`h-5 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse`}
+                          className={`h-5 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800`}
                           style={{ width: `${width}%` }}
                         />
                       </li>
@@ -1739,13 +1738,13 @@ export function RecipeImportClient({
 
                 {/* Instructions Skeleton */}
                 <div className="space-y-3">
-                  <div className="h-4 w-32 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+                  <div className="h-4 w-32 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
                   <ol className="space-y-2">
                     {[75, 85, 70, 80].map((width, i) => (
                       <li key={i} className="flex items-start gap-3">
-                        <div className="h-5 w-5 rounded-full bg-zinc-300 dark:bg-zinc-700 flex-shrink-0 mt-0.5" />
+                        <div className="mt-0.5 h-5 w-5 flex-shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" />
                         <div
-                          className={`h-5 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse`}
+                          className={`h-5 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800`}
                           style={{ width: `${width}%` }}
                         />
                       </li>
@@ -1758,15 +1757,15 @@ export function RecipeImportClient({
 
           {/* Failed State */}
           {remoteJob.status === 'failed' && (
-            <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/50">
               <div className="flex items-start gap-3">
-                <ExclamationTriangleIcon className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
+                <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 text-red-600 dark:text-red-400" />
                 <div className="flex-1">
-                  <Text className="text-red-600 dark:text-red-400 font-medium mb-2">
+                  <Text className="mb-2 font-medium text-red-600 dark:text-red-400">
                     {t('uploadFailed')}
                   </Text>
                   {validationErrors && (
-                    <div className="space-y-2 mb-4">
+                    <div className="mb-4 space-y-2">
                       {(validationErrors as { stage?: string }).stage && (
                         <Text className="text-sm text-red-600 dark:text-red-400">
                           <strong>{t('errorStage')}:</strong>{' '}
@@ -1796,7 +1795,7 @@ export function RecipeImportClient({
 
           {/* Review UI (Real Data) */}
           {remoteJob.status === 'ready_for_review' && (
-            <div className="space-y-4 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 bg-white dark:bg-zinc-900">
+            <div className="space-y-4 rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
               <div className="flex items-center justify-between">
                 <Heading level={2}>{t('reviewTitle')}</Heading>
                 {remoteJob.confidenceOverall !== null && (
@@ -1820,14 +1819,14 @@ export function RecipeImportClient({
                   {/* Warnings */}
                   {extractedRecipe.warnings &&
                     extractedRecipe.warnings.length > 0 && (
-                      <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-4">
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/50">
                         <div className="flex items-start gap-2">
-                          <ExclamationTriangleIcon className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                          <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 text-amber-600 dark:text-amber-400" />
                           <div className="flex-1">
-                            <Text className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">
+                            <Text className="mb-2 text-sm font-medium text-amber-800 dark:text-amber-200">
                               {t('warnings')}
                             </Text>
-                            <ul className="list-disc list-inside space-y-1">
+                            <ul className="list-inside list-disc space-y-1">
                               {extractedRecipe.warnings.map((warning, idx) => (
                                 <li
                                   key={idx}
@@ -1933,13 +1932,13 @@ export function RecipeImportClient({
                   )}
 
                   {/* Finalize CTA */}
-                  <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                  <div className="border-t border-zinc-200 pt-4 dark:border-zinc-800">
                     <div className="space-y-4">
                       {/* Categorie (Soort) – simple custom listbox i.p.v. native select */}
                       <div>
                         <Text
                           id="meal-slot-label"
-                          className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2"
+                          className="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-300"
                         >
                           {t('mealSlotLabel')}
                         </Text>
@@ -1975,7 +1974,7 @@ export function RecipeImportClient({
                       >
                         {finalizingJob ? (
                           <>
-                            <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                            <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
                             {t('finalizeLoading')}
                           </>
                         ) : (
@@ -1986,7 +1985,7 @@ export function RecipeImportClient({
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-8">
+                <div className="py-8 text-center">
                   <Text className="text-zinc-500 dark:text-zinc-400">
                     {t('noExtractedData')}
                   </Text>
@@ -2006,17 +2005,17 @@ export function RecipeImportClient({
 
           {/* Finalized State */}
           {remoteJob.status === 'finalized' && remoteJob.recipeId && (
-            <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/50 p-6">
+            <div className="rounded-lg border border-green-200 bg-green-50 p-6 dark:border-green-800 dark:bg-green-950/50">
               <div className="flex items-start gap-3">
-                <CheckCircleIcon className="h-6 w-6 text-green-600 dark:text-green-400 mt-0.5" />
+                <CheckCircleIcon className="mt-0.5 h-6 w-6 text-green-600 dark:text-green-400" />
                 <div className="flex-1">
                   <Heading
                     level={3}
-                    className="text-green-800 dark:text-green-200 mb-2"
+                    className="mb-2 text-green-800 dark:text-green-200"
                   >
                     {t('finalizeSuccessTitle')}
                   </Heading>
-                  <Text className="text-green-700 dark:text-green-300 mb-4">
+                  <Text className="mb-4 text-green-700 dark:text-green-300">
                     {t('finalizeSuccessBody')}
                   </Text>
                   <Link href={`/recipes/${remoteJob.recipeId}`}>
@@ -2168,7 +2167,7 @@ export function RecipeImportClient({
                 <Subheading level={3} className="mb-2">
                   Raw (JSON)
                 </Subheading>
-                <pre className="max-h-96 overflow-auto rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 p-4 text-xs font-mono">
+                <pre className="max-h-96 overflow-auto rounded-lg border border-zinc-200 bg-zinc-50 p-4 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-900">
                   {JSON.stringify(urlImportDiagnostics, null, 2)}
                 </pre>
               </div>
@@ -2187,17 +2186,17 @@ export function RecipeImportClient({
         <DialogTitle>{t('cameraTitle')}</DialogTitle>
         <DialogBody>
           <div className="space-y-4">
-            <div className="relative bg-zinc-900 rounded-lg overflow-hidden aspect-[3/4] max-h-[70vh] sm:max-h-none">
+            <div className="relative aspect-[3/4] max-h-[70vh] overflow-hidden rounded-lg bg-zinc-900 sm:max-h-none">
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted
-                className="w-full h-full object-cover"
+                className="h-full w-full object-cover"
               />
               <canvas ref={canvasRef} className="hidden" />
             </div>
-            <Text className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
+            <Text className="text-center text-sm text-zinc-500 dark:text-zinc-400">
               {t('cameraHint')}
             </Text>
           </div>
@@ -2207,7 +2206,7 @@ export function RecipeImportClient({
             {t('cancel')}
           </Button>
           <Button onClick={handleCapturePhoto} color="primary">
-            <CameraIcon className="h-4 w-4 mr-2" />
+            <CameraIcon className="mr-2 h-4 w-4" />
             {t('capturePhoto')}
           </Button>
         </DialogActions>

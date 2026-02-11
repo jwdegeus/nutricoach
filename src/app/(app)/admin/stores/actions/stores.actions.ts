@@ -151,7 +151,7 @@ export async function createStoreTemplateAction(form: {
   if (typeof form.detailConcurrency === 'number' && form.detailConcurrency > 0)
     connector_config.detailConcurrency = form.detailConcurrency;
 
-  const { data: templateRow, error: templateErr } = await supabase
+  const { data: _templateRow, error: templateErr } = await supabase
     .from('store_templates')
     .insert({
       name,

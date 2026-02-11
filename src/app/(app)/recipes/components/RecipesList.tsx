@@ -16,14 +16,14 @@ function RecipeThumbnail({
 
   if (!imageUrl || imageError) {
     return (
-      <div className="h-10 w-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center ring-1 ring-zinc-950/5 dark:ring-white/10">
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 ring-1 ring-zinc-950/5 dark:bg-zinc-800 dark:ring-white/10">
         <PhotoIcon className="h-5 w-5 text-zinc-400 dark:text-zinc-500" />
       </div>
     );
   }
 
   return (
-    <span className="relative block h-10 w-10 rounded-full overflow-hidden ring-1 ring-zinc-950/5 dark:ring-white/10">
+    <span className="relative block h-10 w-10 overflow-hidden rounded-full ring-1 ring-zinc-950/5 dark:ring-white/10">
       <Image
         src={imageUrl}
         alt={alt}
@@ -369,7 +369,7 @@ export function RecipesList({
 
   if (hasNoMeals) {
     return (
-      <div className="text-center py-12">
+      <div className="py-12 text-center">
         <p className="text-zinc-500 dark:text-zinc-400">
           Nog geen recepten. Voeg je eerste recept toe via een foto, screenshot
           of bestand.
@@ -381,7 +381,7 @@ export function RecipesList({
   // If we have meals but none are valid after filtering, show empty state
   if (validMeals.length === 0 && meals.length > 0) {
     return (
-      <div className="text-center py-12">
+      <div className="py-12 text-center">
         <p className="text-zinc-500 dark:text-zinc-400">
           Geen geldige recepten gevonden.
         </p>
@@ -391,7 +391,7 @@ export function RecipesList({
 
   return (
     <>
-      <div className="overflow-x-auto -mx-6 sm:-mx-4 lg:-mx-10">
+      <div className="-mx-6 overflow-x-auto sm:-mx-4 lg:-mx-10">
         <div className="inline-block min-w-full px-6 sm:px-4 lg:px-10">
           <Table className="[--gutter:--spacing(6)] sm:[--gutter:--spacing(8)]">
             <TableHead>
@@ -435,8 +435,8 @@ export function RecipesList({
                     <TableCell>
                       <RecipeThumbnail imageUrl={imageUrl} alt={name} />
                     </TableCell>
-                    <TableCell className="font-medium min-w-[180px]">
-                      <div className="flex items-center gap-2 flex-wrap">
+                    <TableCell className="min-w-[180px] font-medium">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span>{name}</span>
                         {formatDietTypeName(
                           String(mealR.dietKey ?? mealR.diet_key ?? ''),
@@ -449,7 +449,7 @@ export function RecipesList({
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="capitalize whitespace-nowrap text-sm">
+                    <TableCell className="text-sm whitespace-nowrap capitalize">
                       {formatMealSlot(
                         String(mealR.mealSlot ?? mealR.meal_slot ?? ''),
                       )}
@@ -468,7 +468,7 @@ export function RecipesList({
                           </span>
                         </div>
                       ) : (
-                        <span className="text-zinc-400 text-sm">-</span>
+                        <span className="text-sm text-zinc-400">-</span>
                       )}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
@@ -484,7 +484,7 @@ export function RecipesList({
                           </span>
                         </div>
                       ) : (
-                        <span className="text-zinc-400 text-sm">-</span>
+                        <span className="text-sm text-zinc-400">-</span>
                       )}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
@@ -516,18 +516,18 @@ export function RecipesList({
                                   Number(
                                     mealR.userRating ?? mealR.user_rating ?? 0,
                                   )
-                                    ? 'text-yellow-400 fill-yellow-400'
-                                    : 'text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700'
+                                    ? 'fill-yellow-400 text-yellow-400'
+                                    : 'fill-zinc-300 text-zinc-300 dark:fill-zinc-700 dark:text-zinc-700'
                                 }`}
                               />
                             ))}
                           </div>
-                          <span className="text-xs text-zinc-600 dark:text-zinc-400 ml-0.5">
+                          <span className="ml-0.5 text-xs text-zinc-600 dark:text-zinc-400">
                             {Number(mealR.userRating ?? mealR.user_rating)}/5
                           </span>
                         </div>
                       ) : (
-                        <span className="text-zinc-400 text-sm">-</span>
+                        <span className="text-sm text-zinc-400">-</span>
                       )}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
@@ -536,9 +536,9 @@ export function RecipesList({
                           score={complianceScores[String(meal.id)]}
                         />
                       ) : complianceLoading ? (
-                        <span className="text-zinc-400 text-sm">...</span>
+                        <span className="text-sm text-zinc-400">...</span>
                       ) : (
-                        <span className="text-zinc-400 text-sm">-</span>
+                        <span className="text-sm text-zinc-400">-</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -587,7 +587,7 @@ export function RecipesList({
                             </DropdownItem>
                             <DropdownItem
                               onClick={() => handleDelete(meal)}
-                              className="text-red-600 data-focus:text-white data-focus:bg-red-600 dark:text-red-400"
+                              className="text-red-600 data-focus:bg-red-600 data-focus:text-white dark:text-red-400"
                             >
                               <TrashIcon data-slot="icon" />
                               <span>Verwijderen</span>

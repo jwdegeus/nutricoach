@@ -321,7 +321,7 @@ export function PantryRow({
 
   return (
     <TableRow>
-      <TableCell className="whitespace-nowrap py-4">
+      <TableCell className="py-4 whitespace-nowrap">
         <div className="flex items-center gap-3">
           <div className="size-11 shrink-0 overflow-hidden rounded-lg bg-muted/30 shadow-sm outline outline-1 -outline-offset-1 outline-white/10">
             {item.imageUrl ? (
@@ -359,7 +359,7 @@ export function PantryRow({
           <span className="text-muted-foreground">—</span>
         )}
       </TableCell>
-      <TableCell className="whitespace-nowrap py-4 text-muted-foreground">
+      <TableCell className="py-4 whitespace-nowrap text-muted-foreground">
         {quantityText}
       </TableCell>
       <TableCell className="py-4">

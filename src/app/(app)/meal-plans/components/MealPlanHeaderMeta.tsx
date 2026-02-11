@@ -81,7 +81,7 @@ export function MealPlanHeaderMeta({
             <ChevronDownIcon className="ml-0.5 h-4 w-4" />
           </DropdownButton>
           <DropdownMenu anchor="bottom start" className="min-w-[18rem]">
-            <div className="px-3.5 py-3 text-sm text-muted-foreground space-y-2">
+            <div className="space-y-2 px-3.5 py-3 text-sm text-muted-foreground">
               <div>
                 <span className="text-muted-foreground">Plan ID: </span>
                 <span className="font-mono">{planId.slice(0, 8)}…</span>

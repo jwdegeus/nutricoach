@@ -26,7 +26,7 @@ export default async function RootLayout({
     <html
       lang={locale}
       suppressHydrationWarning
-      className="antialiased bg-background text-foreground"
+      className="bg-background text-foreground antialiased"
     >
       <head>
         <link rel="preconnect" href="https://rsms.me/" />

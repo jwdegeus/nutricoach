@@ -103,7 +103,7 @@ export function GuardrailsViolationMessage({
 
       {/* Link to guardrails settings */}
       {dietTypeId && (
-        <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-900/50">
+        <div className="mt-3 border-t border-red-200 pt-3 dark:border-red-900/50">
           <Link
             href={`/settings/diets/${dietTypeId}/edit`}
             className="text-sm font-medium text-red-900 underline hover:text-red-700 dark:text-red-100 dark:hover:text-red-300"

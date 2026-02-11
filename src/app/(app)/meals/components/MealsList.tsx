@@ -133,7 +133,7 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
 
   if (meals.length === 0) {
     return (
-      <div className="text-center py-12">
+      <div className="py-12 text-center">
         <p className="text-zinc-500 dark:text-zinc-400">
           Nog geen maaltijden. Voeg je eerste maaltijd toe via een foto,
           screenshot of bestand.
@@ -221,7 +221,7 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
                 <Dropdown>
                   <DropdownButton
                     plain
-                    className="p-1 no-hover-bg"
+                    className="no-hover-bg p-1"
                     onClick={(e: MouseEvent) => e.stopPropagation()}
                   >
                     <EllipsisVerticalIcon className="size-6 text-zinc-500" />
@@ -280,7 +280,7 @@ export function MealsList({ meals, onConsumptionLogged }: MealsListProps) {
                           e.stopPropagation();
                           handleDelete(meal);
                         }}
-                        className="text-red-600 data-focus:text-white data-focus:bg-red-600 dark:text-red-400"
+                        className="text-red-600 data-focus:bg-red-600 data-focus:text-white dark:text-red-400"
                       >
                         <TrashIcon data-slot="icon" />
                         <span>Verwijderen</span>

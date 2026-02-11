@@ -90,9 +90,9 @@ export function QuickEditBar({
           disabled={isPending}
         >
           {isPending ? (
-            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
           ) : (
-            <Plus className="h-3 w-3 mr-1" />
+            <Plus className="mr-1 h-3 w-3" />
           )}
           Tussendoortje
         </Button>
@@ -103,9 +103,9 @@ export function QuickEditBar({
           disabled={isPending}
         >
           {isPending ? (
-            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
           ) : (
-            <RefreshCw className="h-3 w-3 mr-1" />
+            <RefreshCw className="mr-1 h-3 w-3" />
           )}
           Regenereren
         </Button>

@@ -82,7 +82,7 @@ export function StoresAdminClient({ initialStores }: Props) {
   const router = useRouter();
   const { showToast } = useToast();
   const [stores, setStores] = useState<StoreForAdmin[]>(initialStores);
-  const [loading, setLoading] = useState(false);
+  const [_loading, _setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -275,8 +275,8 @@ export function StoresAdminClient({ initialStores }: Props) {
         </div>
       )}
       {error && (
-        <div className="rounded-xl bg-red-50 p-4 text-red-800 dark:bg-red-950/40 dark:text-red-200 flex items-start gap-2">
-          <ExclamationTriangleIcon className="size-5 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-2 rounded-xl bg-red-50 p-4 text-red-800 dark:bg-red-950/40 dark:text-red-200">
+          <ExclamationTriangleIcon className="mt-0.5 size-5 shrink-0" />
           <span>{error}</span>
           <Button
             plain
@@ -350,7 +350,7 @@ export function StoresAdminClient({ initialStores }: Props) {
                   </TableCell>
                   <TableCell>
                     <span
-                      className="text-muted-foreground truncate max-w-[200px] inline-block"
+                      className="inline-block max-w-[200px] truncate text-muted-foreground"
                       title={row.base_url}
                     >
                       {row.base_url}
@@ -359,7 +359,7 @@ export function StoresAdminClient({ initialStores }: Props) {
                   <TableCell>
                     {row.sitemap_url ? (
                       <span
-                        className="text-muted-foreground truncate max-w-[180px] inline-block"
+                        className="inline-block max-w-[180px] truncate text-muted-foreground"
                         title={row.sitemap_url}
                       >
                         {row.sitemap_url}
@@ -442,7 +442,7 @@ export function StoresAdminClient({ initialStores }: Props) {
                     <Label>Actief</Label>
                   </div>
                 </Field>
-                <div className="border-t border-white/10 pt-4 space-y-4">
+                <div className="space-y-4 border-t border-white/10 pt-4">
                   <p className="text-sm font-medium text-foreground">
                     Sync-instellingen (connector_config)
                   </p>
@@ -548,7 +548,7 @@ export function StoresAdminClient({ initialStores }: Props) {
                     placeholder="https://www.voorbeeld.nl/sitemap.xml"
                   />
                 </Field>
-                <div className="border-t border-white/10 pt-4 space-y-4">
+                <div className="space-y-4 border-t border-white/10 pt-4">
                   <p className="text-sm font-medium text-foreground">
                     Sync-instellingen
                   </p>
@@ -637,7 +637,7 @@ export function StoresAdminClient({ initialStores }: Props) {
                     Geen winkels in de catalogus. Maak hierboven een nieuwe aan.
                   </p>
                 ) : (
-                  <ul className="rounded-lg bg-muted/20 divide-y divide-white/10 max-h-72 overflow-y-auto">
+                  <ul className="max-h-72 divide-y divide-white/10 overflow-y-auto rounded-lg bg-muted/20">
                     {templates.map((t) => (
                       <li
                         key={t.id}
@@ -648,7 +648,7 @@ export function StoresAdminClient({ initialStores }: Props) {
                             {t.name}
                           </span>
                           <span
-                            className="text-muted-foreground text-sm ml-2 block truncate"
+                            className="ml-2 block truncate text-sm text-muted-foreground"
                             title={t.base_url}
                           >
                             {t.base_url}
@@ -674,7 +674,7 @@ export function StoresAdminClient({ initialStores }: Props) {
                   </ul>
                 )}
                 {error && (
-                  <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">
                     {error}
                   </p>
                 )}

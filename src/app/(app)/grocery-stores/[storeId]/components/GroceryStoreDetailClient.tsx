@@ -6,12 +6,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/catalyst/button';
 import { Input } from '@/components/catalyst/input';
 import { Textarea } from '@/components/catalyst/textarea';
-import {
-  Field,
-  FieldGroup,
-  Label,
-  Description,
-} from '@/components/catalyst/fieldset';
+import { Field, FieldGroup, Label } from '@/components/catalyst/fieldset';
 import {
   Dialog,
   DialogActions,
@@ -375,7 +370,7 @@ export function GroceryStoreDetailClient({
                   )
                 }
                 disabled={submitting}
-                className="mt-1 block w-full rounded-lg border-0 bg-white/5 py-2 shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-accent dark:bg-white/5 dark:ring-white/10"
+                className="mt-1 block w-full rounded-lg border-0 bg-white/5 py-2 shadow-sm ring-1 ring-white/10 ring-inset focus:ring-2 focus:ring-accent focus:ring-inset dark:bg-white/5 dark:ring-white/10"
               >
                 <option value="active">{t('statusActive')}</option>
                 <option value="completed">{t('statusCompleted')}</option>

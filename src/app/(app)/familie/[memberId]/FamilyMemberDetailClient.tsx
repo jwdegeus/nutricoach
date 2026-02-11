@@ -83,7 +83,7 @@ export function FamilyMemberDetailClient({
           <div>
             <Link
               href="/familie"
-              className="inline-flex items-center gap-2 text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white mb-4"
+              className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white"
             >
               <ArrowLeftIcon className="size-4" />
               {t('backToList')}
@@ -98,7 +98,7 @@ export function FamilyMemberDetailClient({
               {t('generalDescription')}
             </p>
           </div>
-          <div className="md:col-span-2 space-y-8">
+          <div className="space-y-8 md:col-span-2">
             {/* Profielfoto */}
             <div className="flex flex-wrap items-center gap-6">
               <Avatar

@@ -74,7 +74,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           {toasts.map((toast) => (
             <div
               key={toast.id}
-              className="pointer-events-auto w-full max-w-sm rounded-lg bg-white shadow-lg ring-1 ring-zinc-950/10 transition duration-300 ease-out dark:bg-zinc-900 dark:ring-white/10 sm:translate-x-0"
+              className="pointer-events-auto w-full max-w-sm rounded-lg bg-white shadow-lg ring-1 ring-zinc-950/10 transition duration-300 ease-out sm:translate-x-0 dark:bg-zinc-900 dark:ring-white/10"
             >
               <div className="p-4">
                 <div className="flex items-start gap-3">

@@ -148,7 +148,7 @@ const LABEL_MAP: Record<string, string> = {
 
 export function IngredientDetailView({ item }: { item: DetailFood }) {
   return (
-    <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+    <div className="max-h-[70vh] space-y-6 overflow-y-auto">
       {GROUPS.map((group) => {
         const entries = group.keys
           .filter((k) => k in item && !SKIP_KEYS.has(k))
@@ -168,7 +168,7 @@ export function IngredientDetailView({ item }: { item: DetailFood }) {
         if (entries.length === 0) return null;
         return (
           <div key={group.title}>
-            <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
+            <h3 className="mb-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
               {group.title}
             </h3>
             <DescriptionList>

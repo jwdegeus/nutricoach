@@ -8,18 +8,18 @@
     'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   --font-sans--font-feature-settings: 'cv11';
 
-  /* Primary: Yellow-Green (fresh, food-forward). */
-  --color-primary-50: oklch(97.6% 0.025 132.12);
-  --color-primary-100: oklch(95.12% 0.047 130.75);
-  --color-primary-200: oklch(90.41% 0.095 131.34);
-  --color-primary-300: oklch(85.91% 0.14 132.1);
-  --color-primary-400: oklch(81.63% 0.18 133.39);
-  --color-primary-500: oklch(77.72% 0.21 134.84);
-  --color-primary-600: oklch(65.88% 0.176 134.77);
-  --color-primary-700: oklch(53.54% 0.14 134.37);
-  --color-primary-800: oklch(40.39% 0.102 134.05);
-  --color-primary-900: oklch(26.05% 0.059 133.31);
-  --color-primary-950: oklch(21.26% 0.045 131.81);
+  /* Primary: Pine Teal — exacte waarden van Coolors Tailwind generator (2d5a47) */
+  --color-primary-50: oklch(96.63% 0.009 171.8);
+  --color-primary-100: oklch(93.45% 0.02 169.32);
+  --color-primary-200: oklch(86.89% 0.041 168.55);
+  --color-primary-300: oklch(80.35% 0.061 167.57);
+  --color-primary-400: oklch(73.86% 0.081 166.3);
+  --color-primary-500: oklch(67.48% 0.099 164.59);
+  --color-primary-600: oklch(57.38% 0.083 164.72);
+  --color-primary-700: oklch(46.81% 0.066 164.92);
+  --color-primary-800: oklch(35.61% 0.047 165.28);
+  --color-primary-900: oklch(23.43% 0.027 166.1);
+  --color-primary-950: oklch(19.57% 0.02 166.31);
 
   /* Secondary: Orange (warmth, energy, food) */
   --color-secondary-50: oklch(0.98 0.016 73.684);
@@ -85,6 +85,8 @@
   --color-popover-foreground: var(--color-background-950);
   --color-card: var(--color-background-50);
   --color-card-foreground: var(--color-background-950);
+  --color-border: var(--color-background-200);
+  --color-input: var(--color-card);
   --color-ring: var(--color-primary-500);
 
   /* Zinc colors - Required for Catalyst UI components (Tailwind default) */
@@ -113,7 +115,7 @@
   --color-emerald-900: var(--color-primary-900);
   --color-emerald-950: var(--color-primary-950);
 
-  /* Blue palette: alias to primary (emerald). Catalyst uses blue-500/600/700 for focus rings and selection; primary must remain emerald. */
+  /* Blue palette: alias to primary. Catalyst uses blue-500/600/700 for focus rings and selection. */
   --color-blue-50: var(--color-primary-50);
   --color-blue-100: var(--color-primary-100);
   --color-blue-200: var(--color-primary-200);
@@ -131,23 +133,23 @@
   --color-black: oklch(0 0 0);
 }
 
-/* Dark mode: Midnight (navy/slate) palette — Tailwind UI Blocks–style premium dark.
-   Semantic tokens + zinc override zodat de hele app (incl. Catalyst) één thema volgt. */
+/* Dark mode: neutrale surfaces (zoals Coolors), Pine Teal alleen voor accenten.
+   Coolors gebruikt charcoal/grijs voor sidebar/cards; primary-500/600 voor buttons/progress */
 .dark {
-  /* Night Olive ramp — softer dark (avoid near-black), food-friendly neutral */
-  --color-night-50: oklch(0.975 0.01 135);
-  --color-night-100: oklch(0.945 0.012 135);
-  --color-night-200: oklch(0.875 0.014 135);
-  --color-night-300: oklch(0.765 0.016 135);
-  --color-night-400: oklch(0.645 0.018 135);
-  --color-night-500: oklch(0.525 0.02 135);
-  --color-night-600: oklch(0.425 0.02 135);
-  --color-night-700: oklch(0.345 0.018 135);
-  --color-night-800: oklch(0.305 0.016 135);
-  --color-night-900: oklch(0.265 0.014 135);
-  --color-night-950: oklch(0.225 0.012 135);
+  /* Night ramp — achromatisch donkergrijs (chroma 0 = geen groen/geel/blauw tint) */
+  --color-night-50: oklch(0.975 0 0);
+  --color-night-100: oklch(0.945 0 0);
+  --color-night-200: oklch(0.875 0 0);
+  --color-night-300: oklch(0.765 0 0);
+  --color-night-400: oklch(0.645 0 0);
+  --color-night-500: oklch(0.525 0 0);
+  --color-night-600: oklch(0.425 0 0);
+  --color-night-700: oklch(0.345 0 0);
+  --color-night-800: oklch(0.305 0 0);
+  --color-night-900: oklch(0.265 0 0);
+  --color-night-950: oklch(0.225 0 0);
 
-  /* Semantic tokens — surface ladder: background (deepest) < card/muted < popover, accent voor hover/selected */
+  /* Semantic tokens — NEUTRAAL voor surfaces; primary alleen voor ring/focus/buttons */
   --color-background: var(--color-night-950);
   --color-foreground: var(--color-night-50);
   --color-muted: var(--color-night-900);
@@ -158,8 +160,11 @@
   --color-popover-foreground: var(--color-night-50);
   --color-accent: var(--color-night-800);
   --color-accent-foreground: var(--color-night-50);
+  --color-border: var(--color-night-800);
+  --color-input: var(--color-card);
+  --color-ring: var(--color-primary-500);
 
-  /* Zinc → night zodat Catalyst (sidebar, modals, table, button) hetzelfde dark theme volgt */
+  /* Zinc → night (neutraal); primary blijft in @theme voor buttons/focus/accents */
   --color-zinc-50: var(--color-night-50);
   --color-zinc-100: var(--color-night-100);
   --color-zinc-200: var(--color-night-200);
@@ -171,6 +176,11 @@
   --color-zinc-800: var(--color-night-800);
   --color-zinc-900: var(--color-night-900);
   --color-zinc-950: var(--color-night-950);
+}
+
+/* Recharts tooltip — no white background on wrapper (custom content has bg-muted) */
+.recharts-tooltip-wrapper {
+  background: transparent !important;
 }
 
 /* Remove hover background for ellipsis button */

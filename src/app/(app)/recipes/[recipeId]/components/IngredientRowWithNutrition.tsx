@@ -192,7 +192,6 @@ export function IngredientRowWithNutrition({
       return;
     }
     setNutrition(undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- match identity used via specific fields
   }, [match?.source, match?.nevoCode, match?.customFoodId, match?.fdcId]);
 
   // Reset "opnieuw koppelen" view when closing the dialog
@@ -587,8 +586,8 @@ export function IngredientRowWithNutrition({
   };
 
   return (
-    <div className="group flex items-center gap-1 w-full rounded-lg -mx-1 px-1 hover:shadow-sm dark:hover:shadow-black/20 transition-shadow">
-      <div className="flex-1 min-w-0 rounded-lg px-2 py-1.5">
+    <div className="group -mx-1 flex w-full items-center gap-1 rounded-lg px-1">
+      <div className="min-w-0 flex-1 rounded-lg px-2 py-1.5">
         <div className="text-sm">
           {!match && (
             <ExclamationTriangleIcon
@@ -625,7 +624,7 @@ export function IngredientRowWithNutrition({
         <DialogTitle>Koppelen: {displayName}</DialogTitle>
         <DialogBody>
           <div className="space-y-4">
-            <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+            <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
               Nog niet gematcht met de database. Zoek suggesties of laat later
               AI het ingrediënt toevoegen.
             </p>
@@ -677,24 +676,24 @@ export function IngredientRowWithNutrition({
                   </div>
                 </div>
                 {suggestions.length > 0 && (
-                  <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4 mt-4">
-                    <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
+                  <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+                    <p className="mb-3 text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
                       Mogelijk bedoelde u
                     </p>
                     <ul className="max-h-52 overflow-y-auto">
                       {suggestions.map((c, i) => (
                         <li
                           key={i}
-                          className="border-b border-zinc-100 dark:border-zinc-800 last:border-b-0"
+                          className="border-b border-zinc-100 last:border-b-0 dark:border-zinc-800"
                         >
                           <button
                             type="button"
                             disabled={isSaving}
                             onClick={() => confirmSuggestion(c)}
-                            className="flex flex-col items-stretch gap-1.5 w-full rounded py-3 px-4 text-left text-sm text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-700 disabled:opacity-50"
+                            className="flex w-full flex-col items-stretch gap-1.5 rounded px-4 py-3 text-left text-sm text-zinc-900 hover:bg-zinc-100 disabled:opacity-50 dark:text-white dark:hover:bg-zinc-700"
                           >
-                            <span className="flex items-center gap-2 flex-wrap">
-                              <span className="block truncate font-medium min-w-0">
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="block min-w-0 truncate font-medium">
                                 {c.name_nl}
                               </span>
                               <Badge
@@ -725,21 +724,21 @@ export function IngredientRowWithNutrition({
                 )}
                 {confirmError && (
                   <p
-                    className="text-xs text-red-600 dark:text-red-400 mt-2"
+                    className="mt-2 text-xs text-red-600 dark:text-red-400"
                     role="alert"
                   >
                     Koppelen mislukt: {confirmError}
                   </p>
                 )}
                 {!suggestionsLoading && suggestions.length === 0 && (
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
                     {hasSearched
                       ? 'Geen suggesties gevonden.'
                       : 'Klik op "Zoek suggesties" om te zoeken in NEVO, eigen ingredienten en FNDDS.'}
                   </p>
                 )}
-                <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4 mt-4">
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-3 leading-relaxed">
+                <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+                  <p className="mb-3 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
                     Ingrediënt niet gevonden? Laat AI het ingrediënt opzoeken,
                     nutriwaardes invullen en toevoegen aan de database.
                   </p>
@@ -786,7 +785,7 @@ export function IngredientRowWithNutrition({
       >
         <DialogTitle>Ingrediënt handmatig toevoegen</DialogTitle>
         <DialogBody>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+          <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
             Voeg het ingrediënt toe als eigen ingrediënt. Vul minimaal de
             Nederlandse naam in; voedingswaarden zijn optioneel (per 100 g).
           </p>
@@ -918,12 +917,12 @@ export function IngredientRowWithNutrition({
         </DialogActions>
       </Dialog>
       {canShowRowMenu && (
-        <div className="shrink-0 flex items-center">
+        <div className="flex shrink-0 items-center">
           <Dropdown>
             <DropdownButton
               as="button"
               type="button"
-              className="flex items-center justify-center w-8 h-8 rounded text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-700"
+              className="flex h-8 w-8 items-center justify-center rounded text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
               title="Opties"
               aria-label={`Opties voor ${displayName}`}
             >
@@ -932,7 +931,7 @@ export function IngredientRowWithNutrition({
             <DropdownMenu anchor="bottom end" className="min-w-[12rem]">
               {canSearchSuggestions && (
                 <DropdownItem onClick={openLinkDialog}>
-                  <LinkIcon className="h-4 w-4 mr-2" data-slot="icon" />
+                  <LinkIcon className="mr-2 h-4 w-4" data-slot="icon" />
                   {match ? 'Opnieuw koppelen' : 'Koppelen'}
                 </DropdownItem>
               )}
@@ -942,7 +941,7 @@ export function IngredientRowWithNutrition({
                     setEditDialogOpen(true);
                   }}
                 >
-                  <PencilIcon className="h-4 w-4 mr-2" data-slot="icon" />
+                  <PencilIcon className="mr-2 h-4 w-4" data-slot="icon" />
                   Bewerken
                 </DropdownItem>
               )}
@@ -954,7 +953,7 @@ export function IngredientRowWithNutrition({
                   }}
                   className="text-red-600 data-focus:bg-red-50 data-focus:text-red-700 dark:text-red-400 dark:data-focus:bg-red-950/30 dark:data-focus:text-red-300"
                 >
-                  <TrashIcon className="h-4 w-4 mr-2" data-slot="icon" />
+                  <TrashIcon className="mr-2 h-4 w-4" data-slot="icon" />
                   Verwijderen
                 </DropdownItem>
               )}

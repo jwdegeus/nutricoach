@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { redirect, notFound } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
 import { createClient } from '@/src/lib/supabase/server';
 import {
   getGroceryStoreAction,

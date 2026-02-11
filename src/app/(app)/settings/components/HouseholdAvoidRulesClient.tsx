@@ -227,7 +227,7 @@ export function HouseholdAvoidRulesClient({
         </Table>
       )}
 
-      <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 space-y-4">
+      <div className="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
         <Text className="text-base/6 font-medium text-zinc-950 dark:text-white">
           {t('householdAvoidNewBlockTitle')}
         </Text>

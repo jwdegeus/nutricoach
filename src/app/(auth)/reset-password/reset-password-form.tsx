@@ -28,13 +28,13 @@ export function ResetPasswordForm() {
   return (
     <form action={handleSubmit} className="space-y-6">
       {error && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-950/50 p-4 text-sm text-red-600 dark:text-red-400">
+        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">
           <strong>Fout:</strong> {error}
         </div>
       )}
 
       {success && (
-        <div className="rounded-lg bg-green-50 dark:bg-green-950/50 p-4 text-sm text-green-600 dark:text-green-400">
+        <div className="rounded-lg bg-green-50 p-4 text-sm text-green-600 dark:bg-green-950/50 dark:text-green-400">
           <strong>Succes:</strong> {success}
         </div>
       )}
@@ -58,7 +58,7 @@ export function ResetPasswordForm() {
       <div className="text-center text-sm text-zinc-500 dark:text-zinc-400">
         <Link
           href="/login"
-          className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          className="font-medium text-blue-600 hover:underline dark:text-blue-400"
         >
           Terug naar login
         </Link>

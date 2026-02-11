@@ -57,7 +57,7 @@ export function HeadlessSidebar({ children }: { children: React.ReactNode }) {
             </TransitionChild>
 
             {/* Mobile Sidebar */}
-            <div className="relative flex grow flex-col gap-y-5 overflow-y-auto bg-white border-r border-gray-200 px-6 pb-4 dark:bg-gray-800/75 dark:border-gray-700">
+            <div className="relative flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4 dark:border-gray-700 dark:bg-gray-800/75">
               <div className="flex h-16 shrink-0 items-center">
                 <Link
                   href="/dashboard"
@@ -97,7 +97,7 @@ export function HeadlessSidebar({ children }: { children: React.ReactNode }) {
                   </li>
                   {secondaryItems.length > 0 && (
                     <li>
-                      <div className="text-xs font-semibold text-gray-500 px-2 dark:text-gray-400">
+                      <div className="px-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
                         Overig
                       </div>
                       <ul role="list" className="-mx-2 mt-2 space-y-1">
@@ -130,7 +130,7 @@ export function HeadlessSidebar({ children }: { children: React.ReactNode }) {
                   <li className="mt-auto">
                     <Link
                       href="/settings"
-                      className="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                      className="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
                     >
                       <Settings
                         aria-hidden="true"
@@ -148,7 +148,7 @@ export function HeadlessSidebar({ children }: { children: React.ReactNode }) {
 
       {/* Static sidebar for desktop */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4 dark:bg-gray-800/75 dark:border-gray-700">
+        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4 dark:border-gray-700 dark:bg-gray-800/75">
           <div className="flex h-16 shrink-0 items-center">
             <Link
               href="/dashboard"
@@ -188,7 +188,7 @@ export function HeadlessSidebar({ children }: { children: React.ReactNode }) {
               </li>
               {secondaryItems.length > 0 && (
                 <li>
-                  <div className="text-xs font-semibold text-gray-500 px-2 dark:text-gray-400">
+                  <div className="px-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
                     Overig
                   </div>
                   <ul role="list" className="-mx-2 mt-2 space-y-1">
@@ -221,7 +221,7 @@ export function HeadlessSidebar({ children }: { children: React.ReactNode }) {
               <li className="mt-auto">
                 <Link
                   href="/settings"
-                  className="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                  className="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                 >
                   <Settings aria-hidden="true" className="size-6 shrink-0" />
                   Instellingen
@@ -234,11 +234,11 @@ export function HeadlessSidebar({ children }: { children: React.ReactNode }) {
 
       <div className="lg:pl-72">
         {/* Top bar */}
-        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 sm:gap-x-6 sm:px-6 lg:px-8 dark:bg-gray-800/75 dark:border-gray-700">
+        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 sm:gap-x-6 sm:px-6 lg:px-8 dark:border-gray-700 dark:bg-gray-800/75">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="-m-2.5 p-2.5 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white lg:hidden"
+            className="-m-2.5 p-2.5 text-gray-600 hover:text-gray-900 lg:hidden dark:text-gray-400 dark:hover:text-white"
           >
             <span className="sr-only">Open sidebar</span>
             <Bars3Icon aria-hidden="true" className="size-6" />
@@ -256,11 +256,11 @@ export function HeadlessSidebar({ children }: { children: React.ReactNode }) {
                 name="search"
                 placeholder="Zoeken"
                 aria-label="Zoeken"
-                className="col-start-1 row-start-1 block size-full rounded-md border border-gray-300 bg-white px-8 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:border-gray-600 dark:bg-gray-800/75 dark:text-white dark:placeholder:text-gray-400"
+                className="col-start-1 row-start-1 block size-full rounded-md border border-gray-300 bg-white px-8 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:outline-none dark:border-gray-600 dark:bg-gray-800/75 dark:text-white dark:placeholder:text-gray-400"
               />
               <MagnifyingGlassIcon
                 aria-hidden="true"
-                className="pointer-events-none col-start-1 row-start-1 size-5 self-center ml-2 text-gray-500 dark:text-gray-400"
+                className="pointer-events-none col-start-1 row-start-1 ml-2 size-5 self-center text-gray-500 dark:text-gray-400"
               />
             </form>
             <div className="flex items-center gap-x-4 lg:gap-x-6">

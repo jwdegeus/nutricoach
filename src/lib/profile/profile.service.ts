@@ -143,14 +143,14 @@ export class ProfileService {
           .eq('id', up.diet_type_id)
           .maybeSingle();
         if (!dtError && dietType?.name) {
-          const dietKey = dietTypeNameToKey(
+          const _dietKey = dietTypeNameToKey(
             (dietType as { name: string }).name,
           );
-          const strictness =
+          const _strictness =
             up.diet_strictness != null
               ? mapNumberToStrictness(up.diet_strictness)
               : 'flexible';
-          const varietyLevel = mapDaysToVarietyLevel(
+          const _varietyLevel = mapDaysToVarietyLevel(
             up.variety_window_days ?? 7,
           );
           const merged = await this.mergeAllFamilyMemberAllergiesAndDislikes(

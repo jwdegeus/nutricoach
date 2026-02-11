@@ -19,7 +19,7 @@ export function ClientOnlyApplicationLayout({
   // This prevents hydration mismatches while maintaining the layout structure
   if (!mounted) {
     return (
-      <div className="relative isolate flex min-h-svh w-full bg-white max-lg:flex-col lg:bg-stone-50 dark:bg-stone-950 dark:lg:bg-stone-900">
+      <div className="relative isolate flex min-h-svh w-full bg-background max-lg:flex-col">
         {/* Sidebar placeholder */}
         <div className="fixed inset-y-0 left-0 w-64 max-lg:hidden">
           <nav className="flex h-full min-h-0 flex-col">
@@ -30,12 +30,12 @@ export function ClientOnlyApplicationLayout({
         </div>
         {/* Content */}
         <main className="flex flex-1 flex-col pb-2 lg:min-w-0 lg:pt-2 lg:pr-2 lg:pl-64">
-          <header className="hidden lg:block px-4 pt-2.5">
+          <header className="hidden px-4 pt-2.5 lg:block">
             <div className="flex h-16 items-center justify-end gap-4">
-              <div className="h-8 w-8 rounded bg-stone-300 dark:bg-stone-700" />
+              <div className="h-8 w-8 rounded bg-muted" />
             </div>
           </header>
-          <div className="grow p-6 lg:rounded-lg lg:bg-white lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-stone-950/5 dark:lg:bg-stone-900 dark:lg:ring-white/10">
+          <div className="grow p-6 lg:rounded-lg lg:bg-card lg:p-10 lg:shadow-sm lg:outline lg:outline-1 lg:-outline-offset-1 lg:outline-border/50">
             <div className="mx-auto max-w-6xl">{children}</div>
           </div>
         </main>

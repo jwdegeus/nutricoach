@@ -55,6 +55,64 @@ import { ThemeSwitcher } from './theme-switcher';
 import { useTranslations } from 'next-intl';
 import { RecipeImportModal } from '@/src/components/recipes/RecipeImportModal';
 import { ToastProvider } from './ToastContext';
+import { getInboxUnreadCountAction } from '@/src/app/(app)/inbox/actions/inboxNotifications.actions';
+
+function InboxNavbarItem({ t }: { t: (key: string) => string }) {
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const load = async () => {
+      const result = await getInboxUnreadCountAction();
+      if (result.ok) setUnreadCount(result.data);
+    };
+    load();
+    const intervalId = setInterval(load, 30000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  return (
+    <NavbarItem href="/inbox" aria-label={t('inbox')}>
+      <span className="relative inline-block">
+        <InboxIcon className="h-5 w-5" />
+        {unreadCount > 0 && (
+          <span
+            className="absolute -top-0.5 -right-0.5 flex h-3 w-3 rounded-full bg-red-500 ring-2 ring-white dark:ring-zinc-900"
+            aria-hidden
+          />
+        )}
+      </span>
+    </NavbarItem>
+  );
+}
+
+function InboxSidebarItem({ t }: { t: (key: string) => string }) {
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const load = async () => {
+      const result = await getInboxUnreadCountAction();
+      if (result.ok) setUnreadCount(result.data);
+    };
+    load();
+    const intervalId = setInterval(load, 30000); // Refresh every 30s
+    return () => clearInterval(intervalId);
+  }, []);
+
+  return (
+    <SidebarItem href="/inbox">
+      <span className="relative inline-flex shrink-0" data-slot="icon">
+        <InboxIcon className="size-6 sm:size-5" />
+        {unreadCount > 0 && (
+          <span
+            className="absolute -top-0.5 -right-0.5 flex h-3 w-3 rounded-full bg-red-500 ring-2 ring-white dark:ring-zinc-900"
+            aria-label={`${unreadCount} ongelezen notificaties`}
+          />
+        )}
+      </span>
+      <SidebarLabel>{t('inbox')}</SidebarLabel>
+    </SidebarItem>
+  );
+}
 
 function AccountDropdownMenu({
   anchor,
@@ -235,9 +293,7 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
               <NavbarItem href="/search" aria-label={t('search')}>
                 <MagnifyingGlassIcon />
               </NavbarItem>
-              <NavbarItem href="/inbox" aria-label={t('inbox')}>
-                <InboxIcon />
-              </NavbarItem>
+              <InboxNavbarItem t={t} />
               <ThemeSwitcher variant="navbar" />
               {mounted && (
                 <Dropdown>
@@ -293,10 +349,7 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
                   <MagnifyingGlassIcon />
                   <SidebarLabel>{t('search')}</SidebarLabel>
                 </SidebarItem>
-                <SidebarItem href="/inbox">
-                  <InboxIcon />
-                  <SidebarLabel>{t('inbox')}</SidebarLabel>
-                </SidebarItem>
+                <InboxSidebarItem t={t} />
               </SidebarSection>
             </SidebarHeader>
 
@@ -383,11 +436,12 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
         }
       >
         <>
-          {!/^\/recipes\/[^/]+$/.test(pathname) &&
-            pathname !== '/account' &&
-            !pathname.startsWith('/account/') && (
-              <Breadcrumbs items={breadcrumbs} className="mb-2" />
-            )}
+          {/* Breadcrumbs: non-sticky, normal flow. Hidden on recipe detail (page has its own). */}
+          {!/^\/recipes\/[^/]+$/.test(pathname) && (
+            <div className="py-3">
+              <Breadcrumbs items={breadcrumbs} />
+            </div>
+          )}
           {children}
         </>
         <RecipeImportModal

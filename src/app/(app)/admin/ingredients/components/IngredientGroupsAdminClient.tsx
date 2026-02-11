@@ -99,11 +99,9 @@ export function IngredientGroupsAdminClient() {
     setLoading(false);
   };
 
-  /* eslint-disable react-hooks/set-state-in-effect -- async fetch on mount */
   useEffect(() => {
     loadCategories();
   }, []);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleCreate = async () => {
     if (!createForm.name_nl.trim()) {
@@ -184,13 +182,13 @@ export function IngredientGroupsAdminClient() {
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
-          <PlusIcon className="h-4 w-4 mr-1" />
+          <PlusIcon className="mr-1 h-4 w-4" />
           Nieuwe groep
         </Button>
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 p-4 text-red-600 dark:bg-red-900/20 dark:text-red-400 whitespace-pre-line">
+        <div className="rounded-lg bg-red-50 p-4 whitespace-pre-line text-red-600 dark:bg-red-900/20 dark:text-red-400">
           {error}
         </div>
       )}
@@ -228,7 +226,7 @@ export function IngredientGroupsAdminClient() {
                 <TableRow>
                   <TableCell
                     colSpan={5}
-                    className="text-center text-zinc-500 dark:text-zinc-400 py-8"
+                    className="py-8 text-center text-zinc-500 dark:text-zinc-400"
                   >
                     Geen ingredientgroepen gevonden
                   </TableCell>
@@ -259,7 +257,7 @@ export function IngredientGroupsAdminClient() {
                       </Badge>
                     </TableCell>
                     <TableCell
-                      className="text-right w-0"
+                      className="w-0 text-right"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex justify-end">
@@ -282,7 +280,7 @@ export function IngredientGroupsAdminClient() {
                               </DropdownItem>
                               <DropdownItem
                                 onClick={() => openDelete(cat)}
-                                className="text-red-600 data-focus:text-white data-focus:bg-red-600 dark:text-red-400"
+                                className="text-red-600 data-focus:bg-red-600 data-focus:text-white dark:text-red-400"
                               >
                                 <TrashIcon data-slot="icon" />
                                 <span>Verwijderen</span>

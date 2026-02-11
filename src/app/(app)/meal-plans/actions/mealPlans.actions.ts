@@ -13,7 +13,10 @@ import {
   createMealPlanInputSchema,
   regenerateMealPlanInputSchema,
 } from '@/src/lib/meal-plans/mealPlans.schemas';
-import { presentMealPlanError } from '@/src/lib/meal-plans/mealPlanErrorPresenter';
+import {
+  presentMealPlanError,
+  buildActionableInboxMessage,
+} from '@/src/lib/meal-plans/mealPlanErrorPresenter';
 
 /**
  * Action result type
@@ -134,10 +137,16 @@ export async function createMealPlanAction(
     };
 
     try {
+      const inboxMessage = buildActionableInboxMessage({
+        code: presentation.code,
+        userMessageNl: presentation.userMessageNl,
+        userActionHints: presentation.userActionHints,
+        diagnostics: presentation.diagnostics,
+      });
       await createInboxNotificationAction({
         type: 'meal_plan_generation_failed',
         title: 'Weekmenu generatie mislukt',
-        message: 'Open het weekmenu en probeer opnieuw.',
+        message: inboxMessage,
         details: { errorCode: err.code },
       });
     } catch {

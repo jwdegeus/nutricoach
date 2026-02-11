@@ -190,7 +190,7 @@ export function RecipeSourceEditor({
             value={customSource}
             onChange={(e) => setCustomSource(e.target.value)}
             placeholder="Bijv. 'Mijn oma's recept' of 'Restaurant X'"
-            className="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-500"
+            className="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-500"
             disabled={isSaving}
           />
         </Field>
@@ -209,7 +209,7 @@ export function RecipeSourceEditor({
           color="primary"
           className="text-sm"
         >
-          <CheckIcon className="h-4 w-4 mr-1" />
+          <CheckIcon className="mr-1 h-4 w-4" />
           {isSaving ? 'Opslaan...' : 'Opslaan'}
         </Button>
         <Button
@@ -218,7 +218,7 @@ export function RecipeSourceEditor({
           disabled={isSaving}
           className="text-sm"
         >
-          <XMarkIcon className="h-4 w-4 mr-1" />
+          <XMarkIcon className="mr-1 h-4 w-4" />
           Annuleren
         </Button>
       </div>

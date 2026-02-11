@@ -14,7 +14,7 @@ export function Sidebar() {
   const secondaryItems = navItems.filter((item) => item.group === 'secondary');
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r bg-card md:flex md:flex-col md:fixed md:left-0 md:top-0 md:h-screen md:z-10">
+    <aside className="hidden w-64 shrink-0 border-r bg-card md:fixed md:top-0 md:left-0 md:z-10 md:flex md:h-screen md:flex-col">
       <div className="flex h-full flex-col">
         {/* Logo */}
         <div className="flex h-16 items-center border-b px-6">

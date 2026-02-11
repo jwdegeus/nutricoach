@@ -125,7 +125,6 @@ export function GuardRailsOverview({
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData stable, run when dietTypeId changes
   }, [dietTypeId]);
 
   async function loadData() {

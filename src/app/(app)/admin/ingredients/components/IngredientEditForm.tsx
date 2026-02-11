@@ -380,7 +380,7 @@ export function IngredientEditForm({
           </Button>
         )}
         <Button onClick={handleSave} disabled={saving}>
-          <CheckIcon className="h-5 w-5 mr-1" />
+          <CheckIcon className="mr-1 h-5 w-5" />
           {saving ? 'Opslaan...' : 'Opslaan'}
         </Button>
       </div>
@@ -553,7 +553,7 @@ export function IngredientEditForm({
               setDeleteOpen(true);
             }}
           >
-            <TrashIcon className="h-5 w-5 mr-1" />
+            <TrashIcon className="mr-1 h-5 w-5" />
             Ingrediënt verwijderen
           </Button>
         </section>

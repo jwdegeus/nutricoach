@@ -117,10 +117,10 @@ export function JobsTableClient({
                 <TableCell className="text-sm">
                   {formatScheduledFor(j.scheduledFor)}
                 </TableCell>
-                <TableCell className="text-muted-foreground text-sm">
+                <TableCell className="text-sm text-muted-foreground">
                   {j.attempt} / {j.maxAttempts}
                 </TableCell>
-                <TableCell className="text-muted-foreground text-sm">
+                <TableCell className="text-sm text-muted-foreground">
                   {j.lastErrorCode ?? '—'}
                 </TableCell>
                 <TableCell className="text-sm">

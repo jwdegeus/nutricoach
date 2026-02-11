@@ -87,25 +87,25 @@ export function MealRating({ mealId, className }: MealRatingProps) {
               onMouseEnter={() => setHoveredRating(star)}
               onMouseLeave={() => setHoveredRating(null)}
               disabled={isSubmitting}
-              className="focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+              className="rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
               aria-label={`Beoordeel met ${star} ${star === 1 ? 'ster' : 'sterren'}`}
             >
               <Star
                 className={`h-4 w-4 transition-colors ${
                   star <= displayRating
-                    ? 'text-yellow-400 fill-yellow-400'
-                    : 'text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700'
+                    ? 'fill-yellow-400 text-yellow-400'
+                    : 'fill-zinc-300 text-zinc-300 dark:fill-zinc-700 dark:text-zinc-700'
                 } ${
                   isSubmitting
-                    ? 'opacity-50 cursor-not-allowed'
-                    : 'cursor-pointer hover:text-yellow-300 hover:fill-yellow-300'
+                    ? 'cursor-not-allowed opacity-50'
+                    : 'cursor-pointer hover:fill-yellow-300 hover:text-yellow-300'
                 }`}
               />
             </button>
           ))}
         </div>
         {rating !== null && (
-          <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-1">
+          <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-400">
             {rating}/5
           </span>
         )}

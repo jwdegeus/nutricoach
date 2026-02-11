@@ -266,7 +266,7 @@ export function IngredientProductLinksClient({
               <span className="animate-pulse">Bezig...</span>
             ) : (
               <>
-                <SparklesIcon className="h-4 w-4 mr-2" />
+                <SparklesIcon className="mr-2 h-4 w-4" />
                 Auto-match uitvoeren
               </>
             )}
@@ -282,7 +282,7 @@ export function IngredientProductLinksClient({
 
       {error && (
         <div
-          className="rounded-lg bg-red-50 dark:bg-red-950/20 p-4 text-sm text-red-800 dark:text-red-200"
+          className="rounded-lg bg-red-50 p-4 text-sm text-red-800 dark:bg-red-950/20 dark:text-red-200"
           role="alert"
         >
           {error}
@@ -290,7 +290,7 @@ export function IngredientProductLinksClient({
       )}
 
       {productToLink && (
-        <section className="rounded-lg bg-muted/20 p-4 space-y-3">
+        <section className="space-y-3 rounded-lg bg-muted/20 p-4">
           <Heading level={2} className="text-lg">
             Koppel dit product aan een ingrediënt
           </Heading>
@@ -353,7 +353,7 @@ export function IngredientProductLinksClient({
               <span className="animate-pulse">Zoeken...</span>
             ) : (
               <>
-                <MagnifyingGlassIcon className="h-4 w-4 mr-1" />
+                <MagnifyingGlassIcon className="mr-1 h-4 w-4" />
                 Zoeken
               </>
             )}
@@ -374,20 +374,20 @@ export function IngredientProductLinksClient({
             </Text>
           )}
         {ingredientResults.length > 0 && (
-          <ul className="rounded-lg bg-muted/20 divide-y divide-white/10 max-h-60 overflow-y-auto">
+          <ul className="max-h-60 divide-y divide-white/10 overflow-y-auto rounded-lg bg-muted/20">
             {ingredientResults.map((ing) => (
               <li key={ing.id}>
                 <button
                   type="button"
                   onClick={() => handleIngredientSelect(ing.id)}
-                  className={`w-full text-left px-4 py-2 hover:bg-muted/40 transition-colors ${
+                  className={`w-full px-4 py-2 text-left transition-colors hover:bg-muted/40 ${
                     selectedCanonicalIngredientId === ing.id
                       ? 'bg-muted/40'
                       : ''
                   }`}
                 >
                   <span className="font-medium">{ing.name}</span>
-                  <span className="text-muted-foreground text-sm ml-2">
+                  <span className="ml-2 text-sm text-muted-foreground">
                     ({ing.slug})
                   </span>
                 </button>
@@ -426,7 +426,7 @@ export function IngredientProductLinksClient({
           {currentLinkLoading ? (
             <Text className="text-sm text-muted-foreground">Laden...</Text>
           ) : currentLink ? (
-            <div className="rounded-lg bg-muted/20 p-4 flex items-start justify-between gap-4">
+            <div className="flex items-start justify-between gap-4 rounded-lg bg-muted/20 p-4">
               <div>
                 <Text className="font-medium">
                   {currentLink.storeProduct.title}
@@ -437,7 +437,7 @@ export function IngredientProductLinksClient({
                   </Text>
                 )}
                 {currentLink.storeProduct.priceCents != null && (
-                  <Text className="text-sm mt-1">
+                  <Text className="mt-1 text-sm">
                     €{(currentLink.storeProduct.priceCents / 100).toFixed(2)}
                   </Text>
                 )}
@@ -451,7 +451,7 @@ export function IngredientProductLinksClient({
                   <span className="animate-pulse">Bezig...</span>
                 ) : (
                   <>
-                    <TrashIcon className="h-4 w-4 mr-1" />
+                    <TrashIcon className="mr-1 h-4 w-4" />
                     Verwijder
                   </>
                 )}
@@ -484,7 +484,7 @@ export function IngredientProductLinksClient({
                 <span className="animate-pulse">Zoeken...</span>
               ) : (
                 <>
-                  <MagnifyingGlassIcon className="h-4 w-4 mr-1" />
+                  <MagnifyingGlassIcon className="mr-1 h-4 w-4" />
                   Zoeken
                 </>
               )}
@@ -505,7 +505,7 @@ export function IngredientProductLinksClient({
               </Text>
             )}
           {productResults.length > 0 && (
-            <ul className="rounded-lg bg-muted/20 divide-y divide-white/10 max-h-60 overflow-y-auto">
+            <ul className="max-h-60 divide-y divide-white/10 overflow-y-auto rounded-lg bg-muted/20">
               {productResults.map((product) => (
                 <li
                   key={product.id}

@@ -58,7 +58,6 @@ export function DietRulesManager({
     if (expanded) {
       loadRules();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadRules stable, run when expanded or dietTypeId changes
   }, [expanded, dietTypeId]);
 
   async function loadRules() {

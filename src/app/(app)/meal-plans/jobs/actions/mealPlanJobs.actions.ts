@@ -407,10 +407,16 @@ export async function failMealPlanJobAction(
 
     if (nextStatus === 'failed') {
       try {
+        const genericHints =
+          input.errorCode === 'MEAL_PLAN_VARIETY_TARGETS_NOT_MET'
+            ? 'Taken: Voeg meer recepten met groenten/variatie toe. Recepten moeten ontbijt/lunch/diner zijn en ingrediënten met NEVO-koppeling hebben. Pas eventueel variatie-instellingen aan in beheer (admin).'
+            : input.errorCode === 'MEAL_PLAN_DB_COVERAGE_TOO_LOW'
+              ? 'Voeg meer recepten toe aan je database. Recepten moeten ontbijt/lunch/diner zijn en ingrediënten met NEVO-koppeling hebben.'
+              : 'Probeer opnieuw. Voeg indien nodig meer recepten toe of pas variatie-instellingen aan in beheer (admin).';
         await createInboxNotificationAction({
           type: 'meal_plan_generation_failed',
           title: 'Weekmenu generatie mislukt',
-          message: 'De automatische generatie is mislukt. Probeer opnieuw.',
+          message: genericHints,
           details: { runId: input.jobId, errorCode: input.errorCode },
         });
       } catch {

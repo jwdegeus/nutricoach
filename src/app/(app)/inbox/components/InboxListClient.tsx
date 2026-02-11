@@ -14,9 +14,13 @@ import { Button } from '@/components/catalyst/button';
 import { Heading } from '@/components/catalyst/heading';
 import { Text } from '@/components/catalyst/text';
 import { Badge } from '@/components/catalyst/badge';
-import { markInboxNotificationReadAction } from '../actions/inboxNotifications.actions';
+import {
+  markInboxNotificationReadAction,
+  deleteInboxNotificationAction,
+} from '../actions/inboxNotifications.actions';
 import type { InboxNotificationRecord } from '../actions/inboxNotifications.actions';
 import { Loader2, Inbox } from 'lucide-react';
+import { TrashIcon } from '@heroicons/react/16/solid';
 
 type InboxListClientProps = {
   initialNotifications: InboxNotificationRecord[];
@@ -56,7 +60,25 @@ export function InboxListClient({
 }: InboxListClientProps) {
   const router = useRouter();
   const [markingId, setMarkingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    setError(null);
+    try {
+      const result = await deleteInboxNotificationAction({ id });
+      if (result.ok) {
+        router.refresh();
+      } else {
+        setError(result.error.message);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fout bij verwijderen');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handleMarkRead = async (id: string) => {
     setMarkingId(id);
@@ -141,11 +163,11 @@ export function InboxListClient({
                     <Text className="text-sm">{n.message}</Text>
                     <DetailsMeta details={n.details} />
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
+                  <TableCell className="text-sm text-muted-foreground">
                     {formatDate(n.createdAt)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex flex-wrap gap-2 justify-end">
+                    <div className="flex flex-wrap justify-end gap-2">
                       {n.type === 'meal_plan_ready_for_review' &&
                         (() => {
                           const details = n.details;
@@ -205,6 +227,20 @@ export function InboxListClient({
                           )}
                         </Button>
                       )}
+                      <Button
+                        plain
+                        disabled={deletingId !== null}
+                        onClick={() => handleDelete(n.id)}
+                        className="hover:text-destructive text-muted-foreground"
+                        title="Verwijderen"
+                        aria-label="Verwijderen"
+                      >
+                        {deletingId === n.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <TrashIcon className="h-4 w-4" />
+                        )}
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>

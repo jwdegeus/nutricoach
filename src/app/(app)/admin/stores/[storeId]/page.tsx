@@ -237,13 +237,13 @@ export default async function AdminStoreDetailPage({
             {storeRow.name}
           </h1>
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span title={storeRow.base_url} className="truncate max-w-[280px]">
+            <span title={storeRow.base_url} className="max-w-[280px] truncate">
               {storeRow.base_url}
             </span>
             {storeRow.sitemap_url ? (
               <span
                 title={storeRow.sitemap_url}
-                className="truncate max-w-[200px]"
+                className="max-w-[200px] truncate"
               >
                 Sitemap: {storeRow.sitemap_url}
               </span>
@@ -259,7 +259,7 @@ export default async function AdminStoreDetailPage({
         <ClientOnly
           fallback={
             <div
-              className="h-20 rounded-xl bg-muted/30 animate-pulse"
+              className="h-20 animate-pulse rounded-xl bg-muted/30"
               aria-hidden
             />
           }
@@ -301,7 +301,7 @@ export default async function AdminStoreDetailPage({
                     href={storeRow.sitemap_url}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="block truncate max-w-[400px] text-foreground hover:underline"
+                    className="block max-w-[400px] truncate text-foreground hover:underline"
                     title={storeRow.sitemap_url}
                   >
                     {storeRow.sitemap_url}
@@ -315,7 +315,7 @@ export default async function AdminStoreDetailPage({
           <ClientOnly
             fallback={
               <div
-                className="mt-4 h-48 rounded-lg bg-muted/20 animate-pulse"
+                className="mt-4 h-48 animate-pulse rounded-lg bg-muted/20"
                 aria-hidden
               />
             }
@@ -383,7 +383,7 @@ export default async function AdminStoreDetailPage({
                             {run.status || '—'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                        <TableCell className="text-sm whitespace-nowrap text-muted-foreground">
                           {DATE_FMT.format(new Date(run.started_at))}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
@@ -463,7 +463,7 @@ export default async function AdminStoreDetailPage({
         <ClientOnly
           fallback={
             <div
-              className="h-12 w-full max-w-md rounded-lg bg-muted/20 animate-pulse"
+              className="h-12 w-full max-w-md animate-pulse rounded-lg bg-muted/20"
               aria-hidden
             />
           }

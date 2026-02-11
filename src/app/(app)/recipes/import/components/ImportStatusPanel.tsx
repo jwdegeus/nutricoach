@@ -84,7 +84,7 @@ export function ImportStatusPanel({ state }: ImportStatusPanelProps) {
     const FallbackIcon = fallbackConfig.icon;
 
     return (
-      <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 bg-zinc-50 dark:bg-zinc-900/50">
+      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <FallbackIcon className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
@@ -108,7 +108,7 @@ export function ImportStatusPanel({ state }: ImportStatusPanelProps) {
   const Icon = config.icon;
 
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 bg-zinc-50 dark:bg-zinc-900/50">
+    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div

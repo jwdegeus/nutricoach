@@ -333,7 +333,7 @@ export function TherapeuticSummaryCard({
         <Button
           plain
           onClick={() => setExpanded((e) => !e)}
-          className="text-muted-foreground hover:text-foreground shrink-0"
+          className="shrink-0 text-muted-foreground hover:text-foreground"
         >
           {expanded ? (
             <ChevronUpIcon className="h-5 w-5" />

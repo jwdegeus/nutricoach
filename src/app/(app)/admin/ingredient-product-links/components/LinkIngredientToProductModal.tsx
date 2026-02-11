@@ -222,12 +222,12 @@ export function LinkIngredientToProductModal({
       <DialogBody>
         {needsIngredientStep && !canonicalId ? (
           <>
-            <Text className="text-sm text-muted-foreground mb-2">
+            <Text className="mb-2 text-sm text-muted-foreground">
               Dit NEVO-ingrediënt heeft nog geen canonieke koppeling. Zoek het
               bijpassende canonieke ingrediënt (bijv. &quot;{ingredientName}
               &quot;); suggesties verschijnen na {MIN_CHARS} tekens.
             </Text>
-            <div className="flex gap-2 mb-3">
+            <div className="mb-3 flex gap-2">
               <Input
                 type="search"
                 placeholder="Zoek canoniek ingrediënt op naam (min. 3 tekens)..."
@@ -252,13 +252,13 @@ export function LinkIngredientToProductModal({
             </div>
             {ingredientQuery.trim().length > 0 &&
               ingredientQuery.trim().length < MIN_CHARS && (
-                <p className="text-sm text-muted-foreground mb-2">
+                <p className="mb-2 text-sm text-muted-foreground">
                   Typ nog {MIN_CHARS - ingredientQuery.trim().length} teken(s)
                   voor suggesties.
                 </p>
               )}
             {ingredientResults.length > 0 && (
-              <ul className="rounded-lg bg-muted/20 divide-y divide-white/10 max-h-40 overflow-y-auto">
+              <ul className="max-h-40 divide-y divide-white/10 overflow-y-auto rounded-lg bg-muted/20">
                 {ingredientResults.map((ing) => (
                   <li key={ing.id}>
                     <button
@@ -267,14 +267,14 @@ export function LinkIngredientToProductModal({
                         setSelectedCanonicalIngredientId(ing.id);
                         setSelectedIngredientName(ing.name);
                       }}
-                      className={`w-full text-left px-4 py-2 hover:bg-muted/40 transition-colors ${
+                      className={`w-full px-4 py-2 text-left transition-colors hover:bg-muted/40 ${
                         selectedCanonicalIngredientId === ing.id
                           ? 'bg-muted/40'
                           : ''
                       }`}
                     >
                       <span className="font-medium">{ing.name}</span>
-                      <span className="text-muted-foreground text-sm ml-2">
+                      <span className="ml-2 text-sm text-muted-foreground">
                         ({ing.slug})
                       </span>
                     </button>
@@ -285,7 +285,7 @@ export function LinkIngredientToProductModal({
           </>
         ) : (
           <>
-            <div className="rounded-lg bg-muted/20 px-4 py-2 mb-4">
+            <div className="mb-4 rounded-lg bg-muted/20 px-4 py-2">
               <Text className="font-medium">{displayName}</Text>
             </div>
             <div className="space-y-4">
@@ -341,10 +341,10 @@ export function LinkIngredientToProductModal({
                     )}
                   {productResults.length > 0 && (
                     <>
-                      <Text className="text-sm font-medium text-foreground mt-2">
+                      <Text className="mt-2 text-sm font-medium text-foreground">
                         Geïmporteerde artikelen (koppelen mogelijk)
                       </Text>
-                      <ul className="rounded-lg bg-muted/20 divide-y divide-white/10 max-h-48 overflow-y-auto mt-1">
+                      <ul className="mt-1 max-h-48 divide-y divide-white/10 overflow-y-auto rounded-lg bg-muted/20">
                         {productResults.map((product) => (
                           <li
                             key={product.id}
@@ -378,16 +378,16 @@ export function LinkIngredientToProductModal({
                   )}
                   {(ahResults.length > 0 || ahSearchLoading) && (
                     <>
-                      <Text className="text-sm font-medium text-foreground mt-3">
+                      <Text className="mt-3 text-sm font-medium text-foreground">
                         Albert Heijn (alleen referentie, koppelen via
                         geïmporteerde winkel)
                       </Text>
                       {ahSearchLoading ? (
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="mt-1 text-sm text-muted-foreground">
                           Zoeken...
                         </p>
                       ) : (
-                        <ul className="rounded-lg bg-muted/20 divide-y divide-white/10 max-h-36 overflow-y-auto mt-1">
+                        <ul className="mt-1 max-h-36 divide-y divide-white/10 overflow-y-auto rounded-lg bg-muted/20">
                           {ahResults.map((p, i) => (
                             <li
                               key={`ah-${i}`}
@@ -424,7 +424,7 @@ export function LinkIngredientToProductModal({
         )}
         {error && (
           <div
-            className="rounded-lg bg-red-50 dark:bg-red-950/20 p-3 text-sm text-red-800 dark:text-red-200 mt-4"
+            className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/20 dark:text-red-200"
             role="alert"
           >
             {error}

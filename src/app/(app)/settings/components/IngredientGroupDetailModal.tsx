@@ -135,7 +135,6 @@ export function IngredientGroupDetailModal({
     }
     // If items prop is empty but we have internal items, keep internal items
     // (this prevents flicker during reload)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: sync on category id + items.length only
   }, [categoryIdStable, items.length]);
 
   // Use internal items for display
@@ -429,7 +428,6 @@ export function IngredientGroupDetailModal({
       setEditName(category.name_nl);
       setEditCode(category.code);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run when category identity (catId, catName, catCode) changes
   }, [catId, catName, catCode]);
 
   // Handle save category name
@@ -644,7 +642,7 @@ export function IngredientGroupDetailModal({
               <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 Slug:
               </Text>
-              <code className="text-xs font-mono text-zinc-600 dark:text-zinc-400">
+              <code className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
                 {category.code}
               </code>
               <Button
@@ -795,7 +793,7 @@ export function IngredientGroupDetailModal({
                   );
                 })}
               </div>
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 {selectedSuggestions.size > 0 && (
                   <Button
                     onClick={handleAddSelectedSuggestions}
@@ -866,13 +864,13 @@ export function IngredientGroupDetailModal({
               Laden...
             </div>
           ) : filteredItems.length > 0 ? (
-            <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900 max-h-80 overflow-y-auto">
+            <div className="max-h-80 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
               <div className="flex flex-wrap gap-2">
                 {filteredItems.map((item) =>
                   editingItem?.id === item.id ? (
                     <div
                       key={item.id}
-                      className="w-full rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50 space-y-3"
+                      className="w-full space-y-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50"
                     >
                       <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                         Bewerk: {item.term}

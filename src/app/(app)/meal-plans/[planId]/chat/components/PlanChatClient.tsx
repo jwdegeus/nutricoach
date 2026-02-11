@@ -136,13 +136,13 @@ export function PlanChatClient({
         <Heading>Chat</Heading>
         <div className="mt-4">
           {/* Messages */}
-          <div className="space-y-4 mb-4 min-h-[300px] max-h-[500px] overflow-y-auto">
+          <div className="mb-4 max-h-[500px] min-h-[300px] space-y-4 overflow-y-auto">
             {messages.length === 0 && (
-              <div className="text-center text-zinc-500 dark:text-zinc-400 py-8">
+              <div className="py-8 text-center text-zinc-500 dark:text-zinc-400">
                 <Text>
                   Stel een vraag of vraag om een aanpassing aan je weekmenu.
                 </Text>
-                <Text className="text-sm mt-2">
+                <Text className="mt-2 text-sm">
                   Bijvoorbeeld: &quot;Maak maandag gezonder&quot; of
                   &quot;Vervang het ontbijt op dinsdag&quot;
                 </Text>
@@ -157,7 +157,7 @@ export function PlanChatClient({
               ) {
                 return (
                   <div key={idx} className="flex justify-start">
-                    <div className="max-w-[80%] w-full">
+                    <div className="w-full max-w-[80%]">
                       <GuardrailsViolationMessage
                         reasonCodes={msg.reasonCodes}
                         contentHash={msg.contentHash}
@@ -194,7 +194,7 @@ export function PlanChatClient({
 
             {isPending && (
               <div className="flex justify-start">
-                <div className="bg-zinc-100 dark:bg-zinc-800 rounded-lg px-4 py-2">
+                <div className="rounded-lg bg-zinc-100 px-4 py-2 dark:bg-zinc-800">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span className="text-sm">Denken...</span>
@@ -206,7 +206,7 @@ export function PlanChatClient({
 
           {/* Error */}
           {error && (
-            <div className="mb-4 rounded-lg bg-red-50 dark:bg-red-950/50 p-3 text-sm text-red-600 dark:text-red-400">
+            <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">
               <strong>Fout:</strong> {error}
             </div>
           )}
@@ -222,7 +222,7 @@ export function PlanChatClient({
               </div>
               <Link
                 href={`/meal-plans/${planId}/shopping`}
-                className="text-sm underline mt-1 block"
+                className="mt-1 block text-sm underline"
               >
                 Bekijk bijgewerkt plan →
               </Link>

@@ -231,7 +231,7 @@ function computeMaxRepeatWithinDays(
   plan: MealPlanResponse,
   windowDays: number,
 ): { maxRepeat: number; topRepeats: { name: string; count: number }[] } {
-  const nameCountByWindow = new Map<string, number>();
+  const _nameCountByWindow = new Map<string, number>();
   const dayOrder = [...(plan.days ?? [])].sort((a, b) =>
     (a.date ?? '').localeCompare(b.date ?? ''),
   );

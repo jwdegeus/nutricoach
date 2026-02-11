@@ -71,7 +71,6 @@ export function FamilieListClient() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once on mount; t/showToast are unstable
   }, []);
 
   async function handleAdd() {

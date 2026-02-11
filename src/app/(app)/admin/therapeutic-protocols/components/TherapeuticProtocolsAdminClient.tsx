@@ -123,13 +123,13 @@ export function TherapeuticProtocolsAdminClient({
                   href={`/admin/therapeutic-protocols/${row.id}`}
                   title={`${row.name_nl} openen`}
                 >
-                  <TableCell className="font-mono text-sm font-medium text-zinc-900 dark:text-white max-w-[140px] truncate">
+                  <TableCell className="max-w-[140px] truncate font-mono text-sm font-medium text-zinc-900 dark:text-white">
                     {row.protocol_key}
                   </TableCell>
-                  <TableCell className="font-medium text-zinc-900 dark:text-white max-w-[200px] truncate">
+                  <TableCell className="max-w-[200px] truncate font-medium text-zinc-900 dark:text-white">
                     {row.name_nl}
                   </TableCell>
-                  <TableCell className="text-zinc-600 dark:text-zinc-400 text-sm tabular-nums">
+                  <TableCell className="text-sm text-zinc-600 tabular-nums dark:text-zinc-400">
                     {row.version ?? '—'}
                   </TableCell>
                   <TableCell>

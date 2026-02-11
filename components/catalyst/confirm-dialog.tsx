@@ -45,7 +45,7 @@ export function ConfirmDialog({
       <DialogDescription>{description}</DialogDescription>
       <DialogBody>
         {error && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400 whitespace-pre-line">
+          <div className="rounded-lg bg-red-50 p-3 text-sm whitespace-pre-line text-red-600 dark:bg-red-900/20 dark:text-red-400">
             {error}
           </div>
         )}

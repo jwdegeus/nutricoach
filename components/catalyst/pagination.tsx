@@ -13,7 +13,7 @@ export function Pagination({
       {...props}
       className={clsx(
         className,
-        'flex items-center justify-between border-t border-zinc-200 px-4 dark:border-white/10 sm:px-0',
+        'flex items-center justify-between border-t border-zinc-200 px-4 sm:px-0 dark:border-white/10',
       )}
     />
   );
@@ -23,10 +23,10 @@ export function Pagination({
 const plainNavButtonClass = clsx(
   'relative inline-flex items-center justify-center gap-x-2 rounded-lg border border-transparent text-base/6 font-semibold',
   'text-zinc-950 dark:text-white',
-  'px-[calc(theme(spacing.3.5)-1px)] py-[calc(theme(spacing.2.5)-1px)] sm:px-[calc(theme(spacing.3)-1px)] sm:py-[calc(theme(spacing.1.5)-1px)] sm:text-sm/6',
-  'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-950',
+  'px-[calc(theme(spacing.3.5)-1px)] py-[calc(theme(spacing.2.5)-1px)] sm:py-[calc(theme(spacing.1.5)-1px)] sm:px-[calc(theme(spacing.3)-1px)] sm:text-sm/6',
+  'focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none dark:focus:ring-offset-zinc-950',
   'hover:bg-zinc-950/5 active:bg-zinc-950/5 dark:hover:bg-white/10 dark:active:bg-white/10',
-  'disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed',
+  'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
   'cursor-pointer',
 );
 

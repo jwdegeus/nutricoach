@@ -169,12 +169,10 @@ export function IngredientGroupDetailPageClient({
 
   useEffect(() => {
     loadCategory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadCategory stable, run when groupId changes
   }, [groupId]);
 
   useEffect(() => {
     if (category) loadItems();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: run when category id changes only
   }, [category?.id]);
 
   const refreshItems = () => {
@@ -630,10 +628,10 @@ export function IngredientGroupDetailPageClient({
 
   if (error || !category) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="space-y-4 p-6">
         <Link
           href="/admin/ingredients?tab=groups"
-          className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline dark:text-blue-400"
         >
           <ArrowLeftIcon className="h-4 w-4" />
           Terug naar ingredientgroepen
@@ -650,7 +648,7 @@ export function IngredientGroupDetailPageClient({
       <div>
         <Link
           href="/admin/ingredients?tab=groups"
-          className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline mb-4"
+          className="mb-4 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline dark:text-blue-400"
         >
           <ArrowLeftIcon className="h-4 w-4" />
           Terug naar ingredientgroepen
@@ -664,7 +662,7 @@ export function IngredientGroupDetailPageClient({
       </div>
 
       {/* Groepinstellingen */}
-      <section className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 space-y-4">
+      <section className="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
           Groepinstellingen
         </h2>
@@ -740,7 +738,7 @@ export function IngredientGroupDetailPageClient({
       </section>
 
       {/* Ingrediënten toevoegen */}
-      <section className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 space-y-4">
+      <section className="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
           Ingrediënten toevoegen
         </h2>
@@ -760,7 +758,7 @@ export function IngredientGroupDetailPageClient({
             }}
             placeholder="Voer een term in en druk op Enter..."
             disabled={isPending || isGeneratingAI}
-            className="flex-1 min-w-[200px]"
+            className="min-w-[200px] flex-1"
           />
           <Button
             onClick={handleAddTag}
@@ -808,7 +806,7 @@ export function IngredientGroupDetailPageClient({
                 </Badge>
               ))}
             </div>
-            <div className="flex flex-wrap gap-2 mt-2">
+            <div className="mt-2 flex flex-wrap gap-2">
               {selectedSuggestions.size > 0 && (
                 <Button
                   onClick={handleAddSelectedSuggestions}
@@ -866,7 +864,7 @@ export function IngredientGroupDetailPageClient({
                 }}
                 placeholder="Zoek op naam..."
                 disabled={nevoSearchLoading}
-                className="flex-1 min-w-[200px]"
+                className="min-w-[200px] flex-1"
               />
               <Button onClick={handleNevoSearch} disabled={nevoSearchLoading}>
                 {nevoSearchLoading ? (
@@ -900,7 +898,7 @@ export function IngredientGroupDetailPageClient({
                     </Button>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+                <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto">
                   {nevoSearchResults.map((hit) => (
                     <div
                       key={hit.id}
@@ -921,14 +919,14 @@ export function IngredientGroupDetailPageClient({
                       />
                       <Badge
                         color="blue"
-                        className="text-xs cursor-grab active:cursor-grabbing"
+                        className="cursor-grab text-xs active:cursor-grabbing"
                       >
                         {hit.name_nl}
                         <button
                           type="button"
                           onClick={() => handleAddNevoIngredient(hit.id)}
                           disabled={isPending}
-                          className="ml-1.5 rounded hover:bg-blue-600/20 px-0.5 disabled:opacity-50"
+                          className="ml-1.5 rounded px-0.5 hover:bg-blue-600/20 disabled:opacity-50"
                           title="Toevoegen aan groep"
                         >
                           <PlusIcon className="h-3 w-3" />
@@ -964,9 +962,9 @@ export function IngredientGroupDetailPageClient({
 
       {/* Lijst ingrediënten (dropzone voor NEVO-labels) */}
       <section
-        className={`rounded-lg border p-4 space-y-4 transition-colors ${
+        className={`space-y-4 rounded-lg border p-4 transition-colors ${
           dragOverGroup
-            ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 dark:border-blue-500'
+            ? 'border-blue-500 bg-blue-50/50 dark:border-blue-500 dark:bg-blue-900/20'
             : 'border-zinc-200 dark:border-zinc-700'
         }`}
         onDragOver={handleGroupDragOver}
@@ -1059,13 +1057,13 @@ export function IngredientGroupDetailPageClient({
         {loadingItems ? (
           <p className="text-sm text-zinc-500 dark:text-zinc-400">Laden...</p>
         ) : displayItems.length > 0 ? (
-          <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900 max-h-96 overflow-y-auto">
+          <div className="max-h-96 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
             <div className="flex flex-wrap gap-2">
               {displayItems.map((item) =>
                 editingItem?.id === item.id ? (
                   <div
                     key={item.id}
-                    className="w-full rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50 space-y-3"
+                    className="w-full space-y-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50"
                   >
                     <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                       Bewerk: {item.term}
@@ -1129,7 +1127,7 @@ export function IngredientGroupDetailPageClient({
                     />
                     <Badge
                       color={item.nevo_food_id != null ? 'green' : 'zinc'}
-                      className="group relative text-xs cursor-pointer"
+                      className="group relative cursor-pointer text-xs"
                       onClick={() => handleOpenItemEdit(item)}
                       title={
                         item.nevo_food_id != null

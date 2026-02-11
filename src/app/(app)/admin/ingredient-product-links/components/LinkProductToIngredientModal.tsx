@@ -112,7 +112,7 @@ export function LinkProductToIngredientModal({
       <DialogTitle>Koppel product aan ingrediënt</DialogTitle>
       <DialogBody>
         {product && (
-          <div className="rounded-lg bg-muted/20 px-4 py-2 mb-4">
+          <div className="mb-4 rounded-lg bg-muted/20 px-4 py-2">
             <Text className="font-medium">{product.title}</Text>
             {product.brand && (
               <Text className="text-sm text-muted-foreground">
@@ -123,7 +123,7 @@ export function LinkProductToIngredientModal({
         )}
         {error && (
           <div
-            className="rounded-lg bg-red-50 dark:bg-red-950/20 p-3 text-sm text-red-800 dark:text-red-200 mb-4"
+            className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/20 dark:text-red-200"
             role="alert"
           >
             {error}
@@ -159,20 +159,20 @@ export function LinkProductToIngredientModal({
             </Button>
           </div>
           {ingredientResults.length > 0 && (
-            <ul className="rounded-lg bg-muted/20 divide-y divide-white/10 max-h-48 overflow-y-auto">
+            <ul className="max-h-48 divide-y divide-white/10 overflow-y-auto rounded-lg bg-muted/20">
               {ingredientResults.map((ing) => (
                 <li key={ing.id}>
                   <button
                     type="button"
                     onClick={() => setSelectedCanonicalIngredientId(ing.id)}
-                    className={`w-full text-left px-4 py-2 hover:bg-muted/40 transition-colors ${
+                    className={`w-full px-4 py-2 text-left transition-colors hover:bg-muted/40 ${
                       selectedCanonicalIngredientId === ing.id
                         ? 'bg-muted/40'
                         : ''
                     }`}
                   >
                     <span className="font-medium">{ing.name}</span>
-                    <span className="text-muted-foreground text-sm ml-2">
+                    <span className="ml-2 text-sm text-muted-foreground">
                       ({ing.slug})
                     </span>
                   </button>

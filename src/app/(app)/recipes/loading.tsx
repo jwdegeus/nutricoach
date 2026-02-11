@@ -7,13 +7,13 @@ export default function RecipesIndexLoading() {
     <div className="space-y-6">
       {/* Tabs: Alles / Opgeslagen / Recent */}
       <div className="flex gap-2 border-b border-zinc-200 dark:border-zinc-700">
-        <div className="h-9 w-16 rounded-t bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+        <div className="h-9 w-16 animate-pulse rounded-t bg-zinc-200 dark:bg-zinc-700" />
         <div
-          className="h-9 w-20 rounded-t bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+          className="h-9 w-20 animate-pulse rounded-t bg-zinc-100 dark:bg-zinc-800"
           style={{ animationDelay: '50ms' }}
         />
         <div
-          className="h-9 w-14 rounded-t bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+          className="h-9 w-14 animate-pulse rounded-t bg-zinc-100 dark:bg-zinc-800"
           style={{ animationDelay: '100ms' }}
         />
       </div>
@@ -21,18 +21,18 @@ export default function RecipesIndexLoading() {
       {/* Zoekveld + filter-chips (zelfde layout als RecipesIndexClient) */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex-1 min-w-[200px] flex gap-2">
-            <div className="flex-1 min-h-10 rounded-lg bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+          <div className="flex min-w-[200px] flex-1 gap-2">
+            <div className="min-h-10 flex-1 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-700" />
             <div
-              className="h-10 w-20 rounded-lg bg-zinc-200 dark:bg-zinc-700 animate-pulse"
+              className="h-10 w-20 animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-700"
               style={{ animationDelay: '75ms' }}
             />
           </div>
-          <div className="hidden sm:flex flex-wrap items-center gap-2">
+          <div className="hidden flex-wrap items-center gap-2 sm:flex">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
-                className="h-9 w-24 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+                className="h-9 w-24 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800"
                 style={{ animationDelay: `${i * 40}ms` }}
               />
             ))}
@@ -41,37 +41,37 @@ export default function RecipesIndexLoading() {
       </div>
 
       {/* Teller: "X recepten" */}
-      <div className="h-4 w-20 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+      <div className="h-4 w-20 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
 
       {/* Grid:zelfde responsive kolommen als echte lijst; kaarten lijken op MealCard (h-36 image, p-4 content) */}
-      <ul className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:gap-x-8">
+      <ul className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-8 2xl:grid-cols-6">
         {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
           <li key={i} className="h-[320px]">
-            <div className="flex h-full flex-col overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xs">
+            <div className="flex h-full flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-xs dark:border-zinc-700 dark:bg-zinc-900">
               {/* Thumbnail (zelfde hoogte als MealCardThumbnail) */}
-              <div className="relative h-36 w-full shrink-0 overflow-hidden rounded-t-lg rounded-b-sm bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+              <div className="relative h-36 w-full shrink-0 animate-pulse overflow-hidden rounded-t-lg rounded-b-sm bg-zinc-200 dark:bg-zinc-700" />
               {/* Content (p-4, title + badges + bron) */}
               <div className="flex min-h-0 flex-1 flex-col p-4">
                 <div
-                  className="h-5 w-4/5 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse"
+                  className="h-5 w-4/5 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700"
                   style={{ animationDelay: `${i * 30}ms` }}
                 />
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <div
-                    className="h-5 w-14 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+                    className="h-5 w-14 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800"
                     style={{ animationDelay: `${i * 30 + 20}ms` }}
                   />
                   <div
-                    className="h-4 w-12 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+                    className="h-4 w-12 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800"
                     style={{ animationDelay: `${i * 30 + 40}ms` }}
                   />
                   <div
-                    className="h-4 w-16 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+                    className="h-4 w-16 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800"
                     style={{ animationDelay: `${i * 30 + 60}ms` }}
                   />
                 </div>
                 <div
-                  className="mt-auto pt-1 h-3 w-3/4 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+                  className="mt-auto h-3 w-3/4 animate-pulse rounded bg-zinc-100 pt-1 dark:bg-zinc-800"
                   style={{ animationDelay: `${i * 30 + 80}ms` }}
                 />
               </div>

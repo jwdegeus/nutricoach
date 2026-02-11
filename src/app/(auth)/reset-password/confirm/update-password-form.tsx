@@ -23,7 +23,7 @@ export function UpdatePasswordForm() {
   return (
     <form action={handleSubmit} className="space-y-6">
       {error && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-950/50 p-4 text-sm text-red-600 dark:text-red-400">
+        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">
           <strong>Fout:</strong> {error}
         </div>
       )}

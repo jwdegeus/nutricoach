@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/catalyst/badge';
+import { Link } from '@/components/catalyst/link';
 import { Text } from '@/components/catalyst/text';
 import { Button } from '@/components/catalyst/button';
 import {
@@ -192,6 +193,15 @@ type MealDetailProps = {
   onSourceSaved?: () => void;
   /** Wordt aangeroepen nadat de gebruiker een beoordeling heeft opgeslagen (bijv. om meal opnieuw te laden) */
   onRatingUpdated?: () => void;
+  /** Receptenboek-label indien gekoppeld (voor badge in header) */
+  recipeBookLabel?: string | null;
+  /** Weekmenu-status voor badge in header */
+  weekmenuStatus?:
+    | 'ready'
+    | 'blocked_slot'
+    | 'blocked_refs'
+    | 'blocked_both'
+    | null;
 };
 
 export function MealDetail({
@@ -205,6 +215,8 @@ export function MealDetail({
   onIngredientMatched,
   onSourceSaved: _onSourceSaved,
   onRatingUpdated,
+  recipeBookLabel,
+  weekmenuStatus,
 }: MealDetailProps) {
   const { showToast } = useToast();
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -582,12 +594,12 @@ export function MealDetail({
         index,
       });
       if (!result.ok) return;
-      onRecipeApplied?.();
+      onRecipeAppliedSilent?.();
       setRemoveIngredientNotification({
         message: `"${displayName}" uit recept verwijderd`,
       });
     },
-    [mealId, mealSource, onRecipeApplied],
+    [mealId, mealSource, onRecipeAppliedSilent],
   );
 
   const mealUpdatedAt = meal?.updated_at ?? meal?.updatedAt;
@@ -979,7 +991,7 @@ export function MealDetail({
         instructions,
       });
       if (result.ok) {
-        onRecipeApplied?.();
+        onRecipeAppliedSilent?.();
       } else {
         showToast({
           type: 'error',
@@ -993,7 +1005,7 @@ export function MealDetail({
       aiAnalysis,
       mealId,
       mealSource,
-      onRecipeApplied,
+      onRecipeAppliedSilent,
       showToast,
     ],
   );
@@ -1083,7 +1095,7 @@ export function MealDetail({
         patch,
       });
       if (result.ok) {
-        onRecipeApplied?.();
+        onRecipeAppliedSilent?.();
       } else {
         showToast({
           type: 'error',
@@ -1092,7 +1104,7 @@ export function MealDetail({
         });
       }
     },
-    [mealId, mealSource, onRecipeApplied, showToast],
+    [mealId, mealSource, onRecipeAppliedSilent, showToast],
   );
 
   const formatDietTypeName = (
@@ -1111,7 +1123,7 @@ export function MealDetail({
     <div className="space-y-6">
       {/* Header Info */}
       <div className="rounded-lg bg-white shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 p-6">
+        <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-[1fr_320px]">
           <div className="order-1 lg:order-2">
             {/* Receptafbeelding rechts (desktop) en bovenaan (mobile) */}
             <RecipeImageUpload
@@ -1162,12 +1174,61 @@ export function MealDetail({
               square
             />
           </div>
-          <div className="order-2 lg:order-1 flex flex-col gap-6">
-            <div className="flex-1 min-w-0">
-              <h2 className="text-2xl font-bold text-zinc-950 dark:text-white mb-2">
+          <div className="order-2 flex flex-col gap-6 lg:order-1">
+            <div className="min-w-0 flex-1">
+              <h2 className="mb-2 text-2xl font-bold text-zinc-950 dark:text-white">
                 {mealName}
               </h2>
-              <div className="flex items-center gap-3 mb-2 flex-wrap">
+              <div className="mb-2 flex flex-wrap items-center gap-3">
+                <span className="flex items-center gap-1.5">
+                  <span className="text-xs font-medium text-zinc-500 dark:text-zinc-500">
+                    Receptenboek:
+                  </span>
+                  {recipeBookLabel ? (
+                    <Link
+                      href="/recipes"
+                      className="text-xs font-medium text-foreground hover:underline"
+                    >
+                      {recipeBookLabel}
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-zinc-500 dark:text-zinc-500">
+                      —
+                    </span>
+                  )}
+                </span>
+                {weekmenuStatus != null ? (
+                  <Badge
+                    color={weekmenuStatus === 'ready' ? 'green' : 'amber'}
+                    className="text-xs"
+                    title={
+                      weekmenuStatus === 'ready'
+                        ? 'Dit recept is geschikt voor het weekmenu (soort ontbijt/lunch/diner en ingrediënten gekoppeld aan de database voor nutriënten).'
+                        : weekmenuStatus === 'blocked_slot'
+                          ? 'Soort is geen ontbijt, lunch of diner. Alleen die soorten worden gebruikt in het weekmenu.'
+                          : weekmenuStatus === 'blocked_refs'
+                            ? 'Er zijn geen ingrediënten gekoppeld aan de database voor nutriënten. Koppel ingrediënten (NEVO, eigen of FNDDS) om dit recept in het weekmenu te gebruiken.'
+                            : '• Soort blokkeert weekmenu\n• Ingrediëntkoppelingen ontbreken'
+                    }
+                  >
+                    {weekmenuStatus === 'ready'
+                      ? 'Weekmenu-klaar'
+                      : weekmenuStatus === 'blocked_slot'
+                        ? 'Soort blokkeert weekmenu'
+                        : weekmenuStatus === 'blocked_refs'
+                          ? 'Ingrediëntkoppelingen ontbreken'
+                          : 'Niet klaar'}
+                  </Badge>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-zinc-500 dark:text-zinc-500">
+                      Weekmenu:
+                    </span>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-500">
+                      —
+                    </span>
+                  </span>
+                )}
                 <Badge color={mealSource === 'custom' ? 'blue' : 'zinc'}>
                   {mealSource === 'custom' ? 'Custom' : 'Gemini'}
                 </Badge>
@@ -1251,7 +1312,7 @@ export function MealDetail({
               {mealSource === 'custom' &&
                 classificationLoadState === 'error' &&
                 classificationLoadError && (
-                  <div className="mt-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-3 flex items-center justify-between gap-3">
+                  <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/50">
                     <Text className="text-sm text-amber-800 dark:text-amber-200">
                       Classificatie laden mislukt: {classificationLoadError}
                     </Text>
@@ -1301,13 +1362,13 @@ export function MealDetail({
                   id="advisory-panel"
                   role="region"
                   aria-label="Waarom dit werkt voor jouw dieet"
-                  className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/80 dark:bg-emerald-950/30 p-4"
+                  className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-800/50 dark:bg-emerald-950/30"
                 >
-                  <Text className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mb-3">
+                  <Text className="mb-3 text-sm font-semibold text-emerald-800 dark:text-emerald-200">
                     Waarom dit werkt voor jouw dieet
                   </Text>
                   {advisoryIntro?.trim() && (
-                    <Text className="text-sm text-emerald-800 dark:text-emerald-200 mb-3 whitespace-pre-wrap">
+                    <Text className="mb-3 text-sm whitespace-pre-wrap text-emerald-800 dark:text-emerald-200">
                       {advisoryIntro}
                     </Text>
                   )}
@@ -1317,9 +1378,9 @@ export function MealDetail({
                         {advisoryWhyThisWorks.map((bullet, idx) => (
                           <li
                             key={idx}
-                            className="text-sm text-emerald-800 dark:text-emerald-200 flex items-start gap-2"
+                            className="flex items-start gap-2 text-sm text-emerald-800 dark:text-emerald-200"
                           >
-                            <span className="text-emerald-500 dark:text-emerald-400 mt-0.5">
+                            <span className="mt-0.5 text-emerald-500 dark:text-emerald-400">
                               •
                             </span>
                             <span>{bullet}</span>
@@ -1373,7 +1434,7 @@ export function MealDetail({
             </div>
 
             {/* Basic Info */}
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="mt-4 grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
               {consumptionCount > 0 && (
                 <div className="flex items-center gap-2">
                   <span className="text-zinc-600 dark:text-zinc-400">
@@ -1405,22 +1466,22 @@ export function MealDetail({
                           type="button"
                           disabled={isRatingSubmitting}
                           onClick={() => handleRatingStarClick(star)}
-                          className="p-0.5 rounded touch-manipulation disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 dark:focus-visible:ring-white"
+                          className="touch-manipulation rounded p-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 disabled:pointer-events-none disabled:opacity-50 dark:focus-visible:ring-white"
                           aria-label={`${star} van 5 sterren`}
                           aria-pressed={filled}
                         >
                           <StarIcon
                             className={`h-4 w-4 ${
                               filled
-                                ? 'text-yellow-400 fill-yellow-400'
-                                : 'text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700'
+                                ? 'fill-yellow-400 text-yellow-400'
+                                : 'fill-zinc-300 text-zinc-300 dark:fill-zinc-700 dark:text-zinc-700'
                             }`}
                           />
                         </button>
                       );
                     })}
                   </div>
-                  <span className="font-medium text-zinc-900 dark:text-white ml-1">
+                  <span className="ml-1 font-medium text-zinc-900 dark:text-white">
                     {optimisticRating ??
                       (userRating != null ? Number(userRating) : null) ??
                       0}
@@ -1431,7 +1492,7 @@ export function MealDetail({
             </div>
 
             {/* Dates */}
-            <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-400 space-y-1">
+            <div className="mt-4 space-y-1 border-t border-zinc-200 pt-4 text-sm text-zinc-600 dark:border-zinc-700 dark:text-zinc-400">
               {createdAt && <div>Toegevoegd: {formatDate(createdAt)}</div>}
               {firstConsumedAt && (
                 <div>
@@ -1449,12 +1510,12 @@ export function MealDetail({
 
             {/* Bron-URL (originele receptpagina) */}
             {sourceUrl && (
-              <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 text-sm">
+              <div className="mt-4 border-t border-zinc-200 pt-4 text-sm dark:border-zinc-700">
                 <a
                   href={sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 hover:underline"
+                  className="inline-flex items-center gap-1.5 text-blue-600 hover:underline dark:text-blue-400"
                 >
                   <LinkIcon className="h-4 w-4 flex-shrink-0" />
                   Bron: originele receptpagina
@@ -1467,7 +1528,7 @@ export function MealDetail({
 
       {/* Bekijk origineel / aangepaste versie toggle – alleen als er een aangepaste versie is (server-check) */}
       {hasAppliedAdaptation === true && hasOriginal && (
-        <div className="mb-4 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-3 flex items-center justify-between gap-4">
+        <div className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/50">
           <Text className="text-sm text-zinc-700 dark:text-zinc-300">
             {viewingOriginal
               ? 'Je bekijkt de originele versie.'
@@ -1483,119 +1544,832 @@ export function MealDetail({
         </div>
       )}
 
-      {/* AI Analysis / Instructions — Tailwind description list style */}
-      {(displayAiAnalysis || aiAnalysis) && (
-        <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-          <div className="flex items-center justify-between gap-4 px-0">
-            <div>
-              <h3 className="text-base/7 font-semibold text-zinc-950 dark:text-white">
-                Bereidingsinstructies
-              </h3>
-              <p className="mt-1 max-w-2xl text-sm/6 text-zinc-500 dark:text-zinc-400">
-                Stappen om het recept te bereiden.
-              </p>
-            </div>
-            {!viewingOriginal && (
-              <Button
-                plain
-                onClick={() => setInstructionsEditOpen(true)}
-                className="text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 shrink-0"
+      {/* Bereidingsinstructies (2/3) + Ingrediënten (1/3) naast elkaar op desktop */}
+      {(() => {
+        const hasInstructions = !!(displayAiAnalysis || aiAnalysis);
+        const hasIngredients =
+          (displayMealData?.ingredientRefs?.length ?? 0) > 0 ||
+          (displayMealData?.ingredients?.length ?? 0) > 0;
+        if (!hasInstructions && !hasIngredients) return null;
+        return (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            {hasInstructions && (
+              <div
+                className={hasIngredients ? 'lg:col-span-2' : 'lg:col-span-3'}
               >
-                <PencilIcon className="h-4 w-4 mr-1.5 inline-block" />
-                Bewerk
-              </Button>
-            )}
-          </div>
-          {(() => {
-            const effectiveInstructions =
-              instructionsOverride ?? displayAiAnalysis?.instructions;
-            const isArray = Array.isArray(effectiveInstructions);
-            if (effectiveInstructions && isArray) {
-              return (
-                <div className="mt-6 border-t border-zinc-200 dark:border-white/10">
-                  <dl className="divide-y divide-zinc-200 dark:divide-white/10">
-                    {effectiveInstructions.map((instruction, idx) => {
-                      const inst = instruction as InstructionLike;
-                      const instructionText =
-                        typeof inst === 'string'
-                          ? inst
-                          : inst?.text || inst?.step || String(inst);
+                {/* AI Analysis / Instructions — Tailwind description list style */}
+                <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+                  <div className="flex items-center justify-between gap-4 px-0">
+                    <div>
+                      <h3 className="text-base/7 font-semibold text-zinc-950 dark:text-white">
+                        Bereidingsinstructies
+                      </h3>
+                      <p className="mt-1 max-w-2xl text-sm/6 text-zinc-500 dark:text-zinc-400">
+                        Stappen om het recept te bereiden.
+                      </p>
+                    </div>
+                    {!viewingOriginal && (
+                      <Button
+                        plain
+                        onClick={() => setInstructionsEditOpen(true)}
+                        className="shrink-0 text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                      >
+                        <PencilIcon className="mr-1.5 inline-block h-4 w-4" />
+                        Bewerk
+                      </Button>
+                    )}
+                  </div>
+                  {(() => {
+                    const effectiveInstructions =
+                      instructionsOverride ?? displayAiAnalysis?.instructions;
+                    const isArray = Array.isArray(effectiveInstructions);
+                    if (effectiveInstructions && isArray) {
                       return (
-                        <div
-                          key={idx}
-                          className="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0"
-                        >
-                          <dt className="text-sm/6 font-medium text-zinc-950 dark:text-zinc-100">
-                            Stap {idx + 1}
-                          </dt>
-                          <dd className="mt-1 text-sm/6 text-zinc-600 dark:text-zinc-400 sm:col-span-2 sm:mt-0">
-                            {instructionText}
-                          </dd>
+                        <div className="mt-6 border-t border-zinc-200 dark:border-white/10">
+                          <dl className="divide-y divide-zinc-200 dark:divide-white/10">
+                            {effectiveInstructions.map((instruction, idx) => {
+                              const inst = instruction as InstructionLike;
+                              const instructionText =
+                                typeof inst === 'string'
+                                  ? inst
+                                  : inst?.text || inst?.step || String(inst);
+                              return (
+                                <div
+                                  key={idx}
+                                  className="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0"
+                                >
+                                  <dt className="text-sm/6 font-medium text-zinc-950 dark:text-zinc-100">
+                                    Stap {idx + 1}
+                                  </dt>
+                                  <dd className="mt-1 text-sm/6 text-zinc-600 sm:col-span-2 sm:mt-0 dark:text-zinc-400">
+                                    {instructionText}
+                                  </dd>
+                                </div>
+                              );
+                            })}
+                          </dl>
                         </div>
                       );
-                    })}
-                  </dl>
-                </div>
-              );
-            }
-            if (effectiveInstructions) {
-              return (
-                <div className="mt-6 border-t border-zinc-200 dark:border-white/10 pt-4">
-                  <Text className="text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-line">
-                    {typeof effectiveInstructions === 'string'
-                      ? effectiveInstructions
-                      : String(effectiveInstructions)}
-                  </Text>
-                </div>
-              );
-            }
-            return (
-              <div className="mt-6 border-t border-zinc-200 dark:border-white/10 pt-4">
-                <Text className="text-sm text-zinc-500 dark:text-zinc-400">
-                  Geen instructies beschikbaar
-                </Text>
-              </div>
-            );
-          })()}
-
-          {/* Dialog: bewerk alleen bereidingsinstructies */}
-          <Dialog
-            open={instructionsEditOpen}
-            onClose={() => setInstructionsEditOpen(false)}
-            size="xl"
-          >
-            <DialogTitle>Bereidingsinstructies bewerken</DialogTitle>
-            <DialogBody>
-              <RecipeContentEditor
-                key={instructionsEditOpen ? 'edit-open' : 'edit-closed'}
-                mealId={mealId}
-                mealSource={mealSource}
-                ingredients={getIngredientsForEditor(mealData)}
-                instructions={getInstructionsForEditor(aiAnalysis)}
-                instructionsOnly
-                onUpdated={(updatedInstructions) => {
-                  setInstructionsEditOpen(false);
-                  if (
-                    updatedInstructions &&
-                    Array.isArray(updatedInstructions) &&
-                    updatedInstructions.length > 0
-                  ) {
-                    setInstructionsOverride(
-                      updatedInstructions as unknown as InstructionList,
+                    }
+                    if (effectiveInstructions) {
+                      return (
+                        <div className="mt-6 border-t border-zinc-200 pt-4 dark:border-white/10">
+                          <Text className="text-sm whitespace-pre-line text-zinc-600 dark:text-zinc-400">
+                            {typeof effectiveInstructions === 'string'
+                              ? effectiveInstructions
+                              : String(effectiveInstructions)}
+                          </Text>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="mt-6 border-t border-zinc-200 pt-4 dark:border-white/10">
+                        <Text className="text-sm text-zinc-500 dark:text-zinc-400">
+                          Geen instructies beschikbaar
+                        </Text>
+                      </div>
                     );
-                    showToast({
-                      type: 'success',
-                      title: 'Wijzigingen opgeslagen',
-                      description: 'De bereidingsinstructies zijn bijgewerkt.',
-                    });
-                  }
-                }}
-                onCancel={() => setInstructionsEditOpen(false)}
-              />
-            </DialogBody>
-          </Dialog>
-        </div>
-      )}
+                  })()}
+
+                  {/* Dialog: bewerk alleen bereidingsinstructies */}
+                  <Dialog
+                    open={instructionsEditOpen}
+                    onClose={() => setInstructionsEditOpen(false)}
+                    size="xl"
+                  >
+                    <DialogTitle>Bereidingsinstructies bewerken</DialogTitle>
+                    <DialogBody>
+                      <RecipeContentEditor
+                        key={instructionsEditOpen ? 'edit-open' : 'edit-closed'}
+                        mealId={mealId}
+                        mealSource={mealSource}
+                        ingredients={getIngredientsForEditor(mealData)}
+                        instructions={getInstructionsForEditor(aiAnalysis)}
+                        instructionsOnly
+                        onUpdated={(updatedInstructions) => {
+                          setInstructionsEditOpen(false);
+                          if (
+                            updatedInstructions &&
+                            Array.isArray(updatedInstructions) &&
+                            updatedInstructions.length > 0
+                          ) {
+                            setInstructionsOverride(
+                              updatedInstructions as unknown as InstructionList,
+                            );
+                            showToast({
+                              type: 'success',
+                              title: 'Wijzigingen opgeslagen',
+                              description:
+                                'De bereidingsinstructies zijn bijgewerkt.',
+                            });
+                          }
+                        }}
+                        onCancel={() => setInstructionsEditOpen(false)}
+                      />
+                    </DialogBody>
+                  </Dialog>
+                </div>
+              </div>
+            )}
+            {hasIngredients && (
+              <div
+                className={hasInstructions ? 'lg:col-span-1' : 'lg:col-span-3'}
+              >
+                {/* Ingredients — Tailwind table with grouped rows */}
+                <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+                  <div className="sm:flex sm:items-center sm:justify-between sm:gap-4">
+                    <div className="sm:flex-auto">
+                      <h3 className="text-base font-semibold text-zinc-950 dark:text-white">
+                        Ingrediënten
+                      </h3>
+                      <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                        Overzicht van alle ingrediënten en hoeveelheden voor dit
+                        recept.
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button
+                        plain
+                        onClick={() => setIngredientsEditOpen(true)}
+                        className="text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                      >
+                        <PencilIcon
+                          className="mr-1.5 inline-block h-4 w-4"
+                          aria-hidden
+                        />
+                        Bewerk alle
+                      </Button>
+                      <Button
+                        color="primary"
+                        onClick={() => setAddIngredientModalOpen(true)}
+                        className="shrink-0"
+                      >
+                        <PlusIcon className="mr-1.5 h-4 w-4" aria-hidden />
+                        Ingrediënt toevoegen
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-6 flow-root">
+                    <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                      <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+                        <table className="relative min-w-full">
+                          <thead>
+                            <tr>
+                              <th
+                                scope="col"
+                                className="py-3.5 pr-3 pl-0 text-left text-sm font-semibold text-zinc-950 sm:pl-0 dark:text-white"
+                              >
+                                Ingrediënt
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-200 dark:divide-white/10">
+                            {/* Parallel formaat: refs[i] hoort bij ingredients[i] — één lijst in importvolgorde */}
+                            {displayMealData?.ingredientRefs &&
+                              displayMealData?.ingredients &&
+                              displayMealData.ingredientRefs.length ===
+                                displayMealData.ingredients.length &&
+                              (() => {
+                                const refs =
+                                  displayMealData.ingredientRefs as IngredientRefLike[];
+                                const legacyList =
+                                  displayMealData.ingredients as MealIngredientLike[];
+                                return legacyList.map(
+                                  (ing: MealIngredientLike, idx: number) => {
+                                    const ref = refs[idx];
+                                    const isRefSlot =
+                                      ref &&
+                                      typeof ref === 'object' &&
+                                      (ref.nevoCode != null ||
+                                        ref.customFoodId != null ||
+                                        ref.fdcId != null);
+                                    if (isRefSlot) {
+                                      const name =
+                                        (ref.customFoodId &&
+                                          customFoodNamesById[
+                                            ref.customFoodId
+                                          ]) ||
+                                        (ref.nevoCode != null &&
+                                          nevoFoodNamesByCode[
+                                            String(ref.nevoCode)
+                                          ]) ||
+                                        ref.displayName ||
+                                        (ref.customFoodId
+                                          ? 'Eigen ingrediënt'
+                                          : ref.fdcId != null
+                                            ? 'FNDDS ingrediënt'
+                                            : `NEVO ${ref.nevoCode}`);
+                                      const refQty = ref.quantity;
+                                      const refUnit =
+                                        (ref.unit ?? 'g')?.toString().trim() ||
+                                        'g';
+                                      const refQtyG =
+                                        ref.quantityG ?? ref.quantity_g;
+                                      const amountG =
+                                        typeof refQtyG === 'number' &&
+                                        refQtyG > 0
+                                          ? refQtyG
+                                          : typeof refQty === 'number' &&
+                                              refUnit
+                                            ? quantityUnitToGrams(
+                                                refQty,
+                                                refUnit,
+                                              )
+                                            : 0;
+                                      const quantityLabel =
+                                        typeof refQty === 'number' &&
+                                        refUnit &&
+                                        refUnit !== 'g'
+                                          ? `${refQty} ${refUnit}`
+                                          : amountG > 0
+                                            ? `${amountG}g`
+                                            : undefined;
+                                      const nevoCode =
+                                        typeof ref.nevoCode === 'string'
+                                          ? parseInt(ref.nevoCode, 10)
+                                          : ref.nevoCode;
+                                      const match = ref.customFoodId
+                                        ? {
+                                            source: 'custom' as const,
+                                            customFoodId: ref.customFoodId,
+                                          }
+                                        : ref.fdcId != null
+                                          ? {
+                                              source: 'fndds' as const,
+                                              fdcId:
+                                                typeof ref.fdcId === 'number'
+                                                  ? ref.fdcId
+                                                  : Number(ref.fdcId),
+                                            }
+                                          : typeof nevoCode === 'number' &&
+                                              Number.isFinite(nevoCode) &&
+                                              nevoCode > 0
+                                            ? {
+                                                source: 'nevo' as const,
+                                                nevoCode,
+                                              }
+                                            : null;
+                                      const refQtyNum =
+                                        typeof refQty === 'number'
+                                          ? refQty
+                                          : typeof refQty === 'string'
+                                            ? parseFloat(refQty)
+                                            : undefined;
+                                      return (
+                                        <tr
+                                          key={idx}
+                                          className="border-t border-zinc-200 dark:border-white/10"
+                                        >
+                                          <td className="py-4 pr-3 pl-0 text-sm text-zinc-600 sm:pl-0 dark:text-zinc-400">
+                                            <IngredientRowWithNutrition
+                                              displayName={name}
+                                              amountG={amountG}
+                                              quantityLabel={quantityLabel}
+                                              quantity={refQtyNum}
+                                              unit={refUnit}
+                                              match={match}
+                                              mealId={mealId}
+                                              mealSource={mealSource}
+                                              ingredientIndex={idx}
+                                              onConfirmed={
+                                                handleLegacyIngredientConfirmed
+                                              }
+                                              externalSaving={
+                                                savingIngredientMatch
+                                              }
+                                              onSavingChange={
+                                                setSavingIngredientMatch
+                                              }
+                                              onRemove={
+                                                !viewingOriginal
+                                                  ? () =>
+                                                      handleRemoveIngredient(
+                                                        idx,
+                                                        name,
+                                                      )
+                                                  : undefined
+                                              }
+                                              onEdit={
+                                                !viewingOriginal
+                                                  ? (patch) =>
+                                                      handleEditRefIngredient(
+                                                        idx,
+                                                        patch,
+                                                      )
+                                                  : undefined
+                                              }
+                                            />
+                                          </td>
+                                        </tr>
+                                      );
+                                    }
+                                    const name =
+                                      resolvedLegacyMatches?.[idx]
+                                        ?.displayName ??
+                                      (ing.name ||
+                                        ing.original_line ||
+                                        `Ingrediënt ${idx + 1}`);
+                                    const quantity = ing.quantity ?? ing.amount;
+                                    const numQty =
+                                      typeof quantity === 'number'
+                                        ? quantity
+                                        : typeof quantity === 'string'
+                                          ? parseFloat(quantity)
+                                          : undefined;
+                                    const unit =
+                                      (ing.unit ?? 'g')?.toString().trim() ||
+                                      'g';
+                                    const note = ing.note ?? ing.notes;
+                                    const isToTaste = isToTasteIngredient(name);
+                                    const quantityUnknown =
+                                      numQty == null ||
+                                      (isToTaste &&
+                                        unit === 'g' &&
+                                        numQty === 100);
+                                    const quantityLabel = quantityUnknown
+                                      ? undefined
+                                      : numQty != null
+                                        ? `${numQty} ${unit}`
+                                        : undefined;
+                                    const amountG =
+                                      quantityUnknown && isToTaste
+                                        ? 0
+                                        : unit === 'g' &&
+                                            typeof numQty === 'number' &&
+                                            numQty > 0
+                                          ? numQty
+                                          : typeof numQty === 'number' &&
+                                              numQty > 0
+                                            ? quantityUnitToGrams(numQty, unit)
+                                            : 100;
+                                    return (
+                                      <tr
+                                        key={idx}
+                                        className="border-t border-zinc-200 dark:border-white/10"
+                                      >
+                                        <td className="py-4 pr-3 pl-0 text-sm text-zinc-600 sm:pl-0 dark:text-zinc-400">
+                                          <IngredientRowWithNutrition
+                                            displayName={name}
+                                            amountG={amountG}
+                                            quantityLabel={quantityLabel}
+                                            quantity={numQty}
+                                            unit={unit}
+                                            note={note ?? undefined}
+                                            match={
+                                              resolvedLegacyMatches?.[idx] ??
+                                              null
+                                            }
+                                            mealId={mealId}
+                                            mealSource={mealSource}
+                                            ingredientIndex={idx}
+                                            onConfirmed={
+                                              handleLegacyIngredientConfirmed
+                                            }
+                                            externalSaving={
+                                              savingIngredientMatch
+                                            }
+                                            onSavingChange={
+                                              setSavingIngredientMatch
+                                            }
+                                            onRemove={
+                                              !viewingOriginal
+                                                ? () =>
+                                                    handleRemoveIngredient(
+                                                      idx,
+                                                      name,
+                                                    )
+                                                : undefined
+                                            }
+                                            onEdit={
+                                              !viewingOriginal
+                                                ? (patch) =>
+                                                    handleEditIngredient(
+                                                      idx,
+                                                      patch,
+                                                    )
+                                                : undefined
+                                            }
+                                          />
+                                        </td>
+                                      </tr>
+                                    );
+                                  },
+                                );
+                              })()}
+                            {/* Alleen refs (geen ingredients): puur ref-lijst, nulls overslaan */}
+                            {displayMealData?.ingredientRefs &&
+                              displayMealData.ingredientRefs.length > 0 &&
+                              (!displayMealData?.ingredients ||
+                                displayMealData.ingredients.length === 0) &&
+                              (
+                                displayMealData.ingredientRefs as IngredientRefLike[]
+                              )
+                                .map((ref, idx) => ({ ref, idx }))
+                                .filter(
+                                  (x: { ref: IngredientRefLike }) =>
+                                    x.ref &&
+                                    typeof x.ref === 'object' &&
+                                    (x.ref.nevoCode != null ||
+                                      x.ref.customFoodId != null ||
+                                      x.ref.fdcId != null),
+                                )
+                                .map(
+                                  ({
+                                    ref,
+                                    idx,
+                                  }: {
+                                    ref: IngredientRefLike;
+                                    idx: number;
+                                  }) => {
+                                    const name =
+                                      (ref.customFoodId &&
+                                        customFoodNamesById[
+                                          ref.customFoodId
+                                        ]) ||
+                                      (ref.nevoCode != null &&
+                                        nevoFoodNamesByCode[
+                                          String(ref.nevoCode)
+                                        ]) ||
+                                      ref.displayName ||
+                                      (ref.customFoodId
+                                        ? 'Eigen ingrediënt'
+                                        : ref.fdcId != null
+                                          ? 'FNDDS ingrediënt'
+                                          : `NEVO ${ref.nevoCode}`);
+                                    const refQty = ref.quantity;
+                                    const refUnit =
+                                      (ref.unit ?? 'g')?.toString().trim() ||
+                                      'g';
+                                    const refQtyG =
+                                      ref.quantityG ?? ref.quantity_g;
+                                    const amountG =
+                                      typeof refQtyG === 'number' && refQtyG > 0
+                                        ? refQtyG
+                                        : typeof refQty === 'number' && refUnit
+                                          ? quantityUnitToGrams(refQty, refUnit)
+                                          : 0;
+                                    const quantityLabel =
+                                      typeof refQty === 'number' &&
+                                      refUnit &&
+                                      refUnit !== 'g'
+                                        ? `${refQty} ${refUnit}`
+                                        : amountG > 0
+                                          ? `${amountG}g`
+                                          : undefined;
+                                    const refQtyNum =
+                                      typeof refQty === 'number'
+                                        ? refQty
+                                        : typeof refQty === 'string'
+                                          ? parseFloat(refQty)
+                                          : undefined;
+                                    const nevoCode =
+                                      typeof ref.nevoCode === 'string'
+                                        ? parseInt(ref.nevoCode, 10)
+                                        : ref.nevoCode;
+                                    const match = ref.customFoodId
+                                      ? {
+                                          source: 'custom' as const,
+                                          customFoodId: ref.customFoodId,
+                                        }
+                                      : ref.fdcId != null
+                                        ? {
+                                            source: 'fndds' as const,
+                                            fdcId:
+                                              typeof ref.fdcId === 'number'
+                                                ? ref.fdcId
+                                                : Number(ref.fdcId),
+                                          }
+                                        : typeof nevoCode === 'number' &&
+                                            Number.isFinite(nevoCode) &&
+                                            nevoCode > 0
+                                          ? {
+                                              source: 'nevo' as const,
+                                              nevoCode,
+                                            }
+                                          : null;
+                                    return (
+                                      <tr
+                                        key={idx}
+                                        className="border-t border-zinc-200 dark:border-white/10"
+                                      >
+                                        <td className="py-4 pr-3 pl-0 text-sm text-zinc-600 sm:pl-0 dark:text-zinc-400">
+                                          <IngredientRowWithNutrition
+                                            displayName={name}
+                                            amountG={amountG}
+                                            quantityLabel={quantityLabel}
+                                            quantity={refQtyNum}
+                                            unit={refUnit}
+                                            match={match}
+                                            mealId={mealId}
+                                            mealSource={mealSource}
+                                            ingredientIndex={idx}
+                                            onRemove={
+                                              !viewingOriginal
+                                                ? () =>
+                                                    handleRemoveIngredient(
+                                                      idx,
+                                                      name,
+                                                    )
+                                                : undefined
+                                            }
+                                            onEdit={
+                                              !viewingOriginal
+                                                ? (patch) =>
+                                                    handleEditRefIngredient(
+                                                      idx,
+                                                      patch,
+                                                    )
+                                                : undefined
+                                            }
+                                          />
+                                        </td>
+                                      </tr>
+                                    );
+                                  },
+                                )}
+                            {/* Show ingredients (legacy format, geen parallel refs) — met secties als aanwezig */}
+                            {displayMealData?.ingredients &&
+                              displayMealData.ingredients.length > 0 &&
+                              !(
+                                displayMealData?.ingredientRefs &&
+                                displayMealData.ingredientRefs.length ===
+                                  displayMealData.ingredients.length
+                              ) &&
+                              (() => {
+                                const legacyList =
+                                  displayMealData.ingredients as MealIngredientLike[];
+                                const hasSections = legacyList.some(
+                                  (ing: MealIngredientLike) =>
+                                    ing.section != null &&
+                                    String(ing.section).trim() !== '',
+                                );
+                                if (!hasSections) {
+                                  return legacyList.map(
+                                    (ing: MealIngredientLike, idx: number) => {
+                                      const name =
+                                        resolvedLegacyMatches?.[idx]
+                                          ?.displayName ??
+                                        (ing.name ||
+                                          ing.original_line ||
+                                          `Ingrediënt ${idx + 1}`);
+                                      const quantity =
+                                        ing.quantity ?? ing.amount;
+                                      const rawNumQty =
+                                        typeof quantity === 'number'
+                                          ? quantity
+                                          : typeof quantity === 'string'
+                                            ? parseFloat(quantity)
+                                            : undefined;
+                                      const numQty =
+                                        rawNumQty != null &&
+                                        Number.isFinite(rawNumQty)
+                                          ? rawNumQty
+                                          : undefined;
+                                      const unit =
+                                        (ing.unit ?? 'g')?.toString().trim() ||
+                                        'g';
+                                      const note = ing.note ?? ing.notes;
+                                      const isToTaste =
+                                        isToTasteIngredient(name);
+                                      const quantityUnknown =
+                                        numQty == null ||
+                                        (isToTaste &&
+                                          unit === 'g' &&
+                                          numQty === 100);
+                                      const quantityLabel = quantityUnknown
+                                        ? undefined
+                                        : numQty != null
+                                          ? `${numQty} ${unit}`
+                                          : undefined;
+                                      const amountG =
+                                        quantityUnknown && isToTaste
+                                          ? 0
+                                          : unit === 'g' &&
+                                              typeof numQty === 'number' &&
+                                              numQty > 0
+                                            ? numQty
+                                            : typeof numQty === 'number' &&
+                                                numQty > 0
+                                              ? quantityUnitToGrams(
+                                                  numQty,
+                                                  unit,
+                                                )
+                                              : 100;
+                                      return (
+                                        <tr
+                                          key={idx}
+                                          className="border-t border-zinc-200 dark:border-white/10"
+                                        >
+                                          <td className="py-4 pr-3 pl-0 text-sm text-zinc-600 sm:pl-0 dark:text-zinc-400">
+                                            <IngredientRowWithNutrition
+                                              displayName={name}
+                                              amountG={amountG}
+                                              quantityLabel={quantityLabel}
+                                              quantity={numQty}
+                                              unit={unit}
+                                              note={note ?? undefined}
+                                              match={
+                                                resolvedLegacyMatches?.[idx] ??
+                                                null
+                                              }
+                                              mealId={mealId}
+                                              mealSource={mealSource}
+                                              ingredientIndex={idx}
+                                              onConfirmed={
+                                                handleLegacyIngredientConfirmed
+                                              }
+                                              externalSaving={
+                                                savingIngredientMatch
+                                              }
+                                              onSavingChange={
+                                                setSavingIngredientMatch
+                                              }
+                                              onRemove={
+                                                !viewingOriginal
+                                                  ? () =>
+                                                      handleRemoveIngredient(
+                                                        idx,
+                                                        name,
+                                                      )
+                                                  : undefined
+                                              }
+                                              onEdit={
+                                                !viewingOriginal
+                                                  ? (patch) =>
+                                                      handleEditIngredient(
+                                                        idx,
+                                                        patch,
+                                                      )
+                                                  : undefined
+                                              }
+                                            />
+                                          </td>
+                                        </tr>
+                                      );
+                                    },
+                                  );
+                                }
+                                // Groepeer op sectie (volgorde behouden)
+                                const groups: {
+                                  section: string | null;
+                                  indices: number[];
+                                }[] = [];
+                                let curSection: string | null = null;
+                                let curIndices: number[] = [];
+                                for (let i = 0; i < legacyList.length; i++) {
+                                  const s =
+                                    legacyList[i].section != null &&
+                                    String(legacyList[i].section).trim() !== ''
+                                      ? String(legacyList[i].section).trim()
+                                      : null;
+                                  if (s !== curSection) {
+                                    if (curIndices.length > 0)
+                                      groups.push({
+                                        section: curSection,
+                                        indices: curIndices,
+                                      });
+                                    curSection = s;
+                                    curIndices = [i];
+                                  } else {
+                                    curIndices.push(i);
+                                  }
+                                }
+                                if (curIndices.length > 0)
+                                  groups.push({
+                                    section: curSection,
+                                    indices: curIndices,
+                                  });
+
+                                return groups.map((group, gi) => (
+                                  <Fragment key={gi}>
+                                    {group.section && (
+                                      <tr className="border-t border-zinc-200 dark:border-white/10">
+                                        <th
+                                          scope="colgroup"
+                                          colSpan={1}
+                                          className="bg-zinc-100 py-2 pr-3 pl-0 text-left text-sm font-semibold text-zinc-950 sm:pl-0 dark:bg-zinc-800/50 dark:text-white"
+                                        >
+                                          {group.section}
+                                        </th>
+                                      </tr>
+                                    )}
+                                    {group.indices.map((idx) => {
+                                      const ing = legacyList[idx];
+                                      const name =
+                                        resolvedLegacyMatches?.[idx]
+                                          ?.displayName ??
+                                        (ing.name ||
+                                          ing.original_line ||
+                                          `Ingrediënt ${idx + 1}`);
+                                      const quantity =
+                                        ing.quantity ?? ing.amount;
+                                      const rawNumQty =
+                                        typeof quantity === 'number'
+                                          ? quantity
+                                          : typeof quantity === 'string'
+                                            ? parseFloat(quantity)
+                                            : undefined;
+                                      const numQty =
+                                        rawNumQty != null &&
+                                        Number.isFinite(rawNumQty)
+                                          ? rawNumQty
+                                          : undefined;
+                                      const unit =
+                                        (ing.unit ?? 'g')?.toString().trim() ||
+                                        'g';
+                                      const note = ing.note ?? ing.notes;
+                                      const isToTaste =
+                                        isToTasteIngredient(name);
+                                      const quantityUnknown =
+                                        numQty == null ||
+                                        (isToTaste &&
+                                          unit === 'g' &&
+                                          numQty === 100);
+                                      const quantityLabel = quantityUnknown
+                                        ? undefined
+                                        : numQty != null
+                                          ? `${numQty} ${unit}`
+                                          : undefined;
+                                      const amountG =
+                                        quantityUnknown && isToTaste
+                                          ? 0
+                                          : unit === 'g' &&
+                                              typeof numQty === 'number' &&
+                                              numQty > 0
+                                            ? numQty
+                                            : typeof numQty === 'number' &&
+                                                numQty > 0
+                                              ? quantityUnitToGrams(
+                                                  numQty,
+                                                  unit,
+                                                )
+                                              : 100;
+                                      return (
+                                        <tr
+                                          key={idx}
+                                          className="border-t border-zinc-200 dark:border-white/10"
+                                        >
+                                          <td className="py-4 pr-3 pl-0 text-sm text-zinc-600 sm:pl-0 dark:text-zinc-400">
+                                            <IngredientRowWithNutrition
+                                              displayName={name}
+                                              amountG={amountG}
+                                              quantityLabel={quantityLabel}
+                                              quantity={numQty}
+                                              unit={unit}
+                                              note={note ?? undefined}
+                                              match={
+                                                resolvedLegacyMatches?.[idx] ??
+                                                null
+                                              }
+                                              mealId={mealId}
+                                              mealSource={mealSource}
+                                              ingredientIndex={idx}
+                                              onConfirmed={
+                                                handleLegacyIngredientConfirmed
+                                              }
+                                              externalSaving={
+                                                savingIngredientMatch
+                                              }
+                                              onSavingChange={
+                                                setSavingIngredientMatch
+                                              }
+                                              onRemove={
+                                                !viewingOriginal
+                                                  ? () =>
+                                                      handleRemoveIngredient(
+                                                        idx,
+                                                        name,
+                                                      )
+                                                  : undefined
+                                              }
+                                              onEdit={
+                                                !viewingOriginal
+                                                  ? (patch) =>
+                                                      handleEditIngredient(
+                                                        idx,
+                                                        patch,
+                                                      )
+                                                  : undefined
+                                              }
+                                            />
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </Fragment>
+                                ));
+                              })()}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Modal: één ingrediënt toevoegen */}
       <Dialog
@@ -1619,7 +2393,7 @@ export function MealDetail({
           <div className="space-y-4">
             {addIngredientError && (
               <div
-                className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 px-3 py-2 text-sm text-red-700 dark:text-red-300"
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300"
                 role="alert"
               >
                 {addIngredientError}
@@ -1732,601 +2506,6 @@ export function MealDetail({
         </DialogBody>
       </Dialog>
 
-      {/* Ingredients — Tailwind table with grouped rows */}
-      {((displayMealData?.ingredientRefs &&
-        displayMealData.ingredientRefs.length > 0) ||
-        (displayMealData?.ingredients &&
-          displayMealData.ingredients.length > 0)) && (
-        <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-          <div className="sm:flex sm:items-center sm:justify-between sm:gap-4">
-            <div className="sm:flex-auto">
-              <h3 className="text-base font-semibold text-zinc-950 dark:text-white">
-                Ingrediënten
-              </h3>
-              <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                Overzicht van alle ingrediënten en hoeveelheden voor dit recept.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                plain
-                onClick={() => setIngredientsEditOpen(true)}
-                className="text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-              >
-                <PencilIcon
-                  className="h-4 w-4 mr-1.5 inline-block"
-                  aria-hidden
-                />
-                Bewerk alle
-              </Button>
-              <Button
-                color="primary"
-                onClick={() => setAddIngredientModalOpen(true)}
-                className="shrink-0"
-              >
-                <PlusIcon className="h-4 w-4 mr-1.5" aria-hidden />
-                Ingrediënt toevoegen
-              </Button>
-            </div>
-          </div>
-          <div className="mt-6 flow-root">
-            <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-              <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-                <table className="relative min-w-full">
-                  <thead>
-                    <tr>
-                      <th
-                        scope="col"
-                        className="py-3.5 pr-3 pl-0 text-left text-sm font-semibold text-zinc-950 dark:text-white sm:pl-0"
-                      >
-                        Ingrediënt
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-200 dark:divide-white/10">
-                    {/* Parallel formaat: refs[i] hoort bij ingredients[i] — één lijst in importvolgorde */}
-                    {displayMealData?.ingredientRefs &&
-                      displayMealData?.ingredients &&
-                      displayMealData.ingredientRefs.length ===
-                        displayMealData.ingredients.length &&
-                      (() => {
-                        const refs =
-                          displayMealData.ingredientRefs as IngredientRefLike[];
-                        const legacyList =
-                          displayMealData.ingredients as MealIngredientLike[];
-                        return legacyList.map(
-                          (ing: MealIngredientLike, idx: number) => {
-                            const ref = refs[idx];
-                            const isRefSlot =
-                              ref &&
-                              typeof ref === 'object' &&
-                              (ref.nevoCode != null ||
-                                ref.customFoodId != null ||
-                                ref.fdcId != null);
-                            if (isRefSlot) {
-                              const name =
-                                (ref.customFoodId &&
-                                  customFoodNamesById[ref.customFoodId]) ||
-                                (ref.nevoCode != null &&
-                                  nevoFoodNamesByCode[String(ref.nevoCode)]) ||
-                                ref.displayName ||
-                                (ref.customFoodId
-                                  ? 'Eigen ingrediënt'
-                                  : ref.fdcId != null
-                                    ? 'FNDDS ingrediënt'
-                                    : `NEVO ${ref.nevoCode}`);
-                              const refQty = ref.quantity;
-                              const refUnit =
-                                (ref.unit ?? 'g')?.toString().trim() || 'g';
-                              const refQtyG = ref.quantityG ?? ref.quantity_g;
-                              const amountG =
-                                typeof refQtyG === 'number' && refQtyG > 0
-                                  ? refQtyG
-                                  : typeof refQty === 'number' && refUnit
-                                    ? quantityUnitToGrams(refQty, refUnit)
-                                    : 0;
-                              const quantityLabel =
-                                typeof refQty === 'number' &&
-                                refUnit &&
-                                refUnit !== 'g'
-                                  ? `${refQty} ${refUnit}`
-                                  : amountG > 0
-                                    ? `${amountG}g`
-                                    : undefined;
-                              const nevoCode =
-                                typeof ref.nevoCode === 'string'
-                                  ? parseInt(ref.nevoCode, 10)
-                                  : ref.nevoCode;
-                              const match = ref.customFoodId
-                                ? {
-                                    source: 'custom' as const,
-                                    customFoodId: ref.customFoodId,
-                                  }
-                                : ref.fdcId != null
-                                  ? {
-                                      source: 'fndds' as const,
-                                      fdcId:
-                                        typeof ref.fdcId === 'number'
-                                          ? ref.fdcId
-                                          : Number(ref.fdcId),
-                                    }
-                                  : typeof nevoCode === 'number' &&
-                                      Number.isFinite(nevoCode) &&
-                                      nevoCode > 0
-                                    ? { source: 'nevo' as const, nevoCode }
-                                    : null;
-                              const refQtyNum =
-                                typeof refQty === 'number'
-                                  ? refQty
-                                  : typeof refQty === 'string'
-                                    ? parseFloat(refQty)
-                                    : undefined;
-                              return (
-                                <tr
-                                  key={idx}
-                                  className="border-t border-zinc-200 dark:border-white/10"
-                                >
-                                  <td className="py-4 pr-3 pl-0 text-sm text-zinc-600 dark:text-zinc-400 sm:pl-0">
-                                    <IngredientRowWithNutrition
-                                      displayName={name}
-                                      amountG={amountG}
-                                      quantityLabel={quantityLabel}
-                                      quantity={refQtyNum}
-                                      unit={refUnit}
-                                      match={match}
-                                      mealId={mealId}
-                                      mealSource={mealSource}
-                                      ingredientIndex={idx}
-                                      onConfirmed={
-                                        handleLegacyIngredientConfirmed
-                                      }
-                                      externalSaving={savingIngredientMatch}
-                                      onSavingChange={setSavingIngredientMatch}
-                                      onRemove={
-                                        !viewingOriginal
-                                          ? () =>
-                                              handleRemoveIngredient(idx, name)
-                                          : undefined
-                                      }
-                                      onEdit={
-                                        !viewingOriginal
-                                          ? (patch) =>
-                                              handleEditRefIngredient(
-                                                idx,
-                                                patch,
-                                              )
-                                          : undefined
-                                      }
-                                    />
-                                  </td>
-                                </tr>
-                              );
-                            }
-                            const name =
-                              resolvedLegacyMatches?.[idx]?.displayName ??
-                              (ing.name ||
-                                ing.original_line ||
-                                `Ingrediënt ${idx + 1}`);
-                            const quantity = ing.quantity ?? ing.amount;
-                            const numQty =
-                              typeof quantity === 'number'
-                                ? quantity
-                                : typeof quantity === 'string'
-                                  ? parseFloat(quantity)
-                                  : undefined;
-                            const unit =
-                              (ing.unit ?? 'g')?.toString().trim() || 'g';
-                            const note = ing.note ?? ing.notes;
-                            const isToTaste = isToTasteIngredient(name);
-                            const quantityUnknown =
-                              numQty == null ||
-                              (isToTaste && unit === 'g' && numQty === 100);
-                            const quantityLabel = quantityUnknown
-                              ? undefined
-                              : numQty != null
-                                ? `${numQty} ${unit}`
-                                : undefined;
-                            const amountG =
-                              quantityUnknown && isToTaste
-                                ? 0
-                                : unit === 'g' &&
-                                    typeof numQty === 'number' &&
-                                    numQty > 0
-                                  ? numQty
-                                  : typeof numQty === 'number' && numQty > 0
-                                    ? quantityUnitToGrams(numQty, unit)
-                                    : 100;
-                            return (
-                              <tr
-                                key={idx}
-                                className="border-t border-zinc-200 dark:border-white/10"
-                              >
-                                <td className="py-4 pr-3 pl-0 text-sm text-zinc-600 dark:text-zinc-400 sm:pl-0">
-                                  <IngredientRowWithNutrition
-                                    displayName={name}
-                                    amountG={amountG}
-                                    quantityLabel={quantityLabel}
-                                    quantity={numQty}
-                                    unit={unit}
-                                    note={note ?? undefined}
-                                    match={resolvedLegacyMatches?.[idx] ?? null}
-                                    mealId={mealId}
-                                    mealSource={mealSource}
-                                    ingredientIndex={idx}
-                                    onConfirmed={
-                                      handleLegacyIngredientConfirmed
-                                    }
-                                    externalSaving={savingIngredientMatch}
-                                    onSavingChange={setSavingIngredientMatch}
-                                    onRemove={
-                                      !viewingOriginal
-                                        ? () =>
-                                            handleRemoveIngredient(idx, name)
-                                        : undefined
-                                    }
-                                    onEdit={
-                                      !viewingOriginal
-                                        ? (patch) =>
-                                            handleEditIngredient(idx, patch)
-                                        : undefined
-                                    }
-                                  />
-                                </td>
-                              </tr>
-                            );
-                          },
-                        );
-                      })()}
-                    {/* Alleen refs (geen ingredients): puur ref-lijst, nulls overslaan */}
-                    {displayMealData?.ingredientRefs &&
-                      displayMealData.ingredientRefs.length > 0 &&
-                      (!displayMealData?.ingredients ||
-                        displayMealData.ingredients.length === 0) &&
-                      (displayMealData.ingredientRefs as IngredientRefLike[])
-                        .map((ref, idx) => ({ ref, idx }))
-                        .filter(
-                          (x: { ref: IngredientRefLike }) =>
-                            x.ref &&
-                            typeof x.ref === 'object' &&
-                            (x.ref.nevoCode != null ||
-                              x.ref.customFoodId != null ||
-                              x.ref.fdcId != null),
-                        )
-                        .map(
-                          ({
-                            ref,
-                            idx,
-                          }: {
-                            ref: IngredientRefLike;
-                            idx: number;
-                          }) => {
-                            const name =
-                              (ref.customFoodId &&
-                                customFoodNamesById[ref.customFoodId]) ||
-                              (ref.nevoCode != null &&
-                                nevoFoodNamesByCode[String(ref.nevoCode)]) ||
-                              ref.displayName ||
-                              (ref.customFoodId
-                                ? 'Eigen ingrediënt'
-                                : ref.fdcId != null
-                                  ? 'FNDDS ingrediënt'
-                                  : `NEVO ${ref.nevoCode}`);
-                            const refQty = ref.quantity;
-                            const refUnit =
-                              (ref.unit ?? 'g')?.toString().trim() || 'g';
-                            const refQtyG = ref.quantityG ?? ref.quantity_g;
-                            const amountG =
-                              typeof refQtyG === 'number' && refQtyG > 0
-                                ? refQtyG
-                                : typeof refQty === 'number' && refUnit
-                                  ? quantityUnitToGrams(refQty, refUnit)
-                                  : 0;
-                            const quantityLabel =
-                              typeof refQty === 'number' &&
-                              refUnit &&
-                              refUnit !== 'g'
-                                ? `${refQty} ${refUnit}`
-                                : amountG > 0
-                                  ? `${amountG}g`
-                                  : undefined;
-                            const refQtyNum =
-                              typeof refQty === 'number'
-                                ? refQty
-                                : typeof refQty === 'string'
-                                  ? parseFloat(refQty)
-                                  : undefined;
-                            const nevoCode =
-                              typeof ref.nevoCode === 'string'
-                                ? parseInt(ref.nevoCode, 10)
-                                : ref.nevoCode;
-                            const match = ref.customFoodId
-                              ? {
-                                  source: 'custom' as const,
-                                  customFoodId: ref.customFoodId,
-                                }
-                              : ref.fdcId != null
-                                ? {
-                                    source: 'fndds' as const,
-                                    fdcId:
-                                      typeof ref.fdcId === 'number'
-                                        ? ref.fdcId
-                                        : Number(ref.fdcId),
-                                  }
-                                : typeof nevoCode === 'number' &&
-                                    Number.isFinite(nevoCode) &&
-                                    nevoCode > 0
-                                  ? { source: 'nevo' as const, nevoCode }
-                                  : null;
-                            return (
-                              <tr
-                                key={idx}
-                                className="border-t border-zinc-200 dark:border-white/10"
-                              >
-                                <td className="py-4 pr-3 pl-0 text-sm text-zinc-600 dark:text-zinc-400 sm:pl-0">
-                                  <IngredientRowWithNutrition
-                                    displayName={name}
-                                    amountG={amountG}
-                                    quantityLabel={quantityLabel}
-                                    quantity={refQtyNum}
-                                    unit={refUnit}
-                                    match={match}
-                                    mealId={mealId}
-                                    mealSource={mealSource}
-                                    ingredientIndex={idx}
-                                    onRemove={
-                                      !viewingOriginal
-                                        ? () =>
-                                            handleRemoveIngredient(idx, name)
-                                        : undefined
-                                    }
-                                    onEdit={
-                                      !viewingOriginal
-                                        ? (patch) =>
-                                            handleEditRefIngredient(idx, patch)
-                                        : undefined
-                                    }
-                                  />
-                                </td>
-                              </tr>
-                            );
-                          },
-                        )}
-                    {/* Show ingredients (legacy format, geen parallel refs) — met secties als aanwezig */}
-                    {displayMealData?.ingredients &&
-                      displayMealData.ingredients.length > 0 &&
-                      !(
-                        displayMealData?.ingredientRefs &&
-                        displayMealData.ingredientRefs.length ===
-                          displayMealData.ingredients.length
-                      ) &&
-                      (() => {
-                        const legacyList =
-                          displayMealData.ingredients as MealIngredientLike[];
-                        const hasSections = legacyList.some(
-                          (ing: MealIngredientLike) =>
-                            ing.section != null &&
-                            String(ing.section).trim() !== '',
-                        );
-                        if (!hasSections) {
-                          return legacyList.map(
-                            (ing: MealIngredientLike, idx: number) => {
-                              const name =
-                                resolvedLegacyMatches?.[idx]?.displayName ??
-                                (ing.name ||
-                                  ing.original_line ||
-                                  `Ingrediënt ${idx + 1}`);
-                              const quantity = ing.quantity ?? ing.amount;
-                              const rawNumQty =
-                                typeof quantity === 'number'
-                                  ? quantity
-                                  : typeof quantity === 'string'
-                                    ? parseFloat(quantity)
-                                    : undefined;
-                              const numQty =
-                                rawNumQty != null && Number.isFinite(rawNumQty)
-                                  ? rawNumQty
-                                  : undefined;
-                              const unit =
-                                (ing.unit ?? 'g')?.toString().trim() || 'g';
-                              const note = ing.note ?? ing.notes;
-                              const isToTaste = isToTasteIngredient(name);
-                              const quantityUnknown =
-                                numQty == null ||
-                                (isToTaste && unit === 'g' && numQty === 100);
-                              const quantityLabel = quantityUnknown
-                                ? undefined
-                                : numQty != null
-                                  ? `${numQty} ${unit}`
-                                  : undefined;
-                              const amountG =
-                                quantityUnknown && isToTaste
-                                  ? 0
-                                  : unit === 'g' &&
-                                      typeof numQty === 'number' &&
-                                      numQty > 0
-                                    ? numQty
-                                    : typeof numQty === 'number' && numQty > 0
-                                      ? quantityUnitToGrams(numQty, unit)
-                                      : 100;
-                              return (
-                                <tr
-                                  key={idx}
-                                  className="border-t border-zinc-200 dark:border-white/10"
-                                >
-                                  <td className="py-4 pr-3 pl-0 text-sm text-zinc-600 dark:text-zinc-400 sm:pl-0">
-                                    <IngredientRowWithNutrition
-                                      displayName={name}
-                                      amountG={amountG}
-                                      quantityLabel={quantityLabel}
-                                      quantity={numQty}
-                                      unit={unit}
-                                      note={note ?? undefined}
-                                      match={
-                                        resolvedLegacyMatches?.[idx] ?? null
-                                      }
-                                      mealId={mealId}
-                                      mealSource={mealSource}
-                                      ingredientIndex={idx}
-                                      onConfirmed={
-                                        handleLegacyIngredientConfirmed
-                                      }
-                                      externalSaving={savingIngredientMatch}
-                                      onSavingChange={setSavingIngredientMatch}
-                                      onRemove={
-                                        !viewingOriginal
-                                          ? () =>
-                                              handleRemoveIngredient(idx, name)
-                                          : undefined
-                                      }
-                                      onEdit={
-                                        !viewingOriginal
-                                          ? (patch) =>
-                                              handleEditIngredient(idx, patch)
-                                          : undefined
-                                      }
-                                    />
-                                  </td>
-                                </tr>
-                              );
-                            },
-                          );
-                        }
-                        // Groepeer op sectie (volgorde behouden)
-                        const groups: {
-                          section: string | null;
-                          indices: number[];
-                        }[] = [];
-                        let curSection: string | null = null;
-                        let curIndices: number[] = [];
-                        for (let i = 0; i < legacyList.length; i++) {
-                          const s =
-                            legacyList[i].section != null &&
-                            String(legacyList[i].section).trim() !== ''
-                              ? String(legacyList[i].section).trim()
-                              : null;
-                          if (s !== curSection) {
-                            if (curIndices.length > 0)
-                              groups.push({
-                                section: curSection,
-                                indices: curIndices,
-                              });
-                            curSection = s;
-                            curIndices = [i];
-                          } else {
-                            curIndices.push(i);
-                          }
-                        }
-                        if (curIndices.length > 0)
-                          groups.push({
-                            section: curSection,
-                            indices: curIndices,
-                          });
-
-                        return groups.map((group, gi) => (
-                          <Fragment key={gi}>
-                            {group.section && (
-                              <tr className="border-t border-zinc-200 dark:border-white/10">
-                                <th
-                                  scope="colgroup"
-                                  colSpan={1}
-                                  className="bg-zinc-100 dark:bg-zinc-800/50 py-2 pr-3 pl-0 text-left text-sm font-semibold text-zinc-950 dark:text-white sm:pl-0"
-                                >
-                                  {group.section}
-                                </th>
-                              </tr>
-                            )}
-                            {group.indices.map((idx) => {
-                              const ing = legacyList[idx];
-                              const name =
-                                resolvedLegacyMatches?.[idx]?.displayName ??
-                                (ing.name ||
-                                  ing.original_line ||
-                                  `Ingrediënt ${idx + 1}`);
-                              const quantity = ing.quantity ?? ing.amount;
-                              const rawNumQty =
-                                typeof quantity === 'number'
-                                  ? quantity
-                                  : typeof quantity === 'string'
-                                    ? parseFloat(quantity)
-                                    : undefined;
-                              const numQty =
-                                rawNumQty != null && Number.isFinite(rawNumQty)
-                                  ? rawNumQty
-                                  : undefined;
-                              const unit =
-                                (ing.unit ?? 'g')?.toString().trim() || 'g';
-                              const note = ing.note ?? ing.notes;
-                              const isToTaste = isToTasteIngredient(name);
-                              const quantityUnknown =
-                                numQty == null ||
-                                (isToTaste && unit === 'g' && numQty === 100);
-                              const quantityLabel = quantityUnknown
-                                ? undefined
-                                : numQty != null
-                                  ? `${numQty} ${unit}`
-                                  : undefined;
-                              const amountG =
-                                quantityUnknown && isToTaste
-                                  ? 0
-                                  : unit === 'g' &&
-                                      typeof numQty === 'number' &&
-                                      numQty > 0
-                                    ? numQty
-                                    : typeof numQty === 'number' && numQty > 0
-                                      ? quantityUnitToGrams(numQty, unit)
-                                      : 100;
-                              return (
-                                <tr
-                                  key={idx}
-                                  className="border-t border-zinc-200 dark:border-white/10"
-                                >
-                                  <td className="py-4 pr-3 pl-0 text-sm text-zinc-600 dark:text-zinc-400 sm:pl-0">
-                                    <IngredientRowWithNutrition
-                                      displayName={name}
-                                      amountG={amountG}
-                                      quantityLabel={quantityLabel}
-                                      quantity={numQty}
-                                      unit={unit}
-                                      note={note ?? undefined}
-                                      match={
-                                        resolvedLegacyMatches?.[idx] ?? null
-                                      }
-                                      mealId={mealId}
-                                      mealSource={mealSource}
-                                      ingredientIndex={idx}
-                                      onConfirmed={
-                                        handleLegacyIngredientConfirmed
-                                      }
-                                      externalSaving={savingIngredientMatch}
-                                      onSavingChange={setSavingIngredientMatch}
-                                      onRemove={
-                                        !viewingOriginal
-                                          ? () =>
-                                              handleRemoveIngredient(idx, name)
-                                          : undefined
-                                      }
-                                      onEdit={
-                                        !viewingOriginal
-                                          ? (patch) =>
-                                              handleEditIngredient(idx, patch)
-                                          : undefined
-                                      }
-                                    />
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </Fragment>
-                        ));
-                      })()}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Voeding van gerecht (onder ingrediënten, alleen als ingrediënten gekoppeld zijn) */}
       {hasIngredientsForNutrition && (
         <RecipeNutritionKpi
@@ -2361,10 +2540,10 @@ export function MealDetail({
       {/* Nutrition Info */}
       {(mealData?.estimatedMacros || mealData?.nutrition) && (
         <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-          <h3 className="text-lg font-semibold text-zinc-950 dark:text-white mb-4">
+          <h3 className="mb-4 text-lg font-semibold text-zinc-950 dark:text-white">
             Voedingswaarden
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
             {(mealData.estimatedMacros || mealData.nutrition)?.calories !==
               undefined && (
               <div>
@@ -2459,8 +2638,8 @@ export function MealDetail({
 
       {/* Aangepaste versie verwijderen – alleen tonen als er een aangepaste versie is (server-check) */}
       {hasAppliedAdaptation === true && (
-        <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10 border-t border-zinc-200 dark:border-zinc-800">
-          <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">
+        <div className="rounded-lg border-t border-zinc-200 bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900 dark:ring-white/10">
+          <Text className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
             Je bekijkt dit recept met een door de AI Magician aangepaste versie.
             Je kunt de aanpassing ongedaan maken en teruggaan naar de originele
             versie.
@@ -2475,7 +2654,7 @@ export function MealDetail({
             Aangepaste versie verwijderen
           </Button>
           {removeAdaptationError && (
-            <Text className="text-sm text-red-600 dark:text-red-400 mt-2">
+            <Text className="mt-2 text-sm text-red-600 dark:text-red-400">
               {removeAdaptationError}
             </Text>
           )}
@@ -2500,7 +2679,7 @@ export function MealDetail({
         </DialogDescription>
         <DialogBody>
           {removeAdaptationError && (
-            <Text className="text-sm text-red-600 dark:text-red-400 mb-4">
+            <Text className="mb-4 text-sm text-red-600 dark:text-red-400">
               {removeAdaptationError}
             </Text>
           )}
@@ -2541,7 +2720,7 @@ export function MealDetail({
       </Dialog>
 
       {/* Recept verwijderen – onderaan de pagina */}
-      <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10 border-t border-zinc-200 dark:border-zinc-800">
+      <div className="rounded-lg border-t border-zinc-200 bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:border-zinc-800 dark:bg-zinc-900 dark:ring-white/10">
         <Button
           outline
           disabled={isDeletingRecipe}
@@ -2684,7 +2863,7 @@ export function MealDetail({
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-6 right-6 z-50 flex max-w-sm items-start gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+          className="fixed right-6 bottom-6 z-50 flex max-w-sm items-start gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
         >
           <p className="text-sm font-medium text-zinc-900 dark:text-white">
             {removeIngredientNotification.message}

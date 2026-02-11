@@ -125,7 +125,6 @@ export function IngredientGroupsTab({
 
   useEffect(() => {
     loadCategories();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadCategories stable, run when dietTypeId changes
   }, [dietTypeId]);
 
   useEffect(() => {
@@ -381,7 +380,7 @@ export function IngredientGroupsTab({
           {[1, 2, 3, 4, 5].map((i) => (
             <div
               key={i}
-              className="h-12 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse"
+              className="h-12 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800"
             />
           ))}
         </div>
@@ -432,7 +431,7 @@ export function IngredientGroupsTab({
       {/* Categories Table */}
       <div className="rounded-lg bg-white shadow-xs dark:bg-zinc-900">
         <div className="p-6">
-          <div className="mb-4 flex items-center justify-between gap-2 flex-wrap">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
               Categorieën ({categories.length}) – Klik op een rij om items te
               bekijken. Groepen met een dieetregel kunnen pas na het verwijderen
@@ -540,7 +539,7 @@ export function IngredientGroupsTab({
                         )}
                       </TableCell>
                       <TableCell>
-                        <code className="text-xs font-mono text-zinc-600 dark:text-zinc-400">
+                        <code className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
                           {category.code}
                         </code>
                       </TableCell>
@@ -635,7 +634,7 @@ export function IngredientGroupsTab({
                         )}
                       </TableCell>
                       <TableCell>
-                        <code className="text-xs font-mono text-zinc-600 dark:text-zinc-400">
+                        <code className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
                           {category.code}
                         </code>
                       </TableCell>

@@ -141,7 +141,6 @@ export function RecipeImageUpload({
     }
 
     setImageLoadError(false); // Reset error state when URL changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- previewUrl is derived in this effect, omit to avoid loop
   }, [currentImageUrl, mealId]);
 
   const handleFileSelect = async (
@@ -375,7 +374,7 @@ export function RecipeImageUpload({
     '[&[data-focus]]:!shadow-sm [&[data-focus]]:!bg-zinc-200/95 dark:[&[data-focus]]:!bg-zinc-600/95';
 
   const overlayButtons = (
-    <div className="absolute bottom-2 right-2 z-0 flex items-center gap-1.5 justify-end">
+    <div className="absolute right-2 bottom-2 z-0 flex items-center justify-end gap-1.5">
       <Button
         plain
         onClick={(e) => {
@@ -386,7 +385,7 @@ export function RecipeImageUpload({
         disabled={isBusy}
         title="Bestand uploaden"
         aria-label="Bestand uploaden"
-        className={`${iconButtonClass} bg-white/95 dark:bg-zinc-900/95 text-zinc-600 dark:text-zinc-400`}
+        className={`${iconButtonClass} bg-white/95 text-zinc-600 dark:bg-zinc-900/95 dark:text-zinc-400`}
       >
         <ArrowUpTrayIcon className="h-5 w-5" aria-hidden />
       </Button>
@@ -400,7 +399,7 @@ export function RecipeImageUpload({
         disabled={isBusy}
         title={isPasting ? 'Bezig…' : 'Plakken'}
         aria-label={isPasting ? 'Bezig…' : 'Plakken'}
-        className={`${iconButtonClass} bg-white/95 dark:bg-zinc-900/95 text-zinc-600 dark:text-zinc-400`}
+        className={`${iconButtonClass} bg-white/95 text-zinc-600 dark:bg-zinc-900/95 dark:text-zinc-400`}
       >
         <ClipboardDocumentIcon className="h-5 w-5" aria-hidden />
       </Button>
@@ -414,7 +413,7 @@ export function RecipeImageUpload({
         disabled={isBusy}
         title={isGenerating ? 'Bezig…' : 'Genereer met AI'}
         aria-label={isGenerating ? 'Bezig…' : 'Genereer met AI'}
-        className={`${iconButtonClass} bg-white/95 dark:bg-zinc-900/95 text-blue-600 dark:text-blue-400`}
+        className={`${iconButtonClass} bg-white/95 text-blue-600 dark:bg-zinc-900/95 dark:text-blue-400`}
       >
         <SparklesIcon className="h-5 w-5" aria-hidden />
       </Button>
@@ -428,7 +427,7 @@ export function RecipeImageUpload({
         disabled={isBusy}
         title="Verwijderen"
         aria-label="Verwijderen"
-        className={`${iconButtonClass} text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 bg-white/95 dark:bg-zinc-900/95`}
+        className={`${iconButtonClass} bg-white/95 text-red-600 hover:text-red-700 dark:bg-zinc-900/95 dark:text-red-400 dark:hover:text-red-300`}
       >
         <TrashIcon className="h-5 w-5" aria-hidden />
       </Button>
@@ -453,11 +452,11 @@ export function RecipeImageUpload({
 
       {square && previewUrl && !imageLoadError ? (
         <>
-          <div className="relative block w-full aspect-square bg-zinc-100 dark:bg-zinc-800 overflow-hidden rounded-lg">
+          <div className="relative block aspect-square w-full overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
             <button
               type="button"
               onClick={handleClick}
-              className="block w-full h-full cursor-pointer hover:opacity-95 transition-opacity"
+              className="block h-full w-full cursor-pointer transition-opacity hover:opacity-95"
               disabled={isBusy}
               aria-label="Receptafbeelding vergroten"
             >
@@ -465,7 +464,7 @@ export function RecipeImageUpload({
                 src={previewUrl}
                 alt="Recept foto"
                 fill
-                className="object-cover rounded-lg"
+                className="rounded-lg object-cover"
                 sizes="(max-width: 1024px) 100vw, 360px"
                 unoptimized
                 onError={() => setImageLoadError(true)}
@@ -480,9 +479,9 @@ export function RecipeImageUpload({
           )}
         </>
       ) : square && !previewUrl ? (
-        <div className="relative border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg p-6 flex flex-col items-center justify-center gap-4 aspect-square bg-zinc-50 dark:bg-zinc-900/50">
+        <div className="relative flex aspect-square flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 p-6 dark:border-zinc-700 dark:bg-zinc-900/50">
           <PhotoIcon className="h-12 w-12 shrink-0 text-zinc-400 dark:text-zinc-500" />
-          <span className="text-sm text-zinc-600 dark:text-zinc-400 text-center">
+          <span className="text-center text-sm text-zinc-600 dark:text-zinc-400">
             Productafbeelding
           </span>
           <div className="flex flex-wrap items-center justify-center gap-2">
@@ -494,7 +493,7 @@ export function RecipeImageUpload({
                 fileInputRef.current?.click();
               }}
               disabled={isBusy}
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
             >
               <ArrowUpTrayIcon className="h-4 w-4" aria-hidden />
               {isUploading ? 'Bezig…' : 'Bestand uploaden'}
@@ -508,7 +507,7 @@ export function RecipeImageUpload({
                   handleGenerateImage();
                 }}
                 disabled={isBusy}
-                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-blue-400 dark:hover:bg-blue-950/30"
               >
                 <SparklesIcon className="h-4 w-4" aria-hidden />
                 {isGenerating ? 'Bezig…' : 'AI genereren'}
@@ -522,25 +521,25 @@ export function RecipeImageUpload({
                 handlePaste();
               }}
               disabled={isBusy}
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
             >
               <ClipboardDocumentIcon className="h-4 w-4" aria-hidden />
               {isPasting ? 'Bezig…' : 'Plakken'}
             </Button>
           </div>
           {error && (
-            <span className="mt-2 block text-sm text-red-600 dark:text-red-400 text-center">
+            <span className="mt-2 block text-center text-sm text-red-600 dark:text-red-400">
               {error}
             </span>
           )}
         </div>
       ) : renderHero && previewUrl && !imageLoadError ? (
         <>
-          <div className="relative block w-full aspect-[4/1] min-h-[100px] max-h-[220px] bg-zinc-100 dark:bg-zinc-800 overflow-hidden rounded-t-lg">
+          <div className="relative block aspect-[4/1] max-h-[220px] min-h-[100px] w-full overflow-hidden rounded-t-lg bg-zinc-100 dark:bg-zinc-800">
             <button
               type="button"
               onClick={handleClick}
-              className="block w-full h-full cursor-pointer hover:opacity-95 transition-opacity"
+              className="block h-full w-full cursor-pointer transition-opacity hover:opacity-95"
               disabled={isBusy}
               aria-label="Receptafbeelding vergroten"
             >
@@ -548,7 +547,7 @@ export function RecipeImageUpload({
                 src={previewUrl}
                 alt="Recept foto"
                 fill
-                className="object-cover rounded-t-lg"
+                className="rounded-t-lg object-cover"
                 sizes="(max-width: 768px) 100vw, 800px"
                 unoptimized
                 onError={() => setImageLoadError(true)}
@@ -563,9 +562,9 @@ export function RecipeImageUpload({
           )}
         </>
       ) : renderHero && !previewUrl ? (
-        <div className="relative border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-t-lg p-6 sm:p-8 flex flex-col items-center justify-center gap-4 min-h-[140px] bg-zinc-50 dark:bg-zinc-900/50">
+        <div className="relative flex min-h-[140px] flex-col items-center justify-center gap-4 rounded-t-lg border-2 border-dashed border-zinc-300 bg-zinc-50 p-6 sm:p-8 dark:border-zinc-700 dark:bg-zinc-900/50">
           <PhotoIcon className="h-12 w-12 shrink-0 text-zinc-400 dark:text-zinc-500" />
-          <span className="text-sm text-zinc-600 dark:text-zinc-400 text-center">
+          <span className="text-center text-sm text-zinc-600 dark:text-zinc-400">
             Productafbeelding
           </span>
           <div className="flex flex-wrap items-center justify-center gap-2">
@@ -577,7 +576,7 @@ export function RecipeImageUpload({
                 fileInputRef.current?.click();
               }}
               disabled={isBusy}
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
             >
               <ArrowUpTrayIcon className="h-4 w-4" aria-hidden />
               {isUploading ? 'Bezig…' : 'Bestand uploaden'}
@@ -591,7 +590,7 @@ export function RecipeImageUpload({
                   handleGenerateImage();
                 }}
                 disabled={isBusy}
-                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-blue-400 dark:hover:bg-blue-950/30"
               >
                 <SparklesIcon className="h-4 w-4" aria-hidden />
                 {isGenerating ? 'Bezig…' : 'AI genereren'}
@@ -605,48 +604,48 @@ export function RecipeImageUpload({
                 handlePaste();
               }}
               disabled={isBusy}
-              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
             >
               <ClipboardDocumentIcon className="h-4 w-4" aria-hidden />
               {isPasting ? 'Bezig…' : 'Plakken'}
             </Button>
           </div>
           {error && (
-            <span className="mt-2 block text-sm text-red-600 dark:text-red-400 text-center">
+            <span className="mt-2 block text-center text-sm text-red-600 dark:text-red-400">
               {error}
             </span>
           )}
         </div>
       ) : previewUrl && !renderHero ? (
         <div>
-          <div className="relative block w-full min-h-[80px] max-h-[192px] rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+          <div className="relative block max-h-[192px] min-h-[80px] w-full overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
             <button
               type="button"
               onClick={handleClick}
-              className="block w-full h-full cursor-pointer hover:opacity-90 transition-opacity min-h-[80px] max-h-[192px]"
+              className="block h-full max-h-[192px] min-h-[80px] w-full cursor-pointer transition-opacity hover:opacity-90"
               disabled={isBusy}
             >
               {!imageLoadError ? (
-                <span className="relative block w-full h-full min-h-[80px] max-h-[192px]">
+                <span className="relative block h-full max-h-[192px] min-h-[80px] w-full">
                   <Image
                     src={previewUrl}
                     alt="Recept foto"
                     fill
-                    className="rounded-lg object-contain shadow-sm hover:shadow-md transition-shadow"
+                    className="rounded-lg object-contain shadow-sm transition-shadow hover:shadow-md"
                     sizes="(max-width: 768px) 100vw, 320px"
                     unoptimized
                     onError={() => setImageLoadError(true)}
                   />
                 </span>
               ) : (
-                <div className="rounded-lg w-full h-full min-h-[80px] max-h-[192px] flex items-center justify-center border-2 border-dashed border-zinc-300 dark:border-zinc-700">
-                  <div className="text-center p-4">
-                    <PhotoIcon className="h-10 w-10 text-zinc-400 dark:text-zinc-500 mx-auto mb-2" />
+                <div className="flex h-full max-h-[192px] min-h-[80px] w-full items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 dark:border-zinc-700">
+                  <div className="p-4 text-center">
+                    <PhotoIcon className="mx-auto mb-2 h-10 w-10 text-zinc-400 dark:text-zinc-500" />
                     <Text className="text-sm text-zinc-600 dark:text-zinc-400">
                       Afbeelding kon niet worden geladen
                     </Text>
                     {previewUrl && (
-                      <Text className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 break-all">
+                      <Text className="mt-1 text-xs break-all text-zinc-500 dark:text-zinc-500">
                         {previewUrl.length > 50
                           ? `${previewUrl.substring(0, 50)}...`
                           : previewUrl}
@@ -666,9 +665,9 @@ export function RecipeImageUpload({
         </div>
       ) : (
         <div>
-          <div className="relative border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg p-6 sm:p-8 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors flex flex-col items-center justify-center gap-4 min-h-[120px]">
+          <div className="relative flex min-h-[120px] flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed border-zinc-300 p-6 transition-colors hover:border-zinc-400 sm:p-8 dark:border-zinc-700 dark:hover:border-zinc-600">
             <PhotoIcon className="h-10 w-10 shrink-0 text-zinc-400 dark:text-zinc-500" />
-            <span className="text-sm text-zinc-600 dark:text-zinc-400 text-center break-words">
+            <span className="text-center text-sm break-words text-zinc-600 dark:text-zinc-400">
               Productafbeelding
             </span>
             <div className="flex flex-wrap items-center justify-center gap-2">
@@ -680,7 +679,7 @@ export function RecipeImageUpload({
                   fileInputRef.current?.click();
                 }}
                 disabled={isBusy}
-                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
               >
                 <ArrowUpTrayIcon className="h-4 w-4" aria-hidden />
                 {isUploading ? 'Bezig…' : 'Bestand uploaden'}
@@ -694,7 +693,7 @@ export function RecipeImageUpload({
                     handleGenerateImage();
                   }}
                   disabled={isBusy}
-                  className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                  className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-blue-400 dark:hover:bg-blue-950/30"
                 >
                   <SparklesIcon className="h-4 w-4" aria-hidden />
                   {isGenerating ? 'Bezig…' : 'AI genereren'}
@@ -708,7 +707,7 @@ export function RecipeImageUpload({
                   handlePaste();
                 }}
                 disabled={isBusy}
-                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
               >
                 <ClipboardDocumentIcon className="h-4 w-4" aria-hidden />
                 {isPasting ? 'Bezig…' : 'Plakken'}

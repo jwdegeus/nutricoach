@@ -8,7 +8,6 @@ import type {
   MealPlanRequest,
   MealPlanResponse,
   DietRuleSet,
-  MealSlot,
   MealIngredientRef,
 } from '@/src/lib/diets';
 import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner';

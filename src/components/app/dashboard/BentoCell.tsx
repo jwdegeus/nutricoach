@@ -37,9 +37,9 @@ export function BentoCell({
       >
         {children}
       </div>
-      {/* Layer 4: soft edge in dark mode (subtle outline, no border) */}
+      {/* Layer 4: soft edge for contrast (per AGENTS 4.0: light outline, no border) */}
       <div
-        className={`pointer-events-none absolute inset-px ${round} shadow-sm dark:outline dark:outline-white/15`}
+        className={`pointer-events-none absolute inset-px ${round} shadow-sm outline outline-1 -outline-offset-1 outline-border/50`}
         aria-hidden
       />
     </div>

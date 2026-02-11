@@ -110,7 +110,7 @@ export function StoreProductSearchPicker({
           <div
             id="store-product-search-list"
             role="listbox"
-            className="absolute z-10 mt-1 w-full max-h-80 overflow-auto rounded-xl bg-white/95 dark:bg-zinc-900/95 shadow-lg ring-1 ring-zinc-950/10 dark:ring-white/10"
+            className="absolute z-10 mt-1 max-h-80 w-full overflow-auto rounded-xl bg-white/95 shadow-lg ring-1 ring-zinc-950/10 dark:bg-zinc-900/95 dark:ring-white/10"
           >
             {loading && (
               <div className="px-4 py-3 text-sm text-muted-foreground">
@@ -133,21 +133,22 @@ export function StoreProductSearchPicker({
                     key={item.id}
                     type="button"
                     role="option"
-                    className="w-full text-left px-4 py-2.5 sm:py-2 hover:bg-zinc-100 dark:hover:bg-white/10 focus:bg-zinc-100 dark:focus:bg-white/10 outline-hidden rounded-lg flex items-center justify-between gap-2"
+                    aria-selected={false}
+                    className="flex w-full items-center justify-between gap-2 rounded-lg px-4 py-2.5 text-left outline-hidden hover:bg-zinc-100 focus:bg-zinc-100 sm:py-2 dark:hover:bg-white/10 dark:focus:bg-white/10"
                     onClick={() => handleSelect(item)}
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="font-medium text-foreground block truncate">
+                      <span className="block truncate font-medium text-foreground">
                         {item.title}
                       </span>
                       {item.brand && (
-                        <span className="text-sm text-muted-foreground block truncate">
+                        <span className="block truncate text-sm text-muted-foreground">
                           {item.brand}
                         </span>
                       )}
                     </span>
                     {right && (
-                      <span className="text-sm text-muted-foreground shrink-0 whitespace-nowrap">
+                      <span className="shrink-0 text-sm whitespace-nowrap text-muted-foreground">
                         {right}
                       </span>
                     )}

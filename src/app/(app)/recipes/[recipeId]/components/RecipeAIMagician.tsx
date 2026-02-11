@@ -434,13 +434,13 @@ export function RecipeAIMagician({
           state.type === 'loading' ||
           state.type === 'analysis_only') && (
           <div
-            className="border-b border-zinc-200 dark:border-zinc-800 mb-6"
+            className="mb-6 border-b border-zinc-200 dark:border-zinc-800"
             role="tablist"
           >
             <nav className="-mb-px flex space-x-8">
               <button
                 onClick={() => setActiveTab('analyse')}
-                className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900 rounded-t ${
+                className={`rounded-t border-b-2 px-1 py-4 text-sm font-medium whitespace-nowrap transition-colors focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:outline-none dark:focus:ring-offset-zinc-900 ${
                   activeTab === 'analyse'
                     ? 'border-primary-500 text-primary-600 dark:text-primary-400'
                     : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
@@ -454,7 +454,7 @@ export function RecipeAIMagician({
               </button>
               <button
                 onClick={() => setActiveTab('rewrite')}
-                className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900 rounded-t ${
+                className={`rounded-t border-b-2 px-1 py-4 text-sm font-medium whitespace-nowrap transition-colors focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:outline-none dark:focus:ring-offset-zinc-900 ${
                   activeTab === 'rewrite'
                     ? 'border-primary-500 text-primary-600 dark:text-primary-400'
                     : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
@@ -479,7 +479,7 @@ export function RecipeAIMagician({
         {state.type === 'idle' && (
           <div className="space-y-4 py-6">
             <div className="text-center">
-              <SparklesIcon className="h-12 w-12 text-blue-500 dark:text-blue-400 mx-auto mb-4" />
+              <SparklesIcon className="mx-auto mb-4 h-12 w-12 text-blue-500 dark:text-blue-400" />
               <Text className="text-zinc-600 dark:text-zinc-400">
                 Laat de AI Magician alleen de ingrediënten die niet passen bij
                 jouw dieet vervangen door passende alternatieven. De rest van
@@ -499,16 +499,16 @@ export function RecipeAIMagician({
         {state.type === 'loading' && (
           <div className="space-y-4 py-6">
             <div className="text-center">
-              <ArrowPathIcon className="h-12 w-12 text-blue-500 dark:text-blue-400 mx-auto mb-4 animate-spin" />
+              <ArrowPathIcon className="mx-auto mb-4 h-12 w-12 animate-spin text-blue-500 dark:text-blue-400" />
               <Text className="text-zinc-600 dark:text-zinc-400">
                 Recept wordt geanalyseerd...
               </Text>
             </div>
             {/* Skeleton for tabs content */}
-            <div className="space-y-4 mt-6">
-              <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-3/4 animate-pulse" />
-              <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-1/2 animate-pulse" />
-              <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-5/6 animate-pulse" />
+            <div className="mt-6 space-y-4">
+              <div className="h-4 w-3/4 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-4 w-1/2 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              <div className="h-4 w-5/6 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
             </div>
           </div>
         )}
@@ -518,20 +518,20 @@ export function RecipeAIMagician({
           <div className="space-y-4 py-8">
             <div className="text-center">
               <ArrowPathIcon
-                className="h-14 w-14 text-blue-500 dark:text-blue-400 mx-auto mb-4 animate-spin"
+                className="mx-auto mb-4 h-14 w-14 animate-spin text-blue-500 dark:text-blue-400"
                 aria-hidden
               />
-              <Text className="text-zinc-700 dark:text-zinc-300 font-medium block mb-1">
+              <Text className="mb-1 block font-medium text-zinc-700 dark:text-zinc-300">
                 Niet-conforme ingrediënten worden vervangen door jouw keuzes
               </Text>
               <Text className="text-sm text-zinc-500 dark:text-zinc-400">
                 Even geduld…
               </Text>
             </div>
-            <div className="space-y-2 mt-6 max-w-sm mx-auto" aria-hidden>
-              <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full animate-pulse" />
-              <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full animate-pulse w-4/5 mx-auto" />
-              <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full animate-pulse w-3/5 mx-auto" />
+            <div className="mx-auto mt-6 max-w-sm space-y-2" aria-hidden>
+              <div className="h-2 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
+              <div className="mx-auto h-2 w-4/5 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
+              <div className="mx-auto h-2 w-3/5 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
             </div>
           </div>
         )}
@@ -540,8 +540,8 @@ export function RecipeAIMagician({
         {state.type === 'error' && (
           <div className="space-y-4 py-6">
             <div className="text-center">
-              <ExclamationTriangleIcon className="h-12 w-12 text-red-500 dark:text-red-400 mx-auto mb-4" />
-              <Text className="text-red-600 dark:text-red-400 font-medium mb-2">
+              <ExclamationTriangleIcon className="mx-auto mb-4 h-12 w-12 text-red-500 dark:text-red-400" />
+              <Text className="mb-2 font-medium text-red-600 dark:text-red-400">
                 Fout
               </Text>
               <Text className="text-zinc-600 dark:text-zinc-400">
@@ -560,7 +560,7 @@ export function RecipeAIMagician({
         {state.type === 'empty' && (
           <div className="space-y-4 py-6">
             <div className="text-center">
-              <ExclamationTriangleIcon className="h-12 w-12 text-amber-500 dark:text-amber-400 mx-auto mb-4" />
+              <ExclamationTriangleIcon className="mx-auto mb-4 h-12 w-12 text-amber-500 dark:text-amber-400" />
               <Text className="text-zinc-600 dark:text-zinc-400">
                 {state.reason === 'Geen dieet geselecteerd'
                   ? 'Selecteer eerst een dieettype in je instellingen om gebruik te maken van de AI Magician.'
@@ -581,9 +581,9 @@ export function RecipeAIMagician({
             {'noRulesConfigured' in state.data &&
             state.data.noRulesConfigured ? (
               <div className="space-y-4 py-2">
-                <div className="text-center py-8 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
-                  <ExclamationTriangleIcon className="h-12 w-12 text-amber-500 dark:text-amber-400 mx-auto mb-4" />
-                  <Text className="text-zinc-700 dark:text-zinc-300 font-medium mb-2">
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 py-8 text-center dark:border-zinc-800 dark:bg-zinc-900/50">
+                  <ExclamationTriangleIcon className="mx-auto mb-4 h-12 w-12 text-amber-500 dark:text-amber-400" />
+                  <Text className="mb-2 font-medium text-zinc-700 dark:text-zinc-300">
                     Geen dieetregels geconfigureerd
                   </Text>
                   <Text className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -595,7 +595,7 @@ export function RecipeAIMagician({
               </div>
             ) : state.data.violations.length > 0 ? (
               <>
-                <div className="flex items-center gap-2 mb-4">
+                <div className="mb-4 flex items-center gap-2">
                   <ExclamationTriangleIcon className="h-5 w-5 text-amber-500 dark:text-amber-400" />
                   <Text className="font-semibold text-zinc-900 dark:text-white">
                     {state.data.violations.length}{' '}
@@ -605,7 +605,7 @@ export function RecipeAIMagician({
                   </Text>
                 </div>
                 <div
-                  className="max-h-[min(40vh,320px)] overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-800 p-1 space-y-4 pr-2"
+                  className="max-h-[min(40vh,320px)] space-y-4 overflow-y-auto rounded-lg border border-zinc-200 p-1 pr-2 dark:border-zinc-800"
                   role="region"
                   aria-label="Afwijkingsmeldingen"
                 >
@@ -636,14 +636,14 @@ export function RecipeAIMagician({
                         key={idx}
                         className={`rounded-lg border p-4 ${
                           severity.level === 'verboden'
-                            ? 'border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-950/30'
+                            ? 'border-red-200 bg-red-50/50 dark:border-red-800/50 dark:bg-red-950/30'
                             : severity.level === 'beter_van_niet'
-                              ? 'border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-950/20'
-                              : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50'
+                              ? 'border-amber-200 bg-amber-50/30 dark:border-amber-800/50 dark:bg-amber-950/20'
+                              : 'border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/50'
                         }`}
                       >
                         <div className="flex items-start gap-3">
-                          <div className="flex-1 space-y-2 min-w-0">
+                          <div className="min-w-0 flex-1 space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
                               <Badge
                                 color={
@@ -662,7 +662,7 @@ export function RecipeAIMagician({
                               </Badge>
                             </div>
                             <div>
-                              <Text className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                              <Text className="text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
                                 Regel
                               </Text>
                               <Text className="text-sm text-zinc-900 dark:text-white">
@@ -670,7 +670,7 @@ export function RecipeAIMagician({
                               </Text>
                             </div>
                             <div>
-                              <Text className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                              <Text className="text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
                                 Advies uit dieetregels
                               </Text>
                               <Text className="text-sm text-zinc-700 dark:text-zinc-300">
@@ -697,7 +697,7 @@ export function RecipeAIMagician({
                                 </div>
                               )}
                             <div className="mt-3">
-                              <Text className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-2 block">
+                              <Text className="mb-2 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
                                 Jouw keuze
                               </Text>
                               <RadioGroup
@@ -725,7 +725,7 @@ export function RecipeAIMagician({
                                 className="space-y-2"
                               >
                                 {hasAllowed && (
-                                  <label className="flex items-center gap-2 cursor-pointer">
+                                  <label className="flex cursor-pointer items-center gap-2">
                                     <Radio
                                       value="use_allowed"
                                       color="dark/zinc"
@@ -742,7 +742,7 @@ export function RecipeAIMagician({
                                   alternatives.map((alt) => (
                                     <label
                                       key={alt}
-                                      className="flex items-center gap-2 cursor-pointer"
+                                      className="flex cursor-pointer items-center gap-2"
                                     >
                                       <Radio
                                         value={`substitute__${alt}`}
@@ -757,7 +757,7 @@ export function RecipeAIMagician({
                                     </label>
                                   ))
                                 ) : (
-                                  <label className="flex items-center gap-2 cursor-pointer">
+                                  <label className="flex cursor-pointer items-center gap-2">
                                     <Radio
                                       value="substitute"
                                       color="dark/zinc"
@@ -768,14 +768,14 @@ export function RecipeAIMagician({
                                   </label>
                                 )}
                                 {severity.level === 'niet_gewenst' && (
-                                  <label className="flex items-center gap-2 cursor-pointer">
+                                  <label className="flex cursor-pointer items-center gap-2">
                                     <Radio value="keep" color="dark/zinc" />
                                     <Text className="text-sm text-zinc-700 dark:text-zinc-300">
                                       Behoud dit ingrediënt
                                     </Text>
                                   </label>
                                 )}
-                                <label className="flex items-center gap-2 cursor-pointer">
+                                <label className="flex cursor-pointer items-center gap-2">
                                   <Radio value="remove" color="dark/zinc" />
                                   <Text className="text-sm text-zinc-700 dark:text-zinc-300">
                                     Schrappen uit het menu
@@ -789,13 +789,13 @@ export function RecipeAIMagician({
                     );
                   })}
                 </div>
-                <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                <div className="border-t border-zinc-200 pt-4 dark:border-zinc-800">
                   {
                     <>
                       {rewriteError && (
-                        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-3 mb-4">
+                        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/50">
                           <div className="flex items-start gap-2">
-                            <ExclamationTriangleIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                            <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
                             <Text className="text-sm text-amber-800 dark:text-amber-200">
                               {rewriteError}
                             </Text>
@@ -815,8 +815,8 @@ export function RecipeAIMagician({
               </>
             ) : (
               <div className="space-y-4 py-2">
-                <div className="text-center py-8">
-                  <CheckCircleIcon className="h-12 w-12 text-green-500 dark:text-green-400 mx-auto mb-4" />
+                <div className="py-8 text-center">
+                  <CheckCircleIcon className="mx-auto mb-4 h-12 w-12 text-green-500 dark:text-green-400" />
                   <Text className="text-zinc-600 dark:text-zinc-400">
                     Geen afwijkingen gevonden! Dit recept past perfect bij jouw
                     dieet.
@@ -837,7 +837,7 @@ export function RecipeAIMagician({
           >
             {state.data.analysis.violations.length > 0 ? (
               <>
-                <div className="flex items-center gap-2 mb-4">
+                <div className="mb-4 flex items-center gap-2">
                   <ExclamationTriangleIcon className="h-5 w-5 text-amber-500 dark:text-amber-400" />
                   <Text className="font-semibold text-zinc-900 dark:text-white">
                     {state.data.analysis.violations.length}{' '}
@@ -847,7 +847,7 @@ export function RecipeAIMagician({
                   </Text>
                 </div>
                 <div
-                  className="max-h-[min(40vh,320px)] overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-800 p-1 space-y-4 pr-2"
+                  className="max-h-[min(40vh,320px)] space-y-4 overflow-y-auto rounded-lg border border-zinc-200 p-1 pr-2 dark:border-zinc-800"
                   role="region"
                   aria-label="Afwijkingsmeldingen"
                 >
@@ -860,14 +860,14 @@ export function RecipeAIMagician({
                         key={idx}
                         className={`rounded-lg border p-4 ${
                           severity.level === 'verboden'
-                            ? 'border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-950/30'
+                            ? 'border-red-200 bg-red-50/50 dark:border-red-800/50 dark:bg-red-950/30'
                             : severity.level === 'beter_van_niet'
-                              ? 'border-amber-200 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-950/20'
-                              : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50'
+                              ? 'border-amber-200 bg-amber-50/30 dark:border-amber-800/50 dark:bg-amber-950/20'
+                              : 'border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/50'
                         }`}
                       >
                         <div className="flex items-start gap-3">
-                          <div className="flex-1 space-y-2 min-w-0">
+                          <div className="min-w-0 flex-1 space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
                               <Badge
                                 color={
@@ -886,7 +886,7 @@ export function RecipeAIMagician({
                               </Badge>
                             </div>
                             <div>
-                              <Text className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                              <Text className="text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
                                 Regel
                               </Text>
                               <Text className="text-sm text-zinc-900 dark:text-white">
@@ -894,7 +894,7 @@ export function RecipeAIMagician({
                               </Text>
                             </div>
                             <div>
-                              <Text className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                              <Text className="text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
                                 Advies uit dieetregels
                               </Text>
                               <Text className="text-sm text-zinc-700 dark:text-zinc-300">
@@ -909,8 +909,8 @@ export function RecipeAIMagician({
                 </div>
               </>
             ) : (
-              <div className="text-center py-8">
-                <CheckCircleIcon className="h-12 w-12 text-green-500 dark:text-green-400 mx-auto mb-4" />
+              <div className="py-8 text-center">
+                <CheckCircleIcon className="mx-auto mb-4 h-12 w-12 text-green-500 dark:text-green-400" />
                 <Text className="text-zinc-600 dark:text-zinc-400">
                   Geen afwijkingen gevonden! Dit recept past perfect bij jouw
                   dieet.
@@ -925,17 +925,17 @@ export function RecipeAIMagician({
           activeTab === 'rewrite' &&
           state.data.rewrite && (
             <div
-              className="flex flex-col min-h-0 max-h-[65vh] py-2"
+              className="flex max-h-[65vh] min-h-0 flex-col py-2"
               role="tabpanel"
               id="rewrite-panel"
               aria-labelledby="rewrite-tab"
             >
               {/* Scrollbare inhoud: intro, ingrediënten, stappen, waarom, meldingen */}
-              <div className="overflow-y-auto flex-1 min-h-0 space-y-6 pr-1 -mr-1">
+              <div className="-mr-1 min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
                 {/* Intro (Gemini "chef" uitleg) */}
                 {state.data.rewrite.intro && (
-                  <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4">
-                    <Text className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
+                  <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
+                    <Text className="text-sm whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
                       {state.data.rewrite.intro}
                     </Text>
                   </div>
@@ -943,14 +943,14 @@ export function RecipeAIMagician({
 
                 {/* Ingredients */}
                 <div>
-                  <Text className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
+                  <Text className="mb-4 text-lg font-semibold text-zinc-900 dark:text-white">
                     Aangepaste ingrediënten
                   </Text>
                   <ul className="space-y-2">
                     {state.data.rewrite.ingredients.map((ingredient, idx) => (
                       <li
                         key={idx}
-                        className="text-sm text-zinc-600 dark:text-zinc-400 flex items-start gap-2"
+                        className="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-400"
                       >
                         <span className="text-zinc-400 dark:text-zinc-500">
                           •
@@ -966,7 +966,7 @@ export function RecipeAIMagician({
                             </>
                           )}
                           {ingredient.note && (
-                            <span className="text-zinc-500 dark:text-zinc-500 ml-1 italic">
+                            <span className="ml-1 text-zinc-500 italic dark:text-zinc-500">
                               ({ingredient.note})
                             </span>
                           )}
@@ -979,7 +979,7 @@ export function RecipeAIMagician({
                 {/* Steps */}
                 {state.data.rewrite.steps.length > 0 && (
                   <div>
-                    <Text className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
+                    <Text className="mb-4 text-lg font-semibold text-zinc-900 dark:text-white">
                       Aangepaste bereidingswijze
                     </Text>
                     <ol className="space-y-3">
@@ -988,7 +988,7 @@ export function RecipeAIMagician({
                           key={`step-${index}`}
                           className="flex gap-3 text-sm text-zinc-600 dark:text-zinc-400"
                         >
-                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-medium text-xs">
+                          <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
                             {step.step}
                           </span>
                           <span className="flex-1 pt-0.5">{step.text}</span>
@@ -1002,20 +1002,20 @@ export function RecipeAIMagician({
                 {state.data.rewrite.whyThisWorks &&
                   state.data.rewrite.whyThisWorks.length > 0 && (
                     <div
-                      className="rounded-lg border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/80 dark:bg-emerald-950/30 p-4"
+                      className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-800/50 dark:bg-emerald-950/30"
                       role="region"
                       aria-label="Waarom dit werkt voor jouw dieet"
                     >
-                      <Text className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mb-3">
+                      <Text className="mb-3 text-sm font-semibold text-emerald-800 dark:text-emerald-200">
                         Waarom dit werkt voor jouw dieet
                       </Text>
                       <ul className="space-y-1.5">
                         {state.data.rewrite.whyThisWorks.map((bullet, idx) => (
                           <li
                             key={idx}
-                            className="text-sm text-emerald-800 dark:text-emerald-200 flex items-start gap-2"
+                            className="flex items-start gap-2 text-sm text-emerald-800 dark:text-emerald-200"
                           >
-                            <span className="text-emerald-500 dark:text-emerald-400 mt-0.5">
+                            <span className="mt-0.5 text-emerald-500 dark:text-emerald-400">
                               •
                             </span>
                             <span>{bullet}</span>
@@ -1027,9 +1027,9 @@ export function RecipeAIMagician({
 
                 {/* Persist Error Alert */}
                 {persistError && (
-                  <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-3">
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/50">
                     <div className="flex items-start gap-2">
-                      <ExclamationTriangleIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                      <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
                       <div className="flex-1">
                         <Text className="text-xs text-amber-800 dark:text-amber-200">
                           Kon niet automatisch opslaan: {persistError}
@@ -1068,28 +1068,28 @@ export function RecipeAIMagician({
               </div>
 
               {/* Persist Success / Apply Section – vast onderaan */}
-              <div className="flex-shrink-0 pt-4 border-t border-zinc-200 dark:border-zinc-800 mt-4">
+              <div className="mt-4 flex-shrink-0 border-t border-zinc-200 pt-4 dark:border-zinc-800">
                 {isApplied ? (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2 justify-center">
+                    <div className="flex items-center justify-center gap-2">
                       <CheckCircleIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
                       <Text className="text-sm font-medium text-green-600 dark:text-green-400">
                         Aangepaste versie toegepast
                       </Text>
                     </div>
-                    <Text className="text-xs text-zinc-500 dark:text-zinc-400 text-center">
+                    <Text className="text-center text-xs text-zinc-500 dark:text-zinc-400">
                       Je aangepaste versie is nu actief
                     </Text>
                   </div>
                 ) : (
                   <>
                     {isPersisting && (
-                      <Text className="text-xs text-zinc-500 dark:text-zinc-400 text-center mb-2">
+                      <Text className="mb-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
                         Opslaan...
                       </Text>
                     )}
                     {adaptationId && !isPersisting && (
-                      <Text className="text-xs text-zinc-500 dark:text-zinc-400 text-center mb-2">
+                      <Text className="mb-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
                         Opgeslagen als concept
                       </Text>
                     )}
@@ -1111,7 +1111,7 @@ export function RecipeAIMagician({
                       )}
                     </Button>
                     {applyError && (
-                      <Text className="text-xs text-red-600 dark:text-red-400 text-center mt-2">
+                      <Text className="mt-2 text-center text-xs text-red-600 dark:text-red-400">
                         {applyError}
                       </Text>
                     )}

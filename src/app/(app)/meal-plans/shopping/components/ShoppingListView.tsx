@@ -272,7 +272,7 @@ export function ShoppingListView({
   return (
     <div className="space-y-6">
       {/* Quick Stats Bar */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-6">
           <div>
             <Text className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -307,9 +307,9 @@ export function ShoppingListView({
             color="green"
           >
             {isBulkAdding ? (
-              <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+              <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <CheckCircleIcon className="h-4 w-4 mr-2" />
+              <CheckCircleIcon className="mr-2 h-4 w-4" />
             )}
             Markeer {checkedItems.size} item{checkedItems.size > 1 ? 's' : ''}{' '}
             als gekocht
@@ -331,7 +331,7 @@ export function ShoppingListView({
               key={group.category}
               className="rounded-lg bg-white p-4 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10"
             >
-              <div className="flex items-center gap-2 mb-3">
+              <div className="mb-3 flex items-center gap-2">
                 <ShoppingBagIcon className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
                 <Heading level={3} className="text-base font-semibold">
                   {group.category}
@@ -350,21 +350,15 @@ export function ShoppingListView({
                   return (
                     <div
                       key={item.nevoCode}
-                      className={`
-                        flex items-center gap-3 p-2 rounded-lg transition-colors
-                        ${isChecked ? 'bg-green-50 dark:bg-green-950/20' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'}
-                      `}
+                      className={`flex items-center gap-3 rounded-lg p-2 transition-colors ${isChecked ? 'bg-green-50 dark:bg-green-950/20' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'} `}
                     >
                       <button
                         onClick={() => handleToggleItem(item.nevoCode)}
-                        className={`
-                          flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all
-                          ${
-                            isChecked
-                              ? 'bg-green-600 border-green-600'
-                              : 'border-zinc-300 dark:border-zinc-600 hover:border-green-500'
-                          }
-                        `}
+                        className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-2 transition-all ${
+                          isChecked
+                            ? 'border-green-600 bg-green-600'
+                            : 'border-zinc-300 hover:border-green-500 dark:border-zinc-600'
+                        } `}
                         title={isChecked ? 'Geselecteerd' : 'Selecteer'}
                       >
                         {isChecked && (
@@ -372,8 +366,8 @@ export function ShoppingListView({
                         )}
                       </button>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium text-zinc-950 dark:text-white">
                             {item.name}
                           </span>
@@ -387,7 +381,7 @@ export function ShoppingListView({
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 mt-0.5">
+                        <div className="mt-0.5 flex items-center gap-2">
                           <Text className="text-xs text-zinc-500 dark:text-zinc-400">
                             {item.missingG.toFixed(0)}g nodig
                           </Text>
@@ -400,7 +394,7 @@ export function ShoppingListView({
                             )}
                         </div>
                         {primaryStore && (
-                          <div className="mt-2 rounded-lg bg-muted/20 p-2 space-y-1">
+                          <div className="mt-2 space-y-1 rounded-lg bg-muted/20 p-2">
                             <Text className="text-xs font-medium text-muted-foreground">
                               Kopen bij: {primaryStore.name}
                             </Text>
@@ -412,7 +406,7 @@ export function ShoppingListView({
                                 );
                                 const link = linkByKey[key];
                                 return (
-                                  <div className="flex items-center gap-2 flex-wrap">
+                                  <div className="flex flex-wrap items-center gap-2">
                                     {link ? (
                                       <>
                                         <Text className="text-sm text-foreground">
@@ -431,9 +425,9 @@ export function ShoppingListView({
                                             })
                                           }
                                           plain
-                                          className="!p-0 h-6 text-xs"
+                                          className="h-6 !p-0 text-xs"
                                         >
-                                          <PencilSquareIcon className="h-3.5 w-3.5 mr-0.5" />
+                                          <PencilSquareIcon className="mr-0.5 h-3.5 w-3.5" />
                                           Wijzig
                                         </Button>
                                       </>
@@ -450,7 +444,7 @@ export function ShoppingListView({
                                         plain
                                         className="h-7 text-sm"
                                       >
-                                        <MagnifyingGlassIcon className="h-3.5 w-3.5 mr-1" />
+                                        <MagnifyingGlassIcon className="mr-1 h-3.5 w-3.5" />
                                         Kies product
                                       </Button>
                                     )}
@@ -467,7 +461,7 @@ export function ShoppingListView({
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <div className="text-sm font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">
+                        <div className="text-sm font-semibold whitespace-nowrap text-red-600 dark:text-red-400">
                           {item.missingG.toFixed(0)}g
                         </div>
                         <Button
@@ -476,7 +470,7 @@ export function ShoppingListView({
                           }
                           disabled={isAdding}
                           plain
-                          className="h-7 w-7 !p-0 !min-w-0"
+                          className="h-7 w-7 !min-w-0 !p-0"
                           title="Voeg toe aan pantry"
                         >
                           {isAdding ? (
@@ -530,7 +524,7 @@ export function ShoppingListView({
             </div>
             {modalError && (
               <div
-                className="rounded-lg bg-red-50 dark:bg-red-950/20 p-3 text-sm text-red-800 dark:text-red-200"
+                className="rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/20 dark:text-red-200"
                 role="alert"
               >
                 {modalError}
@@ -551,25 +545,25 @@ export function ShoppingListView({
                 </Text>
               )}
             {searchResults.length > 0 && (
-              <ul className="space-y-1 max-h-60 overflow-y-auto rounded-lg bg-muted/20 p-2">
+              <ul className="max-h-60 space-y-1 overflow-y-auto rounded-lg bg-muted/20 p-2">
                 {searchResults.map((product) => (
                   <li key={product.id}>
                     <button
                       type="button"
                       onClick={() => handleSelectProduct(product)}
                       disabled={upserting}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted/40 transition-colors disabled:opacity-50"
+                      className="w-full rounded-lg px-3 py-2 text-left transition-colors hover:bg-muted/40 disabled:opacity-50"
                     >
                       <span className="font-medium text-foreground">
                         {product.title}
                       </span>
                       {product.brand && (
-                        <span className="text-muted-foreground text-sm ml-1">
+                        <span className="ml-1 text-sm text-muted-foreground">
                           ({product.brand})
                         </span>
                       )}
                       {product.priceCents != null && (
-                        <span className="text-sm text-muted-foreground block mt-0.5">
+                        <span className="mt-0.5 block text-sm text-muted-foreground">
                           €{(product.priceCents / 100).toFixed(2)}
                         </span>
                       )}

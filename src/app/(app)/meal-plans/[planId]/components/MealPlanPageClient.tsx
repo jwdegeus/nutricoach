@@ -37,11 +37,11 @@ export function MealPlanPageClient({
     <div className="space-y-4">
       {isEditing && (
         <div
-          className="rounded-lg border border-border bg-muted/30 px-4 py-3 flex items-start gap-3"
+          className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3"
           role="status"
           aria-live="polite"
         >
-          <ArrowPathIcon className="h-5 w-5 text-muted-foreground animate-spin flex-shrink-0 mt-0.5" />
+          <ArrowPathIcon className="mt-0.5 h-5 w-5 flex-shrink-0 animate-spin text-muted-foreground" />
           <div className="space-y-1">
             <Text className="text-sm font-medium text-foreground">
               Bezig met aanpassen…

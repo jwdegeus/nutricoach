@@ -480,12 +480,12 @@ export function IngredientsAdminClient({
         >
           <TableHead>
             <TableRow>
-              <TableHeader className="py-3 px-4">Bron</TableHeader>
-              <TableHeader className="py-3 px-4">Groep</TableHeader>
-              <TableHeader className="py-3 px-4">Naam</TableHeader>
-              <TableHeader className="py-3 px-4">Beschrijving</TableHeader>
-              <TableHeader className="py-3 px-4">Aangemaakt</TableHeader>
-              <TableHeader className="w-12 py-3 px-2" aria-label="Acties" />
+              <TableHeader className="px-4 py-3">Bron</TableHeader>
+              <TableHeader className="px-4 py-3">Groep</TableHeader>
+              <TableHeader className="px-4 py-3">Naam</TableHeader>
+              <TableHeader className="px-4 py-3">Beschrijving</TableHeader>
+              <TableHeader className="px-4 py-3">Aangemaakt</TableHeader>
+              <TableHeader className="w-12 px-2 py-3" aria-label="Acties" />
             </TableRow>
           </TableHead>
           <TableBody>
@@ -493,7 +493,7 @@ export function IngredientsAdminClient({
               <TableRow>
                 <TableCell
                   colSpan={6}
-                  className="text-center text-zinc-500 dark:text-zinc-400 py-10 px-4"
+                  className="px-4 py-10 text-center text-zinc-500 dark:text-zinc-400"
                 >
                   Geen ingrediënten gevonden
                 </TableCell>
@@ -514,7 +514,7 @@ export function IngredientsAdminClient({
                     onClick={() => hasDetail && openDetail(row)}
                   >
                     <TableCell
-                      className={`py-3 px-4 ${!isEnabled ? 'opacity-60' : ''}`}
+                      className={`px-4 py-3 ${!isEnabled ? 'opacity-60' : ''}`}
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge
@@ -538,29 +538,29 @@ export function IngredientsAdminClient({
                       </div>
                     </TableCell>
                     <TableCell
-                      className={`py-3 px-4 text-zinc-600 dark:text-zinc-400 max-w-[140px] truncate ${!isEnabled ? 'opacity-60' : ''}`}
+                      className={`max-w-[140px] truncate px-4 py-3 text-zinc-600 dark:text-zinc-400 ${!isEnabled ? 'opacity-60' : ''}`}
                     >
                       {row.food_group_nl ?? '–'}
                     </TableCell>
                     <TableCell
-                      className={`py-3 px-4 font-medium text-zinc-900 dark:text-white max-w-[200px] truncate ${!isEnabled ? 'opacity-60' : ''}`}
+                      className={`max-w-[200px] truncate px-4 py-3 font-medium text-zinc-900 dark:text-white ${!isEnabled ? 'opacity-60' : ''}`}
                     >
                       {row.display_name}
                     </TableCell>
                     <TableCell
-                      className={`py-3 px-4 text-zinc-600 dark:text-zinc-400 max-w-[240px] truncate ${!isEnabled ? 'opacity-60' : ''}`}
+                      className={`max-w-[240px] truncate px-4 py-3 text-zinc-600 dark:text-zinc-400 ${!isEnabled ? 'opacity-60' : ''}`}
                     >
                       {row.description ?? '–'}
                     </TableCell>
                     <TableCell
-                      className={`py-3 px-4 text-zinc-500 dark:text-zinc-400 text-sm tabular-nums ${!isEnabled ? 'opacity-60' : ''}`}
+                      className={`px-4 py-3 text-sm text-zinc-500 tabular-nums dark:text-zinc-400 ${!isEnabled ? 'opacity-60' : ''}`}
                     >
                       {row.created_at
                         ? new Date(row.created_at).toLocaleDateString('nl-NL')
                         : '–'}
                     </TableCell>
                     <TableCell
-                      className="py-3 px-2 w-12"
+                      className="w-12 px-2 py-3"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Dropdown>
@@ -623,7 +623,7 @@ export function IngredientsAdminClient({
                                   e.stopPropagation();
                                   handleDeleteClick(row);
                                 }}
-                                className="text-red-600 dark:text-red-400 data-focus:bg-red-50 data-focus:text-red-700 dark:data-focus:bg-red-900/20 dark:data-focus:text-red-300"
+                                className="text-red-600 data-focus:bg-red-50 data-focus:text-red-700 dark:text-red-400 dark:data-focus:bg-red-900/20 dark:data-focus:text-red-300"
                               >
                                 <TrashIcon className="h-4 w-4" />
                                 Verwijderen
@@ -686,7 +686,7 @@ export function IngredientsAdminClient({
             </p>
           </div>
           <Button onClick={() => setCreateOpen(true)}>
-            <PlusIcon className="h-4 w-4 mr-1" />
+            <PlusIcon className="mr-1 h-4 w-4" />
             Nieuw NutriCoach ingredient
           </Button>
         </div>
@@ -697,7 +697,7 @@ export function IngredientsAdminClient({
             Ingrediënten
           </h2>
           <Button onClick={() => setCreateOpen(true)}>
-            <PlusIcon className="h-4 w-4 mr-1" />
+            <PlusIcon className="mr-1 h-4 w-4" />
             Nieuw NutriCoach ingredient
           </Button>
         </div>
@@ -757,7 +757,7 @@ export function IngredientsAdminClient({
             ))}
           </DropdownMenu>
         </Dropdown>
-        <div className="min-w-[200px] flex-1 max-w-sm">
+        <div className="max-w-sm min-w-[200px] flex-1">
           <InputGroup>
             <MagnifyingGlassIcon data-slot="icon" />
             <Input
@@ -791,25 +791,25 @@ export function IngredientsAdminClient({
           }}
           className="shrink-0"
         >
-          <MagnifyingGlassCircleIcon className="h-4 w-4 mr-1" />
+          <MagnifyingGlassCircleIcon className="mr-1 h-4 w-4" />
           Vind duplicaten
         </Button>
       </div>
 
       {loading ? (
-        <div className="space-y-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
-          <div className="h-5 w-48 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+        <div className="space-y-3 rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="h-5 w-48 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
           <div className="space-y-2">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
-                className="h-12 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse"
+                className="h-12 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800"
               />
             ))}
           </div>
         </div>
       ) : data && data.rows.length === 0 ? (
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-8 text-center">
+        <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-zinc-600 dark:text-zinc-400">
             Geen resultaten. Pas filters aan of zoek op een andere term.
           </p>
@@ -825,7 +825,7 @@ export function IngredientsAdminClient({
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} size="lg">
         <DialogTitle>Nieuw NutriCoach ingredient</DialogTitle>
         <DialogBody>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+          <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
             Voeg een NutriCoach-ingrediënt toe dat niet in NEVO staat. Vul naam
             en kies een ingredientgroep; daarna kun je op de editpagina de
             overige velden invullen. Het ingrediënt wordt ook in die groep
@@ -892,13 +892,13 @@ export function IngredientsAdminClient({
       >
         <DialogTitle>Vind duplicaten (NEVO ↔ FNDDS)</DialogTitle>
         <DialogBody>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+          <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
             Zoek kandidaten die waarschijnlijk hetzelfde ingrediënt zijn.
             Selecteer FNDDS-varianten om in bulk uit te schakelen (NEVO blijft
             primair).
           </p>
 
-          <div className="flex flex-wrap items-end gap-4 mb-4">
+          <div className="mb-4 flex flex-wrap items-end gap-4">
             <Field>
               <Label>Min. score (fuzzy)</Label>
               <select
@@ -908,7 +908,7 @@ export function IngredientsAdminClient({
                     Number(e.target.value) as 0.6 | 0.7 | 0.8 | 0.9,
                   )
                 }
-                className="mt-1 block w-full rounded-lg border-zinc-300 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white sm:text-sm"
+                className="mt-1 block w-full rounded-lg border-zinc-300 sm:text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
                 aria-label="Minimale score"
               >
                 {MIN_SCORE_OPTIONS.map((s) => (
@@ -934,7 +934,7 @@ export function IngredientsAdminClient({
               />
               <Label className="!mb-0">Inclusief fuzzy (trigram)</Label>
             </div>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400 self-center">
+            <span className="self-center text-xs text-zinc-500 dark:text-zinc-400">
               Kan traag zijn bij veel ingrediënten
             </span>
             <Field className="min-w-[180px]">
@@ -948,9 +948,9 @@ export function IngredientsAdminClient({
             </Field>
             <Button onClick={searchDuplicates} disabled={duplicatesLoading}>
               {duplicatesLoading ? (
-                <ArrowPathIcon className="h-4 w-4 animate-spin mr-1" />
+                <ArrowPathIcon className="mr-1 h-4 w-4 animate-spin" />
               ) : (
-                <MagnifyingGlassIcon className="h-4 w-4 mr-1" />
+                <MagnifyingGlassIcon className="mr-1 h-4 w-4" />
               )}
               Zoeken
             </Button>
@@ -970,7 +970,7 @@ export function IngredientsAdminClient({
 
           {duplicatesCandidates.length > 0 && (
             <>
-              <div className="flex flex-wrap items-center gap-3 mb-3">
+              <div className="mb-3 flex flex-wrap items-center gap-3">
                 <Checkbox
                   checked={
                     duplicatesCandidates.filter((c) => c.isFnddsEnabled)
@@ -1007,19 +1007,19 @@ export function IngredientsAdminClient({
                 </span>
               </div>
 
-              <div className="overflow-x-auto max-h-[320px] overflow-y-auto border border-zinc-200 dark:border-zinc-700 rounded-lg">
+              <div className="max-h-[320px] overflow-x-auto overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
                 <Table className="[--gutter:--spacing(4)]" striped>
                   <TableHead>
                     <TableRow>
-                      <TableHeader className="w-10 py-2 px-2">
+                      <TableHeader className="w-10 px-2 py-2">
                         Select
                       </TableHeader>
-                      <TableHeader className="py-2 px-2">NEVO</TableHeader>
-                      <TableHeader className="py-2 px-2">FNDDS</TableHeader>
-                      <TableHeader className="py-2 px-2 w-24">
+                      <TableHeader className="px-2 py-2">NEVO</TableHeader>
+                      <TableHeader className="px-2 py-2">FNDDS</TableHeader>
+                      <TableHeader className="w-24 px-2 py-2">
                         Score / Method
                       </TableHeader>
-                      <TableHeader className="py-2 px-2 w-24">
+                      <TableHeader className="w-24 px-2 py-2">
                         Status FNDDS
                       </TableHeader>
                     </TableRow>
@@ -1027,7 +1027,7 @@ export function IngredientsAdminClient({
                   <TableBody>
                     {duplicatesCandidates.map((c) => (
                       <TableRow key={`${c.nevoUid}-${c.fnddsUid}`}>
-                        <TableCell className="py-2 px-2">
+                        <TableCell className="px-2 py-2">
                           {c.isFnddsEnabled ? (
                             <Checkbox
                               checked={selectedFnddsUids.has(
@@ -1041,26 +1041,26 @@ export function IngredientsAdminClient({
                               aria-label={`${c.fnddsName} selecteren`}
                             />
                           ) : (
-                            <span className="text-zinc-400 text-xs">–</span>
+                            <span className="text-xs text-zinc-400">–</span>
                           )}
                         </TableCell>
-                        <TableCell className="py-2 px-2">
-                          <div className="font-medium text-zinc-900 dark:text-white truncate max-w-[200px]">
+                        <TableCell className="px-2 py-2">
+                          <div className="max-w-[200px] truncate font-medium text-zinc-900 dark:text-white">
                             {c.nevoName}
                           </div>
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate max-w-[200px]">
+                          <div className="max-w-[200px] truncate text-xs text-zinc-500 dark:text-zinc-400">
                             {c.nevoUid}
                           </div>
                         </TableCell>
-                        <TableCell className="py-2 px-2">
-                          <div className="font-medium text-zinc-900 dark:text-white truncate max-w-[200px]">
+                        <TableCell className="px-2 py-2">
+                          <div className="max-w-[200px] truncate font-medium text-zinc-900 dark:text-white">
                             {c.fnddsName}
                           </div>
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate max-w-[200px]">
+                          <div className="max-w-[200px] truncate text-xs text-zinc-500 dark:text-zinc-400">
                             {c.fnddsUid}
                           </div>
                         </TableCell>
-                        <TableCell className="py-2 px-2">
+                        <TableCell className="px-2 py-2">
                           <Badge
                             color={
                               c.matchMethod === 'exact'
@@ -1076,7 +1076,7 @@ export function IngredientsAdminClient({
                             {c.score.toFixed(2)}
                           </span>
                         </TableCell>
-                        <TableCell className="py-2 px-2 text-sm">
+                        <TableCell className="px-2 py-2 text-sm">
                           {c.isFnddsEnabled ? (
                             <span className="text-green-600 dark:text-green-400">
                               Ingeschakeld
@@ -1101,7 +1101,7 @@ export function IngredientsAdminClient({
                   }
                 >
                   {bulkDisabling ? (
-                    <ArrowPathIcon className="h-4 w-4 animate-spin mr-1" />
+                    <ArrowPathIcon className="mr-1 h-4 w-4 animate-spin" />
                   ) : null}
                   Uitschakelen geselecteerde
                 </Button>
@@ -1115,7 +1115,7 @@ export function IngredientsAdminClient({
           )}
 
           {!duplicatesLoading && duplicatesCandidates.length === 0 && (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 py-4">
+            <p className="py-4 text-sm text-zinc-500 dark:text-zinc-400">
               {duplicatesHasSearched
                 ? 'Geen duplicaatkandidaten gevonden.'
                 : 'Klik op Zoeken om NEVO ↔ FNDDS duplicaatkandidaten te laden.'}

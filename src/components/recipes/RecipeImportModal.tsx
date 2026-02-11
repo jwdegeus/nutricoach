@@ -241,11 +241,11 @@ export function RecipeImportModal({ open, onClose }: RecipeImportModalProps) {
           {isPending ? (
             <div className="space-y-6 py-8">
               <div className="text-center">
-                <div className="relative inline-block mb-4">
-                  <SparklesIcon className="h-16 w-16 text-blue-500 dark:text-blue-400 animate-pulse" />
-                  <div className="absolute inset-0 bg-blue-400/20 rounded-full blur-xl animate-pulse" />
+                <div className="relative mb-4 inline-block">
+                  <SparklesIcon className="h-16 w-16 animate-pulse text-blue-500 dark:text-blue-400" />
+                  <div className="absolute inset-0 animate-pulse rounded-full bg-blue-400/20 blur-xl" />
                 </div>
-                <Text className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+                <Text className="mb-2 text-lg font-semibold text-zinc-900 dark:text-white">
                   Recept wordt geïmporteerd...
                 </Text>
                 <Text className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -253,18 +253,18 @@ export function RecipeImportModal({ open, onClose }: RecipeImportModalProps) {
                 </Text>
               </div>
               <div className="space-y-2">
-                <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full w-full animate-pulse" />
-                <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full w-3/4 animate-pulse" />
-                <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full w-5/6 animate-pulse" />
+                <div className="h-2 w-full animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
+                <div className="h-2 w-3/4 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
+                <div className="h-2 w-5/6 animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
               </div>
             </div>
           ) : error ? (
             <div className="space-y-4">
               <div
-                className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4"
+                className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/50"
                 role="alert"
               >
-                <Text className="text-red-600 dark:text-red-400 font-medium mb-2">
+                <Text className="mb-2 font-medium text-red-600 dark:text-red-400">
                   {tImport('urlImportErrorTitle')}
                 </Text>
                 <Text className="text-sm text-red-600 dark:text-red-400">

@@ -30,13 +30,13 @@ export function AdminLinks({ hideSectionHeading }: AdminLinksProps = {}) {
       <div className="space-y-3">
         <Link href="/admin/recipe-sources">
           <Button outline className="w-full justify-start">
-            <TagIcon className="h-4 w-4 mr-2" />
+            <TagIcon className="mr-2 h-4 w-4" />
             Recept Bronnen Beheer
           </Button>
         </Link>
         <Link href="/admin/diet-types">
           <Button outline className="w-full justify-start">
-            <Squares2X2Icon className="h-4 w-4 mr-2" />
+            <Squares2X2Icon className="mr-2 h-4 w-4" />
             Dieettypes Beheer
           </Button>
         </Link>

@@ -52,7 +52,7 @@ export function Breadcrumbs({
                     href={item.href}
                     className={clsx(
                       index > 0 && 'ml-4',
-                      'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors',
+                      'text-zinc-500 transition-colors hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200',
                     )}
                   >
                     <HomeIcon className="size-5 shrink-0" aria-hidden />
@@ -74,7 +74,7 @@ export function Breadcrumbs({
                     href={item.href}
                     className={clsx(
                       index > 0 && 'ml-4',
-                      'text-sm font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors',
+                      'text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200',
                     )}
                   >
                     {item.label}

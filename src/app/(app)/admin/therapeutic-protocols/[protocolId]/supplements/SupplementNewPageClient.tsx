@@ -16,7 +16,10 @@ type Props = {
   protocolTitle: string;
 };
 
-export function SupplementNewPageClient({ protocolId, protocolTitle }: Props) {
+export function SupplementNewPageClient({
+  protocolId,
+  protocolTitle: _protocolTitle,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const { showToast } = useToast();
@@ -30,7 +33,7 @@ export function SupplementNewPageClient({ protocolId, protocolTitle }: Props) {
   const [formError, setFormError] = useState<string | null>(null);
 
   const protocolHref = `/admin/therapeutic-protocols/${protocolId}?tab=supplements`;
-  const supplementsHref = `/admin/therapeutic-protocols/${protocolId}`;
+  const _supplementsHref = `/admin/therapeutic-protocols/${protocolId}`;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +60,7 @@ export function SupplementNewPageClient({ protocolId, protocolTitle }: Props) {
 
   return (
     <>
-      <h1 className="text-xl font-semibold text-zinc-900 dark:text-white mb-6">
+      <h1 className="mb-6 text-xl font-semibold text-zinc-900 dark:text-white">
         {t('supplementModalNew')}
       </h1>
 

@@ -308,7 +308,7 @@ export function ProductSourcesAdminClient() {
               href="https://github.com/gwillem/appie-go/blob/main/doc/albertheijn_api.md"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline text-primary"
+              className="text-primary underline"
             >
               API-documentatie
             </a>

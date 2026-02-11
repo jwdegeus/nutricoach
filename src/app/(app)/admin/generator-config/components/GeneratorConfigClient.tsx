@@ -1107,7 +1107,7 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -1175,10 +1175,10 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
 
         <div
           role="status"
-          className="rounded-xl shadow-sm bg-muted/20 dark:bg-muted/30 p-4 sm:p-6"
+          className="rounded-xl bg-muted/20 p-4 shadow-sm sm:p-6 dark:bg-muted/30"
         >
           <div className="flex items-start gap-3">
-            <InformationCircleIcon className="size-5 text-foreground flex-shrink-0 mt-0.5" />
+            <InformationCircleIcon className="mt-0.5 size-5 flex-shrink-0 text-foreground" />
             <div className="min-w-0 flex-1 space-y-2">
               <Text className="font-semibold text-foreground">
                 DB-first generator actief
@@ -1232,7 +1232,7 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
                         key={tab.id}
                         type="button"
                         onClick={() => setActiveTab(tab.id)}
-                        className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${
+                        className={`border-b-2 px-1 py-4 text-sm font-medium whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 ${
                           activeTab === tab.id
                             ? 'border-primary-500 text-primary-600 dark:text-primary-400'
                             : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
@@ -2634,7 +2634,7 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
                 {previewResult.days.map((day) => (
                   <div
                     key={day.date}
-                    className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3"
+                    className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700"
                   >
                     <p className="mb-2 font-medium text-zinc-900 dark:text-white">
                       {new Date(day.date + 'T12:00:00').toLocaleDateString(
@@ -2712,8 +2712,8 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
                 {previewResult.metadata &&
                   typeof previewResult.metadata === 'object' &&
                   'generator' in previewResult.metadata && (
-                    <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 p-3 text-sm">
-                      <p className="font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-900/50">
+                      <p className="mb-2 font-medium text-zinc-700 dark:text-zinc-300">
                         Generator-meta
                       </p>
                       {(() => {
@@ -2779,7 +2779,7 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
                           </ul>
                         ) : null;
                       })()}
-                      <pre className="whitespace-pre-wrap break-words text-xs text-zinc-600 dark:text-zinc-400">
+                      <pre className="text-xs break-words whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">
                         {JSON.stringify(
                           {
                             mode: (
@@ -2903,7 +2903,7 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
                           </p>
                         )}
                         {computedAt && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
+                          <p className="mt-0.5 text-xs text-muted-foreground">
                             {computedAt}
                           </p>
                         )}
@@ -2937,7 +2937,7 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
                                   ? ` — ${s.dosageText}`
                                   : ''}
                                 {s.notesNl != null && s.notesNl !== '' && (
-                                  <span className="block text-muted-foreground/80 mt-0.5">
+                                  <span className="mt-0.5 block text-muted-foreground/80">
                                     {s.notesNl}
                                   </span>
                                 )}
@@ -2956,8 +2956,8 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
                     );
                     if (suggestions.length === 0) return null;
                     return (
-                      <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-amber-50/50 dark:bg-amber-950/20 p-3 text-sm">
-                        <p className="font-medium text-zinc-800 dark:text-zinc-200 mb-2">
+                      <div className="rounded-lg border border-zinc-200 bg-amber-50/50 p-3 text-sm dark:border-zinc-700 dark:bg-amber-950/20">
+                        <p className="mb-2 font-medium text-zinc-800 dark:text-zinc-200">
                           Suggesties
                         </p>
                         <ul className="space-y-3">
@@ -2999,7 +2999,7 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
                                     return (
                                       <li
                                         key={j}
-                                        className="list-disc flex flex-wrap items-center gap-1"
+                                        className="flex list-disc flex-wrap items-center gap-1"
                                       >
                                         <Button
                                           plain
@@ -3125,7 +3125,7 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
                 <textarea
                   readOnly
                   value={exportJson}
-                  className="w-full min-h-[280px] rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                  className="min-h-[280px] w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900"
                   spellCheck={false}
                 />
                 <Button outline onClick={handleExportCopy}>
@@ -3171,7 +3171,7 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
               value={importJson}
               onChange={(e) => setImportJson(e.target.value)}
               placeholder='{"version":1,"exportedAt":"...","dietKey":"default",...}'
-              className="w-full min-h-[200px] rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-800"
+              className="min-h-[200px] w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-800"
               spellCheck={false}
             />
           </DialogBody>
@@ -3250,7 +3250,7 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
                     value={compareSnapshotA}
                     onChange={(e) => setCompareSnapshotA(e.target.value)}
                     placeholder='{"version":1,"exportedAt":"...","dietKey":"default",...}'
-                    className="mt-1 w-full min-h-[120px] rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-800"
+                    className="mt-1 min-h-[120px] w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-800"
                     spellCheck={false}
                     disabled={compareLoading}
                   />
@@ -3261,7 +3261,7 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
                     value={compareSnapshotB}
                     onChange={(e) => setCompareSnapshotB(e.target.value)}
                     placeholder='{"version":1,"exportedAt":"...","dietKey":"default",...}'
-                    className="mt-1 w-full min-h-[120px] rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-800"
+                    className="mt-1 min-h-[120px] w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-800"
                     spellCheck={false}
                     disabled={compareLoading}
                   />
@@ -3322,8 +3322,8 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 p-3 text-sm">
-                  <p className="font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm dark:border-zinc-700 dark:bg-zinc-900/50">
+                  <p className="mb-2 font-medium text-zinc-700 dark:text-zinc-300">
                     Samenvatting
                   </p>
                   <ul className="space-y-1 text-zinc-600 dark:text-zinc-400">
@@ -3347,9 +3347,9 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
                   {compareResult.diff.byDay.map((day) => (
                     <div
                       key={day.date}
-                      className="rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden"
+                      className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700"
                     >
-                      <p className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      <p className="bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                         {new Date(day.date + 'T12:00:00').toLocaleDateString(
                           'nl-NL',
                           {
@@ -3442,11 +3442,11 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
                   ))}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 p-3 text-xs">
-                    <p className="font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs dark:border-zinc-700 dark:bg-zinc-900/50">
+                    <p className="mb-1 font-medium text-zinc-700 dark:text-zinc-300">
                       Meta A
                     </p>
-                    <pre className="whitespace-pre-wrap break-words text-zinc-600 dark:text-zinc-400">
+                    <pre className="break-words whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">
                       {JSON.stringify(
                         {
                           mode: (
@@ -3474,11 +3474,11 @@ export function GeneratorConfigClient({ initialData, loadError }: Props) {
                       )}
                     </pre>
                   </div>
-                  <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 p-3 text-xs">
-                    <p className="font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs dark:border-zinc-700 dark:bg-zinc-900/50">
+                    <p className="mb-1 font-medium text-zinc-700 dark:text-zinc-300">
                       Meta B
                     </p>
-                    <pre className="whitespace-pre-wrap break-words text-zinc-600 dark:text-zinc-400">
+                    <pre className="break-words whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">
                       {JSON.stringify(
                         {
                           mode: (

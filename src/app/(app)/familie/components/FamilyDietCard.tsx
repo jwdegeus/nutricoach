@@ -265,11 +265,11 @@ export function FamilyDietCard({
         <Description>{t('familyDietIsInflamedDescription')}</Description>
       </Field>
 
-      <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4 mt-4">
-        <h3 className="text-base font-medium text-foreground mb-1">
+      <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+        <h3 className="mb-1 text-base font-medium text-foreground">
           {t('familyPracticalHeading')}
         </h3>
-        <p className="text-sm text-muted-foreground mb-3">
+        <p className="mb-3 text-sm text-muted-foreground">
           {t('familyPracticalDescription')}
         </p>
         <Field>
@@ -306,11 +306,11 @@ export function FamilyDietCard({
         </Field>
       </div>
 
-      <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4 mt-4">
-        <h3 className="text-base font-medium text-foreground mb-1">
+      <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+        <h3 className="mb-1 text-base font-medium text-foreground">
           {t('familyGoalsHeading')}
         </h3>
-        <p className="text-sm text-muted-foreground mb-3">
+        <p className="mb-3 text-sm text-muted-foreground">
           {t('familyGoalsDescription')}
         </p>
         <Field>
@@ -392,11 +392,11 @@ export function FamilyDietCard({
         </Field>
       </div>
 
-      <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4 mt-4">
-        <h3 className="text-base font-medium text-foreground mb-1">
+      <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+        <h3 className="mb-1 text-base font-medium text-foreground">
           {t('familyMealPreferencesHeading')}
         </h3>
-        <p className="text-sm text-muted-foreground mb-3">
+        <p className="mb-3 text-sm text-muted-foreground">
           {t('familyMealPreferencesDescription')}
         </p>
         <Field>
@@ -415,7 +415,7 @@ export function FamilyDietCard({
             disabled={loading}
           />
           {mealPreferences.breakfast.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
+            <div className="mt-2 flex flex-wrap gap-2">
               {mealPreferences.breakfast.map((tag) => (
                 <Badge key={tag} color="blue" className="gap-1">
                   {tag}
@@ -447,7 +447,7 @@ export function FamilyDietCard({
             disabled={loading}
           />
           {mealPreferences.lunch.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
+            <div className="mt-2 flex flex-wrap gap-2">
               {mealPreferences.lunch.map((tag) => (
                 <Badge key={tag} color="blue" className="gap-1">
                   {tag}
@@ -479,7 +479,7 @@ export function FamilyDietCard({
             disabled={loading}
           />
           {mealPreferences.dinner.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
+            <div className="mt-2 flex flex-wrap gap-2">
               {mealPreferences.dinner.map((tag) => (
                 <Badge key={tag} color="blue" className="gap-1">
                   {tag}
@@ -511,16 +511,16 @@ export function FamilyDietCard({
   return (
     <section
       id="family-diet"
-      className="rounded-2xl bg-zinc-100 px-6 py-6 dark:bg-white/10 mx-auto max-w-2xl"
+      className="mx-auto max-w-2xl rounded-2xl bg-zinc-100 px-6 py-6 dark:bg-white/10"
       aria-labelledby="family-diet-heading"
     >
       <h2
         id="family-diet-heading"
-        className="text-lg font-semibold text-foreground mb-1"
+        className="mb-1 text-lg font-semibold text-foreground"
       >
         {t('familyDietHeading')}
       </h2>
-      <p className="text-sm text-muted-foreground mb-4">
+      <p className="mb-4 text-sm text-muted-foreground">
         {t('familyDietDescription')}
       </p>
       {content}

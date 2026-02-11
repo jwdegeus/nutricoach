@@ -164,12 +164,12 @@ export function BarcodeScanner({ onBarcode, onError }: BarcodeScannerProps) {
 
         {/* Scan frame (kader) */}
         <div
-          className="pointer-events-none absolute left-1/2 top-1/2 box-border h-[50%] w-[90%] -translate-x-1/2 -translate-y-1/2 rounded-xl outline outline-2 outline-white/90"
+          className="pointer-events-none absolute top-1/2 left-1/2 box-border h-[50%] w-[90%] -translate-x-1/2 -translate-y-1/2 rounded-xl outline outline-2 outline-white/90"
           aria-hidden
         >
           {/* Animated scan line: red when scanning, green on success */}
           <div
-            className={`absolute left-0 right-0 h-0.5 rounded-full shadow-lg ${
+            className={`absolute right-0 left-0 h-0.5 rounded-full shadow-lg ${
               success ? 'bg-green-500' : 'bg-red-500'
             } ${success ? '' : 'animate-scan-line'}`}
             style={

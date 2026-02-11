@@ -29,17 +29,17 @@ export function Topbar() {
   const tMenu = useTranslations('menu');
 
   return (
-    <header className="flex h-16 items-center border-b border-gray-200 bg-white px-4 md:px-6 dark:bg-gray-800/75 dark:border-gray-700">
+    <header className="flex h-16 items-center border-b border-gray-200 bg-white px-4 md:px-6 dark:border-gray-700 dark:bg-gray-800/75">
       <div className="flex flex-1 items-center justify-between gap-4">
         {/* Left side: Mobile sidebar trigger, breadcrumbs, and page title */}
-        <div className="flex flex-1 items-center gap-4 min-w-0">
+        <div className="flex min-w-0 flex-1 items-center gap-4">
           {/* Mobile Sidebar Trigger */}
           <div className="md:hidden">
             <MobileSidebar />
           </div>
 
           {/* Breadcrumbs */}
-          <div className="hidden md:flex items-center">
+          <div className="hidden items-center md:flex">
             <Breadcrumbs items={breadcrumbs} />
           </div>
 
@@ -52,19 +52,19 @@ export function Topbar() {
         {/* Right side: Search, Theme Switcher and User menu */}
         <div className="flex items-center gap-3">
           {/* Search Input */}
-          <div className="hidden md:flex items-center relative">
-            <Search className="absolute left-3 h-4 w-4 text-gray-500 dark:text-gray-400 pointer-events-none" />
+          <div className="relative hidden items-center md:flex">
+            <Search className="pointer-events-none absolute left-3 h-4 w-4 text-gray-500 dark:text-gray-400" />
             <Input
               type="search"
               placeholder={tCommon('search') + '...'}
-              className="w-64 pl-9 pr-4"
+              className="w-64 pr-4 pl-9"
             />
           </div>
 
           {/* User Dropdown Menu */}
           <Dropdown>
             <DropdownButton>
-              <div className="h-8 w-8 rounded-full bg-zinc-600 dark:bg-zinc-500 flex items-center justify-center text-white">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-600 text-white dark:bg-zinc-500">
                 <User className="h-4 w-4" />
               </div>
             </DropdownButton>

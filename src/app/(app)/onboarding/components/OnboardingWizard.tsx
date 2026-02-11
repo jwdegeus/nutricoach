@@ -152,7 +152,7 @@ export function OnboardingWizard() {
   };
 
   return (
-    <div className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10 sm:p-8">
+    <div className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-zinc-950/5 sm:p-8 dark:bg-zinc-900 dark:ring-white/10">
       <ProgressIndicator currentStep={currentStep} totalSteps={TOTAL_STEPS} />
 
       {error && (

@@ -51,7 +51,7 @@ export function AdminIngredientsPageClient() {
               key={tab.id}
               type="button"
               onClick={() => setActiveTabWithUrl(tab.id)}
-              className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900 ${
+              className={`border-b-2 px-1 py-4 text-sm font-medium whitespace-nowrap transition-colors focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:outline-none dark:focus:ring-offset-zinc-900 ${
                 activeTab === tab.id
                   ? 'border-primary-500 text-primary-600 dark:text-primary-400'
                   : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'

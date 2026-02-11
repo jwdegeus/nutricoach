@@ -83,7 +83,7 @@ export function RecipeNotesEditor({
   return (
     <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-zinc-950 dark:text-white mb-2">
+        <h3 className="mb-2 text-lg font-semibold text-zinc-950 dark:text-white">
           Notities
         </h3>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -93,7 +93,7 @@ export function RecipeNotesEditor({
       </div>
 
       {/* Toolbar */}
-      <div className="mb-4 flex items-center gap-2 p-2 border border-zinc-200 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800/50">
+      <div className="mb-4 flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800/50">
         <Button
           plain
           onClick={() => editor.chain().focus().toggleBold().run()}
@@ -114,7 +114,7 @@ export function RecipeNotesEditor({
         >
           <ItalicIcon className="h-4 w-4" />
         </Button>
-        <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-600 mx-1" />
+        <div className="mx-1 h-4 w-px bg-zinc-300 dark:bg-zinc-600" />
         <Button
           plain
           onClick={() => editor.chain().focus().toggleBulletList().run()}
@@ -136,7 +136,7 @@ export function RecipeNotesEditor({
       </div>
 
       {/* Editor */}
-      <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg min-h-[200px] bg-white dark:bg-zinc-900">
+      <div className="min-h-[200px] rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
         <EditorContent editor={editor} />
       </div>
 

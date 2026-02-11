@@ -278,24 +278,24 @@ export function RecipeSourcesAdminClient() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-zinc-950 dark:text-white">
             Recept Bronnen Beheer
           </h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
             Beheer alle recept bronnen. Wijzig, verwijder of voeg samen.
           </p>
         </div>
         <Button onClick={() => setCreateDialogOpen(true)}>
-          <PlusIcon className="h-4 w-4 mr-1" />
+          <PlusIcon className="mr-1 h-4 w-4" />
           Nieuwe bron
         </Button>
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 p-4 text-red-600 dark:text-red-400">
+        <div className="rounded-lg bg-red-50 p-4 text-red-600 dark:bg-red-900/20 dark:text-red-400">
           {error}
         </div>
       )}
@@ -319,7 +319,7 @@ export function RecipeSourcesAdminClient() {
               <TableRow>
                 <TableCell
                   colSpan={5}
-                  className="text-center text-zinc-500 dark:text-zinc-400 py-8"
+                  className="py-8 text-center text-zinc-500 dark:text-zinc-400"
                 >
                   Geen bronnen gevonden
                 </TableCell>

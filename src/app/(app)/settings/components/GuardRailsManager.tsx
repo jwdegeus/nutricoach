@@ -160,7 +160,6 @@ export function GuardRailsManager({
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData stable, run when dietTypeId changes
   }, [dietTypeId]);
 
   async function loadData() {
@@ -831,7 +830,7 @@ export function GuardRailsManager({
                         )}
                     </div>
                     {category.description && (
-                      <Text className="text-xs mt-1 text-zinc-500 dark:text-zinc-400">
+                      <Text className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                         {category.description}
                       </Text>
                     )}

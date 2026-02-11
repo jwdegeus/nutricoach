@@ -385,11 +385,11 @@ export function CreateMealPlanForm({
 
           {createError && (
             <div
-              className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4"
+              className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/50"
               role="alert"
             >
               <div className="flex items-start gap-3">
-                <ExclamationTriangleIcon className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-400" />
                 <div className="flex-1 space-y-3">
                   <div>
                     <Text className="font-semibold text-red-900 dark:text-red-100">
@@ -401,7 +401,7 @@ export function CreateMealPlanForm({
                   </div>
                   {createError.userActionHints &&
                     createError.userActionHints.length > 0 && (
-                      <ul className="list-disc list-inside text-sm text-red-700 dark:text-red-300 space-y-1">
+                      <ul className="list-inside list-disc space-y-1 text-sm text-red-700 dark:text-red-300">
                         {createError.userActionHints.map((hint, i) => (
                           <li key={i}>{hint}</li>
                         ))}
@@ -411,10 +411,10 @@ export function CreateMealPlanForm({
                     createError.diagnostics &&
                     Object.keys(createError.diagnostics).length > 0 && (
                       <details className="mt-2">
-                        <summary className="text-xs font-medium text-red-800 dark:text-red-200 cursor-pointer">
+                        <summary className="cursor-pointer text-xs font-medium text-red-800 dark:text-red-200">
                           Technische details
                         </summary>
-                        <pre className="mt-2 text-xs overflow-auto rounded bg-red-100 dark:bg-red-950/80 p-3 text-red-900 dark:text-red-100 font-mono max-h-48">
+                        <pre className="mt-2 max-h-48 overflow-auto rounded bg-red-100 p-3 font-mono text-xs text-red-900 dark:bg-red-950/80 dark:text-red-100">
                           {JSON.stringify(createError.diagnostics, null, 2)}
                         </pre>
                       </details>
@@ -425,8 +425,8 @@ export function CreateMealPlanForm({
           )}
 
           {isPending && (
-            <div className="flex flex-col items-center justify-center text-center space-y-4 py-8">
-              <ArrowPathIcon className="h-10 w-10 text-primary-600 dark:text-primary-400 animate-spin" />
+            <div className="flex flex-col items-center justify-center space-y-4 py-8 text-center">
+              <ArrowPathIcon className="h-10 w-10 animate-spin text-primary-600 dark:text-primary-400" />
               <div className="space-y-1">
                 <Text className="font-medium text-foreground">
                   {progress ?? 'Weekmenu genereren...'}
@@ -439,9 +439,9 @@ export function CreateMealPlanForm({
                   </Text>
                 )}
               </div>
-              <div className="w-full max-w-xs bg-muted rounded-full h-2 overflow-hidden">
+              <div className="h-2 w-full max-w-xs overflow-hidden rounded-full bg-muted">
                 <div
-                  className="bg-primary-500 h-2 rounded-full transition-all duration-500"
+                  className="h-2 rounded-full bg-primary-500 transition-all duration-500"
                   style={{
                     width: `${Math.min(95, Math.max(5, (elapsedTime / 40000) * 100))}%`,
                   }}
@@ -462,12 +462,12 @@ export function CreateMealPlanForm({
             <Button type="submit" disabled={isPending} className="flex-1">
               {isPending ? (
                 <>
-                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                  <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
                   Genereren...
                 </>
               ) : (
                 <>
-                  <CalendarDaysIcon className="h-4 w-4 mr-2" />
+                  <CalendarDaysIcon className="mr-2 h-4 w-4" />
                   Genereer weekmenu
                 </>
               )}

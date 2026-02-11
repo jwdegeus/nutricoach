@@ -149,7 +149,7 @@ export function RecipeEditForm({
         <div className="flex items-center justify-between">
           <Heading level={3}>Recept Details</Heading>
           <Button onClick={() => setIsEditing(true)} outline>
-            <PencilIcon className="h-4 w-4 mr-2" />
+            <PencilIcon className="mr-2 h-4 w-4" />
             Bewerken
           </Button>
         </div>
@@ -160,7 +160,7 @@ export function RecipeEditForm({
           {(sourceImageMeta?.savedImageUrl || sourceImageMeta?.imageUrl) && (
             <div>
               <Subheading level={4}>Afbeelding</Subheading>
-              <div className="relative mt-2 min-h-[200px] w-full max-w-md aspect-video rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+              <div className="relative mt-2 aspect-video min-h-[200px] w-full max-w-md overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
                 <Image
                   src={
                     sourceImageMeta.savedImageUrl ||
@@ -213,7 +213,7 @@ export function RecipeEditForm({
                         </span>
                       )}
                       {ing.note && (
-                        <span className="text-zinc-500 dark:text-zinc-400 italic">
+                        <span className="text-zinc-500 italic dark:text-zinc-400">
                           {' '}
                           ({ing.note})
                         </span>
@@ -245,7 +245,7 @@ export function RecipeEditForm({
                 return groups.map((group, gi) => (
                   <Fragment key={gi}>
                     {group.section && (
-                      <li className="list-none mt-3 first:mt-0">
+                      <li className="mt-3 list-none first:mt-0">
                         <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                           {group.section}
                         </span>
@@ -265,7 +265,7 @@ export function RecipeEditForm({
                             </span>
                           )}
                           {ing.note && (
-                            <span className="text-zinc-500 dark:text-zinc-400 italic">
+                            <span className="text-zinc-500 italic dark:text-zinc-400">
                               {' '}
                               ({ing.note})
                             </span>
@@ -281,7 +281,7 @@ export function RecipeEditForm({
 
           <div>
             <Subheading level={4}>Bereidingsinstructies</Subheading>
-            <ol className="mt-2 space-y-2 list-decimal list-inside">
+            <ol className="mt-2 list-inside list-decimal space-y-2">
               {instructions.map((inst, idx) => (
                 <li key={idx} className="text-sm">
                   {inst.text}
@@ -300,18 +300,18 @@ export function RecipeEditForm({
         <Heading level={3}>Recept Bewerken</Heading>
         <div className="flex gap-2">
           <Button onClick={handleCancel} outline disabled={isPending}>
-            <XMarkIcon className="h-4 w-4 mr-2" />
+            <XMarkIcon className="mr-2 h-4 w-4" />
             Annuleren
           </Button>
           <Button onClick={handleSave} disabled={isPending}>
-            <CheckIcon className="h-4 w-4 mr-2" />
+            <CheckIcon className="mr-2 h-4 w-4" />
             {isPending ? 'Opslaan...' : 'Opslaan'}
           </Button>
         </div>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/50">
           <Text className="text-sm text-red-600 dark:text-red-400">
             {error}
           </Text>
@@ -344,10 +344,10 @@ export function RecipeEditForm({
 
         <Field>
           <Label>Ingrediënten *</Label>
-          <div className="space-y-3 mt-2">
+          <div className="mt-2 space-y-3">
             {ingredients.map((ing, idx) => (
-              <div key={idx} className="flex gap-2 items-start">
-                <div className="flex-1 grid grid-cols-2 gap-2">
+              <div key={idx} className="flex items-start gap-2">
+                <div className="grid flex-1 grid-cols-2 gap-2">
                   <Input
                     value={ing.name || ''}
                     onChange={(e) =>
@@ -420,11 +420,11 @@ export function RecipeEditForm({
 
         <Field>
           <Label>Bereidingsinstructies *</Label>
-          <div className="space-y-3 mt-2">
+          <div className="mt-2 space-y-3">
             {instructions.map((inst, idx) => (
-              <div key={idx} className="flex gap-2 items-start">
+              <div key={idx} className="flex items-start gap-2">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="mb-1 flex items-center gap-2">
                     <Text className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
                       Stap {inst.step}:
                     </Text>

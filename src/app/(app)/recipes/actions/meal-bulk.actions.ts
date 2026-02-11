@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { createClient } from '@/src/lib/supabase/server';
 
 const BULK_SLOT_VALUES = ['breakfast', 'lunch', 'dinner'] as const;
-type BulkMealSlot = (typeof BULK_SLOT_VALUES)[number];
 
 const bulkUpdateMealSlotSchema = z.object({
   ids: z.array(z.string().uuid()).min(1, 'Minimaal één recept vereist'),

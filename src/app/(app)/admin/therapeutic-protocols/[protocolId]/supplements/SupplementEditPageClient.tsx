@@ -119,7 +119,7 @@ export function SupplementEditPageClient({
     useState(false);
 
   const protocolHref = `/admin/therapeutic-protocols/${protocol.id}?tab=supplements`;
-  const supplementsListHref = `/admin/therapeutic-protocols/${protocol.id}`;
+  const _supplementsListHref = `/admin/therapeutic-protocols/${protocol.id}`;
 
   const saveSupplement = () => {
     setSupplementError(null);
@@ -344,7 +344,7 @@ export function SupplementEditPageClient({
             </div>
           </Field>
         </FieldGroup>
-        <div className="flex gap-3 mt-4">
+        <div className="mt-4 flex gap-3">
           <Button onClick={saveSupplement} disabled={supplementSaving}>
             {supplementSaving ? t('saving') : t('save')}
           </Button>
@@ -359,8 +359,8 @@ export function SupplementEditPageClient({
       </section>
 
       {/* Rules */}
-      <section className="border-t border-zinc-200 dark:border-zinc-700 pt-6">
-        <div className="flex items-center justify-between gap-2 mb-3">
+      <section className="border-t border-zinc-200 pt-6 dark:border-zinc-700">
+        <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="text-sm font-medium text-zinc-900 dark:text-white">
             {t('supplementRules')}
           </h2>
@@ -370,31 +370,31 @@ export function SupplementEditPageClient({
           </Button>
         </div>
         {invalidWhenCount > 0 && (
-          <p className="text-sm text-amber-600 dark:text-amber-400 mb-2">
+          <p className="mb-2 text-sm text-amber-600 dark:text-amber-400">
             {t('invalidWhenJsonWarning', { count: invalidWhenCount })}
           </p>
         )}
-        <div className="overflow-x-auto max-h-64 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+        <div className="max-h-64 overflow-x-auto overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
           <Table className="[--gutter:--spacing(3)]" striped>
             <TableHead>
               <TableRow>
-                <TableHeader className="py-2 px-3 text-xs">
+                <TableHeader className="px-3 py-2 text-xs">
                   {t('ruleKeyCol')}
                 </TableHeader>
-                <TableHeader className="py-2 px-3 text-xs">
+                <TableHeader className="px-3 py-2 text-xs">
                   {t('kindCol')}
                 </TableHeader>
-                <TableHeader className="py-2 px-3 text-xs">
+                <TableHeader className="px-3 py-2 text-xs">
                   {t('severityCol')}
                 </TableHeader>
-                <TableHeader className="py-2 px-3 text-xs">
+                <TableHeader className="px-3 py-2 text-xs">
                   {t('activeCol')}
                 </TableHeader>
-                <TableHeader className="py-2 px-3 text-xs">
+                <TableHeader className="px-3 py-2 text-xs">
                   {t('messageCol')}
                 </TableHeader>
                 <TableHeader
-                  className="w-12 py-2 px-2"
+                  className="w-12 px-2 py-2"
                   aria-label={t('actionsCol')}
                 />
               </TableRow>
@@ -412,16 +412,16 @@ export function SupplementEditPageClient({
               ) : (
                 initialRules.map((rule) => (
                   <TableRow key={rule.id}>
-                    <TableCell className="py-2 px-3 font-mono text-xs font-medium text-zinc-900 dark:text-white">
+                    <TableCell className="px-3 py-2 font-mono text-xs font-medium text-zinc-900 dark:text-white">
                       {rule.rule_key}
                     </TableCell>
-                    <TableCell className="py-2 px-3 text-xs text-zinc-600 dark:text-zinc-400">
+                    <TableCell className="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
                       {rule.kind}
                     </TableCell>
-                    <TableCell className="py-2 px-3 text-xs text-zinc-600 dark:text-zinc-400">
+                    <TableCell className="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
                       {rule.severity}
                     </TableCell>
-                    <TableCell className="py-2 px-3">
+                    <TableCell className="px-3 py-2">
                       <Switch
                         checked={rule.is_active}
                         disabled={togglingRuleId === rule.id || isPending}
@@ -431,10 +431,10 @@ export function SupplementEditPageClient({
                         color="dark/zinc"
                       />
                     </TableCell>
-                    <TableCell className="py-2 px-3 text-xs text-zinc-600 dark:text-zinc-400 max-w-[160px] truncate">
+                    <TableCell className="max-w-[160px] truncate px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
                       {rule.message_nl}
                     </TableCell>
-                    <TableCell className="py-2 px-2 w-12">
+                    <TableCell className="w-12 px-2 py-2">
                       <Dropdown>
                         <DropdownButton
                           as={Button}
@@ -451,7 +451,7 @@ export function SupplementEditPageClient({
                           </DropdownItem>
                           <DropdownItem
                             onClick={() => setDeleteRuleId(rule.id)}
-                            className="text-red-600 dark:text-red-400 data-focus:bg-red-50 data-focus:text-red-700 dark:data-focus:bg-red-900/20 dark:data-focus:text-red-300"
+                            className="text-red-600 data-focus:bg-red-50 data-focus:text-red-700 dark:text-red-400 dark:data-focus:bg-red-900/20 dark:data-focus:text-red-300"
                           >
                             <TrashIcon className="h-4 w-4" />
                             {t('delete')}
@@ -586,7 +586,7 @@ export function SupplementEditPageClient({
                       <ListboxOption key={snippet.id} value={snippet.id}>
                         <span className="flex flex-wrap items-center gap-2">
                           <span>{snippet.label_nl}</span>
-                          <span className="text-xs text-muted-foreground font-mono">
+                          <span className="font-mono text-xs text-muted-foreground">
                             {snippet.snippet_key}
                           </span>
                           {!snippet.is_active && (

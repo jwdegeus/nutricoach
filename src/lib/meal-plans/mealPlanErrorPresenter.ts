@@ -195,6 +195,72 @@ const MEAL_PLAN_ERROR_MAP: Record<
 };
 
 /**
+ * Build an actionable inbox message (max 500 chars) for failed meal plan generation.
+ * Used when creating user_inbox_notifications.
+ */
+export function buildActionableInboxMessage(
+  presentation: MealPlanErrorPresentation,
+): string {
+  const { code, userMessageNl, userActionHints, diagnostics } = presentation;
+  const parts: string[] = [userMessageNl];
+
+  if (code === 'MEAL_PLAN_VARIETY_TARGETS_NOT_MET' && diagnostics) {
+    const d = diagnostics as Record<string, unknown>;
+    const targets = d.targets as Record<string, number> | undefined;
+    const meets = d.meetsTargets as Record<string, boolean> | undefined;
+    const tasks: string[] = [];
+    if (
+      meets?.meetsUniqueVegMin === false &&
+      typeof d.uniqueVegCount === 'number' &&
+      targets?.unique_veg_min != null
+    ) {
+      const need = targets.unique_veg_min - (d.uniqueVegCount as number);
+      tasks.push(
+        `Voeg minstens ${need} recept(en) met groenten toe (je hebt ${d.uniqueVegCount}, minimaal ${targets.unique_veg_min})`,
+      );
+    }
+    if (
+      meets?.meetsUniqueFruitMin === false &&
+      typeof d.uniqueFruitCount === 'number' &&
+      targets?.unique_fruit_min != null
+    ) {
+      const need = targets.unique_fruit_min - (d.uniqueFruitCount as number);
+      tasks.push(
+        `Voeg minstens ${need} recept(en) met fruit toe (je hebt ${d.uniqueFruitCount}, minimaal ${targets.unique_fruit_min})`,
+      );
+    }
+    if (
+      meets?.meetsProteinRotation === false &&
+      typeof d.proteinUniqueCount === 'number' &&
+      targets?.protein_rotation_min_categories != null
+    ) {
+      tasks.push(
+        `Voeg meer eiwitcategorieën toe (je hebt ${d.proteinUniqueCount}, minimaal ${targets.protein_rotation_min_categories})`,
+      );
+    }
+    if (meets?.meetsRepeatWindow === false) {
+      const max = targets?.max_repeat_same_recipe_within_days ?? 3;
+      tasks.push(
+        `Verminder herhaling: max ${max}× hetzelfde recept per week. Voeg meer gevarieerde recepten toe.`,
+      );
+    }
+    if (tasks.length > 0) {
+      parts.push('', 'Taken:');
+      tasks.forEach((t, i) => parts.push(`${i + 1}. ${t}`));
+      parts.push(
+        '',
+        'Recepten moeten: ontbijt/lunch/diner zijn, ingrediënten met NEVO-koppeling hebben. Pas eventueel variatie-instellingen aan in beheer (admin).',
+      );
+    }
+  } else if (userActionHints.length > 0) {
+    parts.push('', ...userActionHints);
+  }
+
+  const text = parts.join('\n').trim();
+  return text.length > 500 ? text.slice(0, 497) + '…' : text;
+}
+
+/**
  * Map an error (from createPlanForUser or related flows) to a safe, NL user-facing presentation.
  * Use in action/route handlers before returning error to UI.
  */

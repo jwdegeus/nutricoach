@@ -196,7 +196,7 @@ export function DietPreferencesForm({
   if (isLoading) {
     return (
       <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        <div className="text-center py-8">
+        <div className="py-8 text-center">
           <Text>Voorkeuren laden...</Text>
         </div>
       </div>
@@ -237,7 +237,7 @@ export function DietPreferencesForm({
           </div>
 
           {/* Step 2: Allergies & Dislikes */}
-          <div className="space-y-4 pt-6 border-t border-zinc-200 dark:border-zinc-800">
+          <div className="space-y-4 border-t border-zinc-200 pt-6 dark:border-zinc-800">
             <Step2AllergiesDislikes
               allergies={allergies}
               dislikes={dislikes}
@@ -247,7 +247,7 @@ export function DietPreferencesForm({
           </div>
 
           {/* Step 3: Practical Preferences */}
-          <div className="space-y-4 pt-6 border-t border-zinc-200 dark:border-zinc-800">
+          <div className="space-y-4 border-t border-zinc-200 pt-6 dark:border-zinc-800">
             <Step3Practical
               maxPrepMinutes={maxPrepMinutes}
               servingsDefault={servingsDefault}
@@ -257,7 +257,7 @@ export function DietPreferencesForm({
           </div>
 
           {/* Step 4: Goals */}
-          <div className="space-y-4 pt-6 border-t border-zinc-200 dark:border-zinc-800">
+          <div className="space-y-4 border-t border-zinc-200 pt-6 dark:border-zinc-800">
             <Step4Goal
               kcalTarget={kcalTarget}
               varietyLevel={varietyLevel}
@@ -269,7 +269,7 @@ export function DietPreferencesForm({
           </div>
 
           {/* Step 5: Meal Preferences */}
-          <div className="space-y-4 pt-6 border-t border-zinc-200 dark:border-zinc-800">
+          <div className="space-y-4 border-t border-zinc-200 pt-6 dark:border-zinc-800">
             <div>
               <h3 className="text-base/6 font-semibold text-zinc-950 sm:text-sm/6 dark:text-white">
                 Maaltijdvoorkeuren
@@ -298,7 +298,7 @@ export function DietPreferencesForm({
                 />
                 {Array.isArray(mealPreferences.breakfast) &&
                   mealPreferences.breakfast.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
+                    <div className="mt-2 flex flex-wrap gap-2">
                       {mealPreferences.breakfast.map((tag) => (
                         <Badge
                           key={tag}
@@ -336,7 +336,7 @@ export function DietPreferencesForm({
                 />
                 {Array.isArray(mealPreferences.lunch) &&
                   mealPreferences.lunch.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
+                    <div className="mt-2 flex flex-wrap gap-2">
                       {mealPreferences.lunch.map((tag) => (
                         <Badge
                           key={tag}
@@ -374,7 +374,7 @@ export function DietPreferencesForm({
                 />
                 {Array.isArray(mealPreferences.dinner) &&
                   mealPreferences.dinner.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
+                    <div className="mt-2 flex flex-wrap gap-2">
                       {mealPreferences.dinner.map((tag) => (
                         <Badge
                           key={tag}
@@ -398,7 +398,7 @@ export function DietPreferencesForm({
             </div>
           </div>
 
-          <div className="flex justify-end pt-6 border-t border-zinc-200 dark:border-zinc-800">
+          <div className="flex justify-end border-t border-zinc-200 pt-6 dark:border-zinc-800">
             <Button type="submit" disabled={isPending || !dietTypeId}>
               {isPending ? 'Opslaan...' : 'Voorkeuren opslaan'}
             </Button>

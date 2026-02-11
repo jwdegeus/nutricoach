@@ -265,7 +265,7 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
                     {section.description}
                   </Text>
                 </div>
-                <ArrowRightIcon className="h-5 w-5 text-zinc-400 transition group-hover:text-zinc-600 group-hover:translate-x-1 dark:text-zinc-500 dark:group-hover:text-zinc-300" />
+                <ArrowRightIcon className="h-5 w-5 text-zinc-400 transition group-hover:translate-x-1 group-hover:text-zinc-600 dark:text-zinc-500 dark:group-hover:text-zinc-300" />
               </div>
             </Link>
 
@@ -291,7 +291,7 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
                     <Link
                       key={index}
                       href={stat.href}
-                      className="rounded-md transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50 -m-1 p-1"
+                      className="-m-1 rounded-md p-1 transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                     >
                       {content}
                     </Link>

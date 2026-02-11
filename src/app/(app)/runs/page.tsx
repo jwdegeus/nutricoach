@@ -20,7 +20,7 @@ export default async function RunsPage() {
   if (!result.ok) {
     return (
       <div className="container mx-auto py-8">
-        <h1 className="text-2xl font-bold mb-4">Runs</h1>
+        <h1 className="mb-4 text-2xl font-bold">Runs</h1>
         <div className="text-destructive">Fout: {result.error.message}</div>
       </div>
     );
@@ -28,8 +28,8 @@ export default async function RunsPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-4">Weekmenu runs</h1>
-      <p className="text-muted-foreground mb-6">
+      <h1 className="mb-4 text-2xl font-bold">Weekmenu runs</h1>
+      <p className="mb-6 text-muted-foreground">
         Overzicht van alle weekmenu-generaties en -regeneraties. Laatste 50
         runs.
       </p>

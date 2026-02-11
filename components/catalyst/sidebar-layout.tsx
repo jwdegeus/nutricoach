@@ -36,7 +36,7 @@ function MobileSidebar({
         transition
         className="fixed inset-y-0 w-full max-w-80 p-2 transition duration-300 ease-in-out data-closed:-translate-x-full"
       >
-        <div className="flex h-full flex-col rounded-lg bg-white shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+        <div className="flex h-full flex-col rounded-lg bg-card shadow-sm outline outline-1 -outline-offset-1 outline-border/50">
           <div className="-mb-3 px-4 pt-3">
             <Headless.CloseButton as={NavbarItem} aria-label="Close navigation">
               <CloseMenuIcon />
@@ -60,11 +60,11 @@ export function SidebarLayout({
   const [showSidebar, setShowSidebar] = useState(false);
 
   return (
-    <div className="relative isolate flex min-h-svh w-full bg-white max-lg:flex-col lg:bg-zinc-100 dark:bg-zinc-900 dark:lg:bg-zinc-950">
+    <div className="relative isolate flex min-h-svh w-full bg-background max-lg:flex-col">
       {/* Sidebar on desktop */}
       <motion.div
         layoutScroll
-        className="fixed inset-y-0 left-0 w-64 max-lg:hidden border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+        className="fixed inset-y-0 left-0 w-64 border-r border-border bg-card max-lg:hidden"
       >
         {sidebar}
       </motion.div>
@@ -74,8 +74,8 @@ export function SidebarLayout({
         {sidebar}
       </MobileSidebar>
 
-      {/* Navbar on mobile - same background as sidebar, vaste hoogte voor sticky tabs */}
-      <header className="sticky top-0 z-20 flex h-16 shrink-0 flex-col justify-center border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900 lg:hidden">
+      {/* Navbar on mobile — sticky top-0 z-20, h-16 (topbar height; page-sticky uses top-16) */}
+      <header className="sticky top-0 z-20 flex h-16 shrink-0 flex-col justify-center border-b border-border/50 bg-background/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 lg:hidden">
         <div className="flex items-center">
           <div className="py-2.5">
             <NavbarItem
@@ -89,10 +89,10 @@ export function SidebarLayout({
         </div>
       </header>
 
-      {/* Content – geen aparte kaart; vult de breedte enzelfde achtergrond als pagina */}
-      <main className="flex flex-1 flex-col pb-2 lg:min-w-0 lg:pr-2 lg:pl-64">
-        {/* Navbar on desktop - vaste hoogte (h-16) zodat AccountSectionTabs (top-16) netjes eronder plakt */}
-        <header className="sticky top-0 z-20 hidden h-16 shrink-0 items-center border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900 lg:flex">
+      {/* Content – bg-background expliciet zodat dark mode primary-950 correct toont */}
+      <main className="flex flex-1 flex-col bg-background pb-2 lg:min-w-0 lg:pr-2 lg:pl-64">
+        {/* Navbar on desktop — sticky top-0 z-20, h-16 (page-sticky layers use top-16) */}
+        <header className="sticky top-0 z-20 hidden h-16 shrink-0 items-center border-b border-border/50 bg-background/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 lg:flex">
           {navbar}
         </header>
         <div className="flex flex-1 flex-col gap-4 p-6 lg:p-8">

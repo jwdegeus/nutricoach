@@ -51,8 +51,8 @@ export function ReceptenbeheerClient({
               onClick={() => setActiveTab(tab.id)}
               className={
                 isActive
-                  ? 'border-b-2 border-primary-500 pb-3 pr-4 pt-1 text-sm font-medium text-primary-600 dark:text-primary-400'
-                  : 'border-b-2 border-transparent pb-3 pr-4 pt-1 text-sm font-medium text-zinc-600 hover:border-zinc-300 hover:text-zinc-950 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-white'
+                  ? 'border-b-2 border-primary-500 pt-1 pr-4 pb-3 text-sm font-medium text-primary-600 dark:text-primary-400'
+                  : 'border-b-2 border-transparent pt-1 pr-4 pb-3 text-sm font-medium text-zinc-600 hover:border-zinc-300 hover:text-zinc-950 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-white'
               }
             >
               {tab.label}

@@ -70,7 +70,7 @@ export function GuardrailsViolationEmptyState({
 
       {/* FORCE-deficits: “Voeg iets toe uit: …” + link naar recepten die passen */}
       {forceDeficits && forceDeficits.length > 0 && (
-        <div className="mb-4 rounded-md bg-amber-50 dark:bg-amber-950/30 p-3 border border-amber-200 dark:border-amber-800/50">
+        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800/50 dark:bg-amber-950/30">
           <Text className="text-sm font-medium text-amber-900 dark:text-amber-100">
             Voeg iets toe uit:
           </Text>
@@ -149,17 +149,17 @@ export function GuardrailsViolationEmptyState({
       </div>
 
       {/* Actions */}
-      <div className="flex flex-wrap gap-3 pt-4 border-t border-red-200 dark:border-red-900/50">
+      <div className="flex flex-wrap gap-3 border-t border-red-200 pt-4 dark:border-red-900/50">
         {onRetry && (
           <Button onClick={onRetry} disabled={isRetrying} color="blue">
             {isRetrying ? (
               <>
-                <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
                 Opnieuw proberen...
               </>
             ) : (
               <>
-                <ArrowPathIcon className="h-4 w-4 mr-2" />
+                <ArrowPathIcon className="mr-2 h-4 w-4" />
                 Opnieuw proberen
               </>
             )}

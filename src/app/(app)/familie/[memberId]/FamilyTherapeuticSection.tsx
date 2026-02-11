@@ -100,7 +100,6 @@ export function FamilyTherapeuticSection({ memberId }: { memberId: string }) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only refetch when memberId changes; showToast is unstable
   }, [memberId]);
 
   async function handleHealthSave() {
@@ -188,7 +187,7 @@ export function FamilyTherapeuticSection({ memberId }: { memberId: string }) {
   return (
     <div className="space-y-6">
       <FieldGroup>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
+        <p className="mb-2 text-sm text-zinc-600 dark:text-zinc-400">
           {t('healthDataHint')}
         </p>
         <Field>
@@ -253,7 +252,7 @@ export function FamilyTherapeuticSection({ memberId }: { memberId: string }) {
             disabled={healthSaving}
           >
             {healthSaving && (
-              <ArrowPathIcon className="size-4 animate-spin mr-2" aria-hidden />
+              <ArrowPathIcon className="mr-2 size-4 animate-spin" aria-hidden />
             )}
             {healthSaving ? t('saving') : t('saveHealthProfile')}
           </Button>
@@ -289,7 +288,7 @@ export function FamilyTherapeuticSection({ memberId }: { memberId: string }) {
                   </option>
                 ))}
               </Select>
-              <div className="flex justify-end mt-2">
+              <div className="mt-2 flex justify-end">
                 <Button
                   type="button"
                   onClick={handleProtocolSave}
@@ -297,7 +296,7 @@ export function FamilyTherapeuticSection({ memberId }: { memberId: string }) {
                 >
                   {protocolSaving && (
                     <ArrowPathIcon
-                      className="size-4 animate-spin mr-2"
+                      className="mr-2 size-4 animate-spin"
                       aria-hidden
                     />
                   )}

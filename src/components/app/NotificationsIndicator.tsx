@@ -130,9 +130,9 @@ export function NotificationsIndicator() {
           </span>
         )}
       </DropdownButton>
-      <DropdownMenu anchor="bottom end" className="w-80 max-h-[32rem]">
+      <DropdownMenu anchor="bottom end" className="max-h-[32rem] w-80">
         <DropdownHeader>
-          <div className="flex items-center justify-between w-full">
+          <div className="flex w-full items-center justify-between">
             <span className="font-semibold text-zinc-950 dark:text-white">
               Notificaties
             </span>
@@ -146,19 +146,19 @@ export function NotificationsIndicator() {
         <DropdownDivider />
 
         {isLoading ? (
-          <div className="px-3.5 py-4 text-sm text-zinc-500 dark:text-zinc-400 text-center">
+          <div className="px-3.5 py-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
             Laden...
           </div>
         ) : notifications.length === 0 ? (
-          <div className="px-3.5 py-4 text-sm text-zinc-500 dark:text-zinc-400 text-center">
+          <div className="px-3.5 py-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
             Geen notificaties
           </div>
         ) : (
-          <div className="overflow-y-auto max-h-[24rem]">
+          <div className="max-h-[24rem] overflow-y-auto">
             {/* Running notifications */}
             {running.length > 0 && (
               <>
-                <div className="px-3.5 pt-2 pb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+                <div className="px-3.5 pt-2 pb-1 text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
                   Bezig
                 </div>
                 {running.map((notification) =>
@@ -167,13 +167,13 @@ export function NotificationsIndicator() {
                       key={notification.id}
                       href={`/meal-plans/${notification.planId}`}
                     >
-                      <div className="flex items-start gap-2 w-full">
+                      <div className="flex w-full items-start gap-2">
                         {getStatusIcon(notification.status)}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm/6 font-medium text-zinc-950 dark:text-white sm:text-base/6">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm/6 font-medium text-zinc-950 sm:text-base/6 dark:text-white">
                             {getRunTypeLabel(notification.runType)}
                           </div>
-                          <div className="mt-0.5 text-xs/5 text-zinc-500 dark:text-zinc-400 sm:text-sm/5">
+                          <div className="mt-0.5 text-xs/5 text-zinc-500 sm:text-sm/5 dark:text-zinc-400">
                             {formatTime(notification.createdAt)}
                           </div>
                         </div>
@@ -184,13 +184,13 @@ export function NotificationsIndicator() {
                       key={notification.id}
                       className="px-3.5 py-2.5 sm:px-3 sm:py-1.5"
                     >
-                      <div className="flex items-start gap-2 w-full">
+                      <div className="flex w-full items-start gap-2">
                         {getStatusIcon(notification.status)}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm/6 font-medium text-zinc-950 dark:text-white sm:text-base/6">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm/6 font-medium text-zinc-950 sm:text-base/6 dark:text-white">
                             {getRunTypeLabel(notification.runType)}
                           </div>
-                          <div className="mt-0.5 text-xs/5 text-zinc-500 dark:text-zinc-400 sm:text-sm/5">
+                          <div className="mt-0.5 text-xs/5 text-zinc-500 sm:text-sm/5 dark:text-zinc-400">
                             {formatTime(notification.createdAt)}
                           </div>
                         </div>
@@ -207,7 +207,7 @@ export function NotificationsIndicator() {
             {/* Error notifications */}
             {errors.length > 0 && (
               <>
-                <div className="px-3.5 pt-2 pb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+                <div className="px-3.5 pt-2 pb-1 text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
                   Fouten
                 </div>
                 {errors.map((notification) =>
@@ -216,13 +216,13 @@ export function NotificationsIndicator() {
                       key={notification.id}
                       href={`/meal-plans/${notification.planId}`}
                     >
-                      <div className="flex items-start gap-2 w-full">
+                      <div className="flex w-full items-start gap-2">
                         {getStatusIcon(notification.status)}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm/6 font-medium text-zinc-950 dark:text-white sm:text-base/6">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm/6 font-medium text-zinc-950 sm:text-base/6 dark:text-white">
                             {getRunTypeLabel(notification.runType)} - Fout
                           </div>
-                          <div className="mt-0.5 text-xs/5 text-zinc-500 dark:text-zinc-400 sm:text-sm/5">
+                          <div className="mt-0.5 text-xs/5 text-zinc-500 sm:text-sm/5 dark:text-zinc-400">
                             {notification.errorMessage || 'Onbekende fout'}
                           </div>
                           <div className="mt-0.5 text-xs/4 text-zinc-400 dark:text-zinc-500">
@@ -236,13 +236,13 @@ export function NotificationsIndicator() {
                       key={notification.id}
                       className="px-3.5 py-2.5 sm:px-3 sm:py-1.5"
                     >
-                      <div className="flex items-start gap-2 w-full">
+                      <div className="flex w-full items-start gap-2">
                         {getStatusIcon(notification.status)}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm/6 font-medium text-zinc-950 dark:text-white sm:text-base/6">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm/6 font-medium text-zinc-950 sm:text-base/6 dark:text-white">
                             {getRunTypeLabel(notification.runType)} - Fout
                           </div>
-                          <div className="mt-0.5 text-xs/5 text-zinc-500 dark:text-zinc-400 sm:text-sm/5">
+                          <div className="mt-0.5 text-xs/5 text-zinc-500 sm:text-sm/5 dark:text-zinc-400">
                             {notification.errorMessage || 'Onbekende fout'}
                           </div>
                           <div className="mt-0.5 text-xs/4 text-zinc-400 dark:text-zinc-500">
@@ -260,7 +260,7 @@ export function NotificationsIndicator() {
             {/* Recent completed notifications */}
             {recent.length > 0 && (
               <>
-                <div className="px-3.5 pt-2 pb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+                <div className="px-3.5 pt-2 pb-1 text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
                   Recent Voltooid
                 </div>
                 {recent.map((notification) =>
@@ -269,13 +269,13 @@ export function NotificationsIndicator() {
                       key={notification.id}
                       href={`/meal-plans/${notification.planId}`}
                     >
-                      <div className="flex items-start gap-2 w-full">
+                      <div className="flex w-full items-start gap-2">
                         {getStatusIcon(notification.status)}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm/6 font-medium text-zinc-950 dark:text-white sm:text-base/6">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm/6 font-medium text-zinc-950 sm:text-base/6 dark:text-white">
                             {getRunTypeLabel(notification.runType)} - Voltooid
                           </div>
-                          <div className="mt-0.5 text-xs/5 text-zinc-500 dark:text-zinc-400 sm:text-sm/5">
+                          <div className="mt-0.5 text-xs/5 text-zinc-500 sm:text-sm/5 dark:text-zinc-400">
                             {formatTime(notification.createdAt)}
                           </div>
                         </div>
@@ -286,13 +286,13 @@ export function NotificationsIndicator() {
                       key={notification.id}
                       className="px-3.5 py-2.5 sm:px-3 sm:py-1.5"
                     >
-                      <div className="flex items-start gap-2 w-full">
+                      <div className="flex w-full items-start gap-2">
                         {getStatusIcon(notification.status)}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm/6 font-medium text-zinc-950 dark:text-white sm:text-base/6">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm/6 font-medium text-zinc-950 sm:text-base/6 dark:text-white">
                             {getRunTypeLabel(notification.runType)} - Voltooid
                           </div>
-                          <div className="mt-0.5 text-xs/5 text-zinc-500 dark:text-zinc-400 sm:text-sm/5">
+                          <div className="mt-0.5 text-xs/5 text-zinc-500 sm:text-sm/5 dark:text-zinc-400">
                             {formatTime(notification.createdAt)}
                           </div>
                         </div>

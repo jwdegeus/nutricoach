@@ -97,7 +97,7 @@ export function MealPlanCards({
           </div>
 
           {/* Meal Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {day.meals.map((meal) => {
               const enriched = getEnrichedMeal(meal.date, meal.slot);
               const summaryLines = getMealSummary(meal);

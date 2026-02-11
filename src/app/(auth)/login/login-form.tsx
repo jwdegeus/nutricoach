@@ -30,7 +30,7 @@ export function LoginForm() {
   return (
     <form action={handleSubmit} className="space-y-6">
       {error && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-950/50 p-4 text-sm text-red-600 dark:text-red-400">
+        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">
           <strong>Fout:</strong> {error}
         </div>
       )}
@@ -62,7 +62,7 @@ export function LoginForm() {
       <div className="flex items-center justify-between">
         <Link
           href="/reset-password"
-          className="text-sm text-primary hover:underline"
+          className="text-primary text-sm hover:underline"
         >
           Wachtwoord vergeten?
         </Link>
@@ -76,7 +76,7 @@ export function LoginForm() {
         Nog geen account?{' '}
         <Link
           href="/register"
-          className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          className="font-medium text-blue-600 hover:underline dark:text-blue-400"
         >
           Registreer hier
         </Link>

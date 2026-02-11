@@ -22,12 +22,12 @@ export function DietEditPageClient({ dietType }: { dietType: DietTypeOutput }) {
     return (
       <div className="space-y-6">
         <div>
-          <div className="h-8 w-48 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
-          <div className="h-4 w-96 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse mt-2" />
+          <div className="h-8 w-48 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+          <div className="mt-2 h-4 w-96 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
         </div>
         <div className="space-y-4">
-          <div className="h-10 w-full bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
-          <div className="h-24 w-full bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+          <div className="h-10 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+          <div className="h-24 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
         </div>
       </div>
     );

@@ -190,7 +190,7 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
           <Button onClick={goToPreviousMonth} outline className="text-sm">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <h2 className="text-xl font-semibold min-w-[200px] text-center">
+          <h2 className="min-w-[200px] text-center text-xl font-semibold">
             {monthName}
           </h2>
           <Button onClick={goToNextMonth} outline className="text-sm">
@@ -203,13 +203,13 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
       </div>
 
       {/* Calendar grid */}
-      <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+      <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800">
         {/* Day headers */}
         <div className="grid grid-cols-7 bg-zinc-50 dark:bg-zinc-900/50">
           {['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'].map((day) => (
             <div
               key={day}
-              className="p-3 text-center text-sm font-medium text-zinc-700 dark:text-zinc-300 border-r border-zinc-200 dark:border-zinc-800 last:border-r-0"
+              className="border-r border-zinc-200 p-3 text-center text-sm font-medium text-zinc-700 last:border-r-0 dark:border-zinc-800 dark:text-zinc-300"
             >
               {day}
             </div>
@@ -227,22 +227,13 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
             return (
               <div
                 key={index}
-                className={`
-                  min-h-[120px] border-r border-b border-zinc-200 dark:border-zinc-800
-                  ${isCurrentMonth ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-950'}
-                  ${isToday ? 'ring-2 ring-blue-500' : ''}
-                  p-2
-                `}
+                className={`min-h-[120px] border-r border-b border-zinc-200 dark:border-zinc-800 ${isCurrentMonth ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-50 dark:bg-zinc-950'} ${isToday ? 'ring-2 ring-blue-500' : ''} p-2`}
               >
                 {day.dateStr && (
                   <>
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="mb-2 flex items-center justify-between">
                       <span
-                        className={`
-                          text-sm font-medium
-                          ${isToday ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-700 dark:text-zinc-300'}
-                          ${!isCurrentMonth ? 'opacity-50' : ''}
-                        `}
+                        className={`text-sm font-medium ${isToday ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-700 dark:text-zinc-300'} ${!isCurrentMonth ? 'opacity-50' : ''} `}
                       >
                         {day.date.getDate()}
                       </span>
@@ -259,15 +250,9 @@ export function CalendarView({ plans }: { plans: MealPlanRecord[] }) {
                           onClick={() =>
                             setSelectedMeal({ meal, planId, date: day.dateStr })
                           }
-                          className={`
-                            w-full text-left px-2 py-1 rounded text-xs
-                            transition-colors
-                            ${mealSlotColors[meal.slot] || 'bg-zinc-100 dark:bg-zinc-800'}
-                            hover:opacity-80
-                            ${isLocked ? 'opacity-60' : ''}
-                          `}
+                          className={`w-full rounded px-2 py-1 text-left text-xs transition-colors ${mealSlotColors[meal.slot] || 'bg-zinc-100 dark:bg-zinc-800'} hover:opacity-80 ${isLocked ? 'opacity-60' : ''} `}
                         >
-                          <div className="font-medium truncate">
+                          <div className="truncate font-medium">
                             {mealSlotLabels[meal.slot] || meal.slot}
                           </div>
                           <div className="truncate text-xs opacity-90">

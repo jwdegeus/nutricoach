@@ -21,14 +21,14 @@ export function DashboardKpiCards() {
         bg="bg-muted"
       >
         <div className={kpiContentClass}>
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <div className="bg-primary/10 text-primary flex size-10 shrink-0 items-center justify-center rounded-xl">
             <UsersIcon className="size-5" />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-medium text-muted-foreground">
               {t('kpiMembers')}
             </p>
-            <p className="text-2xl font-semibold tabular-nums text-foreground">
+            <p className="text-2xl font-semibold text-foreground tabular-nums">
               4
             </p>
           </div>
@@ -40,14 +40,14 @@ export function DashboardKpiCards() {
         bg="bg-muted"
       >
         <div className={kpiContentClass}>
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <div className="bg-primary/10 text-primary flex size-10 shrink-0 items-center justify-center rounded-xl">
             <ChartBarIcon className="size-5" />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-medium text-muted-foreground">
               {t('kpiMacroScore')}
             </p>
-            <p className="text-2xl font-semibold tabular-nums text-foreground">
+            <p className="text-2xl font-semibold text-foreground tabular-nums">
               87%
             </p>
           </div>
@@ -56,14 +56,14 @@ export function DashboardKpiCards() {
 
       <BentoCell round="rounded-lg" bg="bg-muted">
         <div className={kpiContentClass}>
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-600/20 text-primary-700 dark:text-primary-400">
             <BeakerIcon className="size-5" />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-medium text-muted-foreground">
               {t('kpiSupplements')}
             </p>
-            <p className="text-2xl font-semibold tabular-nums text-foreground">
+            <p className="text-2xl font-semibold text-foreground tabular-nums">
               3/4
             </p>
           </div>
@@ -75,14 +75,14 @@ export function DashboardKpiCards() {
         bg="bg-muted"
       >
         <div className={kpiContentClass}>
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-400/20 text-primary-600 dark:text-primary-300">
             <CalendarDaysIcon className="size-5" />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-medium text-muted-foreground">
               {t('kpiPeriod')}
             </p>
-            <p className="text-2xl font-semibold tabular-nums text-foreground">
+            <p className="text-2xl font-semibold text-foreground tabular-nums">
               7d
             </p>
           </div>

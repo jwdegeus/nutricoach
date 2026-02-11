@@ -116,13 +116,13 @@ export function MealDetailPageClient({
         <div className="flex items-center gap-4">
           <Link href="/meals">
             <Button outline>
-              <ArrowLeftIcon className="h-4 w-4 mr-2" />
+              <ArrowLeftIcon className="mr-2 h-4 w-4" />
               Terug naar maaltijden
             </Button>
           </Link>
           <Heading level={1}>Laden...</Heading>
         </div>
-        <div className="text-center py-12">
+        <div className="py-12 text-center">
           <p className="text-zinc-500 dark:text-zinc-400">
             Maaltijd details worden geladen...
           </p>
@@ -137,13 +137,13 @@ export function MealDetailPageClient({
         <div className="flex items-center gap-4">
           <Link href="/meals">
             <Button outline>
-              <ArrowLeftIcon className="h-4 w-4 mr-2" />
+              <ArrowLeftIcon className="mr-2 h-4 w-4" />
               Terug naar maaltijden
             </Button>
           </Link>
           <Heading level={1}>Fout</Heading>
         </div>
-        <div className="text-center py-12">
+        <div className="py-12 text-center">
           <p className="text-red-600 dark:text-red-400">
             {error || 'Maaltijd niet gevonden'}
           </p>
@@ -157,7 +157,7 @@ export function MealDetailPageClient({
       <div className="flex items-center gap-4">
         <Link href="/meals">
           <Button outline>
-            <ArrowLeftIcon className="h-4 w-4 mr-2" />
+            <ArrowLeftIcon className="mr-2 h-4 w-4" />
             Terug naar maaltijden
           </Button>
         </Link>

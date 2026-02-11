@@ -235,11 +235,11 @@ export function MealCard({
   return (
     <>
       <div
-        className="rounded-lg bg-white p-4 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10 cursor-pointer hover:ring-zinc-950/10 dark:hover:ring-white/20 transition-all"
+        className="cursor-pointer rounded-lg bg-white p-4 shadow-xs ring-1 ring-zinc-950/5 transition-all hover:ring-zinc-950/10 dark:bg-zinc-900 dark:ring-white/10 dark:hover:ring-white/20"
         onClick={() => setShowDetailDialog(true)}
       >
         {linkedRecipe?.imageUrl && (
-          <div className="mb-3 -mx-4 -mt-4 overflow-hidden rounded-t-lg aspect-[16/10] bg-zinc-100 dark:bg-zinc-800">
+          <div className="-mx-4 -mt-4 mb-3 aspect-[16/10] overflow-hidden rounded-t-lg bg-zinc-100 dark:bg-zinc-800">
             <img
               src={linkedRecipe.imageUrl}
               alt=""
@@ -247,9 +247,9 @@ export function MealCard({
             />
           </div>
         )}
-        <div className="flex items-start justify-between mb-2">
+        <div className="mb-2 flex items-start justify-between">
           <div className="flex-1">
-            <div className="text-xs text-muted-foreground uppercase tracking-wide">
+            <div className="text-xs tracking-wide text-muted-foreground uppercase">
               {formatMealSlot(mealSlot)}
             </div>
             <Heading level={3} className="mt-1">
@@ -260,7 +260,7 @@ export function MealCard({
 
         {/* Time info */}
         {(prepTime !== undefined || cookTime !== undefined) && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+          <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />
             {prepTime !== undefined && cookTime !== undefined && (
               <span>
@@ -289,7 +289,7 @@ export function MealCard({
 
         {/* Macros (if available) */}
         {macros && (
-          <div className="mb-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+          <div className="mb-3 border-t border-zinc-200 pt-2 dark:border-zinc-800">
             <div className="grid grid-cols-2 gap-2 text-xs">
               {macros.calories !== undefined && (
                 <div>
@@ -327,7 +327,7 @@ export function MealCard({
 
         {/* Actions */}
         <div
-          className="flex flex-col gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800"
+          className="flex flex-col gap-2 border-t border-zinc-200 pt-2 dark:border-zinc-800"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex gap-2">
@@ -338,7 +338,7 @@ export function MealCard({
                 disabled={isPending}
                 className="flex-1"
               >
-                <Replace className="h-3 w-3 mr-1" />
+                <Replace className="mr-1 h-3 w-3" />
                 Swap
               </Button>
             ) : (
@@ -349,9 +349,9 @@ export function MealCard({
                 className="flex-1"
               >
                 {isPending ? (
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                 ) : (
-                  <ArrowLeftRight className="h-3 w-3 mr-1" />
+                  <ArrowLeftRight className="mr-1 h-3 w-3" />
                 )}
                 Wissel
               </Button>
@@ -363,9 +363,9 @@ export function MealCard({
               className="flex-1"
             >
               {isPending ? (
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
               ) : (
-                <Trash2 className="h-3 w-3 mr-1" />
+                <Trash2 className="mr-1 h-3 w-3" />
               )}
               {showRemoveConfirm ? 'Bevestig' : 'Verwijder'}
             </Button>
@@ -444,7 +444,7 @@ export function MealCard({
             </Field>
             {swapError && (
               <div
-                className="p-3 rounded-lg border border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/30 text-red-800 dark:text-red-200 text-sm"
+                className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200"
                 role="alert"
               >
                 <p className="font-medium">
@@ -468,7 +468,7 @@ export function MealCard({
           <Button onClick={handleSaveSwap} disabled={isSavingSwap}>
             {isSavingSwap ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Opslaan...
               </>
             ) : (

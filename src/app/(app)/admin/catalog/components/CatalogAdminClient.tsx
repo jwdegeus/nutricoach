@@ -100,7 +100,7 @@ export function CatalogAdminClient() {
           </p>
         </div>
         <Button onClick={handleCreateOpen} disabled={loading}>
-          <PlusIcon className="h-4 w-4 mr-1" />
+          <PlusIcon className="mr-1 h-4 w-4" />
           Nieuwe optie
         </Button>
       </div>
@@ -128,13 +128,13 @@ export function CatalogAdminClient() {
             <span className="text-sm text-zinc-500 dark:text-zinc-400">
               Sortering:
             </span>
-            <div className="flex rounded-lg border border-zinc-200 dark:border-zinc-700 p-0.5">
+            <div className="flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-700">
               <button
                 type="button"
                 onClick={() => setSortBy('display_order')}
                 className={
                   sortBy === 'display_order'
-                    ? 'rounded-md bg-zinc-200 dark:bg-zinc-600 px-3 py-1.5 text-sm font-medium text-zinc-950 dark:text-white'
+                    ? 'rounded-md bg-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-950 dark:bg-zinc-600 dark:text-white'
                     : 'rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
                 }
               >
@@ -145,7 +145,7 @@ export function CatalogAdminClient() {
                 onClick={() => setSortBy('label_az')}
                 className={
                   sortBy === 'label_az'
-                    ? 'rounded-md bg-zinc-200 dark:bg-zinc-600 px-3 py-1.5 text-sm font-medium text-zinc-950 dark:text-white'
+                    ? 'rounded-md bg-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-950 dark:bg-zinc-600 dark:text-white'
                     : 'rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
                 }
               >
@@ -158,7 +158,7 @@ export function CatalogAdminClient() {
 
       {error && (
         <div
-          className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 px-4 py-3 text-sm text-red-700 dark:text-red-300"
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300"
           role="alert"
         >
           {error}
@@ -168,7 +168,7 @@ export function CatalogAdminClient() {
       {loading ? (
         <Text className="text-zinc-500 dark:text-zinc-400">Opties laden…</Text>
       ) : displayOptions.length === 0 ? (
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 p-8 text-center">
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-8 text-center dark:border-zinc-700 dark:bg-zinc-900/50">
           <Text className="text-zinc-600 dark:text-zinc-400">
             Geen system opties voor{' '}
             {DIMENSION_OPTIONS.find((o) => o.value === dimension)?.label ??
@@ -176,7 +176,7 @@ export function CatalogAdminClient() {
             .
           </Text>
           <Button className="mt-4" onClick={handleCreateOpen}>
-            <PlusIcon className="h-4 w-4 mr-1" />
+            <PlusIcon className="mr-1 h-4 w-4" />
             Eerste optie toevoegen
           </Button>
         </div>
@@ -246,7 +246,7 @@ export function CatalogAdminClient() {
                       disabled={savingId !== null}
                       onClick={() => handleEditOpen(row)}
                     >
-                      <PencilIcon className="h-4 w-4 mr-1" />
+                      <PencilIcon className="mr-1 h-4 w-4" />
                       Bewerken
                     </Button>
                   </TableCell>

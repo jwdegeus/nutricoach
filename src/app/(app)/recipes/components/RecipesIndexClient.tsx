@@ -681,7 +681,7 @@ export function RecipesIndexClient({
           onClick={handleTabAlles}
           className={
             activeCollection === 'all'
-              ? 'border-b-2 border-primary-600 dark:border-primary-500 px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400'
+              ? 'border-b-2 border-primary-600 px-3 py-2 text-sm font-medium text-primary-600 dark:border-primary-500 dark:text-primary-400'
               : 'border-b-2 border-transparent px-3 py-2 text-sm font-medium text-zinc-500 hover:text-primary-600 dark:text-zinc-400 dark:hover:text-primary-400'
           }
         >
@@ -692,7 +692,7 @@ export function RecipesIndexClient({
           onClick={handleTabOpgeslagen}
           className={
             activeCollection === 'saved'
-              ? 'border-b-2 border-primary-600 dark:border-primary-500 px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400'
+              ? 'border-b-2 border-primary-600 px-3 py-2 text-sm font-medium text-primary-600 dark:border-primary-500 dark:text-primary-400'
               : 'border-b-2 border-transparent px-3 py-2 text-sm font-medium text-zinc-500 hover:text-primary-600 dark:text-zinc-400 dark:hover:text-primary-400'
           }
         >
@@ -703,7 +703,7 @@ export function RecipesIndexClient({
           onClick={handleTabRecent}
           className={
             activeCollection === 'recent'
-              ? 'border-b-2 border-primary-600 dark:border-primary-500 px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400'
+              ? 'border-b-2 border-primary-600 px-3 py-2 text-sm font-medium text-primary-600 dark:border-primary-500 dark:text-primary-400'
               : 'border-b-2 border-transparent px-3 py-2 text-sm font-medium text-zinc-500 hover:text-primary-600 dark:text-zinc-400 dark:hover:text-primary-400'
           }
         >
@@ -714,8 +714,8 @@ export function RecipesIndexClient({
       {/* Zoekveld + filterrij (desktop: chips met dropdowns, mobile: drawer) */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex-1 min-w-[200px] flex gap-2">
-            <span className="relative flex-1 min-w-0">
+          <div className="flex min-w-[200px] flex-1 gap-2">
+            <span className="relative min-w-0 flex-1">
               <InputGroup>
                 <MagnifyingGlassIcon data-slot="icon" />
                 <Input
@@ -733,7 +733,7 @@ export function RecipesIndexClient({
               Zoeken
             </Button>
           </div>
-          <div className="hidden sm:flex flex-wrap items-center gap-2">
+          <div className="hidden flex-wrap items-center gap-2 sm:flex">
             <FilterChipDropdown
               key={`soort-${mealSlot}-${mealSlotOptionId}-${filterCloseKeys.soort}`}
               label="Soort"
@@ -883,7 +883,7 @@ export function RecipesIndexClient({
         </div>
 
         {/* Tweede rij: Labels-samenvatting + Wis filters */}
-        <div className="hidden sm:flex flex-wrap items-center gap-2">
+        <div className="hidden flex-wrap items-center gap-2 sm:flex">
           {tags.length > 0 && (
             <span className="text-sm text-zinc-500 dark:text-zinc-400">
               Labels: {tags.join(', ')}
@@ -1070,7 +1070,7 @@ export function RecipesIndexClient({
             <Squares2X2Icon className="h-4 w-4" />
             Selecteer
           </Button>
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex cursor-pointer items-center gap-2">
             <Switch
               checked={filterNevoMissingOnly}
               onChange={setFilterNevoMissingOnly}
@@ -1140,7 +1140,7 @@ export function RecipesIndexClient({
         </div>
       )}
       {bulkSelectMode && selectedIds.size > 10 && (
-        <div className="rounded-xl bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-300 shadow-sm">
+        <div className="rounded-xl bg-amber-500/10 px-4 py-2 text-sm text-amber-700 shadow-sm dark:text-amber-300">
           Selecteer max 10 recepten om in tabs te openen.
         </div>
       )}
@@ -1150,14 +1150,14 @@ export function RecipesIndexClient({
         </Text>
       )}
       {bulkError && (
-        <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300 shadow-sm">
+        <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-700 shadow-sm dark:text-red-300">
           {bulkError}
         </div>
       )}
 
       {/* Results */}
       {filteredItems.length === 0 ? (
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 p-8 text-center space-y-4">
+        <div className="space-y-4 rounded-lg border border-zinc-200 bg-zinc-50 p-8 text-center dark:border-zinc-700 dark:bg-zinc-900/50">
           <Text className="text-zinc-600 dark:text-zinc-400">
             {filterNevoMissingOnly
               ? 'Geen recepten met ontbrekende NEVO-koppelingen.'
@@ -1183,7 +1183,7 @@ export function RecipesIndexClient({
                 : `${totalCount} recepten`}
             </Text>
           )}
-          <ul className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:gap-x-8">
+          <ul className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-8 2xl:grid-cols-6">
             {filteredItems.map((item) => (
               <MealCard
                 key={item.mealId}
@@ -1243,7 +1243,7 @@ function FilterChipDropdown({
   return (
     <Dropdown>
       <DropdownButton
-        className="inline-flex items-center gap-2 rounded-lg border border-transparent bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-950 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-white dark:hover:bg-zinc-700 data-open:bg-zinc-200 dark:data-open:bg-zinc-700"
+        className="inline-flex items-center gap-2 rounded-lg border border-transparent bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-950 hover:bg-zinc-200 data-open:bg-zinc-200 dark:bg-zinc-800 dark:text-white dark:hover:bg-zinc-700 dark:data-open:bg-zinc-700"
         as="button"
       >
         {icon}
@@ -1255,9 +1255,9 @@ function FilterChipDropdown({
       <DropdownMenu
         anchor="bottom start"
         variant="panel"
-        className="isolate w-max min-w-[220px] max-w-[280px] rounded-xl overflow-visible bg-white dark:bg-zinc-800 shadow-lg ring-1 ring-zinc-950/10 dark:ring-white/10"
+        className="isolate w-max max-w-[280px] min-w-[220px] overflow-visible rounded-xl bg-white shadow-lg ring-1 ring-zinc-950/10 dark:bg-zinc-800 dark:ring-white/10"
       >
-        <div className="p-4 space-y-4">
+        <div className="space-y-4 p-4">
           <p className="font-semibold text-zinc-950 dark:text-white">{label}</p>
           {panel}
         </div>
@@ -1280,8 +1280,8 @@ function FilterSoortPanel({
   const [selected, setSelected] = useState(value);
   return (
     <>
-      <div className="space-y-0 max-h-[280px] overflow-y-auto [scrollbar-gutter:stable]">
-        <label className="flex w-full items-center gap-2 rounded-lg py-2 text-sm cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700/50">
+      <div className="max-h-[280px] space-y-0 overflow-y-auto [scrollbar-gutter:stable]">
+        <label className="flex w-full cursor-pointer items-center gap-2 rounded-lg py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700/50">
           <input
             type="radio"
             name="mealSlot"
@@ -1294,7 +1294,7 @@ function FilterSoortPanel({
         {MEAL_SLOT_OPTIONS.map((opt) => (
           <label
             key={opt.value}
-            className="flex w-full items-center gap-2 rounded-lg py-2 text-sm cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700/50"
+            className="flex w-full cursor-pointer items-center gap-2 rounded-lg py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700/50"
           >
             <input
               type="radio"
@@ -1311,7 +1311,7 @@ function FilterSoortPanel({
             {mealSlotOptions.map((opt) => (
               <label
                 key={opt.id}
-                className="flex w-full items-center gap-2 rounded-lg py-2 text-sm cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700/50"
+                className="flex w-full cursor-pointer items-center gap-2 rounded-lg py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700/50"
               >
                 <input
                   type="radio"
@@ -1330,7 +1330,7 @@ function FilterSoortPanel({
           </>
         )}
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-600">
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-600">
         <Button
           plain
           onClick={onCancel}
@@ -1362,11 +1362,11 @@ function FilterTijdPanel({
   const [selected, setSelected] = useState<number | null>(value ?? null);
   return (
     <>
-      <div className="space-y-0 max-h-[200px] overflow-y-auto [scrollbar-gutter:stable]">
+      <div className="max-h-[200px] space-y-0 overflow-y-auto [scrollbar-gutter:stable]">
         {TIME_PRESETS.map((preset) => (
           <label
             key={preset.label}
-            className="flex w-full items-center gap-2 rounded-lg py-2 text-sm cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700/50"
+            className="flex w-full cursor-pointer items-center gap-2 rounded-lg py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700/50"
           >
             <input
               type="radio"
@@ -1382,7 +1382,7 @@ function FilterTijdPanel({
           </label>
         ))}
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-600">
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-600">
         <Button
           plain
           onClick={onCancel}
@@ -1423,7 +1423,7 @@ function FilterOptionPanel({
   return (
     <>
       {loadError && (
-        <Text className="text-sm text-red-600 dark:text-red-400 mb-2">
+        <Text className="mb-2 text-sm text-red-600 dark:text-red-400">
           Keuzes laden mislukt.
         </Text>
       )}
@@ -1439,7 +1439,7 @@ function FilterOptionPanel({
           </option>
         ))}
       </Select>
-      <div className="flex flex-wrap items-center justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-600">
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-600">
         <Button
           plain
           onClick={onCancel}
@@ -1472,7 +1472,7 @@ function FilterBronPanel({
   return (
     <>
       <div className="flex gap-2">
-        <InputGroup className="flex-1 min-w-0">
+        <InputGroup className="min-w-0 flex-1">
           <FunnelIcon className="h-4 w-4" data-slot="icon" />
           <Input
             type="text"
@@ -1483,7 +1483,7 @@ function FilterBronPanel({
           />
         </InputGroup>
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-600">
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-600">
         <Button
           plain
           onClick={onCancel}
@@ -1524,7 +1524,7 @@ function FilterTagsPanel({
   return (
     <>
       <div className="flex gap-2">
-        <InputGroup className="flex-1 min-w-0">
+        <InputGroup className="min-w-0 flex-1">
           <FunnelIcon className="h-4 w-4" data-slot="icon" />
           <Input
             type="text"
@@ -1538,13 +1538,13 @@ function FilterTagsPanel({
           />
         </InputGroup>
       </div>
-      <div className="max-h-[160px] overflow-y-auto space-y-1.5 [scrollbar-gutter:stable]">
+      <div className="max-h-[160px] space-y-1.5 overflow-y-auto [scrollbar-gutter:stable]">
         {localTags.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {localTags.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center gap-1 rounded-lg bg-zinc-100 dark:bg-zinc-700/50 px-2 py-1 text-sm text-zinc-950 dark:text-white"
+                className="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2 py-1 text-sm text-zinc-950 dark:bg-zinc-700/50 dark:text-white"
               >
                 {tag}
                 <button
@@ -1562,7 +1562,7 @@ function FilterTagsPanel({
           </div>
         )}
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-600">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-600">
         {localTags.length > 0 && (
           <Button
             plain
@@ -1572,7 +1572,7 @@ function FilterTagsPanel({
             Alles deselecteren
           </Button>
         )}
-        <div className="flex gap-2 ml-auto">
+        <div className="ml-auto flex gap-2">
           <Button
             plain
             onClick={onCancel}
@@ -1626,7 +1626,7 @@ function MealCardThumbnail({
         </div>
       )}
       {children && (
-        <div className="absolute right-2 top-2 z-10">{children}</div>
+        <div className="absolute top-2 right-2 z-10">{children}</div>
       )}
     </div>
   );
@@ -1660,15 +1660,15 @@ function MealCard({
     item.weekMenuStatus === 'blocked_refs' ||
     item.weekMenuStatus === 'blocked_both';
   return (
-    <li className="h-[320px] flex flex-col">
-      <div className="relative flex flex-1 min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xs">
+    <li className="flex h-[320px] flex-col">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-xs dark:border-zinc-700 dark:bg-zinc-900">
         <Link
           href={`/recipes/${item.mealId}`}
-          className="relative flex flex-1 min-h-0 flex-col hover:ring-2 hover:ring-zinc-950/10 dark:hover:ring-white/10 rounded-lg"
+          className="relative flex min-h-0 flex-1 flex-col rounded-lg"
         >
           {bulkSelectMode && (
             <div
-              className="absolute left-2 top-2 z-10"
+              className="absolute top-2 left-2 z-10"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1716,7 +1716,7 @@ function MealCard({
             </Button>
           </MealCardThumbnail>
           <div className="flex min-h-0 flex-1 flex-col p-4">
-            <h3 className="truncate font-semibold text-zinc-950 dark:text-white pr-8">
+            <h3 className="truncate pr-8 font-semibold text-zinc-950 dark:text-white">
               {item.title || 'Zonder titel'}
             </h3>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1755,8 +1755,8 @@ function MealCard({
                         key={star}
                         className={`h-3.5 w-3.5 ${
                           star <= item.userRating!
-                            ? 'text-yellow-400 fill-yellow-400'
-                            : 'text-zinc-300 dark:text-zinc-600 fill-zinc-300 dark:fill-zinc-600'
+                            ? 'fill-yellow-400 text-yellow-400'
+                            : 'fill-zinc-300 text-zinc-300 dark:fill-zinc-600 dark:text-zinc-600'
                         }`}
                       />
                     ))}
@@ -1782,14 +1782,14 @@ function MealCard({
               </div>
             )}
             {item.sourceName && (
-              <p className="mt-auto pt-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">
+              <p className="mt-auto truncate pt-1 text-xs text-zinc-500 dark:text-zinc-400">
                 Bron: {item.sourceName}
               </p>
             )}
           </div>
         </Link>
         {showNevoCta && (
-          <div className="shrink-0 px-4 pb-3 pt-1">
+          <div className="shrink-0 px-4 pt-1 pb-3">
             <Link
               href={`/recipes/${item.mealId}`}
               className="inline-flex items-center text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
@@ -1958,11 +1958,11 @@ function RecipesFiltersDrawerContent({
           </Button>
         </div>
         {tags.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             {tags.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center gap-1 rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-sm"
+                className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-sm dark:bg-zinc-800"
               >
                 {tag}
                 <button

@@ -30,7 +30,7 @@ export default async function OnboardingPage() {
   return (
     <div className="w-full max-w-3xl">
       <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white sm:text-4xl">
+        <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl dark:text-white">
           {/* TODO: i18n key: onboarding.title */}
           Welkom bij NutriCoach
         </h1>

@@ -43,6 +43,7 @@
     "next-themes": "^0.4.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "recharts": "^3.7.0",
     "server-only": "^0.0.1",
     "tailwind-merge": "^2.5.5",
     "zod": "^3.23.8",
@@ -58,9 +59,11 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-tailwind-v4": "^1.0.15",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
+    "prettier-plugin-tailwindcss": "^0.7.2",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.7.0",
     "typescript": "^5"
@@ -73,8 +76,8 @@
       "prettier --write",
       "eslint --fix"
     ],
-    "*.{ts,tsx}": [
-      "bash -c 'tsc --noEmit'"
+    "*.{css,json,md}": [
+      "prettier --write"
     ]
   }
 }

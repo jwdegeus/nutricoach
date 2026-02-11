@@ -15,7 +15,7 @@ export default function OnboardingLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-100 px-4 py-8 dark:bg-zinc-900 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-100 px-4 py-8 sm:px-6 lg:px-8 dark:bg-zinc-900">
       {children}
     </div>
   );

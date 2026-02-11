@@ -110,12 +110,12 @@ export function MealDetail({
     <div className="space-y-6">
       {/* Header Info */}
       <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-        <div className="flex items-start justify-between mb-4">
+        <div className="mb-4 flex items-start justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-zinc-950 dark:text-white mb-2">
+            <h2 className="mb-2 text-2xl font-bold text-zinc-950 dark:text-white">
               {mealName}
             </h2>
-            <div className="flex items-center gap-3 mb-2">
+            <div className="mb-2 flex items-center gap-3">
               <Badge color={mealSource === 'custom' ? 'blue' : 'zinc'}>
                 {mealSource === 'custom' ? 'Custom' : 'Gemini'}
               </Badge>
@@ -126,7 +126,7 @@ export function MealDetail({
 
         {/* Source Image */}
         {sourceImageUrl && (
-          <div className="relative mt-4 min-h-[200px] max-h-96 w-full">
+          <div className="relative mt-4 max-h-96 min-h-[200px] w-full">
             <Image
               src={sourceImageUrl}
               alt={mealName}
@@ -139,7 +139,7 @@ export function MealDetail({
         )}
 
         {/* Basic Info */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+        <div className="mt-4 grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
           {(mealData as { prepTime?: number })?.prepTime != null && (
             <div className="flex items-center gap-2">
               <ClockIcon className="h-4 w-4 text-zinc-500" />
@@ -184,7 +184,7 @@ export function MealDetail({
         </div>
 
         {/* Dates */}
-        <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-400 space-y-1">
+        <div className="mt-4 space-y-1 border-t border-zinc-200 pt-4 text-sm text-zinc-600 dark:border-zinc-700 dark:text-zinc-400">
           {createdAt && <div>Toegevoegd: {formatDate(String(createdAt))}</div>}
           {firstConsumedAt && (
             <div>
@@ -204,20 +204,20 @@ export function MealDetail({
       {/* AI Analysis / Instructions */}
       {aiAnalysis && (
         <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-          <h3 className="text-lg font-semibold text-zinc-950 dark:text-white mb-4">
+          <h3 className="mb-4 text-lg font-semibold text-zinc-950 dark:text-white">
             Bereidingsinstructies
           </h3>
           {(() => {
             const instr = (aiAnalysis as { instructions?: unknown })
               .instructions;
             return instr && Array.isArray(instr) ? (
-              <ol className="space-y-2 list-decimal list-inside text-sm text-zinc-600 dark:text-zinc-400">
+              <ol className="list-inside list-decimal space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
                 {instr.map((instruction: unknown, idx: number) => (
                   <li key={idx}>{String(instruction)}</li>
                 ))}
               </ol>
             ) : instr ? (
-              <Text className="text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-line">
+              <Text className="text-sm whitespace-pre-line text-zinc-600 dark:text-zinc-400">
                 {String(instr)}
               </Text>
             ) : (
@@ -235,7 +235,7 @@ export function MealDetail({
           ?.ingredientRefs;
         return refs && refs.length > 0 ? (
           <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-            <h3 className="text-lg font-semibold text-zinc-950 dark:text-white mb-4">
+            <h3 className="mb-4 text-lg font-semibold text-zinc-950 dark:text-white">
               Ingrediënten
             </h3>
             <ul className="space-y-2 text-sm">
@@ -267,10 +267,10 @@ export function MealDetail({
         if (!macros) return null;
         return (
           <div className="rounded-lg bg-white p-6 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-            <h3 className="text-lg font-semibold text-zinc-950 dark:text-white mb-4">
+            <h3 className="mb-4 text-lg font-semibold text-zinc-950 dark:text-white">
               Voedingswaarden
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
               {Number(macros.calories) > 0 && (
                 <div>
                   <span className="text-zinc-600 dark:text-zinc-400">

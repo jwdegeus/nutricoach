@@ -80,9 +80,9 @@ export function GuardrailsViolationCallout({
   };
 
   return (
-    <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 p-4">
+    <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/50">
       <div className="flex items-start gap-3">
-        <ExclamationTriangleIcon className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+        <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600 dark:text-red-400" />
         <div className="flex-1 space-y-3">
           <div className="flex items-start justify-between">
             <div>
@@ -104,7 +104,7 @@ export function GuardrailsViolationCallout({
           {/* Reason Codes */}
           {reasonCodes.length > 0 && (
             <div>
-              <Text className="text-xs font-medium text-red-800 dark:text-red-200 mb-2">
+              <Text className="mb-2 text-xs font-medium text-red-800 dark:text-red-200">
                 Redenen:
               </Text>
               <div className="flex flex-wrap gap-2">
@@ -132,12 +132,12 @@ export function GuardrailsViolationCallout({
           )}
 
           {/* Hash and Version */}
-          <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center">
               <Text className="text-xs text-red-700 dark:text-red-300">
                 Hash:
               </Text>
-              <code className="ml-2 text-xs font-mono text-red-800 dark:text-red-200">
+              <code className="ml-2 font-mono text-xs text-red-800 dark:text-red-200">
                 {shortHash}
               </code>
               <CopyHashButton hash={contentHash} />

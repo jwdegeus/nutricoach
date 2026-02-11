@@ -95,7 +95,7 @@ export function PantryList({
       </div>
 
       {error && (
-        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+        <div className="bg-destructive/10 text-destructive rounded-lg p-3 text-sm">
           {error}
         </div>
       )}
@@ -105,7 +105,7 @@ export function PantryList({
           <Table className="min-w-full divide-y divide-white/10">
             <TableHead>
               <tr>
-                <TableHeader className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-foreground sm:pl-0">
+                <TableHeader className="py-3.5 pr-3 pl-4 text-left text-sm font-semibold text-foreground sm:pl-0">
                   {t('product')}
                 </TableHeader>
                 <TableHeader className="px-3 py-3.5 text-left text-sm font-semibold text-foreground">
@@ -117,7 +117,7 @@ export function PantryList({
                 <TableHeader className="px-3 py-3.5 text-left text-sm font-semibold text-foreground">
                   {t('shop')}
                 </TableHeader>
-                <TableHeader className="relative py-3.5 pl-3 pr-4 sm:pr-0">
+                <TableHeader className="relative py-3.5 pr-4 pl-3 sm:pr-0">
                   <span className="sr-only">{t('edit')}</span>
                 </TableHeader>
               </tr>

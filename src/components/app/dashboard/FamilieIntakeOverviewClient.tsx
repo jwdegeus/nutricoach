@@ -173,8 +173,8 @@ function PercentRing({ value, label }: { value: number; label: string }) {
             background: `conic-gradient(
               var(--color-primary-500) 0%,
               var(--color-primary-500) ${pct}%,
-              var(--color-zinc-200) ${pct}%,
-              var(--color-zinc-200) 100%
+              var(--color-border) ${pct}%,
+              var(--color-border) 100%
             )`,
           }}
           aria-hidden
@@ -184,7 +184,7 @@ function PercentRing({ value, label }: { value: number; label: string }) {
           aria-hidden
         />
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-sm font-semibold tabular-nums text-foreground">
+          <span className="text-sm font-semibold text-foreground tabular-nums">
             {pct}%
           </span>
         </div>

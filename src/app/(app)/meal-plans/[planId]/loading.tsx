@@ -4,49 +4,49 @@
  */
 export default function MealPlanDetailLoading() {
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
       {/* Header: 2 regels */}
       <div className="space-y-4">
-        <div className="h-8 w-48 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+        <div className="h-8 w-48 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
         <div className="flex flex-wrap gap-x-4 gap-y-1">
-          <div className="h-4 w-32 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+          <div className="h-4 w-32 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
           <div
-            className="h-4 w-40 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+            className="h-4 w-40 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800"
             style={{ animationDelay: '50ms' }}
           />
           <div
-            className="h-4 w-24 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+            className="h-4 w-24 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800"
             style={{ animationDelay: '100ms' }}
           />
         </div>
       </div>
 
       {/* Grid: Plan Overzicht + Acties (2 skeleton cards) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-6 space-y-4">
-          <div className="h-6 w-32 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="space-y-4 rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="h-6 w-32 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
           <div className="space-y-3">
-            <div className="h-4 w-full rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+            <div className="h-4 w-full animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
             <div
-              className="h-4 w-4/5 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+              className="h-4 w-4/5 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800"
               style={{ animationDelay: '30ms' }}
             />
             <div
-              className="h-4 w-3/5 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+              className="h-4 w-3/5 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800"
               style={{ animationDelay: '60ms' }}
             />
           </div>
         </div>
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-6 space-y-4">
-          <div className="h-6 w-20 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+        <div className="space-y-4 rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="h-6 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
           <div className="space-y-3">
-            <div className="h-10 w-full rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+            <div className="h-10 w-full animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
             <div
-              className="h-10 w-full rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+              className="h-10 w-full animate-pulse rounded bg-zinc-100 dark:bg-zinc-800"
               style={{ animationDelay: '40ms' }}
             />
             <div
-              className="h-4 w-64 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+              className="h-4 w-64 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800"
               style={{ animationDelay: '80ms' }}
             />
           </div>
@@ -55,32 +55,32 @@ export default function MealPlanDetailLoading() {
 
       {/* Maaltijden: heading + skeleton cards */}
       <div className="space-y-4">
-        <div className="h-6 w-28 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+        <div className="h-6 w-28 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700" />
         <div className="space-y-4">
           {[1, 2, 3].map((day) => (
             <div key={day} className="space-y-3">
               <div
-                className="h-5 w-56 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+                className="h-5 w-56 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800"
                 style={{ animationDelay: `${day * 20}ms` }}
               />
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {[1, 2, 3].map((card) => (
                   <div
                     key={card}
-                    className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4"
+                    className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900"
                   >
                     <div
-                      className="h-4 w-20 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse"
+                      className="h-4 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-700"
                       style={{ animationDelay: `${(day * 3 + card) * 25}ms` }}
                     />
                     <div
-                      className="mt-2 h-5 w-3/4 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+                      className="mt-2 h-5 w-3/4 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800"
                       style={{
                         animationDelay: `${(day * 3 + card) * 25 + 30}ms`,
                       }}
                     />
                     <div
-                      className="mt-2 h-4 w-full rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse"
+                      className="mt-2 h-4 w-full animate-pulse rounded bg-zinc-100 dark:bg-zinc-800"
                       style={{
                         animationDelay: `${(day * 3 + card) * 25 + 60}ms`,
                       }}

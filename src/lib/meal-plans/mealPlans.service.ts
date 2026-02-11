@@ -2390,6 +2390,34 @@ export class MealPlansService {
       }
     }
 
+    // Diagnostic logging when MEAL_PLANNER_PREFILL_DEBUG=true (dev/diagnosis)
+    if (process.env.MEAL_PLANNER_PREFILL_DEBUG === 'true') {
+      const customTotal = allCustomRows.length;
+      const customWithRefs = allCustomRows.filter((r) => {
+        const refs = r.meal_data?.ingredientRefs;
+        const fromDb = ingredientRefsByRecipeId.has(r.id);
+        return (Array.isArray(refs) && refs.length > 0) || fromDb;
+      }).length;
+      const slotCounts = Object.fromEntries(
+        slots.map((slot) => [
+          slot,
+          {
+            custom: customBySlot.find((c) => c.slot === slot)?.rows.length ?? 0,
+            inResult: result[slot]?.length ?? 0,
+          },
+        ]),
+      );
+      console.debug('[loadPrefilledBySlot]', {
+        custom_meals_total: customTotal,
+        custom_with_ingredientRefs: customWithRefs,
+        recipeIds_needing_refs: recipeIdsNeedingRefs.length,
+        refs_from_recipe_ingredients: ingredientRefsByRecipeId.size,
+        meal_history_rows: historyRows.length,
+        slots: slotCounts,
+        dietKey,
+      });
+    }
+
     return result;
   }
 

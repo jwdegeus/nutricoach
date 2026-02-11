@@ -109,7 +109,7 @@ function RunRow({
               Constraints: {run.constraintsInPrompt ? 'ja' : 'nee'}
             </Badge>
             {run.guardrailsContentHash && (
-              <Text className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
+              <Text className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
                 hash:{' '}
                 {run.guardrailsContentHash.length > 8
                   ? `${run.guardrailsContentHash.slice(0, 8)}…`
@@ -167,12 +167,12 @@ function RunRow({
                   <Text className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
                     Looptijd:
                   </Text>
-                  <Text className="text-xs text-zinc-600 dark:text-zinc-400 ml-2">
+                  <Text className="ml-2 text-xs text-zinc-600 dark:text-zinc-400">
                     {formatRunningDuration(runningDuration)} (sinds{' '}
                     {formatDate(run.createdAt)})
                   </Text>
                   {stuck && (
-                    <Text className="text-xs text-red-600 dark:text-red-400 ml-2">
+                    <Text className="ml-2 text-xs text-red-600 dark:text-red-400">
                       ⚠️ Deze run loopt al langer dan 5 minuten en kan
                       vastgelopen zijn.
                     </Text>
@@ -184,7 +184,7 @@ function RunRow({
                   <Text className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
                     Error Code:
                   </Text>
-                  <Text className="text-xs text-zinc-600 dark:text-zinc-400 ml-2 font-mono">
+                  <Text className="ml-2 font-mono text-xs text-zinc-600 dark:text-zinc-400">
                     {run.errorCode}
                   </Text>
                 </div>
@@ -194,7 +194,7 @@ function RunRow({
                   <Text className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
                     Error Message:
                   </Text>
-                  <Text className="text-xs text-zinc-600 dark:text-zinc-400 ml-2 whitespace-pre-wrap">
+                  <Text className="ml-2 text-xs whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">
                     {run.errorMessage}
                   </Text>
                 </div>
@@ -204,7 +204,7 @@ function RunRow({
                   <Text className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
                     Weekmenu ID:
                   </Text>
-                  <Text className="text-xs text-zinc-600 dark:text-zinc-400 ml-2 font-mono">
+                  <Text className="ml-2 font-mono text-xs text-zinc-600 dark:text-zinc-400">
                     {run.mealPlanId}
                   </Text>
                 </div>
@@ -213,7 +213,7 @@ function RunRow({
                 <Text className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
                   Run ID:
                 </Text>
-                <Text className="text-xs text-zinc-600 dark:text-zinc-400 ml-2 font-mono">
+                <Text className="ml-2 font-mono text-xs text-zinc-600 dark:text-zinc-400">
                   {run.id}
                 </Text>
               </div>

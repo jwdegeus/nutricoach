@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/src/lib/supabase/server';
 import { storageService } from '@/src/lib/storage/storage.service';
-import { generateRecipeImage } from '@/src/lib/ai/gemini/gemini-image.client';
+import {
+  generateRecipeImage,
+  ImageGenerationError,
+} from '@/src/lib/ai/gemini/gemini-image.client';
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,18 +67,6 @@ export async function POST(request: NextRequest) {
     const prompt = `Generate a single appetizing, photorealistic food photograph for this recipe. Style: professional food photography, natural lighting, clean presentation. Recipe: "${name}".${contextPart}${presentationHint} Output one image only, no text.`;
 
     const result = await generateRecipeImage(prompt);
-    if (!result) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: {
-            code: 'GENERATION_ERROR',
-            message: 'Geen afbeelding gegenereerd; probeer het opnieuw.',
-          },
-        },
-        { status: 502 },
-      );
-    }
 
     const useBlob =
       typeof process.env.BLOB_READ_WRITE_TOKEN === 'string' &&
@@ -121,6 +112,24 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof ImageGenerationError) {
+      const status =
+        error.code === 'SAFETY_BLOCKED'
+          ? 400
+          : error.code === 'API_ERROR'
+            ? 500
+            : 502;
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: error.code,
+            message: error.message,
+          },
+        },
+        { status },
+      );
+    }
     console.error('Error generating recipe image:', error);
     const message =
       error instanceof Error ? error.message : 'Onbekende fout bij genereren';

@@ -200,7 +200,7 @@ export function DietTypesAdminClient() {
           </p>
         </div>
         <Button onClick={handleCreate}>
-          <PlusIcon className="h-4 w-4 mr-1" />
+          <PlusIcon className="mr-1 h-4 w-4" />
           Nieuw dieettype
         </Button>
       </div>
@@ -235,7 +235,7 @@ export function DietTypesAdminClient() {
               <TableRow>
                 <TableCell
                   colSpan={4}
-                  className="text-center text-zinc-500 dark:text-zinc-400 py-8"
+                  className="py-8 text-center text-zinc-500 dark:text-zinc-400"
                 >
                   Geen dieettypes gevonden
                 </TableCell>
@@ -275,7 +275,7 @@ export function DietTypesAdminClient() {
                             </DropdownItem>
                             <DropdownItem
                               onClick={() => handleDelete(dietType.id)}
-                              className="text-red-600 data-focus:text-white data-focus:bg-red-600 dark:text-red-400"
+                              className="text-red-600 data-focus:bg-red-600 data-focus:text-white dark:text-red-400"
                             >
                               <TrashIcon data-slot="icon" />
                               <span>Verwijderen</span>

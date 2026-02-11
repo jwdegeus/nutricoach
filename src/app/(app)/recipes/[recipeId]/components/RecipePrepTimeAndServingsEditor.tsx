@@ -19,7 +19,7 @@ export function RecipePrepTimeAndServingsEditor({
   currentServings,
 }: RecipePrepTimeAndServingsEditorProps) {
   return (
-    <div className="flex items-center gap-4 flex-wrap">
+    <div className="flex flex-wrap items-center gap-4">
       {currentPrepTime !== null && currentPrepTime !== undefined && (
         <div className="flex items-center gap-2">
           <ClockIcon className="h-4 w-4 text-zinc-500" />

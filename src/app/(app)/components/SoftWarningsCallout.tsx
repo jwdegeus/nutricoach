@@ -31,9 +31,9 @@ export function SoftWarningsCallout({
   const remainingCount = reasonCodes.length - displayReasonCodes.length;
 
   return (
-    <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50 p-3">
+    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/50">
       <div className="flex items-start gap-2">
-        <ExclamationTriangleIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+        <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
         <div className="flex-1 space-y-2">
           <Text className="text-xs font-medium text-amber-800 dark:text-amber-200">
             Waarschuwingen (niet blokkerend)

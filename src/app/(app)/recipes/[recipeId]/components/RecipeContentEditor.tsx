@@ -215,9 +215,9 @@ export function RecipeContentEditor({
 
   if (!isEditing && !instructionsOnly) {
     return (
-      <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-4">
+      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
         <Button outline onClick={handleStartEdit}>
-          <PencilIcon className="h-4 w-4 mr-2" />
+          <PencilIcon className="mr-2 h-4 w-4" />
           Bewerk ingrediënten en bereiding
         </Button>
       </div>
@@ -225,7 +225,7 @@ export function RecipeContentEditor({
   }
 
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 space-y-6">
+    <div className="space-y-6 rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-zinc-950 dark:text-white">
           {instructionsOnly ? 'Bewerk bereidingsinstructies' : 'Bewerk recept'}
@@ -241,7 +241,7 @@ export function RecipeContentEditor({
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-3">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950/30">
           <Text className="text-sm text-red-700 dark:text-red-300">
             {error}
           </Text>
@@ -251,7 +251,7 @@ export function RecipeContentEditor({
       {!instructionsOnly && (
         <Fieldset>
           <Label>Ingrediënten</Label>
-          <div className="space-y-3 mt-2">
+          <div className="mt-2 space-y-3">
             {(() => {
               const hasSections = ingredients.some(
                 (i) => i.section != null && String(i.section).trim() !== '',
@@ -270,7 +270,7 @@ export function RecipeContentEditor({
                           onChange={(e) =>
                             updateIngredient(idx, 'name', e.target.value)
                           }
-                          className="flex-1 min-w-[120px]"
+                          className="min-w-[120px] flex-1"
                         />
                         <Input
                           placeholder="Hoeveelheid"
@@ -306,7 +306,7 @@ export function RecipeContentEditor({
                               e.target.value || null,
                             )
                           }
-                          className="flex-1 min-w-[100px]"
+                          className="min-w-[100px] flex-1"
                         />
                         <button
                           type="button"
@@ -346,7 +346,7 @@ export function RecipeContentEditor({
               return groups.map((group, gi) => (
                 <Fragment key={gi}>
                   {group.section && (
-                    <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300 pt-2 first:pt-0">
+                    <div className="pt-2 text-sm font-medium text-zinc-700 first:pt-0 dark:text-zinc-300">
                       {group.section}
                     </div>
                   )}
@@ -363,7 +363,7 @@ export function RecipeContentEditor({
                           onChange={(e) =>
                             updateIngredient(idx, 'name', e.target.value)
                           }
-                          className="flex-1 min-w-[120px]"
+                          className="min-w-[120px] flex-1"
                         />
                         <Input
                           placeholder="Hoeveelheid"
@@ -399,7 +399,7 @@ export function RecipeContentEditor({
                               e.target.value || null,
                             )
                           }
-                          className="flex-1 min-w-[100px]"
+                          className="min-w-[100px] flex-1"
                         />
                         <button
                           type="button"
@@ -416,7 +416,7 @@ export function RecipeContentEditor({
               ));
             })()}
             <Button outline onClick={addIngredient} className="mt-1">
-              <PlusIcon className="h-4 w-4 mr-1" />
+              <PlusIcon className="mr-1 h-4 w-4" />
               Ingrediënt toevoegen
             </Button>
           </div>
@@ -425,23 +425,23 @@ export function RecipeContentEditor({
 
       <Fieldset>
         <Label>Bereidingsinstructies</Label>
-        <div className="space-y-3 mt-2">
+        <div className="mt-2 space-y-3">
           {instructions.map((inst, idx) => (
             <div key={idx} className="flex gap-2">
-              <span className="flex-shrink-0 w-6 h-10 flex items-center text-sm text-zinc-500">
+              <span className="flex h-10 w-6 flex-shrink-0 items-center text-sm text-zinc-500">
                 {idx + 1}.
               </span>
               <Textarea
                 placeholder={`Stap ${idx + 1}`}
                 value={inst.text}
                 onChange={(e) => updateInstruction(idx, e.target.value)}
-                className="flex-1 min-h-[60px]"
+                className="min-h-[60px] flex-1"
                 rows={2}
               />
               <button
                 type="button"
                 onClick={() => removeInstruction(idx)}
-                className="p-2 text-zinc-500 hover:text-red-600 flex-shrink-0"
+                className="flex-shrink-0 p-2 text-zinc-500 hover:text-red-600"
                 aria-label="Verwijderen"
               >
                 <TrashIcon className="h-4 w-4" />
@@ -449,7 +449,7 @@ export function RecipeContentEditor({
             </div>
           ))}
           <Button outline onClick={addInstruction} className="mt-1">
-            <PlusIcon className="h-4 w-4 mr-1" />
+            <PlusIcon className="mr-1 h-4 w-4" />
             Stap toevoegen
           </Button>
         </div>

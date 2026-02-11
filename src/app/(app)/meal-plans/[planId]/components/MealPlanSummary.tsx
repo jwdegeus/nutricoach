@@ -68,8 +68,8 @@ export function MealPlanSummary({ plan, dietTypeName }: MealPlanSummaryProps) {
           </div>
 
           {totalMacros.calories > 0 && (
-            <div className="pt-4 border-t">
-              <div className="text-sm text-muted-foreground mb-2">
+            <div className="border-t pt-4">
+              <div className="mb-2 text-sm text-muted-foreground">
                 Geschatte Totalen (per dag gemiddeld)
               </div>
               <div className="grid grid-cols-4 gap-4 text-sm">
@@ -102,8 +102,8 @@ export function MealPlanSummary({ plan, dietTypeName }: MealPlanSummaryProps) {
           )}
 
           {hasEnrichment && (
-            <div className="pt-4 border-t">
-              <div className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
+            <div className="border-t pt-4">
+              <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
                 <span className="font-medium">✓</span>
                 <span>
                   Enrichment beschikbaar (titels, instructies, cook plan)
@@ -113,7 +113,7 @@ export function MealPlanSummary({ plan, dietTypeName }: MealPlanSummaryProps) {
           )}
 
           {!hasEnrichment && (
-            <div className="pt-4 border-t">
+            <div className="border-t pt-4">
               <div className="text-sm text-muted-foreground">
                 ⚠ Enrichment nog niet beschikbaar (titels en instructies worden
                 gegenereerd)

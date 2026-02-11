@@ -147,18 +147,18 @@ export function RecipeRatingDialog({
                     onMouseEnter={() => setHoveredRating(star)}
                     onMouseLeave={() => setHoveredRating(null)}
                     disabled={isSubmitting}
-                    className="focus:outline-none focus:ring-2 focus:ring-blue-500 rounded p-1 transition-transform hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="rounded p-1 transition-transform hover:scale-110 focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                     aria-label={`Beoordeel met ${star} ${star === 1 ? 'ster' : 'sterren'}`}
                   >
                     <StarIcon
                       className={`h-10 w-10 transition-colors ${
                         star <= displayRating
-                          ? 'text-yellow-400 fill-yellow-400'
-                          : 'text-zinc-300 dark:text-zinc-700 fill-zinc-300 dark:fill-zinc-700'
+                          ? 'fill-yellow-400 text-yellow-400'
+                          : 'fill-zinc-300 text-zinc-300 dark:fill-zinc-700 dark:text-zinc-700'
                       } ${
                         isSubmitting
                           ? 'opacity-50'
-                          : 'cursor-pointer hover:text-yellow-300 hover:fill-yellow-300'
+                          : 'cursor-pointer hover:fill-yellow-300 hover:text-yellow-300'
                       }`}
                     />
                   </button>

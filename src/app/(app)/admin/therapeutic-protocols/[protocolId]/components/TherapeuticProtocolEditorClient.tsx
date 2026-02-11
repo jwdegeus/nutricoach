@@ -453,23 +453,23 @@ export function TherapeuticProtocolEditorClient({ initialData }: Props) {
             >
               <TableHead>
                 <TableRow>
-                  <TableHeader className="py-3 px-4">
+                  <TableHeader className="px-4 py-3">
                     {t('targetKindCol')}
                   </TableHeader>
-                  <TableHeader className="py-3 px-4">
+                  <TableHeader className="px-4 py-3">
                     {t('targetKeyCol')}
                   </TableHeader>
-                  <TableHeader className="py-3 px-4">
+                  <TableHeader className="px-4 py-3">
                     {t('valueTypeCol')}
                   </TableHeader>
-                  <TableHeader className="py-3 px-4">
+                  <TableHeader className="px-4 py-3">
                     {t('valueNumCol')}
                   </TableHeader>
-                  <TableHeader className="py-3 px-4">
+                  <TableHeader className="px-4 py-3">
                     {t('unitCol')}
                   </TableHeader>
                   <TableHeader
-                    className="w-12 py-3 px-2"
+                    className="w-12 px-2 py-3"
                     aria-label={t('actionsCol')}
                   />
                 </TableRow>
@@ -479,7 +479,7 @@ export function TherapeuticProtocolEditorClient({ initialData }: Props) {
                   <TableRow>
                     <TableCell
                       colSpan={6}
-                      className="py-10 px-4 text-center text-zinc-500 dark:text-zinc-400"
+                      className="px-4 py-10 text-center text-zinc-500 dark:text-zinc-400"
                     >
                       {t('noTargetsForFilters')}
                     </TableCell>
@@ -491,23 +491,23 @@ export function TherapeuticProtocolEditorClient({ initialData }: Props) {
                       onClick={() => openEditTarget(row)}
                       className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                     >
-                      <TableCell className="py-3 px-4 font-mono text-sm font-medium text-zinc-900 dark:text-white">
+                      <TableCell className="px-4 py-3 font-mono text-sm font-medium text-zinc-900 dark:text-white">
                         {row.target_kind}
                       </TableCell>
-                      <TableCell className="py-3 px-4 font-medium text-zinc-900 dark:text-white max-w-[200px] truncate">
+                      <TableCell className="max-w-[200px] truncate px-4 py-3 font-medium text-zinc-900 dark:text-white">
                         {row.target_key}
                       </TableCell>
-                      <TableCell className="py-3 px-4 text-zinc-600 dark:text-zinc-400">
+                      <TableCell className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                         {row.value_type}
                       </TableCell>
-                      <TableCell className="py-3 px-4 text-zinc-600 dark:text-zinc-400">
+                      <TableCell className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                         {row.value_num}
                       </TableCell>
-                      <TableCell className="py-3 px-4 text-zinc-600 dark:text-zinc-400">
+                      <TableCell className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                         {row.unit ?? '—'}
                       </TableCell>
                       <TableCell
-                        className="py-3 px-2 w-12"
+                        className="w-12 px-2 py-3"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <Dropdown>
@@ -529,7 +529,7 @@ export function TherapeuticProtocolEditorClient({ initialData }: Props) {
                             </DropdownItem>
                             <DropdownItem
                               onClick={() => setDeleteTargetId(row.id)}
-                              className="text-red-600 dark:text-red-400 data-focus:bg-red-50 data-focus:text-red-700 dark:data-focus:bg-red-900/20 dark:data-focus:text-red-300"
+                              className="text-red-600 data-focus:bg-red-50 data-focus:text-red-700 dark:text-red-400 dark:data-focus:bg-red-900/20 dark:data-focus:text-red-300"
                             >
                               <TrashIcon className="h-4 w-4" />
                               {t('delete')}
@@ -574,20 +574,20 @@ export function TherapeuticProtocolEditorClient({ initialData }: Props) {
             >
               <TableHead>
                 <TableRow>
-                  <TableHeader className="py-3 px-4">
+                  <TableHeader className="px-4 py-3">
                     {t('supplementKeyCol')}
                   </TableHeader>
-                  <TableHeader className="py-3 px-4">
+                  <TableHeader className="px-4 py-3">
                     {t('labelNlCol')}
                   </TableHeader>
-                  <TableHeader className="py-3 px-4">
+                  <TableHeader className="px-4 py-3">
                     {t('dosageTextCol')}
                   </TableHeader>
-                  <TableHeader className="py-3 px-4">
+                  <TableHeader className="px-4 py-3">
                     {t('activeCol')}
                   </TableHeader>
                   <TableHeader
-                    className="w-12 py-3 px-2"
+                    className="w-12 px-2 py-3"
                     aria-label={t('edit')}
                   />
                 </TableRow>
@@ -597,7 +597,7 @@ export function TherapeuticProtocolEditorClient({ initialData }: Props) {
                   <TableRow>
                     <TableCell
                       colSpan={5}
-                      className="py-10 px-4 text-center text-zinc-500 dark:text-zinc-400"
+                      className="px-4 py-10 text-center text-zinc-500 dark:text-zinc-400"
                     >
                       {t('noSupplements')}
                     </TableCell>
@@ -608,7 +608,7 @@ export function TherapeuticProtocolEditorClient({ initialData }: Props) {
                       key={row.id}
                       className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                     >
-                      <TableCell className="py-3 px-4 font-mono text-sm font-medium text-zinc-900 dark:text-white max-w-[140px] truncate">
+                      <TableCell className="max-w-[140px] truncate px-4 py-3 font-mono text-sm font-medium text-zinc-900 dark:text-white">
                         <Link
                           href={`/admin/therapeutic-protocols/${protocol.id}/supplements/${row.id}/edit`}
                           className="text-primary-600 hover:underline dark:text-primary-400"
@@ -616,13 +616,13 @@ export function TherapeuticProtocolEditorClient({ initialData }: Props) {
                           {row.supplement_key}
                         </Link>
                       </TableCell>
-                      <TableCell className="py-3 px-4 font-medium text-zinc-900 dark:text-white max-w-[200px] truncate">
+                      <TableCell className="max-w-[200px] truncate px-4 py-3 font-medium text-zinc-900 dark:text-white">
                         {row.label_nl}
                       </TableCell>
-                      <TableCell className="py-3 px-4 text-zinc-600 dark:text-zinc-400 max-w-[240px] truncate">
+                      <TableCell className="max-w-[240px] truncate px-4 py-3 text-zinc-600 dark:text-zinc-400">
                         {row.dosage_text ?? '—'}
                       </TableCell>
-                      <TableCell className="py-3 px-4">
+                      <TableCell className="px-4 py-3">
                         <Switch
                           checked={row.is_active}
                           disabled={
@@ -634,7 +634,7 @@ export function TherapeuticProtocolEditorClient({ initialData }: Props) {
                           color="dark/zinc"
                         />
                       </TableCell>
-                      <TableCell className="py-3 px-2 w-12">
+                      <TableCell className="w-12 px-2 py-3">
                         <Dropdown>
                           <DropdownButton
                             as={Button}
@@ -653,7 +653,7 @@ export function TherapeuticProtocolEditorClient({ initialData }: Props) {
                             </DropdownItem>
                             <DropdownItem
                               onClick={() => setDeleteSupplementId(row.id)}
-                              className="text-red-600 dark:text-red-400 data-focus:bg-red-50 data-focus:text-red-700 dark:data-focus:bg-red-900/20 dark:data-focus:text-red-300"
+                              className="text-red-600 data-focus:bg-red-50 data-focus:text-red-700 dark:text-red-400 dark:data-focus:bg-red-900/20 dark:data-focus:text-red-300"
                             >
                               <TrashIcon className="h-4 w-4" />
                               {t('delete')}
@@ -671,14 +671,14 @@ export function TherapeuticProtocolEditorClient({ initialData }: Props) {
       )}
 
       {activeTab === 'sources' && (
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+        <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
           <div className="space-y-6 p-6">
             {protocol.description_nl && (
               <div>
                 <h3 className="text-sm font-medium text-zinc-900 dark:text-white">
                   {t('description')}
                 </h3>
-                <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-600 dark:text-zinc-400">
+                <p className="mt-2 text-sm whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">
                   {protocol.description_nl}
                 </p>
               </div>
@@ -707,7 +707,7 @@ export function TherapeuticProtocolEditorClient({ initialData }: Props) {
                   {sourceRefs.map((ref, index) => (
                     <li
                       key={index}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/50 px-3 py-2"
+                      className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-zinc-50/50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800/50"
                     >
                       <span className="min-w-0 flex-1">
                         {ref.url ? (
@@ -1147,7 +1147,7 @@ export function TherapeuticProtocolEditorClient({ initialData }: Props) {
           <Button onClick={handleCloneSubmit} disabled={cloneSaving}>
             {cloneSaving && (
               <ArrowPathIcon
-                className="size-4 animate-spin mr-2"
+                className="mr-2 size-4 animate-spin"
                 data-slot="icon"
                 aria-hidden
               />

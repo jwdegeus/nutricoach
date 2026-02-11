@@ -271,7 +271,6 @@ export function GuardRailsVNextOverview({
   useEffect(() => {
     loadData();
     loadCategories();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run when dietTypeId changes only
   }, [dietTypeId]);
 
   async function loadCategories() {
@@ -1176,8 +1175,8 @@ export function GuardRailsVNextOverview({
       <div className="space-y-6">
         {/* Header skeleton */}
         <div className="rounded-lg bg-white p-6 shadow-xs dark:bg-zinc-900">
-          <div className="h-6 w-64 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse mb-2" />
-          <div className="h-4 w-96 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+          <div className="mb-2 h-6 w-64 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+          <div className="h-4 w-96 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
         </div>
 
         {/* Table skeleton */}
@@ -1187,7 +1186,7 @@ export function GuardRailsVNextOverview({
               {[1, 2, 3, 4, 5].map((i) => (
                 <div
                   key={i}
-                  className="h-12 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse"
+                  className="h-12 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800"
                 />
               ))}
             </div>
@@ -1221,7 +1220,7 @@ export function GuardRailsVNextOverview({
             {[1, 2, 3, 4, 5].map((i) => (
               <div
                 key={i}
-                className="h-12 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse"
+                className="h-12 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800"
               />
             ))}
           </div>
@@ -1266,7 +1265,7 @@ export function GuardRailsVNextOverview({
               <Text className="text-sm text-zinc-500 dark:text-zinc-400">
                 Hash:
               </Text>
-              <code className="ml-2 text-xs font-mono text-zinc-700 dark:text-zinc-300">
+              <code className="ml-2 font-mono text-xs text-zinc-700 dark:text-zinc-300">
                 {shortHash}
               </code>
               <CopyHashButton hash={data.contentHash} />
@@ -1430,7 +1429,7 @@ export function GuardRailsVNextOverview({
                         </TableCell>
                         <TableCell
                           onClick={(e) => e.stopPropagation()}
-                          className="cursor-grab active:cursor-grabbing text-zinc-400"
+                          className="cursor-grab text-zinc-400 active:cursor-grabbing"
                           title="Sleep om volgorde te wijzigen"
                         >
                           <Bars3Icon className="h-5 w-5" aria-hidden />
@@ -1449,7 +1448,7 @@ export function GuardRailsVNextOverview({
                               e.stopPropagation();
                               handlePolicyPauseOrActivate(policy);
                             }}
-                            className="p-0.5 rounded text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="rounded p-0.5 text-zinc-500 hover:text-zinc-700 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:text-zinc-400 dark:hover:text-zinc-200"
                             aria-label={isPaused ? 'Activeren' : 'Pauzeren'}
                           >
                             {isPaused ? (
@@ -1464,7 +1463,7 @@ export function GuardRailsVNextOverview({
                             <Text className="text-sm font-medium text-zinc-900 dark:text-white">
                               {policy.categoryName}
                             </Text>
-                            <code className="text-xs font-mono text-zinc-500 dark:text-zinc-400">
+                            <code className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
                               {policy.categorySlug}
                             </code>
                           </div>
@@ -1539,7 +1538,7 @@ export function GuardRailsVNextOverview({
                             >
                               <ChevronUpIcon className="h-4 w-4" />
                             </Button>
-                            <Text className="text-sm w-6 text-center">
+                            <Text className="w-6 text-center text-sm">
                               {policy.priority}
                             </Text>
                             <Button
@@ -1633,7 +1632,7 @@ export function GuardRailsVNextOverview({
                 </code>
               </div>
               <FieldGroup>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <Field>
                     <Label>Diet Logic (P0–P3)</Label>
                     <Select
@@ -1822,7 +1821,7 @@ export function GuardRailsVNextOverview({
                     </div>
                   )}
                   <FieldGroup>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       {/* Label */}
                       <Field>
                         <Label htmlFor="edit-label">Label</Label>
@@ -2163,7 +2162,7 @@ export function GuardRailsVNextOverview({
               </FieldGroup>
             ) : createMode === 'recipe_rule' ? (
               <FieldGroup>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {/* Match Value */}
                   <Field className="md:col-span-2">
                     <Label htmlFor="create-match-value">Match waarde *</Label>
@@ -2376,7 +2375,7 @@ export function GuardRailsVNextOverview({
               </FieldGroup>
             ) : (
               <FieldGroup>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {/* Category (Ingrediëntgroep) – alleen groepen zonder bestaande regel, om "al bestaat" te voorkomen */}
                   <Field className="md:col-span-2">
                     <Label htmlFor="create-category">Ingrediëntgroep *</Label>
@@ -2426,7 +2425,7 @@ export function GuardRailsVNextOverview({
                       Termen beheer je in{' '}
                       <Link
                         href="/admin/ingredients?tab=groups"
-                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline"
+                        className="text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                       >
                         Ingrediëntgroepen
                       </Link>

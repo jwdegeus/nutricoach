@@ -279,7 +279,15 @@
       "nutrient": "Nutriënt",
       "value": "Waarde",
       "target": "Streefwaarde",
-      "staticNotice": "Dit is een statisch overzicht met voorbeelddata. Echte inname wordt later gekoppeld, nadat in de kalender per gezinslid kan worden aangegeven of er van het weekmenu is afgeweken."
+      "staticNotice": "Dit is een statisch overzicht met voorbeelddata. Echte inname wordt later gekoppeld, nadat in de kalender per gezinslid kan worden aangegeven of er van het weekmenu is afgeweken.",
+      "caloriesConsumed": "Calorie-inname",
+      "protein": "Eiwit",
+      "carbs": "Koolhydraten",
+      "fat": "Vet",
+      "alcohol": "Alcohol",
+      "vitaminsPercent": "Vitamines (% streefwaarde)",
+      "mineralsPercent": "Mineralen (% streefwaarde)",
+      "supplementsCompliance": "Supplementen (op plan)"
     },
     "intakeDashboard": "Inname-overzicht",
     "familyPracticalHeading": "Praktische voorkeuren",
