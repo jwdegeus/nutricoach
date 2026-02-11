@@ -15,6 +15,7 @@ import {
   Cog6ToothIcon,
   ClipboardDocumentListIcon,
   ShoppingBagIcon,
+  BuildingStorefrontIcon,
 } from '@heroicons/react/20/solid';
 
 type StatItem = {
@@ -57,6 +58,9 @@ type AdminStats = {
   productSources: {
     total: number;
     enabled: number;
+  };
+  stores: {
+    total: number;
   };
 };
 
@@ -117,6 +121,15 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
           iconColor: 'text-green-600 dark:text-green-400',
         },
       ],
+    },
+    {
+      name: 'Winkels & Assortiment',
+      description:
+        'Beheer winkels (sitemap, sync) en start catalog sync. Zoek later winkelproducten in voorraad.',
+      href: '/admin/stores',
+      icon: BuildingStorefrontIcon,
+      iconBackground: 'bg-amber-500',
+      stats: [{ label: 'Winkels', value: stats.stores.total }],
     },
     {
       name: 'Dieettypes',

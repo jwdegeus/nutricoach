@@ -9,6 +9,7 @@
 import type { MealPlanResponse } from '@/src/lib/diets';
 import { getNevoFoodByCode } from '@/src/lib/nevo/nutrition-calculator';
 import { PantryService } from '@/src/lib/pantry/pantry.service';
+import { createClient } from '@/src/lib/supabase/server';
 import type {
   PantryAvailability,
   MealPlanCoverage,
@@ -22,6 +23,10 @@ import {
   mealPlanCoverageSchema,
   shoppingListResponseSchema,
 } from './mealPlannerShopping.schemas';
+
+const CANONICAL_CATALOG_VIEW = 'canonical_ingredient_catalog_v1';
+const CANONICAL_LOOKUP_COLUMNS = 'ingredient_id, ref_value';
+const NEVO_REF_BATCH_SIZE = 100;
 
 /**
  * In-memory cache for NEVO food lookups
@@ -182,6 +187,65 @@ function calculateAvailableG(pantry: PantryAvailability | undefined): number {
 }
 
 /**
+ * Bulk lookup: nevoCode -> canonical_ingredients.id via canonical_ingredient_catalog_v1.
+ * ref_type = 'nevo', ref_value in (nevoCodes). Chunks in batches to avoid .in() limits.
+ * On error returns partial map or empty; does not throw (shopping list still works).
+ * Exported for use in meal plan build-flow (write-time canonical enrichment).
+ */
+export async function getCanonicalIngredientIdsByNevoCodes(
+  nevoCodes: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(nevoCodes)].filter(Boolean);
+  if (unique.length === 0) return new Map();
+
+  const result = new Map<string, string>();
+  const batches: string[][] = [];
+  for (let i = 0; i < unique.length; i += NEVO_REF_BATCH_SIZE) {
+    batches.push(unique.slice(i, i + NEVO_REF_BATCH_SIZE));
+  }
+
+  try {
+    const supabase = await createClient();
+    for (const batch of batches) {
+      const { data, error } = await supabase
+        .from(CANONICAL_CATALOG_VIEW)
+        .select(CANONICAL_LOOKUP_COLUMNS)
+        .eq('ref_type', 'nevo')
+        .in('ref_value', batch);
+
+      if (error) {
+        const isSchemaCache =
+          /schema cache|relation.*does not exist|could not find/i.test(
+            error.message,
+          );
+        if (isSchemaCache) {
+          console.warn(
+            'Canonical ingredient catalog view not available (migrations may not be applied). Run: supabase db push',
+          );
+          return result;
+        }
+        console.error(
+          'Canonical ingredient lookup by nevoCodes failed:',
+          error.message,
+        );
+        continue;
+      }
+      for (const row of data ?? []) {
+        const refValue = row.ref_value as string | null;
+        const ingredientId = row.ingredient_id as string | null;
+        if (refValue != null && ingredientId != null) {
+          result.set(refValue, ingredientId);
+        }
+      }
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Canonical ingredient lookup error:', msg);
+  }
+  return result;
+}
+
+/**
  * Meal Planner Shopping Service
  */
 export class MealPlannerShoppingService {
@@ -301,37 +365,41 @@ export class MealPlannerShoppingService {
     // Use provided pantry or empty array (backward compatible)
     const pantry = providedPantry || [];
 
-    // Create pantry map for quick lookup
+    // Create pantry map for quick lookup (keyed by nevoCode)
     const pantryMap = new Map<string, PantryAvailability>();
     for (const item of pantry) {
       pantryMap.set(item.nevoCode, item);
     }
 
-    // Aggregate ingredients by nevoCode
-    const ingredientMap = new Map<
-      string,
-      {
-        nevoCode: string;
-        requiredG: number;
-        name?: string;
-        category?: string;
-        tags?: string[];
-      }
-    >();
+    // Aggregatie: key = canon:<uuid> of nevo:<code>; value = requiredG + representatieve velden
+    type AggEntry = {
+      requiredG: number;
+      canonicalIngredientId?: string;
+      nevoCode: string;
+      tags?: string[];
+    };
+    const ingredientMap = new Map<string, AggEntry>();
 
-    // Collect all ingredients
     for (const day of plan.days) {
       for (const meal of day.meals) {
         if (!meal.ingredientRefs) continue;
 
         for (const ref of meal.ingredientRefs) {
-          const existing = ingredientMap.get(ref.nevoCode);
+          const ingredientKey = ref.canonicalIngredientId
+            ? `canon:${ref.canonicalIngredientId}`
+            : ref.nevoCode?.trim()
+              ? `nevo:${ref.nevoCode.trim()}`
+              : null;
+          if (!ingredientKey) continue;
+
+          const existing = ingredientMap.get(ingredientKey);
           if (existing) {
             existing.requiredG += ref.quantityG;
           } else {
-            ingredientMap.set(ref.nevoCode, {
-              nevoCode: ref.nevoCode,
+            ingredientMap.set(ingredientKey, {
               requiredG: ref.quantityG,
+              canonicalIngredientId: ref.canonicalIngredientId,
+              nevoCode: ref.nevoCode?.trim() ?? '',
               tags: ref.tags,
             });
           }
@@ -339,19 +407,40 @@ export class MealPlannerShoppingService {
       }
     }
 
-    // Enrich with NEVO data and calculate missing quantities
+    // Alleen voor nevo:-keys: bulk lookup canonical (fallback-enrichment + missing-lijst)
+    const nevoKeysForEnrichment = [...ingredientMap.entries()]
+      .filter(([k]) => k.startsWith('nevo:'))
+      .map(([, v]) => v.nevoCode)
+      .filter(Boolean);
+    const nevoToCanonicalId = await getCanonicalIngredientIdsByNevoCodes(
+      nevoKeysForEnrichment,
+    );
+    const missingCanonicalIngredientNevoCodes = [
+      ...new Set(nevoKeysForEnrichment),
+    ]
+      .filter((code) => !nevoToCanonicalId.has(code))
+      .sort((a, b) => a.localeCompare(b));
+
+    // Bouw shopping list items (name/category uit NEVO via nevoCode; pantry op nevoCode)
     const shoppingListItems: ShoppingListItem[] = [];
     let totalRequiredG = 0;
     let totalMissingG = 0;
 
-    for (const [nevoCode, data] of ingredientMap.entries()) {
-      // Get NEVO food data (with caching)
+    for (const [ingredientKey, data] of ingredientMap.entries()) {
+      const nevoCode = data.nevoCode;
+      const canonicalId = ingredientKey.startsWith('canon:')
+        ? ingredientKey.slice(6)
+        : (nevoToCanonicalId.get(nevoCode) ?? undefined);
+
       const food = await getNevoFoodCached(nevoCode);
-      const name = String(food?.name_nl ?? food?.name_en ?? `NEVO ${nevoCode}`);
-      const category = deriveCategory(food ?? {}) || data.category || 'Overig';
+      const name = String(
+        food?.name_nl ??
+          food?.name_en ??
+          (nevoCode ? `NEVO ${nevoCode}` : 'Onbekend'),
+      );
+      const category = deriveCategory(food ?? {}) || 'Overig';
       const tags = data.tags || [];
 
-      // Get pantry availability
       const pantryItem = pantryMap.get(nevoCode);
       const availableG = calculateAvailableG(pantryItem);
       const requiredG = data.requiredG;
@@ -365,6 +454,7 @@ export class MealPlannerShoppingService {
         missingG,
         category,
         tags,
+        ...(canonicalId && { canonicalIngredientId: canonicalId }),
       });
 
       totalRequiredG += requiredG;
@@ -398,6 +488,7 @@ export class MealPlannerShoppingService {
         requiredG: totalRequiredG,
         missingG: totalMissingG,
       },
+      missingCanonicalIngredientNevoCodes,
     };
 
     // Validate output

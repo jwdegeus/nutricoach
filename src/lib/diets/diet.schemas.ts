@@ -344,6 +344,7 @@ const mealIngredientRefSchema = z.object({
   quantityG: z.number().min(1), // Amount in grams (min 1)
   displayName: z.string().optional(), // Optional display name
   tags: z.array(z.string()).optional(), // Optional tags for categorization
+  canonicalIngredientId: z.string().uuid().optional(),
 });
 
 // Legacy ingredient schema (optional, for backward compatibility)

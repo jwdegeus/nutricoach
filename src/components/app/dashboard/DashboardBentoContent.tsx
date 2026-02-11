@@ -12,7 +12,7 @@ export function DashboardBentoContent({ topMeals }: Props) {
   const [selectedMemberId, setSelectedMemberId] = useState<string>('all');
 
   return (
-    <div className="grid gap-4 sm:mt-16 lg:grid-cols-3 lg:grid-rows-2">
+    <div className="mt-6 grid min-h-[360px] w-full flex-1 gap-4 lg:grid-cols-3 lg:grid-rows-2">
       {/* Col 1, row-span-2: Inname summary — left edge rounding */}
       <BentoCell
         placement="lg:row-span-2"
@@ -28,28 +28,14 @@ export function DashboardBentoContent({ topMeals }: Props) {
         </div>
       </BentoCell>
 
-      {/* Col 2, row 1: Top maaltijden — top-right corner on desktop */}
+      {/* Col 2, row-span-2: Top maaltijden — full column height */}
       <BentoCell
-        placement="max-lg:row-start-2"
-        round="lg:rounded-tr-4xl"
+        placement="lg:row-span-2 max-lg:row-start-2"
+        round="rounded-lg"
         bg="bg-muted"
       >
         <div className="flex h-full flex-col p-6 sm:p-8">
           <TopMealsWidget initialMeals={topMeals} />
-        </div>
-      </BentoCell>
-
-      {/* Col 2, row 2: Small card — periode */}
-      <BentoCell
-        placement="lg:col-start-2 lg:row-start-2"
-        round="rounded-lg"
-        bg="bg-muted"
-      >
-        <div className="flex flex-1 flex-col justify-center p-6 sm:p-8">
-          <p className="text-sm font-medium text-muted-foreground">Periode</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
-            Afgelopen 7 dagen
-          </p>
         </div>
       </BentoCell>
 

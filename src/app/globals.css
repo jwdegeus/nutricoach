@@ -8,18 +8,18 @@
     'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   --font-sans--font-feature-settings: 'cv11';
 
-  /* Primary: Emerald only (oklch hue ~162–172). Do not use blue (hue 250–255). */
-  --color-primary-50: oklch(0.979 0.021 166.113);
-  --color-primary-100: oklch(0.95 0.052 163.051);
-  --color-primary-200: oklch(0.905 0.093 164.15);
-  --color-primary-300: oklch(0.845 0.143 164.978);
-  --color-primary-400: oklch(0.765 0.177 163.223);
-  --color-primary-500: oklch(0.696 0.17 162.48);
-  --color-primary-600: oklch(0.596 0.145 163.225);
-  --color-primary-700: oklch(0.508 0.118 165.612);
-  --color-primary-800: oklch(0.432 0.095 166.913);
-  --color-primary-900: oklch(0.378 0.077 168.94);
-  --color-primary-950: oklch(0.262 0.051 172.552);
+  /* Primary: Yellow-Green (fresh, food-forward). */
+  --color-primary-50: oklch(97.6% 0.025 132.12);
+  --color-primary-100: oklch(95.12% 0.047 130.75);
+  --color-primary-200: oklch(90.41% 0.095 131.34);
+  --color-primary-300: oklch(85.91% 0.14 132.1);
+  --color-primary-400: oklch(81.63% 0.18 133.39);
+  --color-primary-500: oklch(77.72% 0.21 134.84);
+  --color-primary-600: oklch(65.88% 0.176 134.77);
+  --color-primary-700: oklch(53.54% 0.14 134.37);
+  --color-primary-800: oklch(40.39% 0.102 134.05);
+  --color-primary-900: oklch(26.05% 0.059 133.31);
+  --color-primary-950: oklch(21.26% 0.045 131.81);
 
   /* Secondary: Orange (warmth, energy, food) */
   --color-secondary-50: oklch(0.98 0.016 73.684);
@@ -134,43 +134,43 @@
 /* Dark mode: Midnight (navy/slate) palette — Tailwind UI Blocks–style premium dark.
    Semantic tokens + zinc override zodat de hele app (incl. Catalyst) één thema volgt. */
 .dark {
-  /* Midnight ramp — navy/slate (hue ~258), low chroma, duidelijke surface-ladder */
-  --color-midnight-50: oklch(0.98 0.006 255);
-  --color-midnight-100: oklch(0.95 0.01 256);
-  --color-midnight-200: oklch(0.88 0.014 257);
-  --color-midnight-300: oklch(0.76 0.02 257);
-  --color-midnight-400: oklch(0.64 0.024 258);
-  --color-midnight-500: oklch(0.52 0.026 258);
-  --color-midnight-600: oklch(0.42 0.026 258);
-  --color-midnight-700: oklch(0.32 0.024 259);
-  --color-midnight-800: oklch(0.24 0.022 259);
-  --color-midnight-900: oklch(0.16 0.02 260);
-  --color-midnight-950: oklch(0.1 0.02 260);
+  /* Night Olive ramp — softer dark (avoid near-black), food-friendly neutral */
+  --color-night-50: oklch(0.975 0.01 135);
+  --color-night-100: oklch(0.945 0.012 135);
+  --color-night-200: oklch(0.875 0.014 135);
+  --color-night-300: oklch(0.765 0.016 135);
+  --color-night-400: oklch(0.645 0.018 135);
+  --color-night-500: oklch(0.525 0.02 135);
+  --color-night-600: oklch(0.425 0.02 135);
+  --color-night-700: oklch(0.345 0.018 135);
+  --color-night-800: oklch(0.305 0.016 135);
+  --color-night-900: oklch(0.265 0.014 135);
+  --color-night-950: oklch(0.225 0.012 135);
 
   /* Semantic tokens — surface ladder: background (deepest) < card/muted < popover, accent voor hover/selected */
-  --color-background: var(--color-midnight-950);
-  --color-foreground: var(--color-midnight-50);
-  --color-muted: var(--color-midnight-900);
-  --color-muted-foreground: var(--color-midnight-400);
-  --color-card: var(--color-midnight-900);
-  --color-card-foreground: var(--color-midnight-50);
-  --color-popover: var(--color-midnight-900);
-  --color-popover-foreground: var(--color-midnight-50);
-  --color-accent: var(--color-midnight-800);
-  --color-accent-foreground: var(--color-midnight-50);
+  --color-background: var(--color-night-950);
+  --color-foreground: var(--color-night-50);
+  --color-muted: var(--color-night-900);
+  --color-muted-foreground: var(--color-night-300);
+  --color-card: var(--color-night-900);
+  --color-card-foreground: var(--color-night-50);
+  --color-popover: var(--color-night-900);
+  --color-popover-foreground: var(--color-night-50);
+  --color-accent: var(--color-night-800);
+  --color-accent-foreground: var(--color-night-50);
 
-  /* Zinc → midnight zodat Catalyst (sidebar, modals, table, button) hetzelfde dark theme volgt */
-  --color-zinc-50: var(--color-midnight-50);
-  --color-zinc-100: var(--color-midnight-100);
-  --color-zinc-200: var(--color-midnight-200);
-  --color-zinc-300: var(--color-midnight-300);
-  --color-zinc-400: var(--color-midnight-400);
-  --color-zinc-500: var(--color-midnight-500);
-  --color-zinc-600: var(--color-midnight-600);
-  --color-zinc-700: var(--color-midnight-700);
-  --color-zinc-800: var(--color-midnight-800);
-  --color-zinc-900: var(--color-midnight-900);
-  --color-zinc-950: var(--color-midnight-950);
+  /* Zinc → night zodat Catalyst (sidebar, modals, table, button) hetzelfde dark theme volgt */
+  --color-zinc-50: var(--color-night-50);
+  --color-zinc-100: var(--color-night-100);
+  --color-zinc-200: var(--color-night-200);
+  --color-zinc-300: var(--color-night-300);
+  --color-zinc-400: var(--color-night-400);
+  --color-zinc-500: var(--color-night-500);
+  --color-zinc-600: var(--color-night-600);
+  --color-zinc-700: var(--color-night-700);
+  --color-zinc-800: var(--color-night-800);
+  --color-zinc-900: var(--color-night-900);
+  --color-zinc-950: var(--color-night-950);
 }
 
 /* Remove hover background for ellipsis button */

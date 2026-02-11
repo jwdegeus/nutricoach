@@ -1,20 +1,26 @@
 'use client';
 
+import { useState } from 'react';
 import { Link } from '@/components/catalyst/link';
 import { Badge } from '@/components/catalyst/badge';
+import { Button } from '@/components/catalyst/button';
 import { IngredientEditForm } from '../../components/IngredientEditForm';
-import { ArrowLeftIcon } from '@heroicons/react/20/solid';
+import { LinkIngredientToProductModal } from '@/src/app/(app)/admin/ingredient-product-links/components/LinkIngredientToProductModal';
+import { ArrowLeftIcon, LinkIcon } from '@heroicons/react/20/solid';
 
 type NevoIngredientDetailPageClientProps = {
   id: string;
   item: Record<string, unknown> & { source: 'nevo' };
+  canonicalIngredientId: string | null;
 };
 
 export function NevoIngredientDetailPageClient({
   id,
   item,
+  canonicalIngredientId,
 }: NevoIngredientDetailPageClientProps) {
   const name = String(item.name_nl ?? item.name_en ?? 'NEVO-ingrediënt');
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
 
   return (
     <div className="min-h-screen">
@@ -40,6 +46,29 @@ export function NevoIngredientDetailPageClient({
               </p>
             </div>
           </div>
+        </div>
+
+        <div className="mb-6 rounded-lg bg-muted/20 p-4">
+          <p className="text-sm text-muted-foreground mb-2">
+            Koppel dit ingrediënt aan een winkelproduct voor de
+            boodschappenlijst.
+          </p>
+          <Button onClick={() => setLinkModalOpen(true)}>
+            <LinkIcon className="h-4 w-4 mr-2" />
+            Koppel aan winkelproduct
+          </Button>
+          {!canonicalIngredientId && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Geen canonieke koppeling? In de popup kun je eerst het canonieke
+              ingrediënt zoeken op naam.
+            </p>
+          )}
+          <LinkIngredientToProductModal
+            open={linkModalOpen}
+            onClose={() => setLinkModalOpen(false)}
+            canonicalIngredientId={canonicalIngredientId ?? undefined}
+            ingredientName={name}
+          />
         </div>
 
         <IngredientEditForm

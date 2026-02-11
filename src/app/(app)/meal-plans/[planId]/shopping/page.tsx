@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/src/lib/supabase/server';
 import { loadMealPlanAction } from '../../actions/mealPlans.actions';
+import { getStoresForShoppingAction } from '../../actions/storeProductLinks.actions';
 import { ShoppingListView } from '../../shopping/components/ShoppingListView';
 import { MealPlannerShoppingService } from '@/src/lib/agents/meal-planner';
 import { PantryService } from '@/src/lib/pantry/pantry.service';
@@ -76,6 +77,10 @@ export default async function PlanShoppingPage({ params }: PageProps) {
     };
   }
 
+  // Stores for "Kopen bij" product link (user's stores)
+  const storesResult = await getStoresForShoppingAction();
+  const stores = storesResult.ok ? storesResult.data : [];
+
   // Calculate end date for display
   const startDate = new Date(planRecord.dateFrom);
   const endDate = new Date(startDate);
@@ -100,6 +105,7 @@ export default async function PlanShoppingPage({ params }: PageProps) {
         shoppingList={shoppingList}
         coverage={coverage}
         pantryMap={pantryMap}
+        stores={stores}
       />
     </div>
   );

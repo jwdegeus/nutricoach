@@ -252,6 +252,8 @@ export type MealIngredientRef = {
   quantityG: number; // Amount in grams (min 1)
   displayName?: string; // Optional display name for UI
   tags?: string[]; // Optional tags for ingredient categorization (e.g., ["grains", "dairy"])
+  /** Canonical ingredient id (canonical_ingredients.id) when known; filled at build time for shopping/store linking */
+  canonicalIngredientId?: string;
 };
 
 /**

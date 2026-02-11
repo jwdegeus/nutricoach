@@ -1,41 +1,82 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Heading } from '@/components/catalyst/heading';
 import { Text } from '@/components/catalyst/text';
 import { Button } from '@/components/catalyst/button';
 import { Badge } from '@/components/catalyst/badge';
+import { Input } from '@/components/catalyst/input';
+import {
+  Dialog,
+  DialogTitle,
+  DialogBody,
+  DialogDescription,
+  DialogActions,
+} from '@/components/catalyst/dialog';
 import {
   PlusIcon,
   ArrowPathIcon,
   CheckCircleIcon,
   ShoppingBagIcon,
+  MagnifyingGlassIcon,
+  PencilSquareIcon,
 } from '@heroicons/react/16/solid';
 import { useRouter } from 'next/navigation';
 import {
   upsertUserPantryItemAction,
   bulkUpsertUserPantryItemsAction,
 } from '@/src/app/(app)/pantry/actions/pantry-ui.actions';
+import {
+  getStoreProductLinksForStoreAction,
+  searchStoreProductsAction,
+  upsertStoreProductLinkAction,
+} from '@/src/app/(app)/meal-plans/actions/storeProductLinks.actions';
+import type {
+  StoreProductLinkResult,
+  StoreProductDisplay,
+} from '@/src/lib/shopping/storeProductLinks.types';
 import type {
   ShoppingListResponse,
   MealPlanCoverage,
 } from '@/src/lib/agents/meal-planner';
 
+type StoreForShopping = { id: string; name: string };
+
 type ShoppingListViewProps = {
   shoppingList: ShoppingListResponse;
   coverage: MealPlanCoverage;
   pantryMap: Record<string, { availableG?: number; isAvailable?: boolean }>;
+  stores?: StoreForShopping[];
 };
 
 export function ShoppingListView({
   shoppingList,
   coverage,
   pantryMap,
+  stores = [],
 }: ShoppingListViewProps) {
   const router = useRouter();
+  const primaryStore = stores[0] ?? null;
+
   const [addingItems, setAddingItems] = useState<Set<string>>(new Set());
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [isBulkAdding, setIsBulkAdding] = useState(false);
+
+  // Store product link per (canonicalIngredientId, storeId)
+  const [linkByKey, setLinkByKey] = useState<
+    Record<string, StoreProductLinkResult | null>
+  >({});
+  // Modal: which item is being edited
+  const [modalItem, setModalItem] = useState<{
+    canonicalIngredientId: string;
+    nevoCode: string;
+    name: string;
+  } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<StoreProductDisplay[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [upserting, setUpserting] = useState(false);
 
   // Get all items that need to be purchased
   const allItemsToBuy = shoppingList.groups.flatMap((group) =>
@@ -123,6 +164,109 @@ export function ShoppingListView({
     }
 
     return null;
+  };
+
+  const linkKey = useCallback(
+    (canonicalIngredientId: string, storeId: string) =>
+      `${canonicalIngredientId}-${storeId}`,
+    [],
+  );
+
+  // Batch-load store product links for all items with canonicalIngredientId (primary store only)
+  useEffect(() => {
+    if (!primaryStore) return;
+    const canonicalIds = [
+      ...new Set(
+        shoppingList.groups.flatMap((g) =>
+          g.items
+            .filter((i) => i.canonicalIngredientId && i.missingG > 0)
+            .map((i) => i.canonicalIngredientId!),
+        ),
+      ),
+    ];
+    if (canonicalIds.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const res = await getStoreProductLinksForStoreAction({
+        storeId: primaryStore.id,
+        canonicalIngredientIds: canonicalIds,
+      });
+      if (cancelled) return;
+      if (!res.ok) {
+        return; // Log is server-side; no per-item callout
+      }
+      const next: Record<string, StoreProductLinkResult | null> = {};
+      for (const link of res.data) {
+        next[linkKey(link.canonicalIngredientId, primaryStore.id)] = link;
+      }
+      setLinkByKey((prev) => ({ ...prev, ...next }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [primaryStore?.id, shoppingList.groups, linkKey]);
+
+  const openChooseProductModal = (item: {
+    canonicalIngredientId: string;
+    nevoCode: string;
+    name: string;
+  }) => {
+    setModalItem(item);
+    setSearchQuery('');
+    setSearchResults([]);
+    setModalError(null);
+  };
+
+  const closeModal = () => {
+    setModalItem(null);
+    setSearchQuery('');
+    setSearchResults([]);
+    setModalError(null);
+  };
+
+  const runSearch = useCallback(async () => {
+    if (!primaryStore || !modalItem) return;
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults([]);
+      return;
+    }
+    setSearchLoading(true);
+    setModalError(null);
+    const res = await searchStoreProductsAction({
+      storeId: primaryStore.id,
+      q,
+      limit: 20,
+    });
+    setSearchLoading(false);
+    if (res.ok) setSearchResults(res.data);
+    else setModalError(res.error.message);
+  }, [primaryStore, modalItem, searchQuery]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    runSearch();
+  };
+
+  const handleSelectProduct = async (product: StoreProductDisplay) => {
+    if (!primaryStore || !modalItem) return;
+    setUpserting(true);
+    setModalError(null);
+    const res = await upsertStoreProductLinkAction({
+      canonicalIngredientId: modalItem.canonicalIngredientId,
+      storeId: primaryStore.id,
+      storeProductId: product.id,
+    });
+    setUpserting(false);
+    if (res.ok && res.data) {
+      const key = linkKey(modalItem.canonicalIngredientId, primaryStore.id);
+      setLinkByKey((prev) => ({ ...prev, [key]: res.data! }));
+      closeModal();
+      router.refresh();
+    } else {
+      setModalError(res.ok ? 'Onbekende fout' : res.error.message);
+    }
   };
 
   return (
@@ -255,6 +399,71 @@ export function ShoppingListView({
                               </Text>
                             )}
                         </div>
+                        {primaryStore && (
+                          <div className="mt-2 rounded-lg bg-muted/20 p-2 space-y-1">
+                            <Text className="text-xs font-medium text-muted-foreground">
+                              Kopen bij: {primaryStore.name}
+                            </Text>
+                            {item.canonicalIngredientId ? (
+                              (() => {
+                                const key = linkKey(
+                                  item.canonicalIngredientId,
+                                  primaryStore.id,
+                                );
+                                const link = linkByKey[key];
+                                return (
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {link ? (
+                                      <>
+                                        <Text className="text-sm text-foreground">
+                                          {link.storeProduct.title}
+                                          {link.storeProduct.brand
+                                            ? ` (${link.storeProduct.brand})`
+                                            : ''}
+                                        </Text>
+                                        <Button
+                                          onClick={() =>
+                                            openChooseProductModal({
+                                              canonicalIngredientId:
+                                                item.canonicalIngredientId!,
+                                              nevoCode: item.nevoCode,
+                                              name: item.name,
+                                            })
+                                          }
+                                          plain
+                                          className="!p-0 h-6 text-xs"
+                                        >
+                                          <PencilSquareIcon className="h-3.5 w-3.5 mr-0.5" />
+                                          Wijzig
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <Button
+                                        onClick={() =>
+                                          openChooseProductModal({
+                                            canonicalIngredientId:
+                                              item.canonicalIngredientId!,
+                                            nevoCode: item.nevoCode,
+                                            name: item.name,
+                                          })
+                                        }
+                                        plain
+                                        className="h-7 text-sm"
+                                      >
+                                        <MagnifyingGlassIcon className="h-3.5 w-3.5 mr-1" />
+                                        Kies product
+                                      </Button>
+                                    )}
+                                  </div>
+                                );
+                              })()
+                            ) : (
+                              <Text className="text-xs text-muted-foreground">
+                                Koppeling nog niet beschikbaar
+                              </Text>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -291,6 +500,92 @@ export function ShoppingListView({
           );
         })}
       </div>
+
+      <Dialog open={!!modalItem} onClose={closeModal}>
+        <DialogTitle>Kies product</DialogTitle>
+        <DialogBody>
+          <DialogDescription>
+            {modalItem
+              ? `Zoek een product voor: ${modalItem.name}`
+              : 'Zoek een product'}
+          </DialogDescription>
+          <form onSubmit={handleSearchSubmit} className="mt-4 space-y-4">
+            <div className="flex gap-2">
+              <Input
+                type="search"
+                placeholder="Zoek op naam of merk..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1"
+                autoFocus
+              />
+              <Button type="submit" disabled={searchLoading}>
+                {searchLoading ? (
+                  <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                ) : (
+                  <MagnifyingGlassIcon className="h-4 w-4" />
+                )}
+                Zoeken
+              </Button>
+            </div>
+            {modalError && (
+              <div
+                className="rounded-lg bg-red-50 dark:bg-red-950/20 p-3 text-sm text-red-800 dark:text-red-200"
+                role="alert"
+              >
+                {modalError}
+              </div>
+            )}
+            {searchQuery.trim() === '' &&
+              searchResults.length === 0 &&
+              !searchLoading && (
+                <Text className="text-sm text-muted-foreground">
+                  Typ om te zoeken
+                </Text>
+              )}
+            {searchQuery.trim() !== '' &&
+              searchResults.length === 0 &&
+              !searchLoading && (
+                <Text className="text-sm text-muted-foreground">
+                  Geen resultaten
+                </Text>
+              )}
+            {searchResults.length > 0 && (
+              <ul className="space-y-1 max-h-60 overflow-y-auto rounded-lg bg-muted/20 p-2">
+                {searchResults.map((product) => (
+                  <li key={product.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectProduct(product)}
+                      disabled={upserting}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted/40 transition-colors disabled:opacity-50"
+                    >
+                      <span className="font-medium text-foreground">
+                        {product.title}
+                      </span>
+                      {product.brand && (
+                        <span className="text-muted-foreground text-sm ml-1">
+                          ({product.brand})
+                        </span>
+                      )}
+                      {product.priceCents != null && (
+                        <span className="text-sm text-muted-foreground block mt-0.5">
+                          €{(product.priceCents / 100).toFixed(2)}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </form>
+        </DialogBody>
+        <DialogActions>
+          <Button plain onClick={closeModal}>
+            Sluiten
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }

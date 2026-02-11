@@ -70,6 +70,11 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Cron/worker endpoints: no session; auth is via x-cron-secret in the route
+  if (pathname.startsWith('/api/cron')) {
+    return supabaseResponse;
+  }
+
   // Define public routes that don't require authentication
   const publicRoutes = [
     '/login',

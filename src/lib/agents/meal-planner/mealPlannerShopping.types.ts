@@ -29,6 +29,8 @@ export type ShoppingListItem = {
   missingG: number; // Missing quantity (max(requiredG - availableG, 0))
   category?: string; // Category for grouping (e.g., "Groente", "Eiwit")
   tags?: string[]; // Optional tags from NEVO
+  /** Canonical ingredient id (canonical_ingredients.id) when known; for pantry/store linking */
+  canonicalIngredientId?: string;
 };
 
 /**
@@ -84,4 +86,6 @@ export type ShoppingListResponse = {
     requiredG: number; // Total required quantity
     missingG: number; // Total missing quantity
   };
+  /** NEVO codes that have no canonical_ingredients mapping yet (for admin backfill workflow) */
+  missingCanonicalIngredientNevoCodes: string[];
 };

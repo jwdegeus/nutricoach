@@ -20,11 +20,14 @@ import {
 import { Link } from '@/components/catalyst/link';
 import { useToast } from '@/src/components/app/ToastContext';
 import {
+  listStoreTemplatesForSelectionAction,
+  addGroceryStoreFromTemplateAction,
   createGroceryStoreAction,
   updateGroceryStoreAction,
   deleteGroceryStoreAction,
 } from '../actions/grocery-stores.actions';
 import type { GroceryStoreRow } from '@/src/lib/grocery-stores/grocery-stores.types';
+import type { StoreTemplateForSelection } from '../actions/grocery-stores.actions';
 import {
   PlusIcon,
   PencilSquareIcon,
@@ -52,12 +55,15 @@ export function GroceryStoresPageClient({
   const [submitting, setSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [templates, setTemplates] = useState<StoreTemplateForSelection[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [addingTemplateId, setAddingTemplateId] = useState<string | null>(null);
 
   useEffect(() => {
     setStores(initialStores);
   }, [initialStores]);
 
-  const openAdd = () => {
+  const openAdd = async () => {
     setName('');
     setAddress('');
     setNotes('');
@@ -65,6 +71,29 @@ export function GroceryStoresPageClient({
     setCutoffTimes('');
     setEditStore(null);
     setAddOpen(true);
+    setTemplatesLoading(true);
+    const res = await listStoreTemplatesForSelectionAction();
+    setTemplatesLoading(false);
+    if (res.ok) setTemplates(res.templates);
+    else setTemplates([]);
+  };
+
+  const handleAddFromTemplate = async (templateId: string) => {
+    setAddingTemplateId(templateId);
+    const result = await addGroceryStoreFromTemplateAction(templateId);
+    setAddingTemplateId(null);
+    if (result.ok) {
+      setStores((prev) =>
+        [...prev, result.store].sort(
+          (a, b) =>
+            a.sortOrder - b.sortOrder || a.createdAt.localeCompare(b.createdAt),
+        ),
+      );
+      closeForm();
+      showToast({ type: 'success', title: t('storeAdded') });
+    } else {
+      showToast({ type: 'error', title: result.error });
+    }
   };
 
   const openEdit = (store: GroceryStoreRow) => {
@@ -321,68 +350,120 @@ export function GroceryStoresPageClient({
           {isEdit ? t('editStoreTitle') : t('addStore')}
         </DialogTitle>
         <DialogBody>
-          <FieldGroup>
-            <Field>
-              <Label>{t('name')}</Label>
-              <Description>{t('nameRequired')}</Description>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={t('namePlaceholder')}
-                disabled={submitting}
-              />
-            </Field>
-            <Field>
-              <Label>{t('website')}</Label>
-              <Description>{t('websitePlaceholder')}</Description>
-              <Input
-                type="url"
-                value={websiteUrl}
-                onChange={(e) => setWebsiteUrl(e.target.value)}
-                placeholder={t('websitePlaceholder')}
-                disabled={submitting}
-              />
-            </Field>
-            <Field>
-              <Label>{t('cutoffTimes')}</Label>
-              <Description>{t('cutoffTimesPlaceholder')}</Description>
-              <Input
-                value={cutoffTimes}
-                onChange={(e) => setCutoffTimes(e.target.value)}
-                placeholder={t('cutoffTimesPlaceholder')}
-                disabled={submitting}
-              />
-            </Field>
-            <Field>
-              <Label>{t('address')}</Label>
-              <Description>{t('addressPlaceholder')}</Description>
-              <Input
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder={t('addressPlaceholder')}
-                disabled={submitting}
-              />
-            </Field>
-            <Field>
-              <Label>{t('notes')}</Label>
-              <Description>{t('notesPlaceholder')}</Description>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder={t('notesPlaceholder')}
-                disabled={submitting}
-                rows={2}
-              />
-            </Field>
-          </FieldGroup>
+          {isEdit ? (
+            <FieldGroup>
+              <Field>
+                <Label>{t('name')}</Label>
+                <Description>{t('nameRequired')}</Description>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={t('namePlaceholder')}
+                  disabled={submitting}
+                />
+              </Field>
+              <Field>
+                <Label>{t('website')}</Label>
+                <Description>{t('websitePlaceholder')}</Description>
+                <Input
+                  type="url"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  placeholder={t('websitePlaceholder')}
+                  disabled={submitting}
+                />
+              </Field>
+              <Field>
+                <Label>{t('cutoffTimes')}</Label>
+                <Description>{t('cutoffTimesPlaceholder')}</Description>
+                <Input
+                  value={cutoffTimes}
+                  onChange={(e) => setCutoffTimes(e.target.value)}
+                  placeholder={t('cutoffTimesPlaceholder')}
+                  disabled={submitting}
+                />
+              </Field>
+              <Field>
+                <Label>{t('address')}</Label>
+                <Description>{t('addressPlaceholder')}</Description>
+                <Input
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder={t('addressPlaceholder')}
+                  disabled={submitting}
+                />
+              </Field>
+              <Field>
+                <Label>{t('notes')}</Label>
+                <Description>{t('notesPlaceholder')}</Description>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder={t('notesPlaceholder')}
+                  disabled={submitting}
+                  rows={2}
+                />
+              </Field>
+            </FieldGroup>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground mb-4">
+                Kies een winkel uit de catalogus (aangemaakt in admin). Je
+                koppelt de winkel aan je lijst; je kunt daarna adres en
+                besteltijden bewerken.
+              </p>
+              {templatesLoading ? (
+                <p className="text-sm text-muted-foreground">Laden...</p>
+              ) : templates.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Geen winkels in de catalogus. Vraag een beheerder om winkels
+                  toe te voegen in Admin → Winkels &amp; Assortiment.
+                </p>
+              ) : (
+                <ul className="rounded-lg bg-muted/20 divide-y divide-white/10 max-h-72 overflow-y-auto">
+                  {templates.map((template) => (
+                    <li
+                      key={template.id}
+                      className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <span className="font-medium text-foreground">
+                          {template.name}
+                        </span>
+                        <span
+                          className="text-muted-foreground text-sm ml-2 block truncate"
+                          title={template.base_url}
+                        >
+                          {template.base_url
+                            .replace(/^https?:\/\//, '')
+                            .slice(0, 50)}
+                          {template.base_url.length > 50 ? '…' : ''}
+                        </span>
+                      </div>
+                      <Button
+                        onClick={() => handleAddFromTemplate(template.id)}
+                        disabled={addingTemplateId !== null}
+                      >
+                        {addingTemplateId === template.id
+                          ? t('saving')
+                          : 'Koppelen'}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
         </DialogBody>
         <DialogActions>
           <Button plain onClick={closeForm} disabled={submitting}>
             {t('cancel')}
           </Button>
-          <Button onClick={handleSave} disabled={submitting || !name.trim()}>
-            {submitting ? t('saving') : isEdit ? t('edit') : t('add')}
-          </Button>
+          {isEdit && (
+            <Button onClick={handleSave} disabled={submitting || !name.trim()}>
+              {submitting ? t('saving') : t('edit')}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 

@@ -5,6 +5,9 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Heading } from '@/components/catalyst/heading';
 import { Breadcrumbs } from '@/components/catalyst/breadcrumbs';
+import { Badge } from '@/components/catalyst/badge';
+import { Link } from '@/components/catalyst/link';
+import { Text } from '@/components/catalyst/text';
 import { MealDetail } from './MealDetail';
 import { getMealByIdAction } from '../../actions/meals.actions';
 import { getRecipeComplianceScoresAction } from '../../actions/recipe-compliance.actions';
@@ -20,6 +23,38 @@ type RecipeDetailPageClientProps = {
   mealId: string;
   mealSource: 'custom' | 'gemini';
 };
+
+type WeekMenuStatus =
+  | 'ready'
+  | 'blocked_slot'
+  | 'blocked_refs'
+  | 'blocked_both';
+
+function weekMenuStatusLabel(s: WeekMenuStatus): string {
+  switch (s) {
+    case 'ready':
+      return 'Weekmenu-klaar';
+    case 'blocked_slot':
+      return 'Soort blokkeert weekmenu';
+    case 'blocked_refs':
+      return 'Ingrediëntkoppelingen ontbreken';
+    case 'blocked_both':
+      return 'Niet klaar';
+  }
+}
+
+function weekMenuStatusTitle(s: WeekMenuStatus): string {
+  switch (s) {
+    case 'ready':
+      return 'Dit recept is geschikt voor het weekmenu (soort ontbijt/lunch/diner en ingrediënten gekoppeld aan de database voor nutriënten).';
+    case 'blocked_slot':
+      return 'Soort is geen ontbijt, lunch of diner. Alleen die soorten worden gebruikt in het weekmenu.';
+    case 'blocked_refs':
+      return 'Er zijn geen ingrediënten gekoppeld aan de database voor nutriënten. Koppel ingrediënten (NEVO, eigen of FNDDS) om dit recept in het weekmenu te gebruiken.';
+    case 'blocked_both':
+      return '• Soort blokkeert weekmenu\n• Ingrediëntkoppelingen ontbreken';
+  }
+}
 
 export function RecipeDetailPageClient({
   mealId,
@@ -305,6 +340,15 @@ export function RecipeDetailPageClient({
     );
   }
 
+  const weekmenuStatus = (meal as Record<string, unknown>)?.weekmenuStatus as
+    | WeekMenuStatus
+    | null
+    | undefined;
+  const recipeBookLabel = (meal as Record<string, unknown>)?.recipeBookLabel as
+    | string
+    | null
+    | undefined;
+
   return (
     <div className="mt-6 space-y-6">
       <Breadcrumbs
@@ -312,6 +356,36 @@ export function RecipeDetailPageClient({
         currentPageClassName="text-zinc-500 dark:text-zinc-400"
         className="mb-2"
       />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+        <span className="flex items-center gap-1.5">
+          <Text className="font-medium text-zinc-500 dark:text-zinc-500">
+            Receptenboek:
+          </Text>
+          {recipeBookLabel ? (
+            <Link href="/recipes" className="text-foreground hover:underline">
+              {recipeBookLabel}
+            </Link>
+          ) : (
+            <span className="text-zinc-500 dark:text-zinc-500">—</span>
+          )}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Text className="font-medium text-zinc-500 dark:text-zinc-500">
+            Weekmenu:
+          </Text>
+          {weekmenuStatus ? (
+            <Badge
+              color={weekmenuStatus === 'ready' ? 'green' : 'amber'}
+              className="text-xs"
+              title={weekMenuStatusTitle(weekmenuStatus)}
+            >
+              {weekMenuStatusLabel(weekmenuStatus)}
+            </Badge>
+          ) : (
+            <span className="text-zinc-500 dark:text-zinc-500">—</span>
+          )}
+        </span>
+      </div>
       <MealDetail
         meal={meal}
         mealSource={mealSource}
@@ -380,6 +454,7 @@ export function RecipeDetailPageClient({
             });
             return;
           }
+          // Geen payload: match staat alleen server-side; sync client met reload zodat UI niet uit sync raakt
           loadMealSilent();
           showToast({
             type: 'success',

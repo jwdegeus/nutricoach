@@ -62,6 +62,7 @@ async function getAdminStats() {
     protocolsActiveRes,
     productSourceRes,
     productSourceActiveRes,
+    storesRes,
   ] = await Promise.all([
     supabase
       .from('meal_plan_templates')
@@ -87,6 +88,7 @@ async function getAdminStats() {
       .from('product_source_config')
       .select('id', { count: 'exact', head: true })
       .eq('is_enabled', true),
+    supabase.from('stores').select('id', { count: 'exact', head: true }),
   ]);
   const generatorStats = {
     templatesTotal: templateRes.error ? 0 : (templateRes.count ?? 0),
@@ -131,6 +133,9 @@ async function getAdminStats() {
       enabled: productSourceActiveRes.error
         ? 0
         : (productSourceActiveRes.count ?? 0),
+    },
+    stores: {
+      total: storesRes.error ? 0 : (storesRes.count ?? 0),
     },
   };
 }

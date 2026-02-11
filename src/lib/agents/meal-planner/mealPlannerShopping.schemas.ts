@@ -28,6 +28,7 @@ export const shoppingListItemSchema = z.object({
   missingG: z.number().min(0),
   category: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  canonicalIngredientId: z.string().uuid().optional(),
 });
 
 export type ShoppingListItemInput = z.infer<typeof shoppingListItemSchema>;
@@ -95,6 +96,7 @@ export const shoppingListResponseSchema = z.object({
     requiredG: z.number().min(0),
     missingG: z.number().min(0),
   }),
+  missingCanonicalIngredientNevoCodes: z.array(z.string()).default([]),
 });
 
 export type ShoppingListResponseInput = z.infer<

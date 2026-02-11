@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Dropdown,
   DropdownButton,
@@ -200,7 +200,36 @@ export function IngredientRowWithNutrition({
     if (!linkDialogOpen) setShowRelinkUI(false);
   }, [linkDialogOpen]);
 
-  // Na 3 tekens direct zoeken in het handmatige zoekveld (debounced 300 ms)
+  const loadSuggestionsWithQuery = useCallback(
+    async (query: string) => {
+      if (!canSearchSuggestions) return;
+      const q = query.trim();
+      if (!q) return;
+      setSuggestionsLoading(true);
+      setSuggestions([]);
+      setConfirmError(null);
+      setHasSearched(true);
+      try {
+        const searchResult = await searchIngredientCandidatesAction(q, 15);
+        if (searchResult.ok) {
+          setSuggestions(searchResult.data ?? []);
+        } else {
+          setConfirmError(searchResult.error.message ?? 'Zoeken mislukt');
+        }
+      } catch (err) {
+        setConfirmError(err instanceof Error ? err.message : 'Zoeken mislukt');
+      } finally {
+        setSuggestionsLoading(false);
+      }
+    },
+    [canSearchSuggestions],
+  );
+
+  // Na 3 tekens direct zoeken in het handmatige zoekveld (debounced 300 ms). Alleen query/canSearch in deps zodat de modal niet herlaadt bij elke state-update.
+  const searchQueryRef = useRef(manualSearchQuery);
+  searchQueryRef.current = manualSearchQuery;
+  const loadSuggestionsRef = useRef(loadSuggestionsWithQuery);
+  loadSuggestionsRef.current = loadSuggestionsWithQuery;
   useEffect(() => {
     const q = manualSearchQuery.trim();
     if (q.length < MIN_CHARS_AUTO_SEARCH || !canSearchSuggestions) {
@@ -208,10 +237,9 @@ export function IngredientRowWithNutrition({
       return;
     }
     const t = setTimeout(() => {
-      loadSuggestionsWithQuery(q);
+      loadSuggestionsRef.current(searchQueryRef.current.trim());
     }, 300);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadSuggestionsWithQuery is stable enough; we only want to run when query/canSearch changes
   }, [manualSearchQuery, canSearchSuggestions]);
 
   const _loadNutrition = async () => {
@@ -229,28 +257,6 @@ export function IngredientRowWithNutrition({
       setNutrition(result.data);
     } else {
       setNutrition(null);
-    }
-  };
-
-  const loadSuggestionsWithQuery = async (query: string) => {
-    if (!canSearchSuggestions) return;
-    const q = query.trim();
-    if (!q) return;
-    setSuggestionsLoading(true);
-    setSuggestions([]);
-    setConfirmError(null);
-    setHasSearched(true);
-    try {
-      const searchResult = await searchIngredientCandidatesAction(q, 15);
-      if (searchResult.ok) {
-        setSuggestions(searchResult.data);
-      } else {
-        setConfirmError(searchResult.error.message ?? 'Zoeken mislukt');
-      }
-    } catch (err) {
-      setConfirmError(err instanceof Error ? err.message : 'Zoeken mislukt');
-    } finally {
-      setSuggestionsLoading(false);
     }
   };
 
@@ -611,6 +617,7 @@ export function IngredientRowWithNutrition({
       </div>
 
       <Dialog
+        key={`link-${mealId ?? 'n'}-${mealSource ?? 'n'}-${ingredientIndex ?? 0}`}
         open={linkDialogOpen}
         onClose={() => setLinkDialogOpen(false)}
         size="md"

@@ -96,7 +96,7 @@ export function SidebarLayout({
           {navbar}
         </header>
         <div className="flex flex-1 flex-col gap-4 p-6 lg:p-8">
-          <div className="mx-auto w-full max-w-7xl flex-1">{children}</div>
+          <div className="w-full max-w-full flex-1">{children}</div>
         </div>
       </main>
     </div>

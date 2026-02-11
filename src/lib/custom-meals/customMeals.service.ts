@@ -38,6 +38,10 @@ export type CustomMealRecord = {
   createdAt: string;
   updatedAt: string;
   notes: string | null;
+  /** Voor weekmenu inzetten als: ontbijt, lunch en/of diner. */
+  weekmenuSlots: string[] | null;
+  /** Receptenboek (catalog_options dimension=recipe_book). */
+  recipeBookOptionId: string | null;
 };
 
 /**
@@ -250,6 +254,8 @@ export class CustomMealsService {
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
       notes: (row.notes as string | null) ?? null,
+      weekmenuSlots: (row.weekmenu_slots as string[] | null) ?? null,
+      recipeBookOptionId: (row.recipe_book_option_id as string | null) ?? null,
     };
   }
 }

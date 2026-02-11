@@ -87,8 +87,85 @@ export async function listGroceryStoresAction(): Promise<{
   return { ok: true, stores };
 }
 
+/** Store template voor selectie (uit catalogus, aangemaakt in admin). */
+export type StoreTemplateForSelection = {
+  id: string;
+  name: string;
+  base_url: string;
+};
+
 /**
- * Create a new grocery store.
+ * Lijst winkels uit de catalogus (store_templates) om te koppelen.
+ * Alleen voor gebruik op /grocery-stores; winkels worden in admin aangemaakt.
+ */
+export async function listStoreTemplatesForSelectionAction(): Promise<
+  | {
+      ok: true;
+      templates: StoreTemplateForSelection[];
+    }
+  | { ok: false; error: string }
+> {
+  const { supabase } = await getSupabaseAndUserId();
+  const { data, error } = await supabase
+    .from('store_templates')
+    .select('id, name, base_url')
+    .order('name');
+  if (error) return { ok: false, error: error.message };
+  const templates = (data ?? []).map((r) => ({
+    id: (r as { id: string }).id,
+    name: (r as { name: string }).name,
+    base_url: (r as { base_url: string }).base_url,
+  }));
+  return { ok: true, templates };
+}
+
+/**
+ * Winkel koppelen: voeg een winkel uit de catalogus toe aan mijn winkellijst.
+ * Kopieert naam en website (base_url) uit de template.
+ */
+export async function addGroceryStoreFromTemplateAction(
+  templateId: string,
+): Promise<
+  { ok: true; store: GroceryStoreRow } | { ok: false; error: string }
+> {
+  const { supabase, userId } = await getSupabaseAndUserId();
+  const { data: template, error: fetchErr } = await supabase
+    .from('store_templates')
+    .select('id, name, base_url')
+    .eq('id', templateId)
+    .single();
+  if (fetchErr || !template) {
+    return { ok: false, error: 'Winkel niet gevonden in catalogus.' };
+  }
+  const { data: maxOrder } = await supabase
+    .from('user_grocery_stores')
+    .select('sort_order')
+    .eq('user_id', userId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const sortOrder =
+    ((maxOrder as { sort_order: number } | null)?.sort_order ?? -1) + 1;
+  const { data: inserted, error: insErr } = await supabase
+    .from('user_grocery_stores')
+    .insert({
+      user_id: userId,
+      name: (template as { name: string }).name,
+      address: null,
+      notes: null,
+      website_url: (template as { base_url: string }).base_url,
+      cutoff_times: null,
+      sort_order: sortOrder,
+    })
+    .select(STORE_SELECT)
+    .single();
+  if (insErr) return { ok: false, error: insErr.message };
+  revalidatePath('/grocery-stores');
+  return { ok: true, store: rowToStore(inserted as Record<string, unknown>) };
+}
+
+/**
+ * Create a new grocery store (handmatig – alleen indien nodig).
  */
 export async function createGroceryStoreAction(
   raw: unknown,

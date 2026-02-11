@@ -6,6 +6,11 @@ import { existsSync } from 'fs';
 import { createClient } from '@/src/lib/supabase/server';
 import { CustomMealsService } from '@/src/lib/custom-meals/customMeals.service';
 import { MealHistoryService } from '@/src/lib/meal-history';
+import {
+  computeWeekMenuStatus,
+  effectiveWeekmenuSlots,
+  type WeekMenuStatus,
+} from './weekMenuStatus';
 import { isVercelBlobUrl } from '@/src/lib/storage/storage.service';
 import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
 import type { MealSlot } from '@/src/lib/diets';
@@ -1506,11 +1511,48 @@ export async function getMealByIdAction(
       // Get notes
       const notes = meal.notes || null;
 
+      // Weekmenu status: slot-eligible + has ingredient refs (NEVO/custom/FNDDS)
+      const mealDataRaw = meal.mealData as Record<string, unknown> | undefined;
+      const refs = Array.isArray(mealDataRaw?.ingredientRefs)
+        ? (mealDataRaw.ingredientRefs as Record<string, unknown>[])
+        : [];
+      const hasIngredientRefs = refs.some(
+        (ref) =>
+          ref != null &&
+          typeof ref === 'object' &&
+          (ref.nevoCode != null ||
+            ref.customFoodId != null ||
+            ref.custom_food_id != null ||
+            (ref as { fdcId?: string }).fdcId != null ||
+            (ref as { fdc_id?: string }).fdc_id != null),
+      );
+      const slots = effectiveWeekmenuSlots(
+        meal.weekmenuSlots ?? null,
+        meal.mealSlot ?? null,
+      );
+      const weekmenuStatus: WeekMenuStatus = computeWeekMenuStatus(
+        slots,
+        hasIngredientRefs,
+      );
+
+      // Receptenboek-label ophalen indien gekoppeld
+      let recipeBookLabel: string | null = null;
+      if (meal.recipeBookOptionId) {
+        const { data: opt } = await supabase
+          .from('catalog_options')
+          .select('label')
+          .eq('id', meal.recipeBookOptionId)
+          .maybeSingle();
+        recipeBookLabel = (opt?.label as string) ?? null;
+      }
+
       const mealData = {
         ...meal,
         userRating: ratingData?.user_rating || null,
         notes,
         source_image_url: meal.sourceImageUrl ?? null,
+        weekmenuStatus,
+        recipeBookLabel,
       };
 
       return {
@@ -1582,6 +1624,8 @@ export async function getMealByIdAction(
           sourceImageUrl: resolvedImageUrl,
           source_image_url: resolvedImageUrl,
           sourceImagePath: null,
+          weekmenuStatus: null as WeekMenuStatus | null,
+          recipeBookLabel: null as string | null,
         },
       };
     }

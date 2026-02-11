@@ -223,6 +223,70 @@ describe('Diet Validator', () => {
     });
   });
 
+  describe('findForbiddenMatches - glutenvrij(e) / gluten-free in naam', () => {
+    const glutenRulesetWithBloem: DietRuleset = {
+      dietId: 'test-diet',
+      version: 1,
+      forbidden: [
+        {
+          term: 'gluten',
+          synonyms: ['tarwe', 'bloem', 'pasta', 'brood'],
+          ruleCode: 'wahls_forbidden_gluten',
+          ruleLabel: 'Gluten (Strikt verboden)',
+          substitutionSuggestions: ['courgette noodles'],
+        },
+      ],
+    };
+
+    it('should NOT flag glutenvrije pannenkoekenmix as gluten', () => {
+      const matches = findForbiddenMatches(
+        'glutenvrije pannenkoekenmix',
+        glutenRulesetWithBloem,
+        'ingredients',
+      );
+      assert.strictEqual(
+        matches.length,
+        0,
+        'glutenvrije pannenkoekenmix is gluten-free, so allowed under gluten rule',
+      );
+    });
+
+    it('should NOT flag glutenvrij brood as gluten', () => {
+      const matches = findForbiddenMatches(
+        'glutenvrij brood',
+        glutenRulesetWithBloem,
+        'ingredients',
+      );
+      assert.strictEqual(
+        matches.length,
+        0,
+        'glutenvrij brood is gluten-free, so allowed',
+      );
+    });
+
+    it('should NOT flag gluten-free bread as gluten', () => {
+      const matches = findForbiddenMatches(
+        'gluten-free bread',
+        glutenRulesetWithBloem,
+        'ingredients',
+      );
+      assert.strictEqual(
+        matches.length,
+        0,
+        'gluten-free bread is allowed under gluten rule',
+      );
+    });
+
+    it('should still flag plain brood as gluten', () => {
+      const matches = findForbiddenMatches(
+        'brood',
+        glutenRulesetWithBloem,
+        'ingredients',
+      );
+      assert.strictEqual(matches.length, 1, 'plain brood should be flagged');
+    });
+  });
+
   describe('findForbiddenMatches - kokosyoghurt vs zuivel (dairy alternative)', () => {
     const dairyRuleset: DietRuleset = {
       dietId: 'test-diet',

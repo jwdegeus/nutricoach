@@ -52,6 +52,7 @@ import {
   type SanityResult,
 } from '@/src/lib/meal-plans/mealPlanSanityValidator';
 import { validateCulinaryCoherence } from './validators/culinaryCoherenceValidator';
+import { getCanonicalIngredientIdsByNevoCodes } from './mealPlannerShopping.service';
 import { createClient } from '@/src/lib/supabase/server';
 import {
   loadMealPlanGeneratorConfig,
@@ -113,6 +114,73 @@ function hasShakeSmoothiePreferenceInRequest(
     lower.includes('smoothie') ||
     lower.includes('eiwit shake')
   );
+}
+
+/**
+ * Vul per ingredientRef canonicalIngredientId in (write-time); geen extra writes.
+ * Lookup fout → log, canonical blijft leeg; mealplan blijft geldig.
+ */
+async function enrichPlanWithCanonicalIngredientIds(
+  plan: MealPlanResponse,
+): Promise<void> {
+  const nevoCodes = new Set<string>();
+  for (const day of plan.days) {
+    for (const meal of day.meals) {
+      for (const ref of meal.ingredientRefs ?? []) {
+        if (ref.nevoCode?.trim()) nevoCodes.add(ref.nevoCode.trim());
+      }
+    }
+  }
+  if (nevoCodes.size === 0) return;
+  try {
+    const nevoToCanonicalId = await getCanonicalIngredientIdsByNevoCodes(
+      Array.from(nevoCodes),
+    );
+    for (const day of plan.days) {
+      for (const meal of day.meals) {
+        for (const ref of meal.ingredientRefs ?? []) {
+          const id = ref.nevoCode?.trim()
+            ? nevoToCanonicalId.get(ref.nevoCode.trim())
+            : undefined;
+          if (id) ref.canonicalIngredientId = id;
+        }
+      }
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Canonical ingredient enrichment (plan) failed:', msg);
+  }
+}
+
+/**
+ * Vul per ingredientRef in day.canonicalIngredientId in (write-time).
+ */
+async function enrichDayWithCanonicalIngredientIds(
+  day: MealPlanDay,
+): Promise<void> {
+  const nevoCodes = new Set<string>();
+  for (const meal of day.meals) {
+    for (const ref of meal.ingredientRefs ?? []) {
+      if (ref.nevoCode?.trim()) nevoCodes.add(ref.nevoCode.trim());
+    }
+  }
+  if (nevoCodes.size === 0) return;
+  try {
+    const nevoToCanonicalId = await getCanonicalIngredientIdsByNevoCodes(
+      Array.from(nevoCodes),
+    );
+    for (const meal of day.meals) {
+      for (const ref of meal.ingredientRefs ?? []) {
+        const id = ref.nevoCode?.trim()
+          ? nevoToCanonicalId.get(ref.nevoCode.trim())
+          : undefined;
+        if (id) ref.canonicalIngredientId = id;
+      }
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Canonical ingredient enrichment (day) failed:', msg);
+  }
 }
 
 /** Provenance counters for plan_snapshot (debugging/UX) */
@@ -721,6 +789,7 @@ export class MealPlannerAgentService {
           // Keep original sanity result for throw
         }
       }
+      await enrichPlanWithCanonicalIngredientIds(plan);
       await applyPrefilledAndAttachProvenance(
         plan,
         request,
@@ -923,6 +992,7 @@ export class MealPlannerAgentService {
           // Keep original plan and sanity for attach + throw
         }
       }
+      await enrichPlanWithCanonicalIngredientIds(plan);
       await applyPrefilledAndAttachProvenance(plan, request, options, rules);
       validateCulinaryCoherence(plan, options?.culinaryRules ?? []);
       throwIfDbCoverageTooLow(
@@ -996,6 +1066,7 @@ export class MealPlannerAgentService {
       }
       const plan = repairResult.response!;
       const sanity = validateMealPlanSanity(plan);
+      await enrichPlanWithCanonicalIngredientIds(plan);
       await applyPrefilledAndAttachProvenance(plan, request, options, rules);
       validateCulinaryCoherence(plan, options?.culinaryRules ?? []);
       throwIfDbCoverageTooLow(
@@ -1207,6 +1278,7 @@ export class MealPlannerAgentService {
       day = validationResult.adjustedDay;
       // If all issues resolved, return early
       if (validationResult.issues.length === 0) {
+        await enrichDayWithCanonicalIngredientIds(day);
         return {
           day,
           adjustments: validationResult.adjustments,
@@ -1282,6 +1354,7 @@ export class MealPlannerAgentService {
       }
 
       // Return with adjustments if any
+      await enrichDayWithCanonicalIngredientIds(day);
       return {
         day,
         adjustments: repairValidationResult.adjustments,
@@ -1289,6 +1362,7 @@ export class MealPlannerAgentService {
     }
 
     // Step 9: Success - return day with adjustments if any
+    await enrichDayWithCanonicalIngredientIds(day);
     return {
       day,
       adjustments: validationResult.adjustments,

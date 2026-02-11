@@ -1,6 +1,7 @@
 import { createClient } from '@/src/lib/supabase/server';
 import { isAdmin } from '@/src/lib/auth/roles';
 import { redirect, notFound } from 'next/navigation';
+import { getCanonicalIngredientIdsByNevoCodes } from '@/src/lib/agents/meal-planner/mealPlannerShopping.service';
 import { NevoIngredientDetailPageClient } from './NevoIngredientDetailPageClient';
 
 type PageProps = {
@@ -43,12 +44,17 @@ export default async function NevoIngredientDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const nevoCode = String((data as { nevo_code?: number }).nevo_code ?? id);
+  const canonicalMap = await getCanonicalIngredientIdsByNevoCodes([nevoCode]);
+  const canonicalIngredientId = canonicalMap.get(nevoCode) ?? null;
+
   const item = { ...data, source: 'nevo' as const };
 
   return (
     <NevoIngredientDetailPageClient
       id={id}
       item={item as Record<string, unknown> & { source: 'nevo' }}
+      canonicalIngredientId={canonicalIngredientId}
     />
   );
 }

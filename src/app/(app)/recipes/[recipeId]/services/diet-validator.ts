@@ -293,6 +293,16 @@ function isGlutenRule(forbidden: {
   );
 }
 
+/** Ingrediënt is expliciet glutenvrij (glutenvrije pannenkoekenmix, gluten-free bread) → onder gluten-regel toegestaan. */
+function isGlutenFreeIngredient(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  return (
+    lower.includes('glutenvrij') ||
+    lower.includes('glutenvrije') ||
+    lower.includes('gluten-free')
+  );
+}
+
 /** Peper (kruid) is toegestaan; alleen paprika/chili/pepper als groente zijn nachtschades. */
 function isNightshadeRule(forbidden: {
   term: string;
@@ -502,6 +512,15 @@ export function findForbiddenMatches(
       context === 'ingredients' &&
       isNightshadeRule(forbidden) &&
       isSpicePepper(lowerText)
+    ) {
+      continue;
+    }
+
+    // Glutenvrij(e) / gluten-free in de naam → onder gluten-regel toegestaan, niet flaggen
+    if (
+      context === 'ingredients' &&
+      isGlutenRule(forbidden) &&
+      isGlutenFreeIngredient(lowerText)
     ) {
       continue;
     }
