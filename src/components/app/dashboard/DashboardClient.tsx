@@ -1,15 +1,12 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { PageHeader } from '@/src/components/app/PageHeader';
 import { FamilyMemberFilter } from './FamilyMemberFilter';
 import { DashboardKpiCards } from './DashboardKpiCards';
 import { BentoCell } from './BentoCell';
-import { CaloriesStackedBarChart } from './CaloriesStackedBarChart';
-import { VitaminsAreaChart } from './VitaminsAreaChart';
-import { MineralsAreaChart } from './MineralsAreaChart';
-import { SupplementsBarChart } from './SupplementsBarChart';
-import { TopMealsWidget } from './top-meals-widget';
+import { DashboardChartSkeleton } from './DashboardChartSkeleton';
 import {
   mockCaloriesData,
   mockVitaminData,
@@ -22,11 +19,46 @@ import {
   getMemberIndex,
   type FamilyMember,
 } from './DashboardChartData';
-import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
+import type {
+  DashboardTopMeal,
+  DashboardFamilyMember,
+} from '@/src/app/(app)/dashboard/dashboard.types';
+
+const CaloriesStackedBarChart = dynamic(
+  () =>
+    import('./CaloriesStackedBarChart').then((m) => m.CaloriesStackedBarChart),
+  {
+    ssr: false,
+    loading: () => <DashboardChartSkeleton minHeight={320} />,
+  },
+);
+
+const VitaminsAreaChart = dynamic(
+  () => import('./VitaminsAreaChart').then((m) => m.VitaminsAreaChart),
+  { ssr: false, loading: () => <DashboardChartSkeleton minHeight={280} /> },
+);
+
+const MineralsAreaChart = dynamic(
+  () => import('./MineralsAreaChart').then((m) => m.MineralsAreaChart),
+  { ssr: false, loading: () => <DashboardChartSkeleton minHeight={280} /> },
+);
+
+const SupplementsBarChart = dynamic(
+  () => import('./SupplementsBarChart').then((m) => m.SupplementsBarChart),
+  { ssr: false, loading: () => <DashboardChartSkeleton minHeight={280} /> },
+);
+
+const TopMealsWidget = dynamic(
+  () => import('./top-meals-widget').then((m) => m.TopMealsWidget),
+  {
+    ssr: false,
+    loading: () => <DashboardChartSkeleton minHeight={240} />,
+  },
+);
 
 type Props = {
-  members: FamilyMember[];
-  topMeals: CustomMealRecord[];
+  members: DashboardFamilyMember[];
+  topMeals: DashboardTopMeal[];
 };
 
 export function DashboardClient({ members, topMeals }: Props) {

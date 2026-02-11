@@ -334,6 +334,11 @@ export async function saveOnboardingAction(
     };
   }
 
+  // 3) user_metadata: so middleware can read onboarding status without DB call
+  supabase.auth
+    .updateUser({ data: { onboarding_completed: true } })
+    .catch(() => {});
+
   revalidatePath('/onboarding');
   revalidatePath('/account');
   revalidatePath('/familie');

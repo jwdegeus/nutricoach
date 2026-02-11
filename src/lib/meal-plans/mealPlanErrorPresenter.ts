@@ -194,8 +194,11 @@ const MEAL_PLAN_ERROR_MAP: Record<
   },
 };
 
+const MAX_INBOX_MESSAGE_CHARS = 1500;
+
 /**
- * Build an actionable inbox message (max 500 chars) for failed meal plan generation.
+ * Build an actionable inbox message for failed meal plan generation.
+ * Geeft exacte instructies: wat je moet doen om het de volgende keer wel te laten lukken.
  * Used when creating user_inbox_notifications.
  */
 export function buildActionableInboxMessage(
@@ -216,7 +219,7 @@ export function buildActionableInboxMessage(
     ) {
       const need = targets.unique_veg_min - (d.uniqueVegCount as number);
       tasks.push(
-        `Voeg minstens ${need} recept(en) met groenten toe (je hebt ${d.uniqueVegCount}, minimaal ${targets.unique_veg_min})`,
+        `Voeg minstens ${need} recept(en) met groenten toe om aan de variatie te voldoen (je hebt nu ${d.uniqueVegCount} unieke groenten, minimaal ${targets.unique_veg_min}). Kies gevarieerde groenten (bijv. kool, ui, broccoli, paprika) voor betere spreiding.`,
       );
     }
     if (
@@ -226,7 +229,7 @@ export function buildActionableInboxMessage(
     ) {
       const need = targets.unique_fruit_min - (d.uniqueFruitCount as number);
       tasks.push(
-        `Voeg minstens ${need} recept(en) met fruit toe (je hebt ${d.uniqueFruitCount}, minimaal ${targets.unique_fruit_min})`,
+        `Voeg minstens ${need} recept(en) met fruit toe (je hebt nu ${d.uniqueFruitCount} unieke fruitsoorten, minimaal ${targets.unique_fruit_min})`,
       );
     }
     if (
@@ -235,29 +238,31 @@ export function buildActionableInboxMessage(
       targets?.protein_rotation_min_categories != null
     ) {
       tasks.push(
-        `Voeg meer eiwitcategorieën toe (je hebt ${d.proteinUniqueCount}, minimaal ${targets.protein_rotation_min_categories})`,
+        `Voeg meer recepten toe met verschillende eiwitbronnen – nu ${d.proteinUniqueCount} categorieën, minimaal ${targets.protein_rotation_min_categories} (bijv. vis, vlees, peulvruchten, ei)`,
       );
     }
     if (meets?.meetsRepeatWindow === false) {
       const max = targets?.max_repeat_same_recipe_within_days ?? 3;
       tasks.push(
-        `Verminder herhaling: max ${max}× hetzelfde recept per week. Voeg meer gevarieerde recepten toe.`,
+        `Te veel herhaling: max ${max}× hetzelfde recept per week. Voeg meer gevarieerde recepten toe zodat het systeem alternatieven heeft.`,
       );
     }
     if (tasks.length > 0) {
-      parts.push('', 'Taken:');
+      parts.push('', 'Wat je moet doen:');
       tasks.forEach((t, i) => parts.push(`${i + 1}. ${t}`));
       parts.push(
         '',
-        'Recepten moeten: ontbijt/lunch/diner zijn, ingrediënten met NEVO-koppeling hebben. Pas eventueel variatie-instellingen aan in beheer (admin).',
+        'Belangrijk: recepten moeten een maaltijdtype (ontbijt/lunch/diner) hebben en ingrediënten met NEVO-koppeling. Pas eventueel de variatie-instellingen aan in beheer (admin).',
       );
     }
   } else if (userActionHints.length > 0) {
-    parts.push('', ...userActionHints);
+    parts.push('', 'Wat je kunt doen:', ...userActionHints);
   }
 
   const text = parts.join('\n').trim();
-  return text.length > 500 ? text.slice(0, 497) + '…' : text;
+  return text.length > MAX_INBOX_MESSAGE_CHARS
+    ? text.slice(0, MAX_INBOX_MESSAGE_CHARS - 3) + '…'
+    : text;
 }
 
 /**

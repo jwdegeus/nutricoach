@@ -37,6 +37,8 @@ import {
   PhotoIcon,
   StarIcon,
   Squares2X2Icon,
+  ShieldCheckIcon,
+  WrenchScrewdriverIcon,
 } from '@heroicons/react/20/solid';
 import { BookmarkIcon as BookmarkIconSolid } from '@heroicons/react/16/solid';
 import { BookmarkIcon as BookmarkIconOutline } from '@heroicons/react/24/outline';
@@ -256,6 +258,9 @@ export function RecipesIndexClient({
   const [filterNevoMissingOnly, setFilterNevoMissingOnly] = useState(
     () => getParam(searchParams, 'filter') === 'nevo-missing',
   );
+  const [filterNotWeekMenuReady, setFilterNotWeekMenuReady] = useState(
+    () => getParam(searchParams, 'filter') === 'not-weekmenu-ready',
+  );
 
   const [extraItems, setExtraItems] = useState<MealListItem[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -266,11 +271,11 @@ export function RecipesIndexClient({
     setExtraItems([]);
   }, [listResult]);
 
-  // Deep link: /recipes?filter=nevo-missing → turn NEVO filter on when URL has it
+  // Deep link: /recipes?filter=nevo-missing|not-weekmenu-ready
   useEffect(() => {
-    if (getParam(searchParams, 'filter') === 'nevo-missing') {
-      setFilterNevoMissingOnly(true);
-    }
+    const filter = getParam(searchParams, 'filter');
+    if (filter === 'nevo-missing') setFilterNevoMissingOnly(true);
+    if (filter === 'not-weekmenu-ready') setFilterNotWeekMenuReady(true);
   }, [searchParams]);
 
   const collectionParam = getParam(searchParams, 'collection');
@@ -540,13 +545,19 @@ export function RecipesIndexClient({
   }, [listResult.items, extraItems]);
 
   const filteredItems = useMemo(() => {
-    if (!filterNevoMissingOnly) return items;
-    return items.filter(
-      (i) =>
-        i.weekMenuStatus === 'blocked_refs' ||
-        i.weekMenuStatus === 'blocked_both',
-    );
-  }, [items, filterNevoMissingOnly]);
+    let result = items;
+    if (filterNevoMissingOnly) {
+      result = result.filter(
+        (i) =>
+          i.weekMenuStatus === 'blocked_refs' ||
+          i.weekMenuStatus === 'blocked_both',
+      );
+    }
+    if (filterNotWeekMenuReady) {
+      result = result.filter((i) => i.weekMenuStatus !== 'ready');
+    }
+    return result;
+  }, [items, filterNevoMissingOnly, filterNotWeekMenuReady]);
 
   const selectableIds = useMemo(
     () =>
@@ -1066,9 +1077,10 @@ export function RecipesIndexClient({
               setBulkSelectMode(true);
               setBulkError(null);
             }}
+            title="Selecteer meerdere recepten om bulk te wijzigen (soort)"
           >
             <Squares2X2Icon className="h-4 w-4" />
-            Selecteer
+            Bulk selectie
           </Button>
           <label className="flex cursor-pointer items-center gap-2">
             <Switch
@@ -1077,6 +1089,15 @@ export function RecipesIndexClient({
             />
             <span className="text-sm text-foreground">
               Toon alleen: NEVO ontbreekt
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-center gap-2">
+            <Switch
+              checked={filterNotWeekMenuReady}
+              onChange={setFilterNotWeekMenuReady}
+            />
+            <span className="text-sm text-foreground">
+              Toon alleen: niet weekmenu-klaar
             </span>
           </label>
         </div>
@@ -1161,15 +1182,25 @@ export function RecipesIndexClient({
           <Text className="text-zinc-600 dark:text-zinc-400">
             {filterNevoMissingOnly
               ? 'Geen recepten met ontbrekende NEVO-koppelingen.'
-              : 'Geen recepten gevonden.'}
+              : filterNotWeekMenuReady
+                ? 'Geen recepten die nog niet weekmenu-klaar zijn.'
+                : 'Geen recepten gevonden.'}
           </Text>
-          {hasAnyFilter && !filterNevoMissingOnly && (
-            <Button outline onClick={clearFilters}>
-              Wis filters
-            </Button>
-          )}
-          {filterNevoMissingOnly && (
-            <Button plain onClick={() => setFilterNevoMissingOnly(false)}>
+          {hasAnyFilter &&
+            !filterNevoMissingOnly &&
+            !filterNotWeekMenuReady && (
+              <Button outline onClick={clearFilters}>
+                Wis filters
+              </Button>
+            )}
+          {(filterNevoMissingOnly || filterNotWeekMenuReady) && (
+            <Button
+              plain
+              onClick={() => {
+                setFilterNevoMissingOnly(false);
+                setFilterNotWeekMenuReady(false);
+              }}
+            >
               Toon alle recepten
             </Button>
           )}
@@ -1180,7 +1211,9 @@ export function RecipesIndexClient({
             <Text className="text-sm text-zinc-500 dark:text-zinc-400">
               {filterNevoMissingOnly
                 ? `${filteredItems.length} recepten (NEVO ontbreekt)`
-                : `${totalCount} recepten`}
+                : filterNotWeekMenuReady
+                  ? `${filteredItems.length} recepten (niet weekmenu-klaar)`
+                  : `${totalCount} recepten`}
             </Text>
           )}
           <ul className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-8 2xl:grid-cols-6">
@@ -1720,13 +1753,32 @@ function MealCard({
               {item.title || 'Zonder titel'}
             </h3>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              {item.weekMenuStatus && (
-                <Badge
-                  color={item.weekMenuStatus === 'ready' ? 'green' : 'amber'}
-                  className="text-xs"
-                  title={weekMenuStatusTitle(item.weekMenuStatus)}
+              {item.weekMenuStatus === 'ready' && (
+                <span
+                  title="Weekmenu-klaar"
+                  className="inline-flex shrink-0 text-green-600 dark:text-green-400"
+                  aria-label="Weekmenu-klaar"
                 >
-                  {weekMenuStatusLabel(item.weekMenuStatus)}
+                  <ShieldCheckIcon className="h-4 w-4" />
+                </span>
+              )}
+              {(item.weekMenuStatus === 'blocked_refs' ||
+                item.weekMenuStatus === 'blocked_both') && (
+                <span
+                  title="Ingrediëntkoppelingen ontbreken"
+                  className="inline-flex shrink-0 text-amber-600 dark:text-amber-400"
+                  aria-label="Ingrediëntkoppelingen ontbreken"
+                >
+                  <WrenchScrewdriverIcon className="h-4 w-4" />
+                </span>
+              )}
+              {item.weekMenuStatus === 'blocked_slot' && (
+                <Badge
+                  color="amber"
+                  className="text-xs"
+                  title={weekMenuStatusTitle('blocked_slot')}
+                >
+                  {weekMenuStatusLabel('blocked_slot')}
                 </Badge>
               )}
               {item.mealSlot && (

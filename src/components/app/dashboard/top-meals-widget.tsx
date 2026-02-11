@@ -1,10 +1,10 @@
 'use client';
 
-import type { CustomMealRecord } from '@/src/lib/custom-meals/customMeals.service';
 import { ChartBarIcon } from '@heroicons/react/20/solid';
+import type { DashboardTopMeal } from '@/src/app/(app)/dashboard/dashboard.types';
 
 type TopMealsWidgetProps = {
-  initialMeals: CustomMealRecord[];
+  initialMeals: DashboardTopMeal[];
 };
 
 export function TopMealsWidget({ initialMeals }: TopMealsWidgetProps) {

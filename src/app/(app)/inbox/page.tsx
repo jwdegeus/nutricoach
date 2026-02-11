@@ -25,10 +25,10 @@ export default async function InboxPage() {
 
   if (!result.ok) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="space-y-6">
         <Heading level={1}>Inbox</Heading>
         <div
-          className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200"
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200"
           role="alert"
         >
           <Text className="font-medium">Fout</Text>
@@ -39,16 +39,14 @@ export default async function InboxPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="space-y-4">
-        <div>
-          <Heading level={1}>Inbox</Heading>
-          <Text className="mt-2 text-muted-foreground">
-            Notificaties over mislukte generaties en andere meldingen
-          </Text>
-        </div>
-        <InboxListClient initialNotifications={result.data} />
+    <div className="space-y-6">
+      <div>
+        <Heading level={1}>Inbox</Heading>
+        <Text className="mt-2 text-muted-foreground">
+          Notificaties over mislukte generaties en andere meldingen
+        </Text>
       </div>
+      <InboxListClient initialNotifications={result.data} />
     </div>
   );
 }

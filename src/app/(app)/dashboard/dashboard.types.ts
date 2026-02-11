@@ -1,3 +1,27 @@
+import type { MealSlot } from '@/src/lib/diets';
+
+/**
+ * Minimal types for dashboard hot-path data (used by loader + DashboardClient)
+ */
+
+export type DashboardTopMeal = {
+  id: string;
+  name: string;
+  mealSlot: MealSlot;
+  consumptionCount: number;
+};
+
+export type DashboardFamilyMember = {
+  id: string;
+  name: string;
+  is_self: boolean;
+};
+
+export type DashboardPageData = {
+  topMeals: DashboardTopMeal[];
+  members: DashboardFamilyMember[];
+};
+
 /**
  * Raw data types - as they come from the database/API
  */

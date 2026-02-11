@@ -29,7 +29,7 @@ const detailsSchema = z
 const createInboxNotificationInputSchema = z.object({
   type: z.string().min(1).max(64),
   title: z.string().min(1).max(120),
-  message: z.string().min(1).max(500),
+  message: z.string().min(1).max(2000),
   details: detailsSchema,
 });
 

@@ -1,5 +1,29 @@
 import { createServerClient } from '@supabase/ssr';
-import { type NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
+
+function readOnboardingFromMetadata(user: {
+  user_metadata?: Record<string, unknown>;
+}): boolean | null {
+  const v = user.user_metadata?.onboarding_completed;
+  if (v === true) return true;
+  if (v === false) return false;
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  return null;
+}
+
+async function getOnboardingCompleted(
+  supabase: ReturnType<typeof createServerClient>,
+  userId: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('user_preferences')
+    .select('onboarding_completed')
+    .eq('user_id', userId)
+    .maybeSingle();
+  return data?.onboarding_completed ?? false;
+}
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -53,7 +77,8 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh session if expired - required for Server Components
-  let user: { id: string } | null = null;
+  let user: { id: string; user_metadata?: Record<string, unknown> } | null =
+    null;
   try {
     const { data } = await supabase.auth.getUser();
     user = data.user;
@@ -93,39 +118,35 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // If user is authenticated and trying to access auth pages, check onboarding first
+  // Authenticated user on auth pages: redirect to dashboard (no preferences query)
   if (user && isPublicRoute && pathname !== '/auth/callback') {
-    // Check onboarding status before redirecting
-    const { data: preferences } = await supabase
-      .from('user_preferences')
-      .select('onboarding_completed')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    // Redirect to onboarding if not completed, otherwise to dashboard
-    const redirectPath = preferences?.onboarding_completed
-      ? '/dashboard'
-      : '/onboarding';
-    return NextResponse.redirect(new URL(redirectPath, request.url));
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  // Onboarding gating: check if user has completed onboarding
-  // Only apply to (app) routes, not to onboarding page itself or auth routes
+  // Onboarding gating: metadata-first, DB fallback, write-back on fallback
   if (
     user &&
     !isPublicRoute &&
     pathname !== '/' &&
     !pathname.startsWith('/onboarding')
   ) {
-    // Lightweight check: only fetch onboarding_completed flag
-    const { data: preferences } = await supabase
-      .from('user_preferences')
-      .select('onboarding_completed')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    // If onboarding is not completed, redirect to onboarding
-    if (!preferences?.onboarding_completed) {
+    let onboardingCompleted: boolean;
+    const fromMeta = readOnboardingFromMetadata(user);
+    if (fromMeta !== null) {
+      onboardingCompleted = fromMeta;
+    } else {
+      onboardingCompleted = await getOnboardingCompleted(supabase, user.id);
+      // Write back to metadata so next request is DB-free (best-effort)
+      supabase.auth
+        .updateUser({
+          data: {
+            ...user.user_metadata,
+            onboarding_completed: onboardingCompleted,
+          },
+        })
+        .catch(() => {});
+    }
+    if (!onboardingCompleted) {
       return NextResponse.redirect(new URL('/onboarding', request.url));
     }
   }

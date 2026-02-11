@@ -1,9 +1,16 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { ThemeProvider } from '@/src/components/theme-provider';
 import { getLocale, getMessages, getTimeZone } from 'next-intl/server';
 import { I18nProvider } from '@/src/components/i18n-provider';
 import './globals.css';
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+});
 
 export const metadata: Metadata = {
   title: {
@@ -26,11 +33,9 @@ export default async function RootLayout({
     <html
       lang={locale}
       suppressHydrationWarning
-      className="bg-background text-foreground antialiased"
+      className={`${inter.variable} ${inter.className} bg-background text-foreground antialiased`}
     >
       <head>
-        <link rel="preconnect" href="https://rsms.me/" />
-        <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
         <script
           dangerouslySetInnerHTML={{
             __html: `

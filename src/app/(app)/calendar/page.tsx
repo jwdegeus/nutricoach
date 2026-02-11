@@ -7,7 +7,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/src/lib/supabase/server';
 import { MealPlansService } from '@/src/lib/meal-plans/mealPlans.service';
-import { CalendarView } from './components/CalendarView';
+import { CalendarViewDynamic } from './components/CalendarViewDynamic';
 
 export default async function CalendarPage() {
   const supabase = await createClient();
@@ -35,7 +35,7 @@ export default async function CalendarPage() {
         </p>
       </div>
 
-      <CalendarView plans={plans} />
+      <CalendarViewDynamic plans={plans} />
     </div>
   );
 }

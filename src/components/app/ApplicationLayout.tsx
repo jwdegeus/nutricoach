@@ -66,8 +66,13 @@ function InboxNavbarItem({ t }: { t: (key: string) => string }) {
       if (result.ok) setUnreadCount(result.data);
     };
     load();
+    const onInboxUpdated = () => void load();
+    window.addEventListener('inbox-updated', onInboxUpdated);
     const intervalId = setInterval(load, 30000);
-    return () => clearInterval(intervalId);
+    return () => {
+      window.removeEventListener('inbox-updated', onInboxUpdated);
+      clearInterval(intervalId);
+    };
   }, []);
 
   return (
@@ -94,8 +99,13 @@ function InboxSidebarItem({ t }: { t: (key: string) => string }) {
       if (result.ok) setUnreadCount(result.data);
     };
     load();
-    const intervalId = setInterval(load, 30000); // Refresh every 30s
-    return () => clearInterval(intervalId);
+    const onInboxUpdated = () => void load();
+    window.addEventListener('inbox-updated', onInboxUpdated);
+    const intervalId = setInterval(load, 30000);
+    return () => {
+      window.removeEventListener('inbox-updated', onInboxUpdated);
+      clearInterval(intervalId);
+    };
   }, []);
 
   return (
