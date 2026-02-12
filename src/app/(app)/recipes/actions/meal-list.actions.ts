@@ -12,6 +12,7 @@ const MEAL_SLOT_VALUES = [
 ] as const;
 export type MealSlotValue = (typeof MEAL_SLOT_VALUES)[number];
 
+import { getNormalizedVariantsForMatchLookup } from '../utils/ingredient-match-lookup';
 import {
   computeWeekMenuStatus,
   effectiveWeekmenuSlots,
@@ -432,6 +433,22 @@ export async function listMealsAction(
       }
 
       const fromMealData = new Set<string>();
+      const isLinked = (ref: unknown): boolean => {
+        if (ref == null || typeof ref !== 'object') return false;
+        const r = ref as Record<string, unknown>;
+        return (
+          r.nevoCode != null ||
+          r.nevo_code != null ||
+          r.nevo_food_id != null ||
+          r.customFoodId != null ||
+          r.custom_food_id != null ||
+          r.fdcId != null ||
+          r.fdc_id != null
+        );
+      };
+
+      // Verzamel genormaliseerde ingrediëntnamen voor null-ref slots (voor batch lookup recipe_ingredient_matches)
+      const normsToLookup = new Set<string>();
       for (const row of mealDataRes.data ?? []) {
         const r = row as { id: string; meal_data: unknown };
         const mealData = (r.meal_data as Record<string, unknown> | null) ?? {};
@@ -439,23 +456,79 @@ export async function listMealsAction(
           ? (mealData.ingredientRefs as Record<string, unknown>[])
           : [];
         const ingredients = Array.isArray(mealData.ingredients)
-          ? (mealData.ingredients as unknown[])
+          ? (mealData.ingredients as Array<{
+              name?: string;
+              original_line?: string;
+            }>)
+          : [];
+        for (let i = 0; i < ingredients.length; i++) {
+          if (!isLinked(refs[i])) {
+            const ing = ingredients[i];
+            for (const norm of getNormalizedVariantsForMatchLookup(ing ?? {})) {
+              normsToLookup.add(norm);
+            }
+          }
+        }
+      }
+
+      const matchSet = new Set<string>();
+      if (normsToLookup.size > 0) {
+        const { data: matchRows } = await supabase
+          .from('recipe_ingredient_matches')
+          .select('normalized_text, nevo_code, custom_food_id, fdc_id')
+          .in('normalized_text', [...normsToLookup])
+          .or(
+            'nevo_code.not.is.null,custom_food_id.not.is.null,fdc_id.not.is.null',
+          );
+        for (const row of matchRows ?? []) {
+          const r = row as {
+            normalized_text: string;
+            nevo_code: number | null;
+            custom_food_id: string | null;
+            fdc_id: number | null;
+          };
+          if (
+            r.nevo_code != null ||
+            r.custom_food_id != null ||
+            r.fdc_id != null
+          ) {
+            matchSet.add(String(r.normalized_text ?? '').trim());
+          }
+        }
+      }
+
+      for (const row of mealDataRes.data ?? []) {
+        const r = row as { id: string; meal_data: unknown };
+        const mealData = (r.meal_data as Record<string, unknown> | null) ?? {};
+        const refs = Array.isArray(mealData.ingredientRefs)
+          ? (mealData.ingredientRefs as Record<string, unknown>[])
+          : [];
+        const ingredients = Array.isArray(mealData.ingredients)
+          ? (mealData.ingredients as Array<{
+              name?: string;
+              original_line?: string;
+            }>)
           : [];
         const total = Math.max(refs.length, ingredients.length) || refs.length;
-        const linked = refs.filter(
-          (ref) =>
-            ref != null &&
-            typeof ref === 'object' &&
-            (ref.nevoCode != null ||
-              ref.customFoodId != null ||
-              (ref as Record<string, unknown>).custom_food_id != null ||
-              ref.fdcId != null ||
-              (ref as Record<string, unknown>).fdc_id != null),
-        ).length;
+        let linked = refs.filter(isLinked).length;
+        for (let i = 0; i < ingredients.length; i++) {
+          if (!isLinked(refs[i])) {
+            const ing = ingredients[i];
+            const variants = getNormalizedVariantsForMatchLookup(ing ?? {});
+            if (variants.some((v) => matchSet.has(v))) linked += 1;
+          }
+        }
         const hasAnyRef = linked > 0;
         if (hasAnyRef) fromMealData.add(r.id);
+        const existing = ingredientLinkByRecipe.get(r.id);
         if (total > 0) {
-          ingredientLinkByRecipe.set(r.id, { linked, total });
+          if (
+            existing == null ||
+            existing.total === 0 ||
+            linked > (existing?.linked ?? 0)
+          ) {
+            ingredientLinkByRecipe.set(r.id, { linked, total });
+          }
         }
       }
 

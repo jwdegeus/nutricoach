@@ -1696,8 +1696,44 @@ export class RecipeAdaptationService {
               .includes(v.ingredientName.toLowerCase()) ||
             v.ruleCode === match.ruleCode,
         );
+        // Als het ingrediënt handmatig al vervangen is door een voorgesteld alternatief,
+        // toon geen step-violation: gebruiker heeft het probleem in de ingrediëntenlijst opgelost
+        const substitutes = [
+          ...(match.substitutionSuggestions ?? []),
+          ...(match.allowedAlternativeInText
+            ? match.allowedAlternativeInText
+                .split(/\s+of\s+|\s*,\s*/)
+                .map((s) => s.trim())
+                .filter(Boolean)
+            : []),
+        ];
+        const substituteVariants = new Set<string>();
+        for (const s of substitutes) {
+          const t = s.toLowerCase().trim();
+          if (t) substituteVariants.add(t);
+          if (t.includes('coconut aminos'))
+            substituteVariants.add('kokos aminos');
+          if (t.includes('kokos aminos'))
+            substituteVariants.add('coconut aminos');
+          if (t.includes('sea salt')) substituteVariants.add('zeezout');
+          if (t.includes('zeezout')) substituteVariants.add('sea salt');
+        }
+        const ingredientNamesForSubstituteCheck = [
+          ...ingredients.map((ing: Record<string, unknown>) =>
+            String(
+              ing?.displayName ?? ing?.name ?? ing?.original_line ?? '',
+            ).toLowerCase(),
+          ),
+        ];
+        const substituteAlreadyInRecipe = [...substituteVariants].some(
+          (sub) => {
+            return ingredientNamesForSubstituteCheck.some(
+              (n) => n.includes(sub) || sub.includes(n),
+            );
+          },
+        );
 
-        if (!alreadyFound) {
+        if (!alreadyFound && !substituteAlreadyInRecipe) {
           // For sugar heuristics, add as violation
           if (match.ruleCode === 'LOW_SUGAR') {
             violations.push({
@@ -1852,6 +1888,13 @@ export class RecipeAdaptationService {
                 rule.substitutionSuggestions[0],
               );
             }
+          }
+        } else {
+          // Geen substitutie → voeg toe aan removeTerms zodat verboden termen
+          // uit stappen worden gehaald (bijv. paprika zonder vervanging)
+          removeTerms.add(rule.term.toLowerCase());
+          for (const syn of rule.synonyms || []) {
+            removeTerms.add(syn.toLowerCase());
           }
         }
       }
@@ -2103,10 +2146,11 @@ export class RecipeAdaptationService {
 
       for (const term of removeTermsSorted) {
         const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex =
-          term.length <= 6
-            ? new RegExp(`\\b${escaped}\\b`, 'gi')
-            : new RegExp(escaped, 'gi');
+        // Voor korte termen: word boundary + optionele possessief/meervoud ('s of s)
+        // zodat "paprika's" en "groene paprika's" volledig worden vervangen
+        const basePattern =
+          term.length <= 8 ? `\\b${escaped}('s|s)?\\b` : `\\b${escaped}\\b`;
+        const regex = new RegExp(basePattern, 'gi');
         rewrittenText = rewrittenText.replace(regex, '(weglaten)');
       }
 

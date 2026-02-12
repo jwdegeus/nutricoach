@@ -101,7 +101,7 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
         },
         {
           label: 'Totaal gebruik',
-          value: stats.recipeSources.totalUsage.toLocaleString(),
+          value: stats.recipeSources.totalUsage.toLocaleString('nl-NL'),
         },
       ],
     },
@@ -167,11 +167,11 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
       stats: [
         {
           label: 'NEVO',
-          value: stats.ingredients.nevo.toLocaleString(),
+          value: stats.ingredients.nevo.toLocaleString('nl-NL'),
         },
         {
           label: 'FNDDS',
-          value: stats.ingredients.fndds.toLocaleString(),
+          value: stats.ingredients.fndds.toLocaleString('nl-NL'),
         },
         {
           label: 'Eigen ingrediënten',
@@ -349,7 +349,7 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
               {t('totalRecipeUsage')}
             </dt>
             <dd className="mt-1 text-2xl font-semibold text-zinc-950 dark:text-white">
-              {stats.recipeSources.totalUsage.toLocaleString()}
+              {stats.recipeSources.totalUsage.toLocaleString('nl-NL')}
             </dd>
           </div>
         </dl>

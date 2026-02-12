@@ -81,6 +81,13 @@ const EXTRA_INGREDIENT_SYNONYMS: Record<string, string[]> = {
     'gerookte paprikapoeder',
     'zoete paprikapoeder',
     'sweet paprika',
+    'groene paprika',
+    'rode paprika',
+    'gele paprika',
+    "paprika's",
+    'paprikas',
+    'bell pepper',
+    'bell peppers',
   ],
   tomaat: ['cherrytomaat', 'cherrytomaatjes', 'tomaatjes', 'tomaten'],
   soja: ['sojasaus', 'tamari', 'ketjap', 'sojabonen'],
@@ -148,7 +155,18 @@ const SUBSTRING_FALSE_POSITIVE_IF_CONTAINS: Record<string, string | string[]> =
       'bloem kool',
     ],
     // "ei" in "rijpe" (ripe), "romeinse" (Romaine), "avocado" = geen eieren
-    ei: ['romeinse', 'romaine', 'rijpe', 'rijp', 'avocado'],
+    // "ei" in "kleine" (small) = "1/2 kleine wortel" (carrot), "kleine ui" = groente, geen eieren
+    // "ei" in "wortel" niet direct, maar "kleine wortel" matcht via "kleine"
+    ei: [
+      'romeinse',
+      'romaine',
+      'rijpe',
+      'rijp',
+      'avocado',
+      'kleine',
+      'wortel',
+      'weinig',
+    ],
     // "ijs" in "ijsblokjes" = ijsblokjes (ice cubes), geen zuivel; "ijs" in "radijs" = radijs (radish)
     ijs: ['radijs', 'ijsblokjes', 'ijsblokje'],
     oca: 'avocado',

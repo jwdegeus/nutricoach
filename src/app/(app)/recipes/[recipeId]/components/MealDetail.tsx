@@ -66,6 +66,7 @@ import {
   type RecipeNutritionSummary,
   type ResolvedIngredientMatch,
 } from '../actions/ingredient-matching.actions';
+import { buildLineOptionsFromIngredients } from '../utils/ingredient-line-options';
 import { AutoLinkReviewDialog } from './AutoLinkReviewDialog';
 import { quantityUnitToGrams } from '@/src/lib/recipes/quantity-unit-to-grams';
 import {
@@ -184,6 +185,8 @@ type MealDetailProps = {
   customFoodNamesById?: Record<string, string>;
   /** Compliance score 0–100% volgens dieetregels */
   complianceScore?: RecipeComplianceResult | null;
+  /** Server-prefetched matches (recipe_ingredient_matches) – voorkomt extra round-trip bij laden */
+  initialResolvedLegacyMatches?: (ResolvedIngredientMatch | null)[] | null;
   /** Wordt aangeroepen nadat AI Magician een aangepaste versie heeft toegepast, zodat de pagina kan verversen */
   onRecipeApplied?: () => void;
   /** Wordt aangeroepen na o.a. classificatie-opslag; stille refresh zonder loading-spinner of paginareload */
@@ -211,6 +214,7 @@ export function MealDetail({
   nevoFoodNamesByCode,
   customFoodNamesById = {},
   complianceScore,
+  initialResolvedLegacyMatches,
   onRecipeApplied,
   onRecipeAppliedSilent,
   onIngredientMatched,
@@ -277,7 +281,7 @@ export function MealDetail({
   /** Opgeslagen matches voor legacy-ingrediënten (uit recipe_ingredient_matches); null = nog niet geladen */
   const [resolvedLegacyMatches, setResolvedLegacyMatches] = useState<
     (ResolvedIngredientMatch | null)[] | null
-  >(null);
+  >(initialResolvedLegacyMatches ?? null);
   /** Een ingrediëntmatch wordt opgeslagen; voorkomt gelijktijdige updates */
   const [savingIngredientMatch, setSavingIngredientMatch] = useState(false);
   /** Notification na verwijderen ingrediënt (toast) */
@@ -872,28 +876,8 @@ export function MealDetail({
       return;
     }
     const ingredients = displayMealData.ingredients as MealIngredientLike[];
-    const lineOptionsPerIngredient = ingredients.map(
-      (ing: MealIngredientLike) => {
-        const name = ing.name || ing.original_line || '';
-        const qty = ing.quantity ?? ing.amount;
-        const numQty =
-          typeof qty === 'number'
-            ? qty
-            : typeof qty === 'string'
-              ? parseFloat(qty)
-              : undefined;
-        const unit = (ing.unit ?? 'g')?.toString().trim() || 'g';
-        const options: string[] = [];
-        if (ing.original_line?.trim()) options.push(ing.original_line.trim());
-        if (name.trim() && numQty != null && unit) {
-          const fullLine = `${name.trim()} ${numQty} ${unit}`.trim();
-          if (!options.includes(fullLine)) options.push(fullLine);
-        }
-        if (name.trim() && !options.includes(name.trim()))
-          options.push(name.trim());
-        return options.length > 0 ? options : [name || ''];
-      },
-    );
+    const lineOptionsPerIngredient =
+      buildLineOptionsFromIngredients(ingredients);
     if (lineOptionsPerIngredient.every((opts) => opts.length === 0)) {
       queueMicrotask(() => setResolvedLegacyMatches(null));
       return;
@@ -922,29 +906,8 @@ export function MealDetail({
         | MealIngredientLike[]
         | undefined;
       if (ingredients?.length) {
-        const lineOptionsPerIngredient = ingredients.map(
-          (ing: MealIngredientLike) => {
-            const name = ing.name || ing.original_line || '';
-            const qty = ing.quantity ?? ing.amount;
-            const numQty =
-              typeof qty === 'number'
-                ? qty
-                : typeof qty === 'string'
-                  ? parseFloat(qty)
-                  : undefined;
-            const unit = (ing.unit ?? 'g')?.toString().trim() || 'g';
-            const options: string[] = [];
-            if (ing.original_line?.trim())
-              options.push(ing.original_line.trim());
-            if (name.trim() && numQty != null && unit) {
-              const fullLine = `${name.trim()} ${numQty} ${unit}`.trim();
-              if (!options.includes(fullLine)) options.push(fullLine);
-            }
-            if (name.trim() && !options.includes(name.trim()))
-              options.push(name.trim());
-            return options.length > 0 ? options : [name || ''];
-          },
-        );
+        const lineOptionsPerIngredient =
+          buildLineOptionsFromIngredients(ingredients);
         getResolvedIngredientMatchesAction(lineOptionsPerIngredient).then(
           (r) => {
             if (r.ok) setResolvedLegacyMatches(r.data);
@@ -1936,6 +1899,10 @@ export function MealDetail({
                                               resolvedLegacyMatches?.[idx] ??
                                               null
                                             }
+                                            isResolvingMatch={
+                                              hasLegacyIngredients &&
+                                              resolvedLegacyMatches === null
+                                            }
                                             originalIngredientDescription={
                                               ing.name ||
                                               ing.original_line ||
@@ -2197,6 +2164,10 @@ export function MealDetail({
                                                 resolvedLegacyMatches?.[idx] ??
                                                 null
                                               }
+                                              isResolvingMatch={
+                                                hasLegacyIngredients &&
+                                                resolvedLegacyMatches === null
+                                              }
                                               mealId={mealId}
                                               mealSource={mealSource}
                                               ingredientIndex={idx}
@@ -2345,6 +2316,10 @@ export function MealDetail({
                                               match={
                                                 resolvedLegacyMatches?.[idx] ??
                                                 null
+                                              }
+                                              isResolvingMatch={
+                                                hasLegacyIngredients &&
+                                                resolvedLegacyMatches === null
                                               }
                                               originalIngredientDescription={
                                                 ing.name ||

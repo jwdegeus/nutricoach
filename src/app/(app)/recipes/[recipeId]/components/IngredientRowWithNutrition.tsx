@@ -72,6 +72,8 @@ type IngredientRowWithNutritionProps = {
   note?: string;
   /** Match met database (NEVO, custom of FNDDS). Bij null toont dropdown "Nog niet gematcht" + suggesties */
   match: Match | null;
+  /** Bij true: match wordt nog geladen (recipe_ingredient_matches) — geen waarschuwing tonen */
+  isResolvingMatch?: boolean;
   /** Originele ingrediëntomschrijving vóór koppeling (voor weergave in edit-dialog) */
   originalIngredientDescription?: string;
   /** Voor legacy-ingrediënten: mealId om ref op te slaan */
@@ -105,6 +107,7 @@ function _formatNutri(value: number | null | undefined, unit: string): string {
 
 export function IngredientRowWithNutrition({
   displayName,
+  isResolvingMatch = false,
   amountG,
   quantityLabel,
   quantity,
@@ -594,7 +597,7 @@ export function IngredientRowWithNutrition({
     <div className="group -mx-1 flex w-full items-center gap-1 rounded-lg px-1">
       <div className="min-w-0 flex-1 rounded-lg px-2 py-1.5">
         <div className="text-sm">
-          {!match && (
+          {!match && !isResolvingMatch && (
             <ExclamationTriangleIcon
               className="mr-1.5 inline-block h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400"
               aria-hidden

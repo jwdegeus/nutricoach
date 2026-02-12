@@ -12,6 +12,7 @@ import {
   getCustomFoodNamesByIdsAction,
   getNevoFoodNamesByCodesAction,
   type OptimisticMatchPayload,
+  type ResolvedIngredientMatch,
 } from '../actions/ingredient-matching.actions';
 import type { RecipeComplianceResult } from '../../actions/recipe-compliance.actions';
 import { useToast } from '@/src/components/app/ToastContext';
@@ -19,6 +20,8 @@ import { useToast } from '@/src/components/app/ToastContext';
 type RecipeDetailPageClientProps = {
   mealId: string;
   mealSource: 'custom' | 'gemini';
+  initialMeal?: Record<string, unknown> | null;
+  initialResolvedLegacyMatches?: (ResolvedIngredientMatch | null)[] | null;
 };
 
 type WeekMenuStatus =
@@ -30,13 +33,17 @@ type WeekMenuStatus =
 export function RecipeDetailPageClient({
   mealId,
   mealSource,
+  initialMeal,
+  initialResolvedLegacyMatches,
 }: RecipeDetailPageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
   const tCommon = useTranslations('common');
   const tNav = useTranslations('nav');
   const { showToast } = useToast();
-  const [meal, setMeal] = useState<Record<string, unknown> | null>(null);
+  const [meal, setMeal] = useState<Record<string, unknown> | null>(
+    initialMeal ?? null,
+  );
   const [nevoFoodNamesByCode, setNevoFoodNamesByCode] = useState<
     Record<string, string>
   >({});
@@ -45,7 +52,7 @@ export function RecipeDetailPageClient({
   >({});
   const [complianceScore, setComplianceScore] =
     useState<RecipeComplianceResult | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialMeal);
   const [error, setError] = useState<string | null>(null);
 
   // Refetch meal data (with or without loading spinner)
@@ -242,9 +249,8 @@ export function RecipeDetailPageClient({
       document.removeEventListener('visibilitychange', handleVisibility);
   }, [meal, loadMealSilent]);
 
-  // Initial load
+  // Initial load (ofwel prefetch data tonen + background enrich, ofwel volledige fetch)
   useEffect(() => {
-    // Validate mealId
     if (!mealId || mealId === 'undefined' || mealId.trim() === '') {
       queueMicrotask(() => {
         setError('Recept ID is vereist');
@@ -252,9 +258,8 @@ export function RecipeDetailPageClient({
       });
       return;
     }
-
-    queueMicrotask(() => loadMeal());
-  }, [mealId, mealSource, loadMeal]);
+    queueMicrotask(() => (initialMeal ? loadMealSilent() : loadMeal()));
+  }, [mealId, mealSource, loadMeal, loadMealSilent, initialMeal]);
 
   const recipeBreadcrumbs = [
     { label: tCommon('home'), href: '/dashboard' },
@@ -333,6 +338,7 @@ export function RecipeDetailPageClient({
         nevoFoodNamesByCode={nevoFoodNamesByCode}
         customFoodNamesById={customFoodNamesById}
         complianceScore={complianceScore}
+        initialResolvedLegacyMatches={initialResolvedLegacyMatches}
         recipeBookLabel={recipeBookLabel}
         weekmenuStatus={weekmenuStatus}
         onRecipeApplied={loadMeal}

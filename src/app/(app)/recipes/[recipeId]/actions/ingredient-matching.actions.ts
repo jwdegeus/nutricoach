@@ -1009,6 +1009,40 @@ export async function applyAutoLinkChoicesAction(
       };
     }
 
+    // Sync recipe_ingredients.nevo_food_id zodat receptenlijst correcte koppeling toont
+    const { data: riRows } = await supabase
+      .from('recipe_ingredients')
+      .select('id')
+      .eq('recipe_id', recipeId)
+      .eq('user_id', user.id)
+      .order('id', { ascending: true });
+    if (riRows?.length === ingredientRefs.length) {
+      for (let i = 0; i < ingredientRefs.length; i++) {
+        const ref = ingredientRefs[i] as Record<string, unknown>;
+        const nevoId =
+          ref.nevoCode != null
+            ? parseInt(String(ref.nevoCode), 10)
+            : ref.nevo_code != null
+              ? Number(ref.nevo_code)
+              : null;
+        if (
+          nevoId != null &&
+          Number.isFinite(nevoId) &&
+          nevoId > 0 &&
+          riRows[i]
+        ) {
+          await supabase
+            .from('recipe_ingredients')
+            .update({
+              nevo_food_id: nevoId,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', (riRows[i] as { id: string }).id)
+            .eq('user_id', user.id);
+        }
+      }
+    }
+
     return {
       ok: true,
       data: {

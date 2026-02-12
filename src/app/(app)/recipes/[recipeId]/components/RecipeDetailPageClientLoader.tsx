@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import type { ResolvedIngredientMatch } from '../actions/ingredient-matching.actions';
 
 const RecipeDetailPageClient = dynamic(
   () =>
@@ -13,8 +14,22 @@ const RecipeDetailPageClient = dynamic(
 type Props = {
   mealId: string;
   mealSource: 'custom' | 'gemini';
+  initialMeal?: Record<string, unknown> | null;
+  initialResolvedLegacyMatches?: (ResolvedIngredientMatch | null)[] | null;
 };
 
-export function RecipeDetailPageClientLoader({ mealId, mealSource }: Props) {
-  return <RecipeDetailPageClient mealId={mealId} mealSource={mealSource} />;
+export function RecipeDetailPageClientLoader({
+  mealId,
+  mealSource,
+  initialMeal,
+  initialResolvedLegacyMatches,
+}: Props) {
+  return (
+    <RecipeDetailPageClient
+      mealId={mealId}
+      mealSource={mealSource}
+      initialMeal={initialMeal}
+      initialResolvedLegacyMatches={initialResolvedLegacyMatches}
+    />
+  );
 }

@@ -206,8 +206,15 @@ class GeminiClient {
     prompt: string;
     temperature?: number;
     purpose?: ModelPurpose;
+    /** Override max output tokens (default from env). Voor grote JSON-responses (bijv. ingredient enrichment). */
+    maxOutputTokens?: number;
   }): Promise<string> {
-    const { prompt, temperature = 0.4, purpose = 'plan' } = args;
+    const {
+      prompt,
+      temperature = 0.4,
+      purpose = 'plan',
+      maxOutputTokens: maxTokensOverride,
+    } = args;
 
     // Select model based on purpose
     const modelName = this.getModelName(purpose);
@@ -218,12 +225,13 @@ class GeminiClient {
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
+        const maxTokens = maxTokensOverride ?? this.maxOutputTokens;
         const response = await this.ai.models.generateContent({
           model: modelName,
           contents: prompt,
           config: {
             temperature,
-            maxOutputTokens: this.maxOutputTokens,
+            maxOutputTokens: maxTokens,
           },
         });
 
