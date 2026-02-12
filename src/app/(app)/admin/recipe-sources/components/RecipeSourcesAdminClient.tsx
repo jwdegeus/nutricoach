@@ -21,7 +21,7 @@ import {
 } from '@/components/catalyst/dialog';
 import { Field, Label, Description } from '@/components/catalyst/fieldset';
 import { Input } from '@/components/catalyst/input';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
 import {
   PencilIcon,
@@ -433,20 +433,21 @@ export function RecipeSourcesAdminClient() {
         <DialogBody>
           <Field>
             <Label>Doelbron</Label>
-            <Select
+            <Listbox
               value={targetSourceId}
-              onChange={(e) => setTargetSourceId(e.target.value)}
+              onChange={(val) => setTargetSourceId(val)}
               disabled={isMerging}
+              aria-label="Target bron"
             >
-              <option value="">Selecteer een bron...</option>
+              <ListboxOption value="">Selecteer een bron...</ListboxOption>
               {sources
                 .filter((s) => s.id !== mergingSource?.id)
                 .map((source) => (
-                  <option key={source.id} value={source.id}>
+                  <ListboxOption key={source.id} value={source.id}>
                     {source.name} ({source.usage_count}x gebruikt)
-                  </option>
+                  </ListboxOption>
                 ))}
-            </Select>
+            </Listbox>
             <Description>
               Kies de bron waarmee je wilt samenvoegen. De huidige bron wordt
               verwijderd.

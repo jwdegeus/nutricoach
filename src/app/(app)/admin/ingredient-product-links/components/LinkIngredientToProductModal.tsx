@@ -11,7 +11,7 @@ import { Button } from '@/components/catalyst/button';
 import { Input } from '@/components/catalyst/input';
 import { Text } from '@/components/catalyst/text';
 import { Field, Label } from '@/components/catalyst/fieldset';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import {
   getStoresForShoppingAction,
   searchStoreProductsAction,
@@ -291,21 +291,22 @@ export function LinkIngredientToProductModal({
             <div className="space-y-4">
               <Field>
                 <Label>Winkel</Label>
-                <Select
+                <Listbox
                   value={selectedStoreId}
-                  onChange={(e) => {
-                    setSelectedStoreId(e.target.value);
+                  onChange={(val) => {
+                    setSelectedStoreId(val);
                     setProductResults([]);
                   }}
                   className="mt-1"
+                  aria-label="Winkel"
                 >
-                  <option value="">Kies een winkel</option>
+                  <ListboxOption value="">Kies een winkel</ListboxOption>
                   {stores.map((s) => (
-                    <option key={s.id} value={s.id}>
+                    <ListboxOption key={s.id} value={s.id}>
                       {s.name}
-                    </option>
+                    </ListboxOption>
                   ))}
-                </Select>
+                </Listbox>
               </Field>
               {selectedStoreId && (
                 <>

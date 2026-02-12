@@ -51,3 +51,7 @@ supabase/.volumes
 
 #custom temp files
 /temp
+
+# meal planner debug logs (NDJSON) + bundles
+/logs
+logs/meal-planner/bundles/

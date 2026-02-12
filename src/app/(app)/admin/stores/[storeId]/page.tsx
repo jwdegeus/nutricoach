@@ -17,9 +17,13 @@ import {
   ArrowLeftIcon,
   ArrowTopRightOnSquareIcon,
 } from '@heroicons/react/16/solid';
+import {
+  ArrowLongLeftIcon,
+  ArrowLongRightIcon,
+} from '@heroicons/react/20/solid';
 import { ClientOnly } from '@/src/components/app/ClientOnly';
 import { StoreSyncControls } from './components/StoreSyncControls';
-import { StoreSyncSettingsForm } from './components/StoreSyncSettingsForm';
+import { StoreSyncSettingsModal } from './components/StoreSyncSettingsModal';
 import { StoreSearchForm } from './components/StoreSearchForm';
 
 export const metadata = {
@@ -98,6 +102,19 @@ function formatPrice(cents: number | null, currency: string | null): string {
   return `${amount} ${currency}`;
 }
 
+function buildPageUrl(
+  storeId: string,
+  pageNum: number,
+  params: { q?: string; inactive?: boolean },
+): string {
+  const search = new URLSearchParams();
+  if (params.q?.trim()) search.set('q', params.q.trim());
+  if (params.inactive) search.set('inactive', '1');
+  if (pageNum > 1) search.set('page', String(pageNum));
+  const s = search.toString();
+  return s ? `/admin/stores/${storeId}?${s}` : `/admin/stores/${storeId}`;
+}
+
 /** Escape for ILIKE; comma would break .or() filter. */
 function ilikePattern(raw: string): string {
   const noComma = raw.replace(/,/g, ' ');
@@ -142,9 +159,11 @@ function getBoolConfig(
   return fallback;
 }
 
+const ITEMS_PER_PAGE = 30;
+
 type PageProps = {
   params: Promise<{ storeId: string }>;
-  searchParams: Promise<{ q?: string; inactive?: string }>;
+  searchParams: Promise<{ q?: string; inactive?: string; page?: string }>;
 };
 
 export default async function AdminStoreDetailPage({
@@ -161,10 +180,11 @@ export default async function AdminStoreDetailPage({
   if (!userIsAdmin) redirect('/dashboard');
 
   const { storeId } = await params;
-  const { q = '', inactive } = await searchParams;
+  const { q = '', inactive, page: pageParam } = await searchParams;
   const showInactive = inactive === '1';
   const query = typeof q === 'string' ? q.trim() : '';
   const hasQuery = query.length >= 2;
+  const page = Math.max(1, parseInt(String(pageParam || '1'), 10) || 1);
 
   const { data: store, error: storeError } = await supabase
     .from('stores')
@@ -184,10 +204,11 @@ export default async function AdminStoreDetailPage({
     .from('store_products')
     .select(
       'id, title, brand, unit_label, price_cents, currency, is_active, product_url, image_url',
+      { count: 'exact' },
     )
     .eq('store_id', storeId)
     .order('title', { ascending: true })
-    .limit(50);
+    .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1);
 
   if (!showInactive) {
     productsQuery = productsQuery.eq('is_active', true);
@@ -199,7 +220,15 @@ export default async function AdminStoreDetailPage({
     );
   }
 
-  const { data: products, error: productsError } = await productsQuery;
+  const {
+    data: products,
+    error: productsError,
+    count: totalCount,
+  } = await productsQuery;
+
+  const totalItems = totalCount ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
 
   const { data: runs } = await supabase
     .from('store_catalog_runs')
@@ -212,7 +241,7 @@ export default async function AdminStoreDetailPage({
 
   if (productsError) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
         <div className="rounded-xl bg-red-50 p-4 text-red-800 dark:bg-red-950/40 dark:text-red-200">
           Fout bij laden producten: {productsError.message}
         </div>
@@ -223,7 +252,7 @@ export default async function AdminStoreDetailPage({
   const productRows = (products ?? []) as ProductRow[];
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
       <div className="space-y-6">
         <div>
           <Link
@@ -271,83 +300,95 @@ export default async function AdminStoreDetailPage({
         </ClientOnly>
 
         <section className="rounded-2xl bg-muted/30 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground">
-            Sync instellingen
-          </h2>
-          <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <dt className="text-sm text-muted-foreground">
-                Default full sync
-              </dt>
-              <dd className="mt-0.5 text-sm font-medium text-foreground">
-                {getBoolConfig(storeRow.connector_config, 'fullSync', false)
-                  ? 'Ja'
-                  : 'Nee'}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-muted-foreground">
-                Sitemap URL ingesteld
-              </dt>
-              <dd className="mt-0.5 text-sm font-medium text-foreground">
-                {storeRow.sitemap_url?.trim() ? 'Ja' : 'Nee'}
-              </dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-sm text-muted-foreground">Sitemap URL</dt>
-              <dd className="mt-0.5 text-sm font-medium text-foreground">
+              <h2 className="text-lg font-semibold text-foreground">
+                Sync instellingen
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
                 {storeRow.sitemap_url?.trim() ? (
-                  <Link
-                    href={storeRow.sitemap_url}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="block max-w-[400px] truncate text-foreground hover:underline"
-                    title={storeRow.sitemap_url}
-                  >
-                    {storeRow.sitemap_url}
-                  </Link>
+                  <>
+                    Sitemap:{' '}
+                    <Link
+                      href={storeRow.sitemap_url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="text-foreground hover:underline"
+                      title={storeRow.sitemap_url}
+                    >
+                      {storeRow.sitemap_url}
+                    </Link>
+                    {' · '}
+                    Rate limit{' '}
+                    {getNumberConfig(
+                      storeRow.connector_config,
+                      'rateLimitRps',
+                      2,
+                      1,
+                    )}{' '}
+                    rps, batch{' '}
+                    {getNumberConfig(
+                      storeRow.connector_config,
+                      'detailBatchSize',
+                      200,
+                      10,
+                    )}
+                    ,{' '}
+                    {getBoolConfig(
+                      storeRow.connector_config,
+                      'productUrlsOnly',
+                      false,
+                    )
+                      ? 'alleen .html'
+                      : "alle URL's"}
+                  </>
                 ) : (
-                  '—'
+                  'Geen sitemap geconfigureerd'
                 )}
-              </dd>
+              </p>
             </div>
-          </dl>
-          <ClientOnly
-            fallback={
-              <div
-                className="mt-4 h-48 animate-pulse rounded-lg bg-muted/20"
-                aria-hidden
+            <ClientOnly
+              fallback={
+                <div
+                  className="h-10 w-32 animate-pulse rounded-lg bg-muted/20"
+                  aria-hidden
+                />
+              }
+            >
+              <StoreSyncSettingsModal
+                storeId={storeId}
+                rateLimitRps={getNumberConfig(
+                  storeRow.connector_config,
+                  'rateLimitRps',
+                  2,
+                  1,
+                )}
+                detailBatchSize={getNumberConfig(
+                  storeRow.connector_config,
+                  'detailBatchSize',
+                  200,
+                  10,
+                )}
+                detailConcurrency={getNumberConfig(
+                  storeRow.connector_config,
+                  'detailConcurrency',
+                  3,
+                  1,
+                )}
+                detailDelayMs={getNumberConfig(
+                  storeRow.connector_config,
+                  'detailDelayMs',
+                  0,
+                  0,
+                )}
+                productUrlsOnly={getBoolConfig(
+                  storeRow.connector_config,
+                  'productUrlsOnly',
+                  false,
+                )}
               />
-            }
-          >
-            <StoreSyncSettingsForm
-              storeId={storeId}
-              rateLimitRps={getNumberConfig(
-                storeRow.connector_config,
-                'rateLimitRps',
-                2,
-                1,
-              )}
-              detailBatchSize={getNumberConfig(
-                storeRow.connector_config,
-                'detailBatchSize',
-                200,
-                10,
-              )}
-              detailConcurrency={getNumberConfig(
-                storeRow.connector_config,
-                'detailConcurrency',
-                3,
-                1,
-              )}
-              detailDelayMs={getNumberConfig(
-                storeRow.connector_config,
-                'detailDelayMs',
-                0,
-                0,
-              )}
-            />
-          </ClientOnly>
+            </ClientOnly>
+          </div>
         </section>
 
         <section className="rounded-2xl bg-muted/30 p-6 shadow-sm">
@@ -366,6 +407,9 @@ export default async function AdminStoreDetailPage({
                     <TableHeader>Status</TableHeader>
                     <TableHeader>Start</TableHeader>
                     <TableHeader>Duur</TableHeader>
+                    <TableHeader title="Sitemap-URL's geoogst">
+                      Sitemap
+                    </TableHeader>
                     <TableHeader>Verwerkt</TableHeader>
                     <TableHeader>Toegevoegd</TableHeader>
                     <TableHeader>Varianten</TableHeader>
@@ -389,6 +433,12 @@ export default async function AdminStoreDetailPage({
                         <TableCell className="text-sm text-muted-foreground">
                           {formatDuration(run.started_at, run.finished_at)}
                         </TableCell>
+                        <TableCell
+                          className="text-sm text-muted-foreground"
+                          title="Aantal URL's uit sitemap geoogst voor verwerking"
+                        >
+                          {statValue(run.stats, 'sitemapUrls')}
+                        </TableCell>
                         <TableCell>
                           {statValue(run.stats, 'processed')}
                         </TableCell>
@@ -410,6 +460,8 @@ export default async function AdminStoreDetailPage({
                             const hints: Record<string, string> = {
                               'FETCH_FAILED:403':
                                 'Geblokkeerd door site (Forbidden)',
+                              'FETCH_FAILED:404':
+                                'Pagina niet gevonden (www vs non-www?)',
                               'FETCH_FAILED:429': 'Rate limit overschreden',
                               'FETCH_FAILED:network':
                                 'Netwerkfout (geen verbinding)',
@@ -445,7 +497,7 @@ export default async function AdminStoreDetailPage({
                       run.error_summary ? (
                         <TableRow>
                           <TableCell
-                            colSpan={9}
+                            colSpan={10}
                             className="bg-red-50/50 py-2 text-sm text-muted-foreground dark:bg-red-950/20"
                           >
                             {run.error_summary}
@@ -482,75 +534,187 @@ export default async function AdminStoreDetailPage({
               : 'Nog geen producten. Draai een sync.'}
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl bg-muted/30 shadow-sm">
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableHeader>Titel</TableHeader>
-                  <TableHeader>Merk</TableHeader>
-                  <TableHeader>Eenheid</TableHeader>
-                  <TableHeader>Prijs</TableHeader>
-                  <TableHeader>Status</TableHeader>
-                  <TableHeader className="w-0">Koppel</TableHeader>
-                  <TableHeader className="w-0">Open</TableHeader>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {productRows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>
-                      <span
-                        className="block max-w-[280px] truncate text-foreground"
-                        title={row.title}
-                      >
-                        {row.title}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-muted-foreground">
-                        {row.brand ?? '—'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-muted-foreground">
-                        {row.unit_label ?? '—'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {formatPrice(row.price_cents, row.currency)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge color={row.is_active ? 'green' : 'zinc'}>
-                        {row.is_active ? 'Actief' : 'Inactief'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <ProductLinkToIngredientCell
-                        storeId={storeId}
-                        storeProductId={row.id}
-                        productTitle={row.title}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {row.product_url ? (
-                        <a
-                          href={row.product_url}
-                          target="_blank"
-                          rel="noreferrer noopener"
-                          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-                        >
-                          Open
-                          <ArrowTopRightOnSquareIcon className="size-4" />
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
+          <>
+            <div className="overflow-hidden rounded-2xl bg-muted/30 shadow-sm">
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableHeader>Titel</TableHeader>
+                    <TableHeader>Merk</TableHeader>
+                    <TableHeader>Eenheid</TableHeader>
+                    <TableHeader>Prijs</TableHeader>
+                    <TableHeader>Status</TableHeader>
+                    <TableHeader className="w-0">Koppel</TableHeader>
+                    <TableHeader className="w-0">Open</TableHeader>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHead>
+                <TableBody>
+                  {productRows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        <span
+                          className="block max-w-[280px] truncate text-foreground"
+                          title={row.title}
+                        >
+                          {row.title}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-muted-foreground">
+                          {row.brand ?? '—'}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-muted-foreground">
+                          {row.unit_label ?? '—'}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {formatPrice(row.price_cents, row.currency)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge color={row.is_active ? 'green' : 'zinc'}>
+                          {row.is_active ? 'Actief' : 'Inactief'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <ProductLinkToIngredientCell
+                          storeId={storeId}
+                          storeProductId={row.id}
+                          productTitle={row.title}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {row.product_url ? (
+                          <a
+                            href={row.product_url}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                          >
+                            Open
+                            <ArrowTopRightOnSquareIcon className="size-4" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {totalPages > 1 && (
+              <nav
+                className="flex items-center justify-between border-t border-zinc-200 px-4 pt-4 sm:px-0 dark:border-white/10"
+                aria-label="Paginatie producten"
+              >
+                <div className="-mt-px flex w-0 flex-1">
+                  {currentPage > 1 ? (
+                    <Link
+                      href={buildPageUrl(storeId, currentPage - 1, {
+                        q: query,
+                        inactive: showInactive,
+                      })}
+                      className="inline-flex items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      <ArrowLongLeftIcon
+                        aria-hidden
+                        className="mr-3 size-5 text-muted-foreground"
+                      />
+                      Vorige
+                    </Link>
+                  ) : (
+                    <span className="inline-flex cursor-default items-center border-t-2 border-transparent pt-4 pr-1 text-sm font-medium text-muted-foreground/60">
+                      <ArrowLongLeftIcon
+                        aria-hidden
+                        className="mr-3 size-5 text-muted-foreground/60"
+                      />
+                      Vorige
+                    </span>
+                  )}
+                </div>
+                <div className="hidden md:-mt-px md:flex md:items-center">
+                  {(() => {
+                    const pages: (number | 'gap')[] = [];
+                    if (totalPages <= 7) {
+                      for (let i = 1; i <= totalPages; i++) pages.push(i);
+                    } else {
+                      const show = new Set<number>([1, totalPages]);
+                      for (
+                        let p = Math.max(1, currentPage - 1);
+                        p <= Math.min(totalPages, currentPage + 1);
+                        p++
+                      ) {
+                        show.add(p);
+                      }
+                      const sorted = Array.from(show).sort((a, b) => a - b);
+                      sorted.forEach((p, idx) => {
+                        if (idx > 0 && p - (sorted[idx - 1] ?? 0) > 1) {
+                          pages.push('gap');
+                        }
+                        pages.push(p);
+                      });
+                    }
+                    return pages.map((item, idx) =>
+                      item === 'gap' ? (
+                        <span
+                          key={`gap-${idx}`}
+                          className="inline-flex items-center border-t-2 border-transparent px-4 pt-4 text-sm font-medium text-muted-foreground"
+                        >
+                          …
+                        </span>
+                      ) : item === currentPage ? (
+                        <span
+                          key={item}
+                          aria-current="page"
+                          className="inline-flex items-center border-t-2 border-primary-600 px-4 pt-4 text-sm font-medium text-primary-600 dark:border-primary-400 dark:text-primary-400"
+                        >
+                          {item}
+                        </span>
+                      ) : (
+                        <Link
+                          key={item}
+                          href={buildPageUrl(storeId, item, {
+                            q: query,
+                            inactive: showInactive,
+                          })}
+                          className="inline-flex items-center border-t-2 border-transparent px-4 pt-4 text-sm font-medium text-muted-foreground hover:text-foreground"
+                        >
+                          {item}
+                        </Link>
+                      ),
+                    );
+                  })()}
+                </div>
+                <div className="-mt-px flex w-0 flex-1 justify-end">
+                  {currentPage < totalPages ? (
+                    <Link
+                      href={buildPageUrl(storeId, currentPage + 1, {
+                        q: query,
+                        inactive: showInactive,
+                      })}
+                      className="inline-flex items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      Volgende
+                      <ArrowLongRightIcon
+                        aria-hidden
+                        className="ml-3 size-5 text-muted-foreground"
+                      />
+                    </Link>
+                  ) : (
+                    <span className="inline-flex cursor-default items-center border-t-2 border-transparent pt-4 pl-1 text-sm font-medium text-muted-foreground/60">
+                      Volgende
+                      <ArrowLongRightIcon
+                        aria-hidden
+                        className="ml-3 size-5 text-muted-foreground/60"
+                      />
+                    </span>
+                  )}
+                </div>
+              </nav>
+            )}
+          </>
         )}
       </div>
     </div>

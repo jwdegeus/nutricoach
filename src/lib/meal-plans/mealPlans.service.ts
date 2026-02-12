@@ -56,6 +56,91 @@ import {
   throwIfVarietyTargetsNotMet,
   scaleVarietyTargetsForPlanDays,
 } from '@/src/lib/meal-planner/metrics/mealPlanVarietyScorecard';
+import {
+  createRunLogger,
+  type SlotSummaryData,
+  type StageCountsEntry,
+  type TopReasonEntry,
+  type RunDiagnosisData,
+} from '@/src/lib/agents/meal-planner/mealPlannerDebugLogger.server';
+import { fetchDbHealthSnapshot } from '@/src/lib/agents/meal-planner/mealPlannerDbHealth.server';
+
+const RUN_DIAGNOSIS_TOP_CODES = 10;
+const DOMINANT_BLOCKERS_MAX = 5;
+
+function buildRunDiagnosis(summaries: SlotSummaryData[]): RunDiagnosisData {
+  const slotsFromDb = summaries.filter((s) => s.finalSource === 'db').length;
+  const slotsFromHistory = summaries.filter(
+    (s) => s.finalSource === 'history',
+  ).length;
+  const slotsFromAi = summaries.filter((s) => s.finalSource === 'ai').length;
+  const slotsFromAiFailed = summaries.filter(
+    (s) => s.finalSource === 'ai_failed',
+  ).length;
+  const reasonsHistogram = summaries
+    .filter(
+      (s) =>
+        s.finalReasonKey &&
+        (s.finalSource === 'ai' || s.finalSource === 'ai_failed'),
+    )
+    .reduce((acc, s) => {
+      const r = s.finalReasonKey!;
+      acc.set(r, (acc.get(r) ?? 0) + 1);
+      return acc;
+    }, new Map<string, number>());
+  const reasonsList = Array.from(reasonsHistogram.entries())
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count);
+  const issueCodesHistogram: Record<
+    string,
+    Array<{ code: string; count: number }>
+  > = {};
+  for (const s of summaries) {
+    for (const [stage, topReasons] of Object.entries(s.topReasonsByStage)) {
+      if (!issueCodesHistogram[stage]) issueCodesHistogram[stage] = [];
+      for (const { code, count } of topReasons) {
+        const arr = issueCodesHistogram[stage];
+        const existing = arr.find((x) => x.code === code);
+        if (existing) existing.count += count;
+        else arr.push({ code, count });
+      }
+    }
+  }
+  for (const stage of Object.keys(issueCodesHistogram)) {
+    issueCodesHistogram[stage] = issueCodesHistogram[stage]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, RUN_DIAGNOSIS_TOP_CODES);
+  }
+  const dominantBlockers: Array<{
+    stage: string;
+    code: string;
+    count: number;
+    share: number;
+  }> = [];
+  for (const [stage, entries] of Object.entries(issueCodesHistogram)) {
+    const totalRejected = entries.reduce((s, e) => s + e.count, 0);
+    for (const { code, count } of entries) {
+      dominantBlockers.push({
+        stage,
+        code,
+        count,
+        share: totalRejected > 0 ? count / totalRejected : 0,
+      });
+    }
+  }
+  dominantBlockers.sort((a, b) => b.count - a.count);
+  const topDominant = dominantBlockers.slice(0, DOMINANT_BLOCKERS_MAX);
+  return {
+    slotsTotal: summaries.length,
+    slotsFromDb,
+    slotsFromHistory,
+    slotsFromAi,
+    slotsFromAiFailed,
+    reasonsHistogram: reasonsList,
+    issueCodesHistogram,
+    dominantBlockers: topDominant,
+  };
+}
 
 /** Explicit columns for meal_plans list (overview) — keeps return shape compatible with MealPlanRecord */
 const MEAL_PLAN_LIST_COLUMNS =
@@ -130,7 +215,7 @@ export type SlotProvenanceReason =
   | 'ai_candidate_blocked_by_constraints';
 
 export type SlotProvenanceEntry = {
-  source: 'db' | 'ai';
+  source: 'db' | 'ai' | 'history';
   reason?: SlotProvenanceReason;
 };
 
@@ -531,7 +616,7 @@ export class MealPlansService {
    * @param userId - User ID
    * @param input - Create meal plan input
    * @param supabaseAdmin - Optional service-role client for server-only/system runs
-   * @returns Plan ID and optional dbCoverage/dbCoverageBelowTarget from plan metadata
+   * @returns Plan ID and optional dbCoverage/dbCoverageBelowTarget/fallbackReasons from plan metadata
    */
   async createPlanForUser(
     userId: string,
@@ -545,6 +630,8 @@ export class MealPlansService {
       percent: number;
     };
     dbCoverageBelowTarget?: boolean;
+    fallbackReasons?: { reason: string; count: number }[];
+    debug?: { runId: string; logFileRelativePath?: string };
   }> {
     const startTime = Date.now();
     let runId: string | null = null;
@@ -748,6 +835,14 @@ export class MealPlansService {
         runId = runData.id;
       }
 
+      const debugMetaCollector =
+        process.env.MEAL_PLANNER_DEBUG_LOG === 'true'
+          ? {
+              runId: runId ?? '',
+              logFileRelativePath: undefined as string | undefined,
+            }
+          : undefined;
+
       // Derive rules
       const rules = deriveDietRuleSet(profile);
 
@@ -795,20 +890,33 @@ export class MealPlansService {
                 // Use reused plan (partially or fully from history)
                 plan = reuseResult.plan;
                 reusedMealsCount = reuseResult.reusedCount;
-                if (process.env.MEAL_PLANNER_DB_FIRST === 'true') {
+                const useDbFirst =
+                  generatorDbConfig.settings.use_db_first ||
+                  process.env.MEAL_PLANNER_DB_FIRST === 'true';
+                if (useDbFirst) {
+                  // History meals may have been AI-generated before; don't claim as "database"
                   const slotProv: Record<string, SlotProvenanceEntry> = {};
                   for (const day of plan.days) {
                     for (const meal of day.meals) {
-                      slotProv[`${day.date}-${meal.slot}`] = { source: 'db' };
+                      slotProv[`${day.date}-${meal.slot}`] = {
+                        source:
+                          meal.recipeSource === 'custom_meals'
+                            ? 'db'
+                            : 'history',
+                      };
                     }
                   }
                   const meta = (plan.metadata ?? {}) as Record<string, unknown>;
                   meta.slotProvenance = slotProv;
                   const total = Object.keys(slotProv).length;
+                  const dbSlots = Object.values(slotProv).filter(
+                    (e) => e.source === 'db',
+                  ).length;
                   meta.dbCoverage = {
-                    dbSlots: total,
+                    dbSlots,
                     totalSlots: total,
-                    percent: total > 0 ? 100 : 0,
+                    percent:
+                      total > 0 ? Math.round((dbSlots / total) * 100) : 0,
                   };
                   meta.fallbackReasons = [];
                   plan.metadata = meta as MealPlanResponse['metadata'];
@@ -824,7 +932,10 @@ export class MealPlansService {
                   profile.dietKey,
                   supabase,
                 );
-                if (process.env.MEAL_PLANNER_DB_FIRST === 'true') {
+                const useDbFirst =
+                  generatorDbConfig.settings.use_db_first ||
+                  process.env.MEAL_PLANNER_DB_FIRST === 'true';
+                if (useDbFirst) {
                   plan = await this.generatePlanDbFirst(
                     request,
                     userLanguage,
@@ -833,6 +944,13 @@ export class MealPlansService {
                     {
                       culinaryRules: generatorDbConfig.culinaryRules,
                       dbFirstSettings: validated.dbFirstSettings,
+                      debugContext: {
+                        userId,
+                        planId: null,
+                        runId: runId ?? undefined,
+                        debugMetaCollector,
+                        supabase,
+                      },
                     },
                   );
                 } else {
@@ -890,7 +1008,10 @@ export class MealPlansService {
                 profile.dietKey,
                 supabase,
               );
-              if (process.env.MEAL_PLANNER_DB_FIRST === 'true') {
+              const useDbFirstRetry =
+                generatorDbConfig.settings.use_db_first ||
+                process.env.MEAL_PLANNER_DB_FIRST === 'true';
+              if (useDbFirstRetry) {
                 plan = await this.generatePlanDbFirst(
                   request,
                   userLanguage,
@@ -899,6 +1020,13 @@ export class MealPlansService {
                   {
                     culinaryRules: generatorDbConfig.culinaryRules,
                     dbFirstSettings: validated.dbFirstSettings,
+                    debugContext: {
+                      userId,
+                      planId: null,
+                      runId: runId ?? undefined,
+                      debugMetaCollector,
+                      supabase,
+                    },
                   },
                 );
               } else {
@@ -930,7 +1058,10 @@ export class MealPlansService {
               profile.dietKey,
               supabase,
             );
-            if (process.env.MEAL_PLANNER_DB_FIRST === 'true') {
+            const useDbFirstAttempt2 =
+              generatorDbConfig.settings.use_db_first ||
+              process.env.MEAL_PLANNER_DB_FIRST === 'true';
+            if (useDbFirstAttempt2) {
               plan = await this.generatePlanDbFirst(
                 request,
                 userLanguage,
@@ -939,6 +1070,13 @@ export class MealPlansService {
                 {
                   culinaryRules: generatorDbConfig.culinaryRules,
                   dbFirstSettings: validated.dbFirstSettings,
+                  debugContext: {
+                    userId,
+                    planId: null,
+                    runId: runId ?? undefined,
+                    debugMetaCollector,
+                    supabase,
+                  },
                 },
               );
             } else {
@@ -1188,12 +1326,46 @@ export class MealPlansService {
                   percent: number;
                 };
                 dbCoverageBelowTarget?: boolean;
+                provenance?: {
+                  reusedRecipeCount?: number;
+                  generatedRecipeCount?: number;
+                };
+                fallbackReasons?: { reason: string; count: number }[];
               }
             | undefined;
+          let dbCoverage = meta?.dbCoverage;
+          if (!dbCoverage && meta?.provenance) {
+            const totalMeals = planToPersist.days.reduce(
+              (s, d) => s + (d.meals?.length ?? 0),
+              0,
+            );
+            const dbSlots = meta.provenance.reusedRecipeCount ?? 0;
+            const totalSlots =
+              totalMeals ||
+              dbSlots + (meta.provenance.generatedRecipeCount ?? 0);
+            dbCoverage =
+              totalSlots > 0
+                ? {
+                    dbSlots,
+                    totalSlots,
+                    percent: Math.round((dbSlots / totalSlots) * 100),
+                  }
+                : undefined;
+          }
           return {
             planId: data.id,
-            dbCoverage: meta?.dbCoverage,
+            dbCoverage,
             dbCoverageBelowTarget: meta?.dbCoverageBelowTarget,
+            fallbackReasons: meta?.fallbackReasons,
+            ...(debugMetaCollector &&
+              process.env.MEAL_PLANNER_DEBUG_LOG === 'true' && {
+                debug: {
+                  runId: debugMetaCollector.runId,
+                  ...(debugMetaCollector.logFileRelativePath && {
+                    logFileRelativePath: debugMetaCollector.logFileRelativePath,
+                  }),
+                },
+              }),
           };
         } catch (e) {
           if (
@@ -1871,6 +2043,16 @@ export class MealPlansService {
         ReturnType<typeof loadMealPlanGeneratorDbConfig>
       >['culinaryRules'];
       dbFirstSettings?: Partial<DbFirstPlanSettings>;
+      /** Optional debug context for structured logging (env: MEAL_PLANNER_DEBUG_LOG). */
+      debugContext?: {
+        userId: string;
+        planId?: string | null;
+        runId?: string;
+        /** Mutable collector for debug metadata to include in API response. */
+        debugMetaCollector?: { runId: string; logFileRelativePath?: string };
+        /** Supabase client (user-context) for db_health_snapshot when debug enabled. */
+        supabase?: SupabaseClient;
+      };
     },
   ): Promise<MealPlanResponse> {
     const settings: DbFirstPlanSettings = {
@@ -1878,6 +2060,36 @@ export class MealPlansService {
       ...options.dbFirstSettings,
     };
     const slots = request.slots;
+    const debug = options.debugContext
+      ? createRunLogger({
+          planId: options.debugContext.planId ?? null,
+          userId: options.debugContext.userId,
+          runId: options.debugContext.runId,
+        })
+      : null;
+    if (debug && options.debugContext?.debugMetaCollector) {
+      options.debugContext.debugMetaCollector.runId = debug.runId;
+    }
+    const runStartTs = debug ? Date.now() : 0;
+    const STAGES = [
+      'variety_window',
+      'hasRefs_filter',
+      'hard_constraints',
+    ] as const;
+    const emptyStageCounts: StageCountsEntry = {
+      before: 0,
+      after: 0,
+      rejected: 0,
+    };
+    const allSlotSummaries: SlotSummaryData[] = [];
+    const deferredSlotStats = new Map<
+      string,
+      {
+        countsByStage: Record<string, StageCountsEntry>;
+        topReasonsByStage: Record<string, TopReasonEntry[]>;
+        candidateSample?: string[];
+      }
+    >();
     const startDate = new Date(request.dateRange.start);
     const endDate = new Date(request.dateRange.end);
     const numDays =
@@ -1921,6 +2133,51 @@ export class MealPlansService {
       return JSON.parse(JSON.stringify(p)) as MealPlanResponse;
     }
 
+    if (debug) {
+      debug.emitFileWriteSkipped();
+      debug.event('run_start', {
+        configSnapshot: {
+          repeat_window_days: settings.repeatWindowDays,
+          target_reuse_ratio: getMealPlannerConfig().targetReuseRatio,
+          db_first: true,
+          ai_fill_mode: settings.aiFillMode,
+        },
+        numDays,
+        slots: [...slots],
+      });
+      if (options.debugContext?.supabase && options.debugContext?.userId) {
+        try {
+          const snapshot = await fetchDbHealthSnapshot(
+            options.debugContext.supabase,
+            options.debugContext.userId,
+            debug.runId,
+            options.debugContext.planId ?? null,
+          );
+          debug.event('db_health_snapshot', {
+            bySlot: snapshot.bySlot,
+            totals: snapshot.totals,
+          });
+        } catch (err) {
+          debug.event('db_health_snapshot', {
+            error: err instanceof Error ? err.message : 'unknown',
+          });
+        }
+      }
+      const poolCounts = Object.fromEntries(
+        slots.map((s) => [
+          s,
+          {
+            total: (prefilledBySlot[s] ?? []).length,
+            withRefs: (prefilledBySlot[s] ?? []).filter(
+              (m) =>
+                Array.isArray(m.ingredientRefs) && m.ingredientRefs.length > 0,
+            ).length,
+          },
+        ]),
+      );
+      debug.event('pool_loaded', { counts: poolCounts });
+    }
+
     // 2) Fill each (day, slot) from DB where a candidate passes hard constraints
     for (let dayIndex = 0; dayIndex < numDays; dayIndex++) {
       const dateStr = plan.days[dayIndex].date;
@@ -1933,6 +2190,10 @@ export class MealPlansService {
         const slot = slots[slotIndex];
         const key = `${dateStr}-${slot}`;
         const pool = prefilledBySlot[slot] ?? [];
+        const slotStartTs = debug ? Date.now() : 0;
+
+        if (debug) debug.event('slot_start', { slotKey: key });
+
         // repeatWindowDays: same meal not used in last N days for this slot
         const usedInWindow = (mealId: string): boolean => {
           const windowStart = Math.max(0, dayIndex - settings.repeatWindowDays);
@@ -1949,7 +2210,53 @@ export class MealPlansService {
         );
         const availableWithRefs = available.filter(hasRefs);
 
+        if (debug) {
+          debug.stage(
+            key,
+            'variety_window',
+            {
+              before: pool.length,
+              after: available.length,
+              rejected: pool.length - available.length,
+            },
+            Date.now() - slotStartTs,
+          );
+          if (available.length > 0) {
+            debug.slotSurvivors(
+              key,
+              'variety_window',
+              available,
+              available.length,
+            );
+          }
+          debug.stage(key, 'hasRefs_filter', {
+            before: available.length,
+            after: availableWithRefs.length,
+            rejected: available.length - availableWithRefs.length,
+          });
+          if (availableWithRefs.length > 0) {
+            debug.slotSurvivors(
+              key,
+              'hasRefs_filter',
+              availableWithRefs,
+              availableWithRefs.length,
+            );
+          }
+        }
+
         if (pool.length === 0) {
+          if (debug) {
+            const countsByStage = Object.fromEntries(
+              STAGES.map((s) => [s, { ...emptyStageCounts }]),
+            ) as Record<string, StageCountsEntry>;
+            const topReasonsByStage = Object.fromEntries(
+              STAGES.map((s) => [s, [] as TopReasonEntry[]]),
+            );
+            deferredSlotStats.set(key, {
+              countsByStage,
+              topReasonsByStage,
+            });
+          }
           missingSlots.push({
             dayIndex,
             slotIndex,
@@ -1961,6 +2268,31 @@ export class MealPlansService {
           continue;
         }
         if (available.length === 0) {
+          if (debug) {
+            debug.topRejectReasons(
+              key,
+              'variety_window',
+              new Map([['repeat_window_blocked', pool.length]]),
+            );
+            const countsByStage = Object.fromEntries(
+              STAGES.map((s) => [s, { ...emptyStageCounts }]),
+            ) as Record<string, StageCountsEntry>;
+            countsByStage.variety_window = {
+              before: pool.length,
+              after: 0,
+              rejected: pool.length,
+            };
+            const topReasonsByStage = Object.fromEntries(
+              STAGES.map((s) => [s, [] as TopReasonEntry[]]),
+            );
+            topReasonsByStage.variety_window = [
+              { code: 'repeat_window_blocked', count: pool.length },
+            ].slice(0, 3);
+            deferredSlotStats.set(key, {
+              countsByStage,
+              topReasonsByStage,
+            });
+          }
           missingSlots.push({
             dayIndex,
             slotIndex,
@@ -1975,6 +2307,40 @@ export class MealPlansService {
           continue;
         }
         if (availableWithRefs.length === 0) {
+          if (debug) {
+            debug.topRejectReasons(
+              key,
+              'hasRefs_filter',
+              new Map([['missing_ingredient_refs', available.length]]),
+            );
+            const countsByStage = Object.fromEntries(
+              STAGES.map((s) => [s, { ...emptyStageCounts }]),
+            ) as Record<string, StageCountsEntry>;
+            countsByStage.variety_window = {
+              before: pool.length,
+              after: available.length,
+              rejected: pool.length - available.length,
+            };
+            countsByStage.hasRefs_filter = {
+              before: available.length,
+              after: 0,
+              rejected: available.length,
+            };
+            const topReasonsByStage = Object.fromEntries(
+              STAGES.map((s) => [s, [] as TopReasonEntry[]]),
+            );
+            topReasonsByStage.hasRefs_filter = [
+              { code: 'missing_ingredient_refs', count: available.length },
+            ].slice(0, 3);
+            const candidateSample = available
+              .map((m) => `${m.recipeSource ?? 'unknown'}:${m.id}`)
+              .slice(0, 10);
+            deferredSlotStats.set(key, {
+              countsByStage,
+              topReasonsByStage,
+              candidateSample,
+            });
+          }
           missingSlots.push({
             dayIndex,
             slotIndex,
@@ -1990,6 +2356,9 @@ export class MealPlansService {
         }
 
         let placed = false;
+        let chosenCandidate: Meal | null = null;
+        const hardConstraintReasonCounts = new Map<string, number>();
+        const hardConstraintsStartTs = debug ? Date.now() : 0;
         for (const candidate of availableWithRefs) {
           const replacedMeal: Meal = {
             ...candidate,
@@ -2007,10 +2376,146 @@ export class MealPlansService {
             plan.days[dayIndex].meals[slotIndex] = replacedMeal;
             usedOnDay.add(candidate.id);
             baseIdByDayAndSlot.set(`${dayIndex}-${slot}`, candidate.id);
-            slotProvenance[key] = { source: 'db' };
-            reusedRecipeCount++;
+            // Only custom_meals count as "database"; meal_history is reused past meals, often AI-generated
+            const fromRecipeDb = candidate.recipeSource === 'custom_meals';
+            slotProvenance[key] = {
+              source: fromRecipeDb ? 'db' : 'history',
+            };
+            if (fromRecipeDb) reusedRecipeCount++;
             placed = true;
+            chosenCandidate = candidate;
+            if (debug) {
+              debug.slotSurvivors(key, 'hard_constraints', [candidate], 1);
+              debug.event('slot_selected', {
+                slotKey: key,
+                source: fromRecipeDb ? 'db' : 'history',
+                candidateKey: `${candidate.recipeSource ?? 'unknown'}:${candidate.id}`,
+                name: (candidate.name ?? '').slice(0, 80),
+              });
+              const hcCounts = {
+                before: availableWithRefs.length,
+                after: 1,
+                rejected: availableWithRefs.length - 1,
+              };
+              const topHc = Array.from(hardConstraintReasonCounts.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .map(([code, count]) => ({ code, count }));
+              const countsByStage: Record<string, StageCountsEntry> = {
+                variety_window: {
+                  before: pool.length,
+                  after: available.length,
+                  rejected: pool.length - available.length,
+                },
+                hasRefs_filter: {
+                  before: available.length,
+                  after: availableWithRefs.length,
+                  rejected: available.length - availableWithRefs.length,
+                },
+                hard_constraints: hcCounts,
+              };
+              const topReasonsByStage: Record<string, TopReasonEntry[]> = {
+                variety_window: [],
+                hasRefs_filter: [],
+                hard_constraints: topHc,
+              };
+              const candidateSample = available
+                .map((m) => `${m.recipeSource ?? 'unknown'}:${m.id}`)
+                .slice(0, 10);
+              const summary: SlotSummaryData = {
+                slotKey: key,
+                finalSource: fromRecipeDb ? 'db' : 'history',
+                countsByStage,
+                topReasonsByStage,
+                candidateSample,
+              };
+              debug.slotSummary(summary);
+              allSlotSummaries.push(summary);
+            }
             break;
+          }
+          if (debug) {
+            const issueEntries = issues.map((i) => ({
+              code: i.code,
+              detail: i.detail ?? i.message?.slice(0, 120),
+            }));
+            debug.candidateReject(
+              key,
+              'hard_constraints',
+              candidate,
+              issueEntries,
+            );
+            const firstCode = issues[0]?.code ?? 'UNKNOWN';
+            hardConstraintReasonCounts.set(
+              firstCode,
+              (hardConstraintReasonCounts.get(firstCode) ?? 0) + 1,
+            );
+          }
+        }
+        if (debug) {
+          debug.slotRanking(
+            key,
+            availableWithRefs.length,
+            availableWithRefs.slice(0, 10),
+            placed && chosenCandidate
+              ? {
+                  candidateKey: `${chosenCandidate.recipeSource ?? 'unknown'}:${chosenCandidate.id}`,
+                  name:
+                    (chosenCandidate.name ?? '').trim().slice(0, 60) ||
+                    '(unnamed)',
+                  reason:
+                    'first_valid_in_prefill_order (prefill: favorite > consumption_count/combined_score > recency)',
+                }
+              : undefined,
+            !placed && availableWithRefs.length > 0
+              ? 'none_passed_hard_constraints'
+              : undefined,
+          );
+          const hcCounts = {
+            before: availableWithRefs.length,
+            after: placed ? 1 : 0,
+            rejected: placed
+              ? availableWithRefs.length - 1
+              : availableWithRefs.length,
+          };
+          const topHc = Array.from(hardConstraintReasonCounts.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([code, count]) => ({ code, count }));
+          debug.stage(
+            key,
+            'hard_constraints',
+            hcCounts,
+            Date.now() - hardConstraintsStartTs,
+            topHc.length > 0 ? { topRejectReasons: topHc } : undefined,
+          );
+          if (!placed) {
+            const countsByStage: Record<string, StageCountsEntry> = {
+              variety_window: {
+                before: pool.length,
+                after: available.length,
+                rejected: pool.length - available.length,
+              },
+              hasRefs_filter: {
+                before: available.length,
+                after: availableWithRefs.length,
+                rejected: available.length - availableWithRefs.length,
+              },
+              hard_constraints: hcCounts,
+            };
+            const topReasonsByStage: Record<string, TopReasonEntry[]> = {
+              variety_window: [],
+              hasRefs_filter: [],
+              hard_constraints: topHc.slice(0, 3),
+            };
+            const candidateSample = available
+              .map((m) => `${m.recipeSource ?? 'unknown'}:${m.id}`)
+              .slice(0, 10);
+            deferredSlotStats.set(key, {
+              countsByStage,
+              topReasonsByStage,
+              candidateSample,
+            });
           }
         }
         if (!placed) {
@@ -2031,6 +2536,35 @@ export class MealPlansService {
 
     // 3) strict: no AI fill — throw when any slot is missing. normal: AI fills missing slots
     if (missingSlots.length > 0 && settings.aiFillMode === 'strict') {
+      if (debug) {
+        for (const m of missingSlots) {
+          const key = `${m.date}-${m.slot}`;
+          const deferred = deferredSlotStats.get(key);
+          const {
+            countsByStage = {},
+            topReasonsByStage = {},
+            candidateSample,
+          } = deferred ?? {};
+          const counts = Object.fromEntries(
+            STAGES.map((s) => [s, countsByStage[s] ?? emptyStageCounts]),
+          ) as Record<string, StageCountsEntry>;
+          const topReasons = Object.fromEntries(
+            STAGES.map((s) => [s, topReasonsByStage[s] ?? []]),
+          );
+          const summary: SlotSummaryData = {
+            slotKey: key,
+            finalSource: 'ai_failed',
+            finalReasonKey: m.reason,
+            countsByStage: counts,
+            topReasonsByStage: topReasons,
+            candidateSample,
+          };
+          debug.slotSummary(summary);
+          allSlotSummaries.push(summary);
+        }
+        const diagnosis = buildRunDiagnosis(allSlotSummaries);
+        debug.runDiagnosis(diagnosis);
+      }
       throw new AppError(
         'MEAL_PLAN_INSUFFICIENT_CANDIDATES',
         'Het weekmenu kon niet volledig worden gevuld binnen je dieet-/huisregels. Voeg meer recepten toe of versoepel je regels.',
@@ -2056,11 +2590,40 @@ export class MealPlansService {
       for (const m of missingSlots) {
         const aiMeal = aiPlan.days[m.dayIndex]?.meals[m.slotIndex];
         const key = `${m.date}-${m.slot}`;
+        const deferred = debug ? deferredSlotStats.get(key) : null;
         if (!aiMeal || MealPlansService.isPlaceholderMeal(aiMeal)) {
           slotProvenance[key] = {
             source: 'ai',
             reason: 'ai_candidate_blocked_by_constraints',
           };
+          if (debug) {
+            debug.event('slot_fallback_failed', {
+              slotKey: key,
+              fallbackReasonKey: 'ai_candidate_blocked_by_constraints',
+              note: 'ai_returned_no_meal_or_placeholder',
+            });
+            const {
+              countsByStage = {},
+              topReasonsByStage = {},
+              candidateSample,
+            } = deferred ?? {};
+            const counts = Object.fromEntries(
+              STAGES.map((s) => [s, countsByStage[s] ?? emptyStageCounts]),
+            ) as Record<string, StageCountsEntry>;
+            const topReasons = Object.fromEntries(
+              STAGES.map((s) => [s, topReasonsByStage[s] ?? []]),
+            );
+            const summary: SlotSummaryData = {
+              slotKey: key,
+              finalSource: 'ai_failed',
+              finalReasonKey: 'ai_candidate_blocked_by_constraints',
+              countsByStage: counts,
+              topReasonsByStage: topReasons,
+              candidateSample,
+            };
+            debug.slotSummary(summary);
+            allSlotSummaries.push(summary);
+          }
           continue;
         }
         const candidatePlan = clonePlan(plan);
@@ -2075,10 +2638,89 @@ export class MealPlansService {
             source: 'ai',
             reason: 'ai_candidate_blocked_by_constraints',
           };
+          if (debug) {
+            const issueEntries = issues.map((i) => ({
+              code: i.code,
+              detail: i.detail ?? i.message?.slice(0, 120),
+            }));
+            debug.candidateReject(
+              key,
+              'hard_constraints',
+              aiMeal,
+              issueEntries,
+            );
+            debug.event('slot_fallback_failed', {
+              slotKey: key,
+              fallbackReasonKey: 'ai_candidate_blocked_by_constraints',
+              topIssueCodes: issues.map((i) => i.code).slice(0, 5),
+            });
+            const {
+              countsByStage = {},
+              topReasonsByStage = {},
+              candidateSample,
+            } = deferred ?? {};
+            const counts = Object.fromEntries(
+              STAGES.map((s) => [s, countsByStage[s] ?? emptyStageCounts]),
+            ) as Record<string, StageCountsEntry>;
+            const topReasons = Object.fromEntries(
+              STAGES.map((s) => [s, topReasonsByStage[s] ?? []]),
+            );
+            const hcTop = issues
+              .map((i) => i.code)
+              .reduce((acc, code) => {
+                acc.set(code, (acc.get(code) ?? 0) + 1);
+                return acc;
+              }, new Map<string, number>());
+            const topHc = Array.from(hcTop.entries())
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 3)
+              .map(([code, count]) => ({ code, count }));
+            topReasons.hard_constraints = topHc;
+            const summary: SlotSummaryData = {
+              slotKey: key,
+              finalSource: 'ai_failed',
+              finalReasonKey: 'ai_candidate_blocked_by_constraints',
+              countsByStage: counts,
+              topReasonsByStage: topReasons,
+              candidateSample,
+            };
+            debug.slotSummary(summary);
+            allSlotSummaries.push(summary);
+          }
           continue;
         }
         plan.days[m.dayIndex].meals[m.slotIndex] = aiMeal;
         slotProvenance[key] = { source: 'ai', reason: m.reason };
+        if (debug) {
+          debug.event('slot_fallback', {
+            slotKey: key,
+            fallbackReasonKey: m.reason,
+            source: 'ai',
+            candidateKey: `ai:${aiMeal.id}`,
+            name: (aiMeal.name ?? '').slice(0, 80),
+          });
+          const {
+            countsByStage = {},
+            topReasonsByStage = {},
+            candidateSample,
+          } = deferred ?? {};
+          const counts = Object.fromEntries(
+            STAGES.map((s) => [s, countsByStage[s] ?? emptyStageCounts]),
+          ) as Record<string, StageCountsEntry>;
+          const topReasons = Object.fromEntries(
+            STAGES.map((s) => [s, topReasonsByStage[s] ?? []]),
+          );
+          const summary: SlotSummaryData = {
+            slotKey: key,
+            finalSource: 'ai',
+            finalReasonKey: m.reason,
+            countsByStage: counts,
+            topReasonsByStage: topReasons,
+            candidateSample,
+          };
+          debug.slotSummary(summary);
+          allSlotSummaries.push(summary);
+        }
       }
 
       // 4) No placeholders in output: if any slot is still a placeholder, throw controlled error
@@ -2126,6 +2768,36 @@ export class MealPlansService {
       .map(([reason, count]) => ({ reason, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 3);
+
+    if (debug) {
+      const entries = Object.values(slotProvenance);
+      const dbSlots = entries.filter((e) => e.source === 'db').length;
+      const historySlots = entries.filter((e) => e.source === 'history').length;
+      const aiSlots = entries.filter((e) => e.source === 'ai').length;
+      debug.event('run_summary', {
+        durationMs: Date.now() - runStartTs,
+        dbSlots,
+        historySlots,
+        aiSlots,
+        totalSlots: entries.length,
+        reasonCounts: Array.from(reasonCounts.entries()).map(
+          ([reason, count]) => ({
+            reason,
+            count,
+          }),
+        ),
+      });
+      const diagnosis = buildRunDiagnosis(allSlotSummaries);
+      debug.runDiagnosis(diagnosis);
+      if (options.debugContext?.debugMetaCollector && debug.getDebugMeta) {
+        const dm = debug.getDebugMeta();
+        options.debugContext.debugMetaCollector.runId = dm.runId;
+        if (dm.logFileRelativePath) {
+          options.debugContext.debugMetaCollector.logFileRelativePath =
+            dm.logFileRelativePath;
+        }
+      }
+    }
 
     plan.metadata = meta as MealPlanResponse['metadata'];
     return plan;
@@ -2206,6 +2878,7 @@ export class MealPlansService {
       fallbackId: string,
       fallbackName: string,
       slot: MealSlot,
+      recipeSource?: 'custom_meals' | 'meal_history',
     ): Meal | null => {
       if (!mealData || typeof mealData !== 'object') return null;
       const m = mealData as Record<string, unknown>;
@@ -2221,6 +2894,7 @@ export class MealPlansService {
         slot,
         date: '',
         ingredientRefs,
+        ...(recipeSource && { recipeSource }),
       };
     };
 
@@ -2336,10 +3010,18 @@ export class MealPlansService {
           (row.id as string) ?? (mealData.id as string),
           (row.name as string) ?? (mealData.name as string) ?? '',
           slot,
+          'custom_meals',
         );
         const id = (row.id as string) ?? (mealData.id as string);
         const name = (row.name as string) ?? (mealData.name as string) ?? '';
-        const stub: Meal = { id, name, slot, date: '', ingredientRefs: [] };
+        const stub: Meal = {
+          id,
+          name,
+          slot,
+          date: '',
+          ingredientRefs: [],
+          recipeSource: 'custom_meals',
+        };
         const toPush = meal ?? stub;
         if (
           !isMealBlockedByHouseholdRules(toPush, toPush.name, blockRules) &&
@@ -2390,6 +3072,7 @@ export class MealPlansService {
         mealId,
         (row.meal_name as string) ?? '',
         slot,
+        'meal_history',
       );
       const stub: Meal = {
         id: mealId,
@@ -2397,6 +3080,7 @@ export class MealPlansService {
         slot,
         date: '',
         ingredientRefs: [],
+        recipeSource: 'meal_history',
       };
       const toPush = meal ?? stub;
       if (

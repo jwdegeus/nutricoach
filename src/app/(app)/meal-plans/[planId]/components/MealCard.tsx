@@ -15,6 +15,8 @@ import {
 import { Field, Label } from '@/components/catalyst/fieldset';
 import { Input } from '@/components/catalyst/input';
 import { ArrowLeftRight, Trash2, Clock, Loader2, Replace } from 'lucide-react';
+import { Badge } from '@/components/catalyst/badge';
+import { Link } from '@/components/catalyst/link';
 import type { MealPlanResponse } from '@/src/lib/diets';
 import type {
   EnrichedMeal,
@@ -44,6 +46,8 @@ type MealCardProps = {
   planStatus?: MealPlanStatus;
   /** Recept uit Recepten gekoppeld aan deze planmaaltijd (afbeelding, link) */
   linkedRecipe?: LinkedRecipe;
+  /** Bron bij generatie: db = uit database, ai = door AI. Bepaalt Database vs AI-gegenereerd badge. */
+  sourceFromProvenance?: 'db' | 'ai';
   /** Called when a per-meal edit (Wissel/Verwijder) is started */
   onEditStarted?: () => void;
 };
@@ -64,6 +68,7 @@ export function MealCard({
   nevoFoodNamesByCode,
   planStatus,
   linkedRecipe,
+  sourceFromProvenance,
   onEditStarted,
 }: MealCardProps) {
   const router = useRouter();
@@ -247,13 +252,31 @@ export function MealCard({
             />
           </div>
         )}
-        <div className="mb-2 flex items-start justify-between">
-          <div className="flex-1">
-            <div className="text-xs tracking-wide text-muted-foreground uppercase">
-              {formatMealSlot(mealSlot)}
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                {formatMealSlot(mealSlot)}
+              </div>
+              <Badge
+                color={sourceFromProvenance === 'db' ? 'emerald' : 'zinc'}
+                className="text-xs"
+              >
+                {sourceFromProvenance === 'db' ? 'Database' : 'AI-gegenereerd'}
+              </Badge>
             </div>
             <Heading level={3} className="mt-1">
-              {title || 'Geen titel'}
+              {linkedRecipe ? (
+                <Link
+                  href={`/recipes/${linkedRecipe.recipeId}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-foreground underline decoration-primary-600/30 underline-offset-2 hover:text-primary-600 hover:decoration-primary-600 dark:decoration-primary-400/30 dark:hover:text-primary-400 dark:hover:decoration-primary-400"
+                >
+                  {title || linkedRecipe.name || 'Geen titel'}
+                </Link>
+              ) : (
+                title || 'Geen titel'
+              )}
             </Heading>
           </div>
         </div>

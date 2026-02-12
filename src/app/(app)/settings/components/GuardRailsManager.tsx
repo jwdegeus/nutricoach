@@ -21,6 +21,7 @@ import {
   Label,
   Description,
 } from '@/components/catalyst/fieldset';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { Text } from '@/components/catalyst/text';
 import { Input } from '@/components/catalyst/input';
 import { Textarea } from '@/components/catalyst/textarea';
@@ -658,25 +659,21 @@ export function GuardRailsManager({
                 </Field>
 
                 <Field>
-                  <Label htmlFor="category-type">Type *</Label>
-                  <select
-                    id="category-type"
+                  <Label>Type *</Label>
+                  <Listbox
                     value={categoryFormData.category_type}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setCategoryFormData({
                         ...categoryFormData,
-                        category_type: e.target.value as
-                          | 'forbidden'
-                          | 'required',
+                        category_type: val as 'forbidden' | 'required',
                       })
                     }
-                    required
                     disabled={!!editingCategoryId}
-                    className="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                    aria-label="Type"
                   >
-                    <option value="forbidden">Verboden</option>
-                    <option value="required">Vereist</option>
-                  </select>
+                    <ListboxOption value="forbidden">Verboden</ListboxOption>
+                    <ListboxOption value="required">Vereist</ListboxOption>
+                  </Listbox>
                   <Description>
                     Type kan niet worden gewijzigd na aanmaken.
                   </Description>
@@ -839,51 +836,49 @@ export function GuardRailsManager({
                     {isSelected && (
                       <div className="mt-3 space-y-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">
                         <Field>
-                          <Label htmlFor={`rule-action-${category.id}`}>
-                            Rule Actie
-                          </Label>
-                          <select
-                            id={`rule-action-${category.id}`}
+                          <Label>Rule Actie</Label>
+                          <Listbox
                             value={
                               details?.rule_action ||
                               (isBlock ? 'block' : 'allow')
                             }
-                            onChange={(e) =>
+                            onChange={(val) =>
                               updateConstraintDetail(
                                 category.id,
                                 'rule_action',
-                                e.target.value as 'allow' | 'block',
+                                val as 'allow' | 'block',
                               )
                             }
-                            className="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                            aria-label="Rule Actie"
                           >
-                            <option value="allow">Allow (Toestaan)</option>
-                            <option value="block">Block (Blokkeren)</option>
-                          </select>
+                            <ListboxOption value="allow">
+                              Allow (Toestaan)
+                            </ListboxOption>
+                            <ListboxOption value="block">
+                              Block (Blokkeren)
+                            </ListboxOption>
+                          </Listbox>
                           <Description>
                             Regel actie. Block heeft voorrang over allow bij
                             gelijke prioriteit.
                           </Description>
                         </Field>
                         <Field>
-                          <Label htmlFor={`strictness-${category.id}`}>
-                            Striktheid
-                          </Label>
-                          <select
-                            id={`strictness-${category.id}`}
+                          <Label>Striktheid</Label>
+                          <Listbox
                             value={details?.strictness || 'hard'}
-                            onChange={(e) =>
+                            onChange={(val) =>
                               updateConstraintDetail(
                                 category.id,
                                 'strictness',
-                                e.target.value as 'hard' | 'soft',
+                                val as 'hard' | 'soft',
                               )
                             }
-                            className="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                            aria-label="Striktheid"
                           >
-                            <option value="hard">Hard</option>
-                            <option value="soft">Soft</option>
-                          </select>
+                            <ListboxOption value="hard">Hard</ListboxOption>
+                            <ListboxOption value="soft">Soft</ListboxOption>
+                          </Listbox>
                         </Field>
                         {(isAllow || category.category_type === 'required') && (
                           <div className="grid grid-cols-2 gap-2">

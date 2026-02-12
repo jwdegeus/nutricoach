@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/catalyst/button';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { Field, Label } from '@/components/catalyst/fieldset';
 import { PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/20/solid';
 
@@ -167,19 +167,20 @@ export function RecipeSourceEditor({
     <div className="space-y-3">
       <Field>
         <Label>Bron</Label>
-        <Select
+        <Listbox
           value={selectedSource}
-          onChange={(e) => setSelectedSource(e.target.value)}
+          onChange={(val) => setSelectedSource(val)}
           disabled={isSaving}
+          aria-label="Bron"
         >
-          <option value="">Geen bron</option>
+          <ListboxOption value="">Geen bron</ListboxOption>
           {sources.map((source) => (
-            <option key={source.id} value={source.name}>
+            <ListboxOption key={source.id} value={source.name}>
               {source.name}
-            </option>
+            </ListboxOption>
           ))}
-          <option value="custom">Anders (aangepast)...</option>
-        </Select>
+          <ListboxOption value="custom">Anders (aangepast)...</ListboxOption>
+        </Listbox>
       </Field>
 
       {selectedSource === 'custom' && (

@@ -18,6 +18,7 @@ export type MealPlanGeneratorSettingsV2 = {
   recency_window_days: number;
   max_ai_generated_slots_per_week: number;
   min_db_recipe_coverage_ratio: number;
+  use_db_first: boolean;
   is_active: boolean;
   schema_version: number;
 };
@@ -52,7 +53,7 @@ export type MealPlanGeneratorDbConfig = {
 };
 
 const SETTINGS_SELECT =
-  'diet_key, min_history_reuse_ratio, target_prefill_ratio, recency_window_days, max_ai_generated_slots_per_week, min_db_recipe_coverage_ratio, is_active, schema_version';
+  'diet_key, min_history_reuse_ratio, target_prefill_ratio, recency_window_days, max_ai_generated_slots_per_week, min_db_recipe_coverage_ratio, use_db_first, is_active, schema_version';
 const VARIETY_SELECT =
   'diet_key, unique_veg_min, unique_fruit_min, protein_rotation_min_categories, max_repeat_same_recipe_within_days, favorites_repeat_boost, is_active, schema_version';
 const CULINARY_SELECT =
@@ -134,6 +135,7 @@ function mapSettingsRow(
       row.min_db_recipe_coverage_ratio,
       0.5,
     ),
+    use_db_first: row.use_db_first === true,
     is_active: row.is_active === true,
     schema_version: ensureNumber(row.schema_version, 1),
   };

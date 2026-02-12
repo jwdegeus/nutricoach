@@ -7,6 +7,7 @@ import { getNevoFoodByCode } from '@/src/lib/nevo/nutrition-calculator';
 import { MealPlanActionsClient } from './components/MealPlanActionsClient';
 import { MealPlanPageWrapper } from './components/MealPlanPageWrapper';
 import { MealPlanPageClient } from './components/MealPlanPageClient';
+import { GeneratorInzichtPanel } from './components/GeneratorInzichtPanel';
 import { MealPlanDraftBannerClient } from './components/MealPlanDraftBannerClient';
 import { MealPlanHeaderMeta } from '../components/MealPlanHeaderMeta';
 import { TherapeuticSummaryCard } from '../components/TherapeuticSummaryCard';
@@ -380,13 +381,13 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
         ).therapeuticSupplementsSummary
       : null;
 
-  // Build NEVO food names map for client components
+  // Build NEVO food names map (alleen voor refs met nevoCode; custom/fdc gebruiken displayName)
   const nevoCodes = new Set<string>();
   for (const day of plan.planSnapshot.days) {
     for (const meal of day.meals) {
       if (meal.ingredientRefs) {
         for (const ref of meal.ingredientRefs) {
-          nevoCodes.add(ref.nevoCode);
+          if (ref.nevoCode?.trim()) nevoCodes.add(ref.nevoCode.trim());
         }
       }
     }
@@ -469,55 +470,13 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
       />
 
       {showDbCoveragePanel && dbCoverageMeta && (
-        <div className="rounded-xl bg-muted/20 px-4 py-3 shadow-sm">
-          <p className="text-sm font-medium text-foreground">
-            DB coverage: {dbCoverageMeta.dbSlots}/{dbCoverageMeta.totalSlots} (
-            {dbCoverageMeta.percent}%)
-          </p>
-          {dbCoverageMeta.dbSlots < dbCoverageMeta.totalSlots &&
-            Array.isArray(fallbackReasonsMeta) &&
-            fallbackReasonsMeta.length > 0 && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                AI redenen:{' '}
-                {fallbackReasonsMeta
-                  .map((r) => `${reasonLabelFor(r.reason)} (${r.count})`)
-                  .join(', ')}
-              </p>
-            )}
-        </div>
+        <GeneratorInzichtPanel
+          dbCoverageMeta={dbCoverageMeta}
+          fallbackReasonsMeta={fallbackReasonsMeta}
+          aiSlotsDisplay={aiSlotsDisplay}
+          hasMissingRefs={hasMissingRefs}
+        />
       )}
-
-      {showDbCoveragePanel &&
-        dbCoverageMeta &&
-        dbCoverageMeta.dbSlots < dbCoverageMeta.totalSlots &&
-        aiSlotsDisplay.length > 0 && (
-          <div className="space-y-2 rounded-xl bg-muted/20 px-4 py-3 shadow-sm">
-            <p className="text-sm font-medium text-foreground">AI ingevuld</p>
-            <ul className="space-y-1 text-sm text-muted-foreground">
-              {aiSlotsDisplay.map((item) => (
-                <li key={`${item.date}-${item.slotLabel}`}>
-                  {item.date} – {item.slotLabel}: {item.reasonLabel}
-                </li>
-              ))}
-            </ul>
-            <div className="flex flex-wrap items-center gap-3 pt-1">
-              {hasMissingRefs && (
-                <Link
-                  href="/recipes?filter=nevo-missing"
-                  className="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
-                >
-                  Fix NEVO ontbreekt
-                </Link>
-              )}
-              <Link
-                href="/recipes"
-                className="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
-              >
-                Open receptenbank
-              </Link>
-            </div>
-          </div>
-        )}
 
       <div
         className={
@@ -575,6 +534,7 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
             nevoFoodNamesByCode={nevoFoodNamesByCode}
             planStatus={plan.status}
             linkedRecipesByMealId={linkedRecipesByMealId}
+            slotProvenance={slotProvenance}
           />
         )}
       </MealPlanPageWrapper>

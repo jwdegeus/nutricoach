@@ -901,22 +901,19 @@ export function IngredientsAdminClient({
           <div className="mb-4 flex flex-wrap items-end gap-4">
             <Field>
               <Label>Min. score (fuzzy)</Label>
-              <select
+              <Listbox
                 value={duplicatesMinScore}
-                onChange={(e) =>
-                  setDuplicatesMinScore(
-                    Number(e.target.value) as 0.6 | 0.7 | 0.8 | 0.9,
-                  )
+                onChange={(val) =>
+                  setDuplicatesMinScore(val as 0.6 | 0.7 | 0.8 | 0.9)
                 }
-                className="mt-1 block w-full rounded-lg border-zinc-300 sm:text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
                 aria-label="Minimale score"
               >
                 {MIN_SCORE_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
+                  <ListboxOption key={s} value={s}>
                     {s}
-                  </option>
+                  </ListboxOption>
                 ))}
-              </select>
+              </Listbox>
             </Field>
             <SwitchField className="flex flex-row items-center gap-3">
               <Label>Alleen ingeschakelde FNDDS</Label>

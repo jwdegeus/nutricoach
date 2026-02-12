@@ -689,6 +689,579 @@ export async function saveIngredientMatchAction(args: {
   }
 }
 
+/**
+ * Haal voorstellen voor auto-koppelen op (zonder op te slaan).
+ * Gebruiker kan in de UI controleren en aanpassen vóór Toepassen.
+ */
+export async function getAutoLinkProposalsAction(recipeId: string): Promise<
+  ActionResult<{
+    ingredients: Array<{
+      name: string;
+      quantity?: string | number | null;
+      unit?: string | null;
+      original_line?: string;
+    }>;
+    proposals: Array<{
+      index: number;
+      ingredient: {
+        name: string;
+        quantity?: string | number | null;
+        unit?: string | null;
+        original_line?: string;
+      };
+      proposedMatch: IngredientCandidate | null;
+      hadExistingRef: boolean;
+    }>;
+  }>
+> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: { code: 'AUTH_ERROR', message: 'Je moet ingelogd zijn' },
+      };
+    }
+
+    const { data: meal, error: fetchError } = await supabase
+      .from('custom_meals')
+      .select('meal_data')
+      .eq('id', recipeId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (fetchError || !meal) {
+      return {
+        ok: false,
+        error: {
+          code: fetchError ? 'DB_ERROR' : 'VALIDATION_ERROR',
+          message: fetchError?.message ?? 'Recept niet gevonden',
+        },
+      };
+    }
+
+    const mealData = (meal.meal_data as Record<string, unknown>) || {};
+    let ingredients: Array<{
+      name: string;
+      quantity?: string | number | null;
+      unit?: string | null;
+      original_line?: string;
+    }> = [];
+
+    const mealDataIngredients = mealData.ingredients;
+    if (Array.isArray(mealDataIngredients) && mealDataIngredients.length > 0) {
+      ingredients = mealDataIngredients.map((ing: Record<string, unknown>) => ({
+        name: String(ing.name ?? ing.original_line ?? '').trim(),
+        quantity:
+          ing.quantity != null
+            ? typeof ing.quantity === 'number'
+              ? ing.quantity
+              : String(ing.quantity)
+            : null,
+        unit: ing.unit != null ? String(ing.unit) : null,
+        original_line: String(ing.original_line ?? ing.name ?? '').trim(),
+      }));
+    } else {
+      const { data: riRows } = await supabase
+        .from('recipe_ingredients')
+        .select('name, quantity, unit, original_line')
+        .eq('recipe_id', recipeId)
+        .order('id', { ascending: true });
+      if (riRows?.length) {
+        ingredients = riRows.map((r: Record<string, unknown>) => ({
+          name: String(r.name ?? r.original_line ?? '').trim(),
+          quantity:
+            r.quantity != null
+              ? typeof r.quantity === 'number'
+                ? r.quantity
+                : Number(r.quantity)
+              : null,
+          unit: r.unit != null ? String(r.unit) : null,
+          original_line: String(r.original_line ?? r.name ?? '').trim(),
+        }));
+      }
+    }
+
+    if (ingredients.length === 0) {
+      return {
+        ok: true,
+        data: { ingredients: [], proposals: [] },
+      };
+    }
+
+    const existingRefs = Array.isArray(mealData.ingredientRefs)
+      ? (mealData.ingredientRefs as Record<string, unknown>[])
+      : [];
+    const proposals: Array<{
+      index: number;
+      ingredient: (typeof ingredients)[number];
+      proposedMatch: IngredientCandidate | null;
+      hadExistingRef: boolean;
+    }> = [];
+
+    const hasRef = (r: Record<string, unknown>): boolean =>
+      r != null &&
+      (r.nevoCode != null || r.customFoodId != null || r.fdcId != null);
+
+    for (let i = 0; i < ingredients.length; i++) {
+      const ing = ingredients[i];
+      const displayName = ing.name || ing.original_line || '';
+      const searchLine =
+        [ing.quantity, ing.unit, displayName].filter(Boolean).join(' ') ||
+        displayName;
+      const existing = existingRefs[i];
+
+      if (existing && hasRef(existing)) {
+        proposals.push({
+          index: i,
+          ingredient: ing,
+          proposedMatch: null,
+          hadExistingRef: true,
+        });
+        continue;
+      }
+
+      const searchResult = await searchIngredientCandidatesAction(
+        searchLine.trim() || displayName,
+        5,
+      );
+      if (!searchResult.ok) {
+        proposals.push({
+          index: i,
+          ingredient: ing,
+          proposedMatch: null,
+          hadExistingRef: false,
+        });
+        continue;
+      }
+      const candidates = searchResult.data;
+      const best = candidates[0] ?? null;
+
+      proposals.push({
+        index: i,
+        ingredient: ing,
+        proposedMatch: best,
+        hadExistingRef: false,
+      });
+    }
+
+    return {
+      ok: true,
+      data: { ingredients, proposals },
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: e instanceof Error ? e.message : 'Onbekende fout',
+      },
+    };
+  }
+}
+
+/**
+ * Pas de door de gebruiker gekozen koppelingen toe.
+ * choices[i] = IngredientCandidate | null (null = geen koppeling of behoud bestaande).
+ */
+export async function applyAutoLinkChoicesAction(
+  recipeId: string,
+  choices: Array<{ index: number; candidate: IngredientCandidate | null }>,
+  keepExistingRefs: boolean,
+): Promise<
+  ActionResult<{
+    linked: number;
+    skipped: number;
+    total: number;
+    updated: boolean;
+  }>
+> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: { code: 'AUTH_ERROR', message: 'Je moet ingelogd zijn' },
+      };
+    }
+
+    const { data: meal, error: fetchError } = await supabase
+      .from('custom_meals')
+      .select('meal_data')
+      .eq('id', recipeId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (fetchError || !meal) {
+      return {
+        ok: false,
+        error: {
+          code: fetchError ? 'DB_ERROR' : 'VALIDATION_ERROR',
+          message: fetchError?.message ?? 'Recept niet gevonden',
+        },
+      };
+    }
+
+    const mealData = (meal.meal_data as Record<string, unknown>) || {};
+    const existingRefs = Array.isArray(mealData.ingredientRefs)
+      ? (mealData.ingredientRefs as Record<string, unknown>[])
+      : [];
+    let ingredients: Array<Record<string, unknown>> = Array.isArray(
+      mealData.ingredients,
+    )
+      ? (mealData.ingredients as Array<Record<string, unknown>>)
+      : [];
+    if (ingredients.length === 0) {
+      const { data: riRows } = await supabase
+        .from('recipe_ingredients')
+        .select('name, quantity, unit, original_line')
+        .eq('recipe_id', recipeId)
+        .order('id', { ascending: true });
+      ingredients = (riRows ?? []) as Array<Record<string, unknown>>;
+    }
+
+    const choiceByIndex = new Map(choices.map((c) => [c.index, c.candidate]));
+    const ingredientRefs: Array<Record<string, unknown>> = [];
+    let linked = 0;
+    let skipped = 0;
+
+    const hasRef = (r: Record<string, unknown>): boolean =>
+      r != null &&
+      (r.nevoCode != null || r.customFoodId != null || r.fdcId != null);
+
+    for (let i = 0; i < ingredients.length; i++) {
+      const ing = ingredients[i] ?? {};
+      const displayName = String(ing.name ?? ing.original_line ?? '').trim();
+      const choice = choiceByIndex.get(i);
+      const existing = existingRefs[i];
+
+      if (keepExistingRefs && existing && hasRef(existing)) {
+        ingredientRefs.push(existing);
+        skipped++;
+        continue;
+      }
+
+      if (
+        choice &&
+        (choice.nevoCode != null || choice.customFoodId || choice.fdcId != null)
+      ) {
+        const searchLine =
+          [ing.quantity, ing.unit, displayName].filter(Boolean).join(' ') ||
+          displayName;
+        const norm = normalizeIngredientText(searchLine.trim() || displayName);
+        if (norm) {
+          await saveIngredientMatchAction({
+            normalizedText: norm,
+            source: choice.source,
+            nevoCode: choice.nevoCode,
+            customFoodId: choice.customFoodId,
+            fdcId: choice.fdcId,
+          });
+        }
+        const quantityG = quantityGFromIngredient(ing);
+        const ref: Record<string, unknown> = {
+          displayName: choice.name_nl || displayName,
+          quantityG: quantityG > 0 ? quantityG : 100,
+        };
+        if (choice.source === 'nevo' && choice.nevoCode != null) {
+          ref.nevoCode = String(choice.nevoCode);
+        } else if (choice.source === 'custom' && choice.customFoodId) {
+          ref.customFoodId = choice.customFoodId;
+        } else if (choice.source === 'fndds' && choice.fdcId != null) {
+          ref.fdcId = choice.fdcId;
+        }
+        ingredientRefs.push(ref);
+        linked++;
+      } else {
+        ingredientRefs.push({
+          displayName,
+          quantityG: quantityGFromIngredient(ing),
+        });
+      }
+    }
+
+    const updatedMealData = {
+      ...mealData,
+      ingredientRefs,
+    };
+
+    const { error: updateError } = await supabase
+      .from('custom_meals')
+      .update({
+        meal_data: updatedMealData,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', recipeId)
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      return {
+        ok: false,
+        error: { code: 'DB_ERROR', message: updateError.message },
+      };
+    }
+
+    return {
+      ok: true,
+      data: {
+        linked,
+        skipped,
+        total: ingredients.length,
+        updated: linked > 0,
+      },
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: e instanceof Error ? e.message : 'Onbekende fout',
+      },
+    };
+  }
+}
+
+/** Bepaal quantityG uit quantity + unit (voor ingredientRefs). */
+function quantityGFromIngredient(ing: {
+  quantity?: string | number | null;
+  unit?: string | null;
+}): number {
+  const q = ing.quantity;
+  const u = (ing.unit ?? 'g').toString().trim().toLowerCase() || 'g';
+  const numQty =
+    q == null
+      ? NaN
+      : typeof q === 'number'
+        ? q
+        : parseFloat(String(q).replace(/,/g, '.'));
+  if (!Number.isFinite(numQty) || numQty <= 0) return 0;
+  return quantityUnitToGrams(numQty, u);
+}
+
+/**
+ * Auto-koppel ingrediënten voor een recept: zoekt voor elk ongekoppeld ingrediënt
+ * in NEVO, custom en FNDDS, kiest de beste match en vult meal_data.ingredientRefs.
+ * Zie docs/ingredient-sources-unificatie-stappenplan.md (Fase 1).
+ */
+export async function autoLinkRecipeIngredientsAction(
+  recipeId: string,
+): Promise<
+  ActionResult<{
+    linked: number;
+    skipped: number;
+    total: number;
+    updated: boolean;
+  }>
+> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: { code: 'AUTH_ERROR', message: 'Je moet ingelogd zijn' },
+      };
+    }
+
+    const { data: meal, error: fetchError } = await supabase
+      .from('custom_meals')
+      .select('meal_data')
+      .eq('id', recipeId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (fetchError || !meal) {
+      return {
+        ok: false,
+        error: {
+          code: fetchError ? 'DB_ERROR' : 'VALIDATION_ERROR',
+          message: fetchError?.message ?? 'Recept niet gevonden',
+        },
+      };
+    }
+
+    const mealData = (meal.meal_data as Record<string, unknown>) || {};
+    let ingredients: Array<{
+      name: string;
+      quantity?: string | number | null;
+      unit?: string | null;
+      original_line?: string;
+    }> = [];
+
+    const mealDataIngredients = mealData.ingredients;
+    if (Array.isArray(mealDataIngredients) && mealDataIngredients.length > 0) {
+      ingredients = mealDataIngredients.map((ing: Record<string, unknown>) => ({
+        name: String(ing.name ?? ing.original_line ?? '').trim(),
+        quantity:
+          ing.quantity != null
+            ? typeof ing.quantity === 'number'
+              ? ing.quantity
+              : String(ing.quantity)
+            : null,
+        unit: ing.unit != null ? String(ing.unit) : null,
+        original_line: String(ing.original_line ?? ing.name ?? '').trim(),
+      }));
+    } else {
+      const { data: riRows } = await supabase
+        .from('recipe_ingredients')
+        .select('name, quantity, unit, original_line')
+        .eq('recipe_id', recipeId)
+        .order('id', { ascending: true });
+      if (riRows?.length) {
+        ingredients = riRows.map((r: Record<string, unknown>) => ({
+          name: String(r.name ?? r.original_line ?? '').trim(),
+          quantity:
+            r.quantity != null
+              ? typeof r.quantity === 'number'
+                ? r.quantity
+                : Number(r.quantity)
+              : null,
+          unit: r.unit != null ? String(r.unit) : null,
+          original_line: String(r.original_line ?? r.name ?? '').trim(),
+        }));
+      }
+    }
+
+    if (ingredients.length === 0) {
+      return {
+        ok: true,
+        data: { linked: 0, skipped: 0, total: 0, updated: false },
+      };
+    }
+
+    const existingRefs = Array.isArray(mealData.ingredientRefs)
+      ? (mealData.ingredientRefs as Record<string, unknown>[])
+      : [];
+    const ingredientRefs: Array<Record<string, unknown>> = [];
+    let linked = 0;
+    let skipped = 0;
+
+    for (let i = 0; i < ingredients.length; i++) {
+      const ing = ingredients[i];
+      const displayName = ing.name || ing.original_line || '';
+      const searchLine =
+        [ing.quantity, ing.unit, displayName].filter(Boolean).join(' ') ||
+        displayName;
+
+      const hasRef = (r: Record<string, unknown>): boolean =>
+        r != null &&
+        (r.nevoCode != null || r.customFoodId != null || r.fdcId != null);
+      const existing = existingRefs[i];
+
+      if (existing && hasRef(existing)) {
+        ingredientRefs.push(existing);
+        skipped++;
+        continue;
+      }
+
+      const searchResult = await searchIngredientCandidatesAction(
+        searchLine.trim() || displayName,
+        5,
+      );
+      if (!searchResult.ok) {
+        ingredientRefs.push({
+          displayName,
+          quantityG: quantityGFromIngredient(ing),
+        });
+        continue;
+      }
+      const candidates = searchResult.data;
+      const best = candidates[0];
+
+      if (!best) {
+        ingredientRefs.push({
+          displayName,
+          quantityG: quantityGFromIngredient(ing),
+        });
+        continue;
+      }
+
+      const norm = normalizeIngredientText(searchLine.trim() || displayName);
+      if (norm) {
+        const saveResult = await saveIngredientMatchAction({
+          normalizedText: norm,
+          source: best.source,
+          nevoCode: best.nevoCode,
+          customFoodId: best.customFoodId,
+          fdcId: best.fdcId,
+        });
+        if (!saveResult.ok) {
+          ingredientRefs.push({
+            displayName,
+            quantityG: quantityGFromIngredient(ing),
+          });
+          continue;
+        }
+      }
+
+      const quantityG = quantityGFromIngredient(ing);
+      const ref: Record<string, unknown> = {
+        displayName: best.name_nl || displayName,
+        quantityG: quantityG > 0 ? quantityG : 100,
+      };
+      if (best.source === 'nevo' && best.nevoCode != null) {
+        ref.nevoCode = String(best.nevoCode);
+      } else if (best.source === 'custom' && best.customFoodId) {
+        ref.customFoodId = best.customFoodId;
+      } else if (best.source === 'fndds' && best.fdcId != null) {
+        ref.fdcId = best.fdcId;
+      }
+      ingredientRefs.push(ref);
+      linked++;
+    }
+
+    const updatedMealData = {
+      ...mealData,
+      ingredientRefs,
+    };
+
+    const { error: updateError } = await supabase
+      .from('custom_meals')
+      .update({
+        meal_data: updatedMealData,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', recipeId)
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      return {
+        ok: false,
+        error: { code: 'DB_ERROR', message: updateError.message },
+      };
+    }
+
+    return {
+      ok: true,
+      data: {
+        linked,
+        skipped,
+        total: ingredients.length,
+        updated: linked > 0,
+      },
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: e instanceof Error ? e.message : 'Onbekende fout',
+      },
+    };
+  }
+}
+
 /** Weergavelabel voor de bron in zoekresultaten (eigen / AI / Nevo / FNDDS). */
 export type IngredientSourceLabel = 'Eigen' | 'AI' | 'Nevo' | 'FNDDS';
 

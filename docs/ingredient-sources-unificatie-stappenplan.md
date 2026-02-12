@@ -169,8 +169,8 @@
 ## 6. Volgorde voor implementatie (Fase 1 – aanbevolen start)
 
 1. **Analyseren** – Welke recepten hebben lege ingredientRefs en waar zitten de recipe_ingredients? (Query uit eerdere analyse.)
-2. **autoLinkRecipeIngredientsAction** – Server action die voor één recept alle ingrediënten matcht en meal_data.ingredientRefs + recipe_ingredient_matches vult.
-3. **UI** – Knop “Koppel alle ingrediënten” bij recept (bijv. in AI Magician of naast Classificeren).
+2. **autoLinkRecipeIngredientsAction** – Server action die voor één recept alle ingrediënten matcht en meal_data.ingredientRefs + recipe_ingredient_matches vult. ✅ **Geïmplementeerd** (`ingredient-matching.actions.ts`)
+3. **UI** – Knop “Koppel ingrediënten” bij recept (naast Classificeren en AI Magician). ✅ **Geïmplementeerd** (`MealDetail.tsx`)
 4. **Testen** – Voor en na: aantal recepten met ingredientRefs; weekmenu-prefill.
 5. **Bulk** (optioneel) – Job of admin-pagina om alle recepten van een user te verwerken.
 

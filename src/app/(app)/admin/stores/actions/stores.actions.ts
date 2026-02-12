@@ -276,6 +276,7 @@ export async function updateStoreAction(
     detailBatchSize?: number | null;
     detailConcurrency?: number | null;
     detailDelayMs?: number | null;
+    productUrlsOnly?: boolean | null;
   },
 ): Promise<UpdateStoreResult> {
   const userIsAdmin = await isAdmin();
@@ -323,6 +324,8 @@ export async function updateStoreAction(
     connector_config.detailConcurrency = form.detailConcurrency ?? undefined;
   if (form.detailDelayMs !== undefined)
     connector_config.detailDelayMs = form.detailDelayMs ?? undefined;
+  if (form.productUrlsOnly !== undefined)
+    connector_config.productUrlsOnly = form.productUrlsOnly ?? undefined;
   updates.connector_config = connector_config;
 
   const { error } = await supabase.from('stores').update(updates).eq('id', id);

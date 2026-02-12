@@ -161,10 +161,11 @@ export class MealHistoryService {
     try {
       // Calculate macros
       const macros = await calcMealMacros(
-        meal.ingredientRefs.map((ref) => ({
-          nevoCode: ref.nevoCode,
-          quantityG: ref.quantityG,
-        })),
+        meal.ingredientRefs
+          .filter((ref): ref is typeof ref & { nevoCode: string } =>
+            Boolean(ref.nevoCode),
+          )
+          .map((ref) => ({ nevoCode: ref.nevoCode, quantityG: ref.quantityG })),
       );
 
       const { calories, proteinG, carbsG, fatG } = macros;

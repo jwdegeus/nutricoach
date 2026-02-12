@@ -84,7 +84,7 @@ async function buildNevoFoodNamesByCode(
     for (const meal of day.meals) {
       if (meal.ingredientRefs) {
         for (const ref of meal.ingredientRefs) {
-          nevoCodes.add(ref.nevoCode);
+          if (ref.nevoCode) nevoCodes.add(ref.nevoCode);
         }
       }
     }
@@ -293,7 +293,7 @@ export class MealPlannerEnrichmentService {
     const nevoCodes = new Set<string>();
     if (meal.ingredientRefs) {
       for (const ref of meal.ingredientRefs) {
-        nevoCodes.add(ref.nevoCode);
+        if (ref.nevoCode) nevoCodes.add(ref.nevoCode);
       }
     }
 
@@ -434,7 +434,7 @@ export class MealPlannerEnrichmentService {
     const allowedCodes = new Set<string>();
     if (meal.ingredientRefs) {
       for (const ref of meal.ingredientRefs) {
-        allowedCodes.add(ref.nevoCode);
+        if (ref.nevoCode) allowedCodes.add(ref.nevoCode);
       }
     }
 

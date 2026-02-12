@@ -8,6 +8,61 @@ import { MealPlansService } from '@/src/lib/meal-plans/mealPlans.service';
 import { AppError } from '@/src/lib/errors/app-error';
 import { buildInboxMessageFromErrorCode } from '@/src/lib/meal-plans/mealPlanErrorPresenter';
 
+/** Dutch labels for AI fallback reasons (DB-first flow) */
+const FALLBACK_REASON_LABELS: Record<string, string> = {
+  no_candidates: 'Geen passende recepten',
+  repeat_window_blocked: 'Variatie-venster te streng',
+  missing_ingredient_refs: 'NEVO ontbreekt',
+  all_candidates_blocked_by_constraints: 'Geblokkeerd door regels',
+  ai_candidate_blocked_by_constraints: 'AI voorstel geblokkeerd',
+};
+
+function buildMealPlanReadyNotification(params: {
+  planId: string;
+  runId?: string;
+  dbCoverage?: { dbSlots: number; totalSlots: number; percent: number };
+  fallbackReasons?: { reason: string; count: number }[];
+}): { message: string; details: Record<string, unknown> } {
+  const { planId, runId, dbCoverage, fallbackReasons } = params;
+  const dbSlots = dbCoverage?.dbSlots ?? 0;
+  const totalSlots = dbCoverage?.totalSlots ?? 0;
+  const percent = dbCoverage?.percent ?? 0;
+  const aiSlots = totalSlots > 0 ? totalSlots - dbSlots : 0;
+
+  let message = 'Er staat een nieuw concept-weekmenu klaar om te reviewen.';
+  if (totalSlots > 0) {
+    message += ` ${dbSlots} maaltijden uit je database, ${aiSlots} door AI (${percent}% database).`;
+  }
+  if (
+    Array.isArray(fallbackReasons) &&
+    fallbackReasons.length > 0 &&
+    aiSlots > 0
+  ) {
+    const reasonParts = fallbackReasons
+      .map(
+        (r) => `${FALLBACK_REASON_LABELS[r.reason] ?? r.reason} (${r.count}×)`,
+      )
+      .join(', ');
+    message += ` Waarom AI: ${reasonParts}.`;
+  }
+  if (dbSlots <= 3 && totalSlots > 0) {
+    message +=
+      ' Tips om meer recepten uit je database te gebruiken: voeg meer recepten toe die als ontbijt/lunch/diner zijn geclassificeerd, zorg dat alle ingrediënten een NEVO-koppeling hebben, pas eventueel je dieetregels aan (minder restrictief = meer keuze).';
+  }
+
+  const details: Record<string, unknown> = { planId };
+  if (runId) details.runId = runId;
+  if (dbCoverage) {
+    details.dbSlots = dbCoverage.dbSlots;
+    details.totalSlots = dbCoverage.totalSlots;
+    details.percent = dbCoverage.percent;
+  }
+  if (Array.isArray(fallbackReasons) && fallbackReasons.length > 0) {
+    details.fallbackReasons = fallbackReasons;
+  }
+  return { message, details };
+}
+
 /** Explicit columns for due-job select (no SELECT *) */
 const JOB_CLAIM_SELECT_COLUMNS =
   'id,user_id,scheduled_for,attempt,max_attempts,request_snapshot';
@@ -1142,7 +1197,8 @@ export async function runOneDueMealPlanJobSystemAction(): Promise<
           percent: number;
         }
       | undefined;
-    let dbCoverageBelowTarget: boolean | undefined;
+    let _dbCoverageBelowTarget: boolean | undefined;
+    let fallbackReasons: { reason: string; count: number }[] | undefined;
     try {
       const service = new MealPlansService();
       const result = await service.createPlanForUser(
@@ -1152,7 +1208,8 @@ export async function runOneDueMealPlanJobSystemAction(): Promise<
       );
       planId = result.planId;
       dbCoverage = result.dbCoverage;
-      dbCoverageBelowTarget = result.dbCoverageBelowTarget;
+      _dbCoverageBelowTarget = result.dbCoverageBelowTarget;
+      fallbackReasons = result.fallbackReasons;
       await ensurePlanIsInDraft(admin, planId);
     } catch (error) {
       const errorCode =
@@ -1210,29 +1267,12 @@ export async function runOneDueMealPlanJobSystemAction(): Promise<
     }
 
     try {
-      const dbSlots = dbCoverage?.dbSlots ?? 0;
-      const totalSlots = dbCoverage?.totalSlots ?? 0;
-      const percent = dbCoverage?.percent ?? 0;
-
-      let message = 'Er staat een nieuw concept-weekmenu klaar om te reviewen.';
-      if (totalSlots > 0) {
-        message += ` ${dbSlots} van ${totalSlots} maaltijden (${percent}%) komen uit je receptendatabase.`;
-      }
-      if (dbSlots <= 3 && totalSlots > 0) {
-        message +=
-          ' Tips om meer recepten uit je database te gebruiken: voeg meer recepten toe die als ontbijt/lunch/diner zijn geclassificeerd, zorg dat alle ingrediënten een NEVO-koppeling hebben, pas eventueel je dieetregels aan (minder restrictief = meer keuze).';
-      }
-
-      const details: Record<string, unknown> = {
+      const { message, details } = buildMealPlanReadyNotification({
         planId,
         runId: claimed.id,
-      };
-      if (dbCoverage) {
-        details.dbSlots = dbCoverage.dbSlots;
-        details.totalSlots = dbCoverage.totalSlots;
-        details.percent = dbCoverage.percent;
-      }
-
+        dbCoverage,
+        fallbackReasons,
+      });
       await admin.from('user_inbox_notifications').insert({
         user_id: claimed.user_id,
         type: 'meal_plan_ready_for_review',
@@ -1474,11 +1514,13 @@ export async function runClaimedMealPlanJobAction(
           percent: number;
         }
       | undefined;
+    let fallbackReasons: { reason: string; count: number }[] | undefined;
     try {
       const service = new MealPlansService();
       const result = await service.createPlanForUser(user.id, createInput);
       planId = result.planId;
       dbCoverage = result.dbCoverage;
+      fallbackReasons = result.fallbackReasons;
     } catch (error) {
       const errorCode =
         error instanceof AppError ? String(error.code).slice(0, 64) : 'UNKNOWN';
@@ -1513,22 +1555,17 @@ export async function runClaimedMealPlanJobAction(
     });
 
     try {
-      const dbSlots = dbCoverage?.dbSlots ?? 0;
-      const totalSlots = dbCoverage?.totalSlots ?? 0;
-      const percent = dbCoverage?.percent ?? 0;
-      let message = 'Er staat een nieuw concept-weekmenu klaar om te reviewen.';
-      if (totalSlots > 0) {
-        message += ` ${dbSlots} van ${totalSlots} maaltijden (${percent}%) komen uit je receptendatabase.`;
-      }
-      if (dbSlots <= 3 && totalSlots > 0) {
-        message +=
-          ' Tips: voeg meer recepten toe (ontbijt/lunch/diner, met NEVO-koppeling), pas eventueel je dieetregels aan.';
-      }
+      const { message, details } = buildMealPlanReadyNotification({
+        planId,
+        runId: input.jobId,
+        dbCoverage,
+        fallbackReasons,
+      });
       await createInboxNotificationAction({
         type: 'meal_plan_ready_for_review',
         title: 'Nieuw weekmenu klaar (concept)',
         message,
-        details: { planId, runId: input.jobId },
+        details,
       });
     } catch {
       // Non-blocking

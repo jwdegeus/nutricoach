@@ -20,6 +20,50 @@ import {
 import { getMealPlannerConfig } from '@/src/lib/meal-plans/mealPlans.config';
 import { getIngredientCategories } from '@/src/lib/diet-validation/ingredient-categorizer';
 
+const DETAIL_STR_MAX = 80;
+
+/** Safe string truncation for debug logs (no PII, bounded). */
+function safeStr(v: unknown, max = DETAIL_STR_MAX): string {
+  if (v == null) return 'unknown';
+  const s = String(v).trim();
+  return s.length > max ? s.slice(0, max) + '…' : s;
+}
+
+/** Safe key for IDs/keys (alphanumeric + limited length). */
+function safeKey(v: unknown): string {
+  if (v == null) return 'unknown';
+  const s = String(v)
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .trim()
+    .slice(0, 64);
+  return s || 'unknown';
+}
+
+/** Culprit detail for debug logs (rule/term/ingredient). Safe, bounded, no PII. */
+export type ValidationIssueDetail =
+  | {
+      ruleId?: string;
+      priority?: number;
+      reasonCode?: string;
+      matchMode?: 'item' | 'category';
+      matchValue?: string;
+      culprit?: string;
+      note?: string;
+    }
+  | {
+      allergenKey?: string;
+      allergenName?: string;
+      culprit?: string;
+      note?: string;
+    }
+  | { dislike?: string; culprit?: string; note?: string }
+  | {
+      expectedSlot?: string;
+      preferenceKey?: string;
+      culprit?: string;
+      note?: string;
+    };
+
 /**
  * Validation issue found in the meal plan
  */
@@ -36,6 +80,8 @@ export type ValidationIssue = {
     | 'MACRO_TARGET_MISS'
     | 'MEAL_PREFERENCE_MISS';
   message: string;
+  /** Optional culprit detail for debug logs (safe, bounded). */
+  detail?: ValidationIssueDetail;
 };
 
 /** Strip invisible/Unicode space so "[]" and "[]\u200b" both normalize to "[]". */
@@ -123,6 +169,38 @@ function isForbiddenIngredient(
   }
 
   return false;
+}
+
+/** Returns first matching forbidden item/category for debug detail. */
+function getForbiddenMatchInfo(
+  ingredientName: string,
+  tags: string[] | undefined,
+  rules: DietRuleSet,
+): { matchValue: string; matchMode: 'item' | 'category' } | null {
+  for (const constraint of rules.ingredientConstraints) {
+    if (constraint.constraintType !== 'hard') continue;
+    if (constraint.type !== 'forbidden') continue;
+    if (constraint.items?.length) {
+      for (const item of constraint.items) {
+        if (matchesIngredient(ingredientName, item))
+          return { matchValue: item, matchMode: 'item' };
+      }
+    }
+    if (constraint.categories && tags) {
+      for (const category of constraint.categories) {
+        if (tags.some((t) => matchesIngredient(t, category)))
+          return { matchValue: category, matchMode: 'category' };
+      }
+    }
+    if (constraint.categories?.length && ingredientName?.trim()) {
+      const nameCategories = getIngredientCategories(ingredientName);
+      for (const category of constraint.categories) {
+        if (nameCategories.includes(category))
+          return { matchValue: category, matchMode: 'category' };
+      }
+    }
+  }
+  return null;
 }
 
 /**
@@ -291,6 +369,31 @@ function isAllergen(
   return false;
 }
 
+/** Returns first matching allergen key for debug detail. */
+function getAllergenMatch(
+  ingredientName: string,
+  tags: string[] | undefined,
+  allergies: string[],
+): string | null {
+  const nameLower = ingredientName.toLowerCase();
+  for (const allergen of allergies) {
+    const key = allergen.toLowerCase().trim();
+    const terms = getAllergenTerms(allergen);
+    const termsForTags =
+      key === 'eieren'
+        ? terms.filter((t) => !EGG_TAG_EXCLUDED_TERMS.has(t.toLowerCase()))
+        : terms;
+    for (const term of terms) {
+      if (textContainsAllergenTerm(nameLower, term)) return key;
+    }
+    for (const term of termsForTags) {
+      if (tags?.some((t) => textContainsAllergenTerm(t.toLowerCase(), term)))
+        return key;
+    }
+  }
+  return null;
+}
+
 /**
  * Check if an ingredient matches user dislikes
  */
@@ -313,6 +416,19 @@ function isDisliked(
     }
   }
   return false;
+}
+
+/** Returns first matching dislike for debug detail. */
+function getDislikeMatch(
+  ingredientName: string,
+  tags: string[] | undefined,
+  dislikes: string[],
+): string | null {
+  for (const dislike of dislikes) {
+    if (matchesIngredient(ingredientName, dislike)) return dislike;
+    if (tags?.some((t) => matchesIngredient(t, dislike))) return dislike;
+  }
+  return null;
 }
 
 function isForbiddenInShakeSmoothie(displayName: string): boolean {
@@ -445,7 +561,8 @@ function checkRequiredCategories(
 }
 
 /**
- * Validate NEVO codes in ingredient references
+ * Validate ingredient refs. Alleen NEVO-codes valideren; customFoodId/fdcId uit
+ * dezelfde database worden overgeslagen (geen NEVO-lookup).
  */
 async function validateNevoCodes(
   plan: MealPlanResponse,
@@ -458,7 +575,6 @@ async function validateNevoCodes(
     for (let mealIndex = 0; mealIndex < day.meals.length; mealIndex++) {
       const meal = day.meals[mealIndex];
 
-      // Validate ingredientRefs if present
       if (meal.ingredientRefs && meal.ingredientRefs.length > 0) {
         for (
           let refIndex = 0;
@@ -469,13 +585,14 @@ async function validateNevoCodes(
           if (ref == null) continue;
           const path = `days[${dayIndex}].meals[${mealIndex}].ingredientRefs[${refIndex}]`;
 
-          // Verify NEVO code exists
-          const isValid = await verifyNevoCode(ref.nevoCode);
+          const nevo = ref.nevoCode?.trim();
+          if (!nevo) continue;
+          const isValid = await verifyNevoCode(nevo);
           if (!isValid) {
             issues.push({
               path,
               code: 'INVALID_NEVO_CODE',
-              message: `Invalid NEVO code: ${ref.nevoCode} (not found in database)`,
+              message: `Invalid NEVO code: ${nevo} (not found in database)`,
             });
           }
         }
@@ -636,10 +753,16 @@ export async function validateHardConstraints(args: {
             slotPreferences,
           );
           if (!matches) {
+            const prefKey = slotPreferences.slice(0, 3).join(', ');
             issues.push({
               path: mealPath,
               code: 'MEAL_PREFERENCE_MISS',
               message: `Meal "${meal.name}" does not match required preferences for ${meal.slot}: ${slotPreferences.join(', ')}`,
+              detail: {
+                expectedSlot: meal.slot,
+                preferenceKey: safeStr(prefKey),
+                culprit: safeStr(meal.name),
+              },
             });
           }
         }
@@ -657,30 +780,74 @@ export async function validateHardConstraints(args: {
 
           // Check for allergens (hard constraint)
           if (isAllergen(ingredient.name, ingredient.tags, allergies)) {
+            const allergenKey = getAllergenMatch(
+              ingredient.name,
+              ingredient.tags,
+              allergies,
+            );
             issues.push({
               path,
               code: 'ALLERGEN_PRESENT',
               message: `Ingredient "${ingredient.name}" contains or matches an allergen: ${allergies
                 .filter((a) => matchesIngredient(ingredient.name, a))
                 .join(', ')}`,
+              detail: allergenKey
+                ? {
+                    allergenKey: safeKey(allergenKey),
+                    allergenName: safeStr(allergenKey),
+                    culprit: safeStr(ingredient.name),
+                  }
+                : {
+                    culprit: safeStr(ingredient.name),
+                    note: 'missing_rule_metadata',
+                  },
             });
           }
 
           // Check for disliked ingredients (hard constraint - user preference)
           if (isDisliked(ingredient.name, ingredient.tags, dislikes)) {
+            const dislike = getDislikeMatch(
+              ingredient.name,
+              ingredient.tags,
+              dislikes,
+            );
             issues.push({
               path,
               code: 'DISLIKED_INGREDIENT',
               message: `Ingredient "${ingredient.name}" is in the user's dislikes list`,
+              detail: dislike
+                ? {
+                    dislike: safeStr(dislike),
+                    culprit: safeStr(ingredient.name),
+                  }
+                : {
+                    culprit: safeStr(ingredient.name),
+                    note: 'missing_rule_metadata',
+                  },
             });
           }
 
           // Check for forbidden ingredients from diet rules
           if (isForbiddenIngredient(ingredient.name, ingredient.tags, rules)) {
+            const match = getForbiddenMatchInfo(
+              ingredient.name,
+              ingredient.tags,
+              rules,
+            );
             issues.push({
               path,
               code: 'FORBIDDEN_INGREDIENT',
               message: `Ingredient "${ingredient.name}" is forbidden by diet rules`,
+              detail: match
+                ? {
+                    matchMode: match.matchMode,
+                    matchValue: safeStr(match.matchValue),
+                    culprit: safeStr(ingredient.name),
+                  }
+                : {
+                    culprit: safeStr(ingredient.name),
+                    note: 'missing_rule_metadata',
+                  },
             });
           }
 
@@ -693,6 +860,10 @@ export async function validateHardConstraints(args: {
               path,
               code: 'FORBIDDEN_INGREDIENT',
               message: `Ei (rauw of gebakken) mag niet in een shake/smoothie. Gebruik yoghurt, melk, kwark of eiwitpoeder voor eiwit.`,
+              detail: {
+                culprit: safeStr(ingredient.name),
+                reasonCode: 'FORBIDDEN_IN_SHAKE_SMOOTHIE',
+              },
             });
           }
 
@@ -705,6 +876,7 @@ export async function validateHardConstraints(args: {
               path,
               code: 'FORBIDDEN_IN_SHAKE_SMOOTHIE',
               message: `Shake/smoothie mag geen vlees/kip/vis bevatten.`,
+              detail: { culprit: safeStr(ingredient.name) },
             });
           }
         }
@@ -724,26 +896,67 @@ export async function validateHardConstraints(args: {
           // Check displayName against allergens/dislikes/forbidden (if provided)
           if (ref.displayName) {
             if (isAllergen(ref.displayName, ref.tags, allergies)) {
+              const allergenKey = getAllergenMatch(
+                ref.displayName,
+                ref.tags,
+                allergies,
+              );
+              const culprit = ref.nevoCode
+                ? `${safeStr(ref.displayName)} (${safeKey(ref.nevoCode)})`
+                : safeStr(ref.displayName);
               issues.push({
                 path,
                 code: 'ALLERGEN_PRESENT',
                 message: `Ingredient "${ref.displayName}" (nevoCode: ${ref.nevoCode}) contains or matches an allergen`,
+                detail: allergenKey
+                  ? {
+                      allergenKey: safeKey(allergenKey),
+                      allergenName: safeStr(allergenKey),
+                      culprit,
+                    }
+                  : { culprit, note: 'missing_rule_metadata' },
               });
             }
 
             if (isDisliked(ref.displayName, ref.tags, dislikes)) {
+              const dislike = getDislikeMatch(
+                ref.displayName,
+                ref.tags,
+                dislikes,
+              );
+              const culprit = ref.nevoCode
+                ? `${safeStr(ref.displayName)} (${safeKey(ref.nevoCode)})`
+                : safeStr(ref.displayName);
               issues.push({
                 path,
                 code: 'DISLIKED_INGREDIENT',
                 message: `Ingredient "${ref.displayName}" (nevoCode: ${ref.nevoCode}) is in the user's dislikes list`,
+                detail: dislike
+                  ? { dislike: safeStr(dislike), culprit }
+                  : { culprit, note: 'missing_rule_metadata' },
               });
             }
 
             if (isForbiddenIngredient(ref.displayName, ref.tags, rules)) {
+              const match = getForbiddenMatchInfo(
+                ref.displayName,
+                ref.tags,
+                rules,
+              );
+              const culprit = ref.nevoCode
+                ? `${safeStr(ref.displayName)} (${safeKey(ref.nevoCode)})`
+                : safeStr(ref.displayName);
               issues.push({
                 path,
                 code: 'FORBIDDEN_INGREDIENT',
                 message: `Ingredient "${ref.displayName}" (nevoCode: ${ref.nevoCode}) is forbidden by diet rules`,
+                detail: match
+                  ? {
+                      matchMode: match.matchMode,
+                      matchValue: safeStr(match.matchValue),
+                      culprit,
+                    }
+                  : { culprit, note: 'missing_rule_metadata' },
               });
             }
 
@@ -752,10 +965,14 @@ export async function validateHardConstraints(args: {
               isShakeOrSmoothieMeal(meal) &&
               isForbiddenInShakeSmoothie(ref.displayName ?? '')
             ) {
+              const culprit = ref.nevoCode
+                ? `${safeStr(ref.displayName)} (${safeKey(ref.nevoCode)})`
+                : safeStr(ref.displayName);
               issues.push({
                 path,
                 code: 'FORBIDDEN_INGREDIENT',
                 message: `Ei (rauw of gebakken) mag niet in een shake/smoothie. Gebruik yoghurt, melk, kwark of eiwitpoeder voor eiwit.`,
+                detail: { culprit, reasonCode: 'FORBIDDEN_IN_SHAKE_SMOOTHIE' },
               });
             }
 
@@ -764,10 +981,14 @@ export async function validateHardConstraints(args: {
               isShakeOrSmoothieMeal(meal) &&
               isMeatFishIngredient(ref.displayName, ref.tags)
             ) {
+              const culprit = ref.nevoCode
+                ? `nevo:${safeKey(ref.nevoCode)}`
+                : safeStr(ref.displayName);
               issues.push({
                 path,
                 code: 'FORBIDDEN_IN_SHAKE_SMOOTHIE',
                 message: `Shake/smoothie mag geen vlees/kip/vis bevatten.`,
+                detail: { culprit },
               });
             }
           } else if (
@@ -780,6 +1001,11 @@ export async function validateHardConstraints(args: {
               path,
               code: 'FORBIDDEN_IN_SHAKE_SMOOTHIE',
               message: `Shake/smoothie mag geen vlees/kip/vis bevatten.`,
+              detail: {
+                culprit: ref.nevoCode
+                  ? `nevo:${safeKey(ref.nevoCode)}`
+                  : 'unknown',
+              },
             });
           }
         }
@@ -856,10 +1082,16 @@ export async function validateDayHardConstraints(args: {
           slotPreferences,
         );
         if (!matches) {
+          const prefKey = slotPreferences.slice(0, 3).join(', ');
           issues.push({
             path: mealPath,
             code: 'MEAL_PREFERENCE_MISS',
             message: `Meal "${meal.name}" does not match required preferences for ${meal.slot}: ${slotPreferences.join(', ')}`,
+            detail: {
+              expectedSlot: meal.slot,
+              preferenceKey: safeStr(prefKey),
+              culprit: safeStr(meal.name),
+            },
           });
         }
       }
@@ -877,30 +1109,71 @@ export async function validateDayHardConstraints(args: {
 
         // Check for allergens (hard constraint)
         if (isAllergen(ingredient.name, ingredient.tags, allergies)) {
+          const allergenKey = getAllergenMatch(
+            ingredient.name,
+            ingredient.tags,
+            allergies,
+          );
           issues.push({
             path,
             code: 'ALLERGEN_PRESENT',
             message: `Ingredient "${ingredient.name}" contains or matches an allergen: ${allergies
               .filter((a) => matchesIngredient(ingredient.name, a))
               .join(', ')}`,
+            detail: allergenKey
+              ? {
+                  allergenKey: safeKey(allergenKey),
+                  allergenName: safeStr(allergenKey),
+                  culprit: safeStr(ingredient.name),
+                }
+              : {
+                  culprit: safeStr(ingredient.name),
+                  note: 'missing_rule_metadata',
+                },
           });
         }
 
         // Check for disliked ingredients (hard constraint - user preference)
         if (isDisliked(ingredient.name, ingredient.tags, dislikes)) {
+          const dislike = getDislikeMatch(
+            ingredient.name,
+            ingredient.tags,
+            dislikes,
+          );
           issues.push({
             path,
             code: 'DISLIKED_INGREDIENT',
             message: `Ingredient "${ingredient.name}" is in the user's dislikes list`,
+            detail: dislike
+              ? { dislike: safeStr(dislike), culprit: safeStr(ingredient.name) }
+              : {
+                  culprit: safeStr(ingredient.name),
+                  note: 'missing_rule_metadata',
+                },
           });
         }
 
         // Check for forbidden ingredients from diet rules
         if (isForbiddenIngredient(ingredient.name, ingredient.tags, rules)) {
+          const match = getForbiddenMatchInfo(
+            ingredient.name,
+            ingredient.tags,
+            rules,
+          );
           issues.push({
             path,
             code: 'FORBIDDEN_INGREDIENT',
             message: `Ingredient "${ingredient.name}" is forbidden by diet rules`,
+            detail: match
+              ? {
+                  matchMode: match.matchMode,
+                  matchValue: safeStr(match.matchValue),
+                  culprit: safeStr(ingredient.name),
+                }
+              : {
+                  culprit: safeStr(ingredient.name),
+                  note: 'missing_rule_metadata',
+                },
           });
         }
 
@@ -913,6 +1186,10 @@ export async function validateDayHardConstraints(args: {
             path,
             code: 'FORBIDDEN_INGREDIENT',
             message: `Ei (rauw of gebakken) mag niet in een shake/smoothie. Gebruik yoghurt, melk, kwark of eiwitpoeder voor eiwit.`,
+            detail: {
+              culprit: safeStr(ingredient.name),
+              reasonCode: 'FORBIDDEN_IN_SHAKE_SMOOTHIE',
+            },
           });
         }
 
@@ -925,6 +1202,7 @@ export async function validateDayHardConstraints(args: {
             path,
             code: 'FORBIDDEN_IN_SHAKE_SMOOTHIE',
             message: `Shake/smoothie mag geen vlees/kip/vis bevatten.`,
+            detail: { culprit: safeStr(ingredient.name) },
           });
         }
       }
@@ -944,26 +1222,67 @@ export async function validateDayHardConstraints(args: {
         // Check displayName against allergens/dislikes/forbidden (if provided)
         if (ref.displayName) {
           if (isAllergen(ref.displayName, ref.tags, allergies)) {
+            const allergenKey = getAllergenMatch(
+              ref.displayName,
+              ref.tags,
+              allergies,
+            );
+            const culprit = ref.nevoCode
+              ? `${safeStr(ref.displayName)} (${safeKey(ref.nevoCode)})`
+              : safeStr(ref.displayName);
             issues.push({
               path,
               code: 'ALLERGEN_PRESENT',
               message: `Ingredient "${ref.displayName}" (nevoCode: ${ref.nevoCode}) contains or matches an allergen`,
+              detail: allergenKey
+                ? {
+                    allergenKey: safeKey(allergenKey),
+                    allergenName: safeStr(allergenKey),
+                    culprit,
+                  }
+                : { culprit, note: 'missing_rule_metadata' },
             });
           }
 
           if (isDisliked(ref.displayName, ref.tags, dislikes)) {
+            const dislike = getDislikeMatch(
+              ref.displayName,
+              ref.tags,
+              dislikes,
+            );
+            const culprit = ref.nevoCode
+              ? `${safeStr(ref.displayName)} (${safeKey(ref.nevoCode)})`
+              : safeStr(ref.displayName);
             issues.push({
               path,
               code: 'DISLIKED_INGREDIENT',
               message: `Ingredient "${ref.displayName}" (nevoCode: ${ref.nevoCode}) is in the user's dislikes list`,
+              detail: dislike
+                ? { dislike: safeStr(dislike), culprit }
+                : { culprit, note: 'missing_rule_metadata' },
             });
           }
 
           if (isForbiddenIngredient(ref.displayName, ref.tags, rules)) {
+            const match = getForbiddenMatchInfo(
+              ref.displayName,
+              ref.tags,
+              rules,
+            );
+            const culprit = ref.nevoCode
+              ? `${safeStr(ref.displayName)} (${safeKey(ref.nevoCode)})`
+              : safeStr(ref.displayName);
             issues.push({
               path,
               code: 'FORBIDDEN_INGREDIENT',
               message: `Ingredient "${ref.displayName}" (nevoCode: ${ref.nevoCode}) is forbidden by diet rules`,
+              detail: match
+                ? {
+                    matchMode: match.matchMode,
+                    matchValue: safeStr(match.matchValue),
+                    culprit,
+                  }
+                : { culprit, note: 'missing_rule_metadata' },
             });
           }
 
@@ -972,10 +1291,14 @@ export async function validateDayHardConstraints(args: {
             isShakeOrSmoothieMeal(meal) &&
             isForbiddenInShakeSmoothie(ref.displayName ?? '')
           ) {
+            const culprit = ref.nevoCode
+              ? `${safeStr(ref.displayName)} (${safeKey(ref.nevoCode)})`
+              : safeStr(ref.displayName);
             issues.push({
               path,
               code: 'FORBIDDEN_INGREDIENT',
               message: `Ei (rauw of gebakken) mag niet in een shake/smoothie. Gebruik yoghurt, melk, kwark of eiwitpoeder voor eiwit.`,
+              detail: { culprit, reasonCode: 'FORBIDDEN_IN_SHAKE_SMOOTHIE' },
             });
           }
 
@@ -984,10 +1307,14 @@ export async function validateDayHardConstraints(args: {
             isShakeOrSmoothieMeal(meal) &&
             isMeatFishIngredient(ref.displayName, ref.tags)
           ) {
+            const culprit = ref.nevoCode
+              ? `nevo:${safeKey(ref.nevoCode)}`
+              : safeStr(ref.displayName);
             issues.push({
               path,
               code: 'FORBIDDEN_IN_SHAKE_SMOOTHIE',
               message: `Shake/smoothie mag geen vlees/kip/vis bevatten.`,
+              detail: { culprit },
             });
           }
         } else if (
@@ -999,17 +1326,23 @@ export async function validateDayHardConstraints(args: {
             path,
             code: 'FORBIDDEN_IN_SHAKE_SMOOTHIE',
             message: `Shake/smoothie mag geen vlees/kip/vis bevatten.`,
+            detail: {
+              culprit: ref.nevoCode
+                ? `nevo:${safeKey(ref.nevoCode)}`
+                : 'unknown',
+            },
           });
         }
 
-        // Verify NEVO code exists
-        const isValidCode = await verifyNevoCode(ref.nevoCode);
-        if (!isValidCode) {
-          issues.push({
-            path,
-            code: 'INVALID_NEVO_CODE',
-            message: `Invalid NEVO code: ${ref.nevoCode}`,
-          });
+        if (ref.nevoCode?.trim()) {
+          const isValidCode = await verifyNevoCode(ref.nevoCode);
+          if (!isValidCode) {
+            issues.push({
+              path,
+              code: 'INVALID_NEVO_CODE',
+              message: `Invalid NEVO code: ${ref.nevoCode}`,
+            });
+          }
         }
       }
     }

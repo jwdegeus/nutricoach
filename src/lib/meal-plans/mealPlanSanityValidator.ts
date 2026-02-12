@@ -48,8 +48,8 @@ const PLACEHOLDER_NAMES = new Set([
   'avondeten',
 ]);
 
-/** Lower bound: some diets allow very simple meals (e.g. 2-ingredient breakfast). */
-const MIN_INGREDIENTS = 2;
+/** Lower bound: allow 1 for simple meals (e.g. banaan, smoothie); Gemini soms 1. */
+const MIN_INGREDIENTS = 1;
 const MAX_INGREDIENTS = 10;
 const MIN_QTY_G = 1;
 const MAX_QTY_G = 400;
@@ -60,6 +60,24 @@ function isPlaceholderName(name: string): boolean {
   if (PLACEHOLDER_NAMES.has(n)) return true;
   if (n.length <= 2) return true;
   return false;
+}
+
+/** Ref geldig bij nevoCode, customFoodId, of fdcId (één database, alle bronnen). */
+function hasValidIngredientRef(ref: MealIngredientRef): boolean {
+  const n = ref?.nevoCode?.trim();
+  const c = ref?.customFoodId?.trim();
+  const f = ref?.fdcId?.trim();
+  return (n?.length ?? 0) > 0 || (c?.length ?? 0) > 0 || (f?.length ?? 0) > 0;
+}
+
+function ingredientRefKey(ref: MealIngredientRef, idx: number): string {
+  const n = ref?.nevoCode?.trim();
+  const c = ref?.customFoodId?.trim();
+  const f = ref?.fdcId?.trim();
+  if (n) return `nevo:${n}`;
+  if (c) return `custom:${c}`;
+  if (f) return `fdc:${f}`;
+  return `idx:${idx}`;
 }
 
 /**
@@ -95,28 +113,28 @@ function validateMeal(meal: Meal, dayDate: string): SanityIssue[] {
     });
   }
 
-  const seenNevo = new Set<string>();
+  const seenKeys = new Set<string>();
   for (let i = 0; i < refs.length; i++) {
     const ref = refs[i] as MealIngredientRef;
-    const nevo = ref?.nevoCode?.trim();
-    if (nevo === undefined || nevo === '') {
+    if (!hasValidIngredientRef(ref)) {
       issues.push({
         code: 'MISSING_NEVO_CODE',
-        message: `Ingredient ref at index ${i} has no nevoCode`,
+        message: `Ingredient ref at index ${i} has no nevoCode, customFoodId, or fdcId`,
         mealId: meal.id,
         date: dayDate,
       });
-    } else {
-      if (seenNevo.has(nevo)) {
-        issues.push({
-          code: 'DUPLICATE_INGREDIENT',
-          message: `Duplicate nevoCode in meal: ${nevo}`,
-          mealId: meal.id,
-          date: dayDate,
-        });
-      }
-      seenNevo.add(nevo);
+      continue;
     }
+    const key = ingredientRefKey(ref, i);
+    if (seenKeys.has(key)) {
+      issues.push({
+        code: 'DUPLICATE_INGREDIENT',
+        message: `Duplicate ingredient in meal: ${key}`,
+        mealId: meal.id,
+        date: dayDate,
+      });
+    }
+    seenKeys.add(key);
 
     const qty = ref?.quantityG;
     if (typeof qty === 'number' && (qty < MIN_QTY_G || qty > MAX_QTY_G)) {

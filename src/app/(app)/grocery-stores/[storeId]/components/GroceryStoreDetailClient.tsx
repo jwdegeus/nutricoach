@@ -7,6 +7,7 @@ import { Button } from '@/components/catalyst/button';
 import { Input } from '@/components/catalyst/input';
 import { Textarea } from '@/components/catalyst/textarea';
 import { Field, FieldGroup, Label } from '@/components/catalyst/fieldset';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import {
   Dialog,
   DialogActions,
@@ -362,20 +363,24 @@ export function GroceryStoreDetailClient({
             </Field>
             <Field>
               <Label>{t('status')}</Label>
-              <select
+              <Listbox
                 value={orderStatus}
-                onChange={(e) =>
-                  setOrderStatus(
-                    e.target.value as 'active' | 'completed' | 'cancelled',
-                  )
+                onChange={(val) =>
+                  setOrderStatus(val as 'active' | 'completed' | 'cancelled')
                 }
                 disabled={submitting}
-                className="mt-1 block w-full rounded-lg border-0 bg-white/5 py-2 shadow-sm ring-1 ring-white/10 ring-inset focus:ring-2 focus:ring-accent focus:ring-inset dark:bg-white/5 dark:ring-white/10"
+                aria-label={t('status')}
               >
-                <option value="active">{t('statusActive')}</option>
-                <option value="completed">{t('statusCompleted')}</option>
-                <option value="cancelled">{t('statusCancelled')}</option>
-              </select>
+                <ListboxOption value="active">
+                  {t('statusActive')}
+                </ListboxOption>
+                <ListboxOption value="completed">
+                  {t('statusCompleted')}
+                </ListboxOption>
+                <ListboxOption value="cancelled">
+                  {t('statusCancelled')}
+                </ListboxOption>
+              </Listbox>
             </Field>
             <Field>
               <Label>{t('notes')}</Label>

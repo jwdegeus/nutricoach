@@ -304,6 +304,72 @@ export async function markInboxNotificationReadAction(
   }
 }
 
+/**
+ * Mark one inbox notification as unread.
+ * RLS: user-context; only own rows.
+ */
+export async function markInboxNotificationUnreadAction(
+  raw: unknown,
+): Promise<ActionResult<Record<string, never>>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        ok: false,
+        error: {
+          code: 'AUTH_ERROR',
+          message: 'Je moet ingelogd zijn',
+        },
+      };
+    }
+
+    const input = markReadInputSchema.parse(raw);
+
+    const { error } = await supabase
+      .from('user_inbox_notifications')
+      .update({ is_read: false })
+      .eq('id', input.id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      return {
+        ok: false,
+        error: {
+          code: 'DB_ERROR',
+          message: `Markeren als ongelezen mislukt: ${error.message}`,
+        },
+      };
+    }
+
+    return { ok: true, data: {} };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        ok: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message:
+            error.errors.map((e) => e.message).join('; ') || 'Ongeldige id',
+        },
+      };
+    }
+    return {
+      ok: false,
+      error: {
+        code: 'DB_ERROR',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Fout bij markeren als ongelezen',
+      },
+    };
+  }
+}
+
 const deleteInputSchema = z.object({
   id: z.string().uuid(),
 });

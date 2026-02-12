@@ -99,10 +99,12 @@ export async function calcDayMacros(dayMeals: Meal[]): Promise<MacroSummary> {
   for (const meal of dayMeals) {
     if (meal.ingredientRefs && meal.ingredientRefs.length > 0) {
       for (const ref of meal.ingredientRefs) {
-        allIngredients.push({
-          nevoCode: ref.nevoCode,
-          quantityG: ref.quantityG,
-        });
+        if (ref.nevoCode) {
+          allIngredients.push({
+            nevoCode: ref.nevoCode,
+            quantityG: ref.quantityG,
+          });
+        }
       }
     }
   }
@@ -354,7 +356,7 @@ export async function adjustDayQuantitiesToTargets(args: {
         // Minimum 1g
         const finalG = Math.max(1, newG);
 
-        if (finalG !== oldG) {
+        if (finalG !== oldG && ref.nevoCode) {
           adjustments.push({
             nevoCode: ref.nevoCode,
             oldG,

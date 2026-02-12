@@ -15,7 +15,7 @@ import {
   DialogActions,
 } from '@/components/catalyst/dialog';
 import { Field, Label } from '@/components/catalyst/fieldset';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import {
   Dropdown,
   DropdownButton,
@@ -261,6 +261,9 @@ export function RecipesIndexClient({
   const [filterNotWeekMenuReady, setFilterNotWeekMenuReady] = useState(
     () => getParam(searchParams, 'filter') === 'not-weekmenu-ready',
   );
+  const [filterIncompleteLinks, setFilterIncompleteLinks] = useState(
+    () => getParam(searchParams, 'filter') === 'incomplete-links',
+  );
 
   const [extraItems, setExtraItems] = useState<MealListItem[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -271,11 +274,12 @@ export function RecipesIndexClient({
     setExtraItems([]);
   }, [listResult]);
 
-  // Deep link: /recipes?filter=nevo-missing|not-weekmenu-ready
+  // Deep link: /recipes?filter=nevo-missing|not-weekmenu-ready|incomplete-links
   useEffect(() => {
     const filter = getParam(searchParams, 'filter');
     if (filter === 'nevo-missing') setFilterNevoMissingOnly(true);
     if (filter === 'not-weekmenu-ready') setFilterNotWeekMenuReady(true);
+    if (filter === 'incomplete-links') setFilterIncompleteLinks(true);
   }, [searchParams]);
 
   const collectionParam = getParam(searchParams, 'collection');
@@ -556,8 +560,21 @@ export function RecipesIndexClient({
     if (filterNotWeekMenuReady) {
       result = result.filter((i) => i.weekMenuStatus !== 'ready');
     }
+    if (filterIncompleteLinks) {
+      result = result.filter(
+        (i) =>
+          i.ingredientLinkStatus != null &&
+          i.ingredientLinkStatus.total > 0 &&
+          i.ingredientLinkStatus.linked < i.ingredientLinkStatus.total,
+      );
+    }
     return result;
-  }, [items, filterNevoMissingOnly, filterNotWeekMenuReady]);
+  }, [
+    items,
+    filterNevoMissingOnly,
+    filterNotWeekMenuReady,
+    filterIncompleteLinks,
+  ]);
 
   const selectableIds = useMemo(
     () =>
@@ -1100,6 +1117,15 @@ export function RecipesIndexClient({
               Toon alleen: niet weekmenu-klaar
             </span>
           </label>
+          <label className="flex cursor-pointer items-center gap-2">
+            <Switch
+              checked={filterIncompleteLinks}
+              onChange={setFilterIncompleteLinks}
+            />
+            <span className="text-sm text-foreground">
+              Toon alleen: onvolledig gekoppeld
+            </span>
+          </label>
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-3 rounded-xl bg-muted/20 px-4 py-3 shadow-sm">
@@ -1184,21 +1210,27 @@ export function RecipesIndexClient({
               ? 'Geen recepten met ontbrekende NEVO-koppelingen.'
               : filterNotWeekMenuReady
                 ? 'Geen recepten die nog niet weekmenu-klaar zijn.'
-                : 'Geen recepten gevonden.'}
+                : filterIncompleteLinks
+                  ? 'Geen recepten met onvolledige ingrediëntkoppelingen.'
+                  : 'Geen recepten gevonden.'}
           </Text>
           {hasAnyFilter &&
             !filterNevoMissingOnly &&
-            !filterNotWeekMenuReady && (
+            !filterNotWeekMenuReady &&
+            !filterIncompleteLinks && (
               <Button outline onClick={clearFilters}>
                 Wis filters
               </Button>
             )}
-          {(filterNevoMissingOnly || filterNotWeekMenuReady) && (
+          {(filterNevoMissingOnly ||
+            filterNotWeekMenuReady ||
+            filterIncompleteLinks) && (
             <Button
               plain
               onClick={() => {
                 setFilterNevoMissingOnly(false);
                 setFilterNotWeekMenuReady(false);
+                setFilterIncompleteLinks(false);
               }}
             >
               Toon alle recepten
@@ -1213,7 +1245,9 @@ export function RecipesIndexClient({
                 ? `${filteredItems.length} recepten (NEVO ontbreekt)`
                 : filterNotWeekMenuReady
                   ? `${filteredItems.length} recepten (niet weekmenu-klaar)`
-                  : `${totalCount} recepten`}
+                  : filterIncompleteLinks
+                    ? `${filteredItems.length} recepten (onvolledig gekoppeld)`
+                    : `${totalCount} recepten`}
             </Text>
           )}
           <ul className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 xl:gap-x-8">
@@ -1460,18 +1494,19 @@ function FilterOptionPanel({
           Keuzes laden mislukt.
         </Text>
       )}
-      <Select
+      <Listbox
         value={selected}
-        onChange={(e) => setSelected(e.target.value)}
+        onChange={(val) => setSelected(val)}
         disabled={disabled}
+        aria-label={placeholder}
       >
-        <option value="">{placeholder}</option>
+        <ListboxOption value="">{placeholder}</ListboxOption>
         {options.map((opt) => (
-          <option key={opt.id} value={opt.id}>
+          <ListboxOption key={opt.id} value={opt.id}>
             {opt.isActive !== false ? opt.label : `${opt.label} (inactief)`}
-          </option>
+          </ListboxOption>
         ))}
-      </Select>
+      </Listbox>
       <div className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-600">
         <Button
           plain
@@ -1786,6 +1821,24 @@ function MealCard({
                   {formatMealSlot(item.mealSlot)}
                 </Badge>
               )}
+              {item.ingredientLinkStatus &&
+                item.ingredientLinkStatus.total > 0 && (
+                  <Badge
+                    color={
+                      item.ingredientLinkStatus.linked ===
+                      item.ingredientLinkStatus.total
+                        ? 'green'
+                        : item.ingredientLinkStatus.linked > 0
+                          ? 'amber'
+                          : 'zinc'
+                    }
+                    className="text-xs"
+                    title={`${item.ingredientLinkStatus.linked} van ${item.ingredientLinkStatus.total} ingrediënten gekoppeld aan product`}
+                  >
+                    {item.ingredientLinkStatus.linked}/
+                    {item.ingredientLinkStatus.total}
+                  </Badge>
+                )}
               {item.totalMinutes != null && item.totalMinutes > 0 && (
                 <span className="text-xs text-zinc-500 dark:text-zinc-400">
                   {item.totalMinutes} min
@@ -1925,14 +1978,18 @@ function RecipesFiltersDrawerContent({
     <div className="space-y-4">
       <Field>
         <Label>Soort</Label>
-        <Select value={mealSlot} onChange={(e) => setMealSlot(e.target.value)}>
-          <option value="">Alle</option>
+        <Listbox
+          value={mealSlot}
+          onChange={(val) => setMealSlot(val)}
+          aria-label="Soort"
+        >
+          <ListboxOption value="">Alle</ListboxOption>
           {MEAL_SLOT_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
+            <ListboxOption key={opt.value} value={opt.value}>
               {opt.label}
-            </option>
+            </ListboxOption>
           ))}
-        </Select>
+        </Listbox>
       </Field>
       <Field>
         <Label>Max. bereidingstijd (min)</Label>
@@ -1955,18 +2012,19 @@ function RecipesFiltersDrawerContent({
       </Field>
       <Field>
         <Label>Keuken</Label>
-        <Select
+        <Listbox
           value={cuisineOptionId}
-          onChange={(e) => setCuisineOptionId(e.target.value)}
+          onChange={(val) => setCuisineOptionId(val)}
           disabled={!!catalogLoadError}
+          aria-label="Keuken"
         >
-          <option value="">Alle keukens</option>
+          <ListboxOption value="">Alle keukens</ListboxOption>
           {cuisineOptions.map((opt) => (
-            <option key={opt.id} value={opt.id}>
+            <ListboxOption key={opt.id} value={opt.id}>
               {opt.isActive !== false ? opt.label : `${opt.label} (inactief)`}
-            </option>
+            </ListboxOption>
           ))}
-        </Select>
+        </Listbox>
         {catalogLoadError && (
           <Text className="mt-1 text-sm text-red-600 dark:text-red-400">
             Keuzes laden mislukt.
@@ -1975,18 +2033,19 @@ function RecipesFiltersDrawerContent({
       </Field>
       <Field>
         <Label>Proteïne-type</Label>
-        <Select
+        <Listbox
           value={proteinTypeOptionId}
-          onChange={(e) => setProteinTypeOptionId(e.target.value)}
+          onChange={(val) => setProteinTypeOptionId(val)}
           disabled={!!catalogLoadError}
+          aria-label="Proteïne-type"
         >
-          <option value="">Alle proteïnes</option>
+          <ListboxOption value="">Alle proteïnes</ListboxOption>
           {proteinTypeOptions.map((opt) => (
-            <option key={opt.id} value={opt.id}>
+            <ListboxOption key={opt.id} value={opt.id}>
               {opt.isActive !== false ? opt.label : `${opt.label} (inactief)`}
-            </option>
+            </ListboxOption>
           ))}
-        </Select>
+        </Listbox>
         {catalogLoadError && (
           <Text className="mt-1 text-sm text-red-600 dark:text-red-400">
             Keuzes laden mislukt.

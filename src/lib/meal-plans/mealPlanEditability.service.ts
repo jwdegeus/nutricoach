@@ -137,9 +137,9 @@ export class MealPlanEditabilityService {
     }
 
     // Check if ingredients are in pantry (purchased)
-    const ingredientNevoCodes = (meal.ingredientRefs || []).map(
-      (ref) => ref.nevoCode,
-    );
+    const ingredientNevoCodes = (meal.ingredientRefs || [])
+      .map((ref) => ref.nevoCode)
+      .filter((c): c is string => Boolean(c));
 
     if (ingredientNevoCodes.length === 0) {
       // No ingredients = can edit/delete
@@ -244,7 +244,7 @@ export class MealPlanEditabilityService {
     const allIngredientNevoCodes = new Set<string>();
     for (const meal of day.meals) {
       (meal.ingredientRefs || []).forEach((ref) => {
-        allIngredientNevoCodes.add(ref.nevoCode);
+        if (ref.nevoCode) allIngredientNevoCodes.add(ref.nevoCode);
       });
     }
 

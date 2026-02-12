@@ -21,7 +21,7 @@ import {
 import { Text } from '@/components/catalyst/text';
 import { Textarea } from '@/components/catalyst/textarea';
 import { Checkbox, CheckboxField } from '@/components/catalyst/checkbox';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
 
 type DietRulesManagerProps = {
@@ -298,17 +298,17 @@ export function DietRulesManager({
             </Field>
             <Field>
               <Label htmlFor="frequency">Frequentie</Label>
-              <Select
-                id="frequency"
+              <Listbox
                 value={value.frequency || ''}
-                onChange={(e) => updateRuleValue('frequency', e.target.value)}
+                onChange={(val) => updateRuleValue('frequency', val)}
+                aria-label="Frequentie"
               >
-                <option value="">Geen</option>
-                <option value="daily">Dagelijks</option>
-                <option value="weekly">Wekelijks</option>
-                <option value="2x_weekly">2x per week</option>
-                <option value="monthly">Maandelijks</option>
-              </Select>
+                <ListboxOption value="">Geen</ListboxOption>
+                <ListboxOption value="daily">Dagelijks</ListboxOption>
+                <ListboxOption value="weekly">Wekelijks</ListboxOption>
+                <ListboxOption value="2x_weekly">2x per week</ListboxOption>
+                <ListboxOption value="monthly">Maandelijks</ListboxOption>
+              </Listbox>
             </Field>
             <Field>
               <Label htmlFor="minAmountMl">Min hoeveelheid (ml)</Label>
@@ -565,21 +565,21 @@ export function DietRulesManager({
                 </Field>
                 <Field>
                   <Label htmlFor="meatRequirement">Vlees vereiste</Label>
-                  <Select
-                    id="meatRequirement"
+                  <Listbox
                     value={value.freshnessRequirement.meatRequirement || ''}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       updateRuleValue('freshnessRequirement', {
                         ...value.freshnessRequirement,
-                        meatRequirement: e.target.value,
+                        meatRequirement: val,
                       })
                     }
+                    aria-label="Vlees vereiste"
                   >
-                    <option value="any">Elk</option>
-                    <option value="fresh_or_flash_frozen">
+                    <ListboxOption value="any">Elk</ListboxOption>
+                    <ListboxOption value="fresh_or_flash_frozen">
                       Vers of diepvries
-                    </option>
-                  </Select>
+                    </ListboxOption>
+                  </Listbox>
                 </Field>
               </>
             )}
@@ -667,27 +667,30 @@ export function DietRulesManager({
                 <FieldGroup>
                   <Field>
                     <Label htmlFor="ruleType">Regeltype *</Label>
-                    <Select
-                      id="ruleType"
+                    <Listbox
                       value={formData.ruleType}
-                      onChange={(e) =>
+                      onChange={(val) =>
                         setFormData({
                           ...formData,
-                          ruleType: e.target.value as DietRuleType,
+                          ruleType: val as DietRuleType,
                           ruleValue: {},
                         })
                       }
-                      required
+                      aria-label="Regeltype"
                     >
-                      <option value="exclude_ingredient">
+                      <ListboxOption value="exclude_ingredient">
                         Uitsluiten ingrediënt
-                      </option>
-                      <option value="require_ingredient">
+                      </ListboxOption>
+                      <ListboxOption value="require_ingredient">
                         Vereisen ingrediënt
-                      </option>
-                      <option value="macro_constraint">Macro constraint</option>
-                      <option value="meal_structure">Maaltijd structuur</option>
-                    </Select>
+                      </ListboxOption>
+                      <ListboxOption value="macro_constraint">
+                        Macro constraint
+                      </ListboxOption>
+                      <ListboxOption value="meal_structure">
+                        Maaltijd structuur
+                      </ListboxOption>
+                    </Listbox>
                   </Field>
 
                   <Field>

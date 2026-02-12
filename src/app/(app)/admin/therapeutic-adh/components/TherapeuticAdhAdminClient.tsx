@@ -24,7 +24,7 @@ import {
   DialogDescription,
 } from '@/components/catalyst/dialog';
 import { Field, Label, FieldGroup } from '@/components/catalyst/fieldset';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { PlusIcon, PencilIcon, ArrowPathIcon } from '@heroicons/react/16/solid';
 import type { AdhRefRow } from '../actions/therapeuticAdh.actions';
 import {
@@ -339,22 +339,23 @@ export function TherapeuticAdhAdminClient({ initialData, loadError }: Props) {
             </Field>
             <Field>
               <Label>{t('sexLabel')}</Label>
-              <Select
+              <Listbox
                 value={createForm.sex ?? ''}
-                onChange={(e) =>
+                onChange={(val) =>
                   setCreateForm((f) => ({
                     ...f,
-                    sex: e.target.value === '' ? null : e.target.value,
+                    sex: val === '' ? null : val,
                   }))
                 }
                 disabled={createSaving}
+                aria-label={t('sexLabel')}
               >
                 {SEX_OPTIONS.map((o) => (
-                  <option key={o.value || 'all'} value={o.value}>
+                  <ListboxOption key={o.value || 'all'} value={o.value ?? ''}>
                     {o.label}
-                  </option>
+                  </ListboxOption>
                 ))}
-              </Select>
+              </Listbox>
             </Field>
             <Field>
               <Label>{t('ageMinLabel')}</Label>
@@ -479,22 +480,23 @@ export function TherapeuticAdhAdminClient({ initialData, loadError }: Props) {
             </Field>
             <Field>
               <Label>{t('sexLabel')}</Label>
-              <Select
+              <Listbox
                 value={editForm.sex ?? ''}
-                onChange={(e) =>
+                onChange={(val) =>
                   setEditForm((f) => ({
                     ...f,
-                    sex: e.target.value === '' ? null : e.target.value,
+                    sex: val === '' ? null : val,
                   }))
                 }
                 disabled={editSaving}
+                aria-label={t('sexLabel')}
               >
                 {SEX_OPTIONS.map((o) => (
-                  <option key={o.value || 'all'} value={o.value}>
+                  <ListboxOption key={o.value || 'all'} value={o.value ?? ''}>
                     {o.label}
-                  </option>
+                  </ListboxOption>
                 ))}
-              </Select>
+              </Listbox>
             </Field>
             <Field>
               <Label>{t('ageMinLabel')}</Label>

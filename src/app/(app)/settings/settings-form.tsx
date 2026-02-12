@@ -7,7 +7,7 @@ import { updateMealPlanSchedulePreferencesAction } from './actions/meal-plan-sch
 import type { MealPlanSchedulePrefs } from './actions/meal-plan-schedule-preferences.actions';
 import { Button } from '@/components/catalyst/button';
 import { Input } from '@/components/catalyst/input';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { FavoritesPickerDialog } from './components/FavoritesPickerDialog';
 import { HouseholdAvoidRulesClient } from './components/HouseholdAvoidRulesClient';
 import { HouseholdServingsClient } from './components/HouseholdServingsClient';
@@ -105,38 +105,36 @@ export function SchedulePreferencesSection({
         <Field>
           <Label htmlFor="shopping_day">{t('shoppingDayLabel')}</Label>
           <Description>{t('shoppingDayDescription')}</Description>
-          <Select
-            id="shopping_day"
-            value={String(shoppingDay)}
-            onChange={(e) => setShoppingDay(Number(e.target.value))}
+          <Listbox
+            value={shoppingDay}
+            onChange={(val) => setShoppingDay(Number(val))}
             disabled={schedulePending}
             className="mt-2"
+            aria-label={t('shoppingDayLabel')}
           >
             {[0, 1, 2, 3, 4, 5, 6].map((d) => (
-              <option key={d} value={d}>
+              <ListboxOption key={d} value={d}>
                 {SHOPPING_DAY_LABELS[d]}
-              </option>
+              </ListboxOption>
             ))}
-          </Select>
+          </Listbox>
         </Field>
         <Field>
           <Label htmlFor="lead_time">{t('leadTimeLabel')}</Label>
           <Description>{t('leadTimeDescription')}</Description>
-          <Select
-            id="lead_time"
-            value={String(leadTimeHours)}
-            onChange={(e) =>
-              setLeadTimeHours(Number(e.target.value) as 24 | 48 | 72)
-            }
+          <Listbox
+            value={leadTimeHours}
+            onChange={(val) => setLeadTimeHours(Number(val) as 24 | 48 | 72)}
             disabled={schedulePending}
             className="mt-2"
+            aria-label={t('leadTimeLabel')}
           >
             {LEAD_TIME_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
+              <ListboxOption key={opt.value} value={opt.value}>
                 {opt.label}
-              </option>
+              </ListboxOption>
             ))}
-          </Select>
+          </Listbox>
         </Field>
         <Field>
           <Label htmlFor="favorite_meal_ids">{t('favoriteMealIdsLabel')}</Label>

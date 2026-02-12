@@ -32,6 +32,7 @@ import {
   Label,
   Description,
 } from '@/components/catalyst/fieldset';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import {
   Dialog,
   DialogActions,
@@ -798,42 +799,44 @@ export function GuardRailsOverview({
                 {!editingConstraint.isLegacy && (
                   <>
                     <Field>
-                      <Label htmlFor="edit-rule-action">Rule Actie</Label>
-                      <select
-                        id="edit-rule-action"
+                      <Label>Rule Actie</Label>
+                      <Listbox
                         value={editFormData.rule_action}
-                        onChange={(e) =>
+                        onChange={(val) =>
                           setEditFormData({
                             ...editFormData,
-                            rule_action: e.target.value as 'allow' | 'block',
+                            rule_action: val as 'allow' | 'block',
                           })
                         }
-                        className="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                        aria-label="Rule Actie"
                       >
-                        <option value="allow">Allow (Toestaan)</option>
-                        <option value="block">Block (Blokkeren)</option>
-                      </select>
+                        <ListboxOption value="allow">
+                          Allow (Toestaan)
+                        </ListboxOption>
+                        <ListboxOption value="block">
+                          Block (Blokkeren)
+                        </ListboxOption>
+                      </Listbox>
                       <Description>
                         Regel actie. Block heeft voorrang over allow bij gelijke
                         prioriteit.
                       </Description>
                     </Field>
                     <Field>
-                      <Label htmlFor="edit-strictness">Striktheid</Label>
-                      <select
-                        id="edit-strictness"
+                      <Label>Striktheid</Label>
+                      <Listbox
                         value={editFormData.strictness}
-                        onChange={(e) =>
+                        onChange={(val) =>
                           setEditFormData({
                             ...editFormData,
-                            strictness: e.target.value as 'hard' | 'soft',
+                            strictness: val as 'hard' | 'soft',
                           })
                         }
-                        className="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                        aria-label="Striktheid"
                       >
-                        <option value="hard">Hard</option>
-                        <option value="soft">Soft</option>
-                      </select>
+                        <ListboxOption value="hard">Hard</ListboxOption>
+                        <ListboxOption value="soft">Soft</ListboxOption>
+                      </Listbox>
                     </Field>
                     {editFormData.rule_action === 'allow' && (
                       <>

@@ -287,6 +287,7 @@ export class MealPlannerShoppingService {
         const ingredientCoverages: MealIngredientCoverage[] = [];
 
         for (const ref of meal.ingredientRefs) {
+          if (!ref.nevoCode) continue;
           // Get NEVO food data (with caching)
           const food = await getNevoFoodCached(ref.nevoCode);
           const name = String(
@@ -516,7 +517,7 @@ export class MealPlannerShoppingService {
       for (const meal of day.meals) {
         if (meal.ingredientRefs) {
           for (const ref of meal.ingredientRefs) {
-            nevoCodes.add(ref.nevoCode);
+            if (ref.nevoCode) nevoCodes.add(ref.nevoCode);
           }
         }
       }
@@ -550,7 +551,7 @@ export class MealPlannerShoppingService {
       for (const meal of day.meals) {
         if (meal.ingredientRefs) {
           for (const ref of meal.ingredientRefs) {
-            nevoCodes.add(ref.nevoCode);
+            if (ref.nevoCode) nevoCodes.add(ref.nevoCode);
           }
         }
       }

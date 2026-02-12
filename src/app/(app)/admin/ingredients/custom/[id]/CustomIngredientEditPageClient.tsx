@@ -3,6 +3,7 @@
 import { Badge } from '@/components/catalyst/badge';
 import { Link } from '@/components/catalyst/link';
 import { IngredientEditForm } from '../../components/IngredientEditForm';
+import { LinkIngredientToProductSection } from '../../components/LinkIngredientToProductSection';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 
 type CustomIngredientEditPageClientProps = {
@@ -43,6 +44,14 @@ export function CustomIngredientEditPageClient({
             </div>
           </div>
         </div>
+
+        <LinkIngredientToProductSection
+          ingredientName={String(
+            initialData.name_nl ??
+              initialData.name_en ??
+              'NutriCoach-ingrediënt',
+          )}
+        />
 
         <IngredientEditForm
           source="custom"

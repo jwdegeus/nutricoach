@@ -101,7 +101,7 @@ export class PlanChatService {
       for (const meal of day.meals) {
         if (meal.ingredientRefs) {
           for (const ref of meal.ingredientRefs) {
-            planNevoCodes.add(ref.nevoCode);
+            if (ref.nevoCode) planNevoCodes.add(ref.nevoCode);
           }
         }
       }

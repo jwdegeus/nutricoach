@@ -110,25 +110,26 @@ export async function addMealToRecipesAction(args: {
     aiAnalysis: aiAnalysis ?? undefined,
   });
 
-  // Insert recipe_ingredients from ingredientRefs
-  const inserts = meal.ingredientRefs.map((ref) => {
-    const name =
-      ref.displayName?.trim() ||
-      nevoFoodNamesByCode[ref.nevoCode] ||
-      `NEVO ${ref.nevoCode}`;
-    const quantity = Number(ref.quantityG);
-    const nevoId = parseInt(ref.nevoCode, 10);
-    return {
-      recipe_id: record.id,
-      user_id: user.id,
-      original_line: `${Number.isFinite(quantity) ? quantity : 0} g ${name}`,
-      quantity: Number.isFinite(quantity) ? quantity : null,
-      unit: 'g',
-      name,
-      note: null,
-      nevo_food_id: Number.isNaN(nevoId) ? null : nevoId,
-    };
-  });
+  // Insert recipe_ingredients from ingredientRefs (alleen refs met nevoCode; recipe_ingredients is NEVO-only)
+  const inserts = meal.ingredientRefs
+    .filter((ref) => ref.nevoCode?.trim())
+    .map((ref) => {
+      const nevo = ref.nevoCode!.trim();
+      const name =
+        ref.displayName?.trim() || nevoFoodNamesByCode[nevo] || `NEVO ${nevo}`;
+      const quantity = Number(ref.quantityG);
+      const nevoId = parseInt(nevo, 10);
+      return {
+        recipe_id: record.id,
+        user_id: user.id,
+        original_line: `${Number.isFinite(quantity) ? quantity : 0} g ${name}`,
+        quantity: Number.isFinite(quantity) ? quantity : null,
+        unit: 'g',
+        name,
+        note: null,
+        nevo_food_id: Number.isNaN(nevoId) ? null : nevoId,
+      };
+    });
 
   if (inserts.length > 0) {
     const { error: ingError } = await supabase

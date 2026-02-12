@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/catalyst/button';
 import { Input } from '@/components/catalyst/input';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import {
   Field,
   FieldGroup,
@@ -124,24 +124,24 @@ export function HouseholdServingsClient({
         <Field>
           <Label htmlFor="servings_policy">{t('servingsPolicyLabel')}</Label>
           <Description>{t('servingsPolicyDescription')}</Description>
-          <Select
-            id="servings_policy"
+          <Listbox
             value={servingsPolicy}
-            onChange={(e) =>
+            onChange={(val) =>
               setServingsPolicy(
-                e.target.value as 'scale_to_household' | 'keep_recipe_servings',
+                val as 'scale_to_household' | 'keep_recipe_servings',
               )
             }
             disabled={savePending}
             className="mt-2"
+            aria-label={t('servingsPolicyLabel')}
           >
-            <option value="scale_to_household">
+            <ListboxOption value="scale_to_household">
               {t('servingsPolicyScaleToHousehold')}
-            </option>
-            <option value="keep_recipe_servings">
+            </ListboxOption>
+            <ListboxOption value="keep_recipe_servings">
               {t('servingsPolicyKeepRecipeServings')}
-            </option>
-          </Select>
+            </ListboxOption>
+          </Listbox>
         </Field>
         <div className="flex justify-end">
           <Button

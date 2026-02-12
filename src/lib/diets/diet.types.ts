@@ -244,11 +244,15 @@ export type DietRuleSet = {
 export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
 /**
- * Meal ingredient reference with NEVO code
- * This is the primary contract for ingredient selection - ingredients must come from NEVO database
+ * Meal ingredient reference. Eén database: NEVO, FNDDS, custom, AI – elk met eigen ref.
  */
 export type MealIngredientRef = {
-  nevoCode: string; // NEVO code as string (for JSON schema compatibility)
+  /** NEVO-code (nevo_foods.id) */
+  nevoCode?: string;
+  /** Custom food id (custom_foods.id) */
+  customFoodId?: string;
+  /** FNDDS/FDC id */
+  fdcId?: string;
   quantityG: number; // Amount in grams (min 1)
   displayName?: string; // Optional display name for UI
   tags?: string[]; // Optional tags for ingredient categorization (e.g., ["grains", "dairy"])
@@ -309,6 +313,8 @@ export type Meal = {
   };
   prepTime?: number; // minutes
   servings?: number;
+  /** Internal: source of prefilled meal (custom_meals = recipe DB, meal_history = past meals). Used for provenance only. */
+  recipeSource?: 'custom_meals' | 'meal_history';
 };
 
 /**

@@ -1,6 +1,6 @@
 'use client';
 
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 
 interface Step3PracticalProps {
   maxPrepMinutes: number;
@@ -48,18 +48,17 @@ export function Step3Practical({
             {/* TODO: i18n key: onboarding.step3.maxPrepMinutesLabel */}
             Maximale bereidingstijd
           </label>
-          <Select
-            id="max-prep-minutes"
-            value={maxPrepMinutes.toString()}
-            onChange={(e) => onMaxPrepMinutesChange(Number(e.target.value))}
-            required
+          <Listbox
+            value={maxPrepMinutes}
+            onChange={(val) => onMaxPrepMinutesChange(Number(val))}
+            aria-label="Maximale bereidingstijd"
           >
             {PREP_TIME_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value.toString()}>
+              <ListboxOption key={option.value} value={option.value}>
                 {option.label}
-              </option>
+              </ListboxOption>
             ))}
-          </Select>
+          </Listbox>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
             {/* TODO: i18n key: onboarding.step3.maxPrepMinutesHelp */}
             We zullen alleen recepten voorstellen die binnen deze tijd kunnen
@@ -76,18 +75,17 @@ export function Step3Practical({
             {/* TODO: i18n key: onboarding.step3.servingsDefaultLabel */}
             Standaard aantal porties
           </label>
-          <Select
-            id="servings-default"
-            value={servingsDefault.toString()}
-            onChange={(e) => onServingsDefaultChange(Number(e.target.value))}
-            required
+          <Listbox
+            value={servingsDefault}
+            onChange={(val) => onServingsDefaultChange(Number(val))}
+            aria-label="Standaard aantal porties"
           >
             {SERVINGS_OPTIONS.map((servings) => (
-              <option key={servings} value={servings.toString()}>
+              <ListboxOption key={servings} value={servings}>
                 {servings} {servings === 1 ? 'portie' : 'porties'}
-              </option>
+              </ListboxOption>
             ))}
-          </Select>
+          </Listbox>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
             {/* TODO: i18n key: onboarding.step3.servingsDefaultHelp */}
             Het standaard aantal porties per maaltijd.

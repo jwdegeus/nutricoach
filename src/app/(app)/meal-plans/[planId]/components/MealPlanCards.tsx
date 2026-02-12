@@ -8,6 +8,8 @@ import { MealCard } from './MealCard';
 import { QuickEditBar } from './QuickEditBar';
 import { Heading } from '@/components/catalyst/heading';
 
+type SlotProvenance = Record<string, { source: string; reason?: string }>;
+
 type MealPlanCardsProps = {
   planId: string;
   plan: MealPlanResponse;
@@ -15,6 +17,7 @@ type MealPlanCardsProps = {
   nevoFoodNamesByCode: Record<string, string>;
   planStatus?: MealPlanStatus;
   linkedRecipesByMealId?: Record<string, LinkedRecipe>;
+  slotProvenance?: SlotProvenance;
   /** Called when a per-meal edit (Wissel/Verwijder/QuickEditBar) is started */
   onEditStarted?: () => void;
 };
@@ -26,6 +29,7 @@ export function MealPlanCards({
   nevoFoodNamesByCode,
   planStatus,
   linkedRecipesByMealId = {},
+  slotProvenance,
   onEditStarted,
 }: MealPlanCardsProps) {
   // Create enrichment map for quick lookup
@@ -71,8 +75,13 @@ export function MealPlanCards({
           .map((ref) => {
             const name =
               ref.displayName ||
-              nevoFoodNamesByCode[ref.nevoCode] ||
-              `NEVO ${ref.nevoCode}`;
+              (ref.nevoCode && nevoFoodNamesByCode[ref.nevoCode]) ||
+              (ref.nevoCode ? `NEVO ${ref.nevoCode}` : null) ||
+              (ref.customFoodId
+                ? `Ingrediënt`
+                : ref.fdcId
+                  ? `Ingrediënt`
+                  : 'Onbekend');
             return `${name} (${ref.quantityG}g)`;
           });
       }
@@ -108,6 +117,16 @@ export function MealPlanCards({
               );
 
               const linkedRecipe = linkedRecipesByMealId[meal.id];
+              const provKey = `${meal.date}-${meal.slot}`;
+              const provenanceSource = slotProvenance?.[provKey]?.source;
+              // Alleen "Database" tonen als er een gekoppeld recept bestaat. slotProvenance 'db'
+              // kan betekenen: uit meal_history (waar óók AI-maaltijden uit vorige plannen terechtkomen),
+              // dus dat is niet hetzelfde als "bestaat in receptendatabase".
+              const sourceFromProvenance = linkedRecipe
+                ? 'db'
+                : provenanceSource === 'ai'
+                  ? 'ai'
+                  : undefined;
               return (
                 <MealCard
                   key={meal.id}
@@ -123,6 +142,7 @@ export function MealPlanCards({
                   macros={meal.estimatedMacros}
                   enrichedMeal={enriched}
                   linkedRecipe={linkedRecipe}
+                  sourceFromProvenance={sourceFromProvenance}
                   cookPlanDay={cookPlan}
                   nevoFoodNamesByCode={nevoFoodNamesByCode}
                   planStatus={planStatus}

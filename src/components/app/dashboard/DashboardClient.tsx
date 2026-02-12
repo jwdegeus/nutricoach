@@ -17,7 +17,6 @@ import {
   aggregateMineralData,
   aggregateSupplementData,
   getMemberIndex,
-  type FamilyMember,
 } from './DashboardChartData';
 import type {
   DashboardTopMeal,

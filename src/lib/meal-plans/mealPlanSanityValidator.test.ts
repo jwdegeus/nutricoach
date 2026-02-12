@@ -71,7 +71,7 @@ describe('mealPlanSanityValidator', () => {
       assert.ok(result.issues.some((i) => i.code === 'PLACEHOLDER_NAME'));
     });
 
-    it('returns INGREDIENT_COUNT_OUT_OF_RANGE when fewer than 2', () => {
+    it('accepts refs with customFoodId or fdcId (geen nevoCode vereist)', () => {
       const plan: MealPlanResponse = {
         requestId: 'r1',
         days: [
@@ -80,7 +80,30 @@ describe('mealPlanSanityValidator', () => {
             meals: [
               {
                 ...validMeal,
-                ingredientRefs: [{ nevoCode: '1', quantityG: 100 }],
+                ingredientRefs: [
+                  { customFoodId: 'cf1', quantityG: 100 },
+                  { fdcId: 'fdc123', quantityG: 50 },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      const result = validateMealPlanSanity(plan);
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(result.issues.length, 0);
+    });
+
+    it('returns INGREDIENT_COUNT_OUT_OF_RANGE when zero ingredients', () => {
+      const plan: MealPlanResponse = {
+        requestId: 'r1',
+        days: [
+          {
+            date: '2026-02-01',
+            meals: [
+              {
+                ...validMeal,
+                ingredientRefs: [],
               },
             ],
           },

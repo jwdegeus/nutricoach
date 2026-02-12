@@ -4,6 +4,7 @@ import { createClient } from '@/src/lib/supabase/server';
 import { z } from 'zod';
 import { getGeminiClient } from '@/src/lib/ai/gemini/gemini.client';
 import type { GeminiExtractedRecipe } from '../recipeImport.gemini.schemas';
+import { normalizeIngredientFromCombinedText } from '../utils/normalizeIngredient';
 
 /** Woorden die typisch Engels zijn in recepten; als deze in de "vertaalde" tekst staan bij target nl, opnieuw per item vertalen */
 const ENGLISH_RECIPE_MARKERS =
@@ -473,27 +474,33 @@ Reply (numbered list only):`;
               const mainPart = noteMatch ? noteMatch[1] : translatedLine;
               const note = noteMatch ? noteMatch[2] : null;
 
-              // Try to extract quantity and unit
-              const qtyUnitMatch = mainPart.match(
-                /^([\d.,]+)\s*([a-zA-Z]+)\s+(.+)$/,
-              );
-              if (qtyUnitMatch) {
-                const qty = parseFloat(qtyUnitMatch[1].replace(',', '.'));
-                const unit = qtyUnitMatch[2];
-                const name = qtyUnitMatch[3].trim();
-
-                translatedIng.quantity = qty;
-                translatedIng.unit = unit;
-                translatedIng.name = name;
+              // Try to extract quantity and unit (incl. fractions like 1/2, ¼)
+              const parsed = normalizeIngredientFromCombinedText(mainPart);
+              if (parsed) {
+                translatedIng.quantity = parsed.quantity;
+                translatedIng.unit = parsed.unit;
+                translatedIng.name = parsed.name;
               } else {
-                // Try unit without quantity
-                const unitMatch = mainPart.match(/^([a-zA-Z]+)\s+(.+)$/);
-                if (unitMatch) {
-                  translatedIng.unit = unitMatch[1];
-                  translatedIng.name = unitMatch[2].trim();
+                const qtyUnitMatch = mainPart.match(
+                  /^([\d.,]+)\s*([a-zA-Z]+)\s+(.+)$/,
+                );
+                if (qtyUnitMatch) {
+                  const qty = parseFloat(qtyUnitMatch[1].replace(',', '.'));
+                  const unit = qtyUnitMatch[2];
+                  const name = qtyUnitMatch[3].trim();
+
+                  translatedIng.quantity = qty;
+                  translatedIng.unit = unit;
+                  translatedIng.name = name;
                 } else {
-                  // Just name
-                  translatedIng.name = mainPart.trim();
+                  // Try unit without quantity
+                  const unitMatch = mainPart.match(/^([a-zA-Z]+)\s+(.+)$/);
+                  if (unitMatch) {
+                    translatedIng.unit = unitMatch[1];
+                    translatedIng.name = unitMatch[2].trim();
+                  } else {
+                    translatedIng.name = mainPart.trim();
+                  }
                 }
               }
 

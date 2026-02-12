@@ -2,7 +2,11 @@
 
 import { z } from 'zod';
 import { createClient } from '@/src/lib/supabase/server';
-import type { MealListItem, MealSlotValue } from './meal-list.actions';
+import type {
+  IngredientLinkStatus,
+  MealListItem,
+  MealSlotValue,
+} from './meal-list.actions';
 import {
   computeWeekMenuStatus,
   effectiveWeekmenuSlots,
@@ -72,6 +76,7 @@ function rowToRecentMealListItem(
   favoritedSet: Set<string>,
   lastViewedAt: string,
   recipesWithIngredientRefs: Set<string>,
+  ingredientLinkByRecipe: Map<string, IngredientLinkStatus>,
 ): RecentMealListItem {
   const tags: string[] = [];
   if (row.recipe_tag_links && Array.isArray(row.recipe_tag_links)) {
@@ -105,6 +110,7 @@ function rowToRecentMealListItem(
     isFavorited: favoritedSet.has(row.id),
     userRating: null,
     weekMenuStatus: computeWeekMenuStatus(slots, hasIngredientRefs),
+    ingredientLinkStatus: ingredientLinkByRecipe.get(row.id) ?? null,
     lastViewedAt,
   };
 }
@@ -289,6 +295,7 @@ export async function listRecentMealsAction(
     let favoritedSet = new Set<string>();
     const ratingsByMealId: Record<string, number> = {};
     let recipesWithIngredientRefs = new Set<string>();
+    const ingredientLinkByRecipe = new Map<string, IngredientLinkStatus>();
     if (mealIdsOrdered.length > 0) {
       const [favRes, ratingRes, nevoRes, mealDataRes] = await Promise.all([
         supabase
@@ -303,9 +310,8 @@ export async function listRecentMealsAction(
           .in('meal_id', mealIdsOrdered),
         supabase
           .from('recipe_ingredients')
-          .select('recipe_id')
-          .in('recipe_id', mealIdsOrdered)
-          .not('nevo_food_id', 'is', null),
+          .select('recipe_id, nevo_food_id')
+          .in('recipe_id', mealIdsOrdered),
         supabase
           .from('custom_meals')
           .select('id, meal_data')
@@ -319,9 +325,16 @@ export async function listRecentMealsAction(
         if (row.user_rating != null)
           ratingsByMealId[row.meal_id] = row.user_rating;
       }
-      const fromRecipeIngredients = new Set(
-        (nevoRes.data ?? []).map((r) => (r as { recipe_id: string }).recipe_id),
-      );
+      for (const row of nevoRes.data ?? []) {
+        const r = row as { recipe_id: string; nevo_food_id: number | null };
+        const prev = ingredientLinkByRecipe.get(r.recipe_id) ?? {
+          linked: 0,
+          total: 0,
+        };
+        prev.total += 1;
+        if (r.nevo_food_id != null) prev.linked += 1;
+        ingredientLinkByRecipe.set(r.recipe_id, prev);
+      }
       const fromMealData = new Set<string>();
       for (const row of mealDataRes.data ?? []) {
         const r = row as { id: string; meal_data: unknown };
@@ -329,18 +342,31 @@ export async function listRecentMealsAction(
         const refs = Array.isArray(mealData.ingredientRefs)
           ? (mealData.ingredientRefs as Record<string, unknown>[])
           : [];
-        const hasAnyRef = refs.some(
+        const ingredients = Array.isArray(mealData.ingredients)
+          ? (mealData.ingredients as unknown[])
+          : [];
+        const total = Math.max(refs.length, ingredients.length) || refs.length;
+        const linked = refs.filter(
           (ref) =>
             ref != null &&
             typeof ref === 'object' &&
             (ref.nevoCode != null ||
               ref.customFoodId != null ||
-              ref.custom_food_id != null ||
+              (ref as Record<string, unknown>).custom_food_id != null ||
               ref.fdcId != null ||
-              ref.fdc_id != null),
-        );
+              (ref as Record<string, unknown>).fdc_id != null),
+        ).length;
+        const hasAnyRef = linked > 0;
         if (hasAnyRef) fromMealData.add(r.id);
+        if (total > 0) {
+          ingredientLinkByRecipe.set(r.id, { linked, total });
+        }
       }
+      const fromRecipeIngredients = new Set(
+        [...ingredientLinkByRecipe.entries()]
+          .filter(([, s]) => s.linked > 0)
+          .map(([id]) => id),
+      );
       recipesWithIngredientRefs = new Set([
         ...fromRecipeIngredients,
         ...fromMealData,
@@ -358,6 +384,7 @@ export async function listRecentMealsAction(
             favoritedSet,
             lastViewedAt,
             recipesWithIngredientRefs,
+            ingredientLinkByRecipe,
           ),
         );
       }

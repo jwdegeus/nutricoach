@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/catalyst/button';
 import { Input } from '@/components/catalyst/input';
 import { Field, Label } from '@/components/catalyst/fieldset';
+import { Switch } from '@/components/catalyst/switch';
 import { useToast } from '@/src/components/app/ToastContext';
 import { updateStoreAction } from '../../actions/stores.actions';
 
@@ -14,6 +15,8 @@ type Props = {
   detailBatchSize: number;
   detailConcurrency: number;
   detailDelayMs: number;
+  productUrlsOnly: boolean;
+  onSuccess?: () => void;
 };
 
 export function StoreSyncSettingsForm({
@@ -22,6 +25,8 @@ export function StoreSyncSettingsForm({
   detailBatchSize: initialDetailBatchSize,
   detailConcurrency: initialDetailConcurrency,
   detailDelayMs: initialDetailDelayMs,
+  productUrlsOnly: initialProductUrlsOnly,
+  onSuccess,
 }: Props) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -34,6 +39,9 @@ export function StoreSyncSettingsForm({
   );
   const [detailDelayMs, setDetailDelayMs] = useState(
     initialDetailDelayMs > 0 ? String(initialDetailDelayMs) : '',
+  );
+  const [productUrlsOnly, setProductUrlsOnly] = useState(
+    initialProductUrlsOnly,
   );
   const [saving, setSaving] = useState(false);
 
@@ -72,10 +80,12 @@ export function StoreSyncSettingsForm({
       detailBatchSize: batch,
       detailConcurrency: concurrency,
       detailDelayMs: delay > 0 ? delay : null,
+      productUrlsOnly,
     });
     setSaving(false);
     if (result.ok) {
       showToast({ type: 'success', title: 'Sync-instellingen opgeslagen' });
+      onSuccess?.();
       router.refresh();
     } else {
       showToast({
@@ -88,6 +98,20 @@ export function StoreSyncSettingsForm({
 
   return (
     <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+      <Field>
+        <div className="flex items-center gap-3">
+          <Switch
+            name="productUrlsOnly"
+            checked={productUrlsOnly}
+            onChange={setProductUrlsOnly}
+          />
+          <Label>Alleen product-URL&apos;s (.html)</Label>
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Bij sitemaps die producten, categorieën en blog mixen (bijv.
+          versenoten.nl) alleen URL&apos;s met .html meenemen.
+        </p>
+      </Field>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field>
           <Label>Rate limit (rps)</Label>

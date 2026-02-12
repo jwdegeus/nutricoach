@@ -242,8 +242,9 @@ export function MealDetail({
               {refs.map((ref: MealIngredientRef, idx: number) => {
                 const name =
                   ref.displayName ||
-                  nevoFoodNamesByCode[ref.nevoCode] ||
-                  `NEVO ${ref.nevoCode}`;
+                  (ref.nevoCode && nevoFoodNamesByCode[ref.nevoCode]) ||
+                  (ref.nevoCode ? `NEVO ${ref.nevoCode}` : null) ||
+                  'Ingrediënt';
                 return (
                   <li key={idx} className="text-zinc-600 dark:text-zinc-400">
                     <span className="font-medium text-zinc-900 dark:text-white">

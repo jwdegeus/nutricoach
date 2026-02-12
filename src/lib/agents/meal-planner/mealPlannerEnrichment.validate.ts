@@ -50,7 +50,7 @@ function getAllowedNevoCodes(
   const codes = new Set<string>();
   if (meal.ingredientRefs) {
     for (const ref of meal.ingredientRefs) {
-      codes.add(ref.nevoCode);
+      if (ref.nevoCode) codes.add(ref.nevoCode);
     }
   }
   return codes;

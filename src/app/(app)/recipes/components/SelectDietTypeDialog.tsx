@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from '@/components/catalyst/dialog';
 import { Button } from '@/components/catalyst/button';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { getDietTypes } from '@/src/app/(app)/onboarding/queries/diet-types.queries';
 import type { DietType } from '@/src/app/(app)/onboarding/queries/diet-types.queries';
 
@@ -94,21 +94,21 @@ export function SelectDietTypeDialog({
           >
             Dieettype
           </label>
-          <Select
-            id="diet-type-select"
+          <Listbox
             value={selectedDietTypeId}
-            onChange={(e) => setSelectedDietTypeId(e.target.value)}
+            onChange={(val) => setSelectedDietTypeId(val)}
             disabled={isLoading}
+            aria-label="Dieettype"
           >
-            <option value="">
+            <ListboxOption value="">
               {isLoading ? 'Laden...' : '-- Geen dieettype --'}
-            </option>
+            </ListboxOption>
             {dietTypes.map((diet) => (
-              <option key={diet.id} value={diet.id}>
+              <ListboxOption key={diet.id} value={diet.id}>
                 {diet.name}
-              </option>
+              </ListboxOption>
             ))}
-          </Select>
+          </Listbox>
           {selectedDietTypeId && (
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               {dietTypes.find((d) => d.id === selectedDietTypeId)?.description}

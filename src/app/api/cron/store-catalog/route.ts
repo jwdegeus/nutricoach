@@ -27,6 +27,7 @@ type StoreRow = {
     detailBatchSize?: number;
     detailConcurrency?: number;
     fullSync?: boolean;
+    productUrlsOnly?: boolean;
   } | null;
   is_active: boolean;
 };
@@ -160,10 +161,12 @@ async function runStoreCatalogSync(
     const fullSync = fullMode || store.connector_config?.fullSync === true;
 
     try {
+      const productUrlsOnly = store.connector_config?.productUrlsOnly === true;
       const { urls, wasCapped } = await harvestSitemapUrls(sitemapUrl, {
         timeoutMs: SITEMAP_TIMEOUT_MS,
         rateLimitRps,
         urlCap: 50_000,
+        productUrlsOnly,
       });
 
       const n = urls.length;
@@ -174,6 +177,7 @@ async function runStoreCatalogSync(
         urls,
         runStartedAt,
         fullSync,
+        baseUrl: store.base_url || undefined,
       });
 
       const stats: Record<string, unknown> = {

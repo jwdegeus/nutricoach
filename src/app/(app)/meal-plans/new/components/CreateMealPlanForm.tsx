@@ -7,7 +7,7 @@ import { Heading } from '@/components/catalyst/heading';
 import { Input } from '@/components/catalyst/input';
 import { Field, Label, Description } from '@/components/catalyst/fieldset';
 import { Text } from '@/components/catalyst/text';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { SwitchField, Switch } from '@/components/catalyst/switch';
 import {
   startMealPlanGenerationJobAction,
@@ -59,7 +59,6 @@ export function CreateMealPlanForm({
     useState<GuardrailsViolationState | null>(null);
   const [dietTypeId, setDietTypeId] = useState<string | undefined>(undefined);
   const [isRetrying, setIsRetrying] = useState(false);
-  const [progress, setProgress] = useState<string>('');
   const [dateFrom, setDateFrom] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
   });
@@ -109,7 +108,6 @@ export function CreateMealPlanForm({
 
     startTransition(async () => {
       try {
-        setProgress('Job aanmaken…');
         const startResult = await startMealPlanGenerationJobAction({
           dateFrom,
           days: daysNum,
@@ -124,35 +122,38 @@ export function CreateMealPlanForm({
           return;
         }
 
-        setProgress('Weekmenu genereren… (dit duurt 20–40 seconden)');
-        const runResult = await runMealPlanJobNowAction({
-          jobId: startResult.data.jobId,
-        });
+        const jobId = startResult.data.jobId;
+        const runResult = await runMealPlanJobNowAction({ jobId });
 
-        if (runResult.ok && runResult.data?.mealPlanId) {
+        if (!runResult.ok) {
+          setCreateError({ message: runResult.error.message });
+          return;
+        }
+
+        if (runResult.data?.mealPlanId) {
           showToast({
             type: 'success',
             title: 'Weekmenu klaar',
             description:
-              'Je krijgt ook een bericht in je inbox met info over recepten uit je database.',
+              'Je weekmenu is aangemaakt. Je krijgt ook een melding in je inbox.',
           });
           window.dispatchEvent(new CustomEvent('meal-plan-changed'));
-          router.replace(`/meal-plans/${runResult.data.mealPlanId}`);
-          return;
+          router.push(`/meal-plans/${runResult.data.mealPlanId}`);
+        } else {
+          showToast({
+            type: 'success',
+            title: 'Weekmenu-generatie voltooid',
+          });
+          window.dispatchEvent(new CustomEvent('meal-plan-changed'));
+          router.push('/meal-plans');
         }
-        setCreateError({
-          message:
-            runResult.ok === false
-              ? runResult.error.message
-              : 'Generatie mislukt. Check je inbox voor details.',
-        });
-        setProgress('');
       } catch (err) {
         setCreateError({
           message:
-            err instanceof Error ? err.message : 'Fout bij aanmaken weekmenu',
+            err instanceof Error
+              ? err.message
+              : 'Fout bij starten weekmenu-generatie',
         });
-        setProgress('');
       }
     });
   };
@@ -178,7 +179,6 @@ export function CreateMealPlanForm({
 
     startTransition(async () => {
       try {
-        setProgress('Job aanmaken…');
         const startResult = await startMealPlanGenerationJobAction({
           dateFrom,
           days: daysNum,
@@ -194,35 +194,39 @@ export function CreateMealPlanForm({
           return;
         }
 
-        setProgress('Weekmenu genereren… (dit duurt 20–40 seconden)');
-        const runResult = await runMealPlanJobNowAction({
-          jobId: startResult.data.jobId,
-        });
+        const jobId = startResult.data.jobId;
+        const runResult = await runMealPlanJobNowAction({ jobId });
 
-        if (runResult.ok && runResult.data?.mealPlanId) {
+        if (!runResult.ok) {
+          setCreateError({ message: runResult.error.message });
+          setIsRetrying(false);
+          return;
+        }
+
+        if (runResult.data?.mealPlanId) {
           showToast({
             type: 'success',
             title: 'Weekmenu klaar',
             description:
-              'Je krijgt ook een bericht in je inbox met info over recepten uit je database.',
+              'Je weekmenu is aangemaakt. Je krijgt ook een melding in je inbox.',
           });
           window.dispatchEvent(new CustomEvent('meal-plan-changed'));
-          router.replace(`/meal-plans/${runResult.data.mealPlanId}`);
-          return;
+          router.push(`/meal-plans/${runResult.data.mealPlanId}`);
+        } else {
+          showToast({
+            type: 'success',
+            title: 'Weekmenu-generatie voltooid',
+          });
+          window.dispatchEvent(new CustomEvent('meal-plan-changed'));
+          router.push('/meal-plans');
         }
-        setCreateError({
-          message:
-            runResult.ok === false
-              ? runResult.error.message
-              : 'Generatie mislukt. Check je inbox voor details.',
-        });
-        setProgress('');
       } catch (err) {
         setCreateError({
           message:
-            err instanceof Error ? err.message : 'Fout bij aanmaken weekmenu',
+            err instanceof Error
+              ? err.message
+              : 'Fout bij starten weekmenu-generatie',
         });
-        setProgress('');
       } finally {
         setIsRetrying(false);
       }
@@ -294,17 +298,18 @@ export function CreateMealPlanForm({
             </Text>
             <Field>
               <Label>Variatie-venster (dagen)</Label>
-              <Select
-                value={String(repeatWindowDays)}
-                onChange={(e) => setRepeatWindowDays(Number(e.target.value))}
+              <Listbox
+                value={repeatWindowDays}
+                onChange={(val) => setRepeatWindowDays(Number(val))}
                 disabled={isPending}
+                aria-label="Variatie-venster (dagen)"
               >
-                <option value={3}>3 dagen</option>
-                <option value={5}>5 dagen</option>
-                <option value={7}>7 dagen</option>
-                <option value={10}>10 dagen</option>
-                <option value={14}>14 dagen</option>
-              </Select>
+                <ListboxOption value={3}>3 dagen</ListboxOption>
+                <ListboxOption value={5}>5 dagen</ListboxOption>
+                <ListboxOption value={7}>7 dagen</ListboxOption>
+                <ListboxOption value={10}>10 dagen</ListboxOption>
+                <ListboxOption value={14}>14 dagen</ListboxOption>
+              </Listbox>
               <Description>
                 Zelfde recept niet opnieuw binnen dit aantal dagen (zelfde
                 maaltijdsoort)
@@ -368,17 +373,6 @@ export function CreateMealPlanForm({
                     )}
                 </div>
               </div>
-            </div>
-          )}
-
-          {isPending && (
-            <div className="rounded-lg bg-muted/30 p-4 shadow-sm">
-              <p className="text-sm font-medium text-foreground">
-                {progress || 'Weekmenu genereren…'}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Blijf deze pagina open. Dit duurt 20–40 seconden.
-              </p>
             </div>
           )}
 

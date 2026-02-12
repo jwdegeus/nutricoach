@@ -46,6 +46,11 @@ export type SyncStoreFromSitemapParams = {
   runStartedAt: string;
   /** If true, process all URLs in chunks and run deactivate sweep after */
   fullSync?: boolean;
+  /**
+   * When set: rewrite product URL origins to match this base URL.
+   * Fixes sitemaps that list versenoten.nl while product pages only work on www.versenoten.nl.
+   */
+  baseUrl?: string;
 };
 
 function parseLastmod(lastmod: string | undefined): string | null {
@@ -248,6 +253,20 @@ async function deactivateUnseen(
 }
 
 /**
+ * Rewrite URL origin to baseUrl when they differ (fixes www vs non-www mismatch).
+ */
+function rewriteToBaseUrl(loc: string, baseUrl: string): string {
+  try {
+    const locUrl = new URL(loc);
+    const baseUrlParsed = new URL(baseUrl);
+    if (locUrl.origin === baseUrlParsed.origin) return loc;
+    return baseUrlParsed.origin + locUrl.pathname + locUrl.search + locUrl.hash;
+  } catch {
+    return loc;
+  }
+}
+
+/**
  * Dedupe by loc; in full mode process all URLs in chunks, else first batch only. Optionally run deactivate sweep.
  */
 export async function syncStoreFromSitemap({
@@ -257,12 +276,15 @@ export async function syncStoreFromSitemap({
   urls,
   runStartedAt,
   fullSync = false,
+  baseUrl,
 }: SyncStoreFromSitemapParams): Promise<SyncStoreFromSitemapResult> {
   const seen = new Set<string>();
   const deduped: SitemapUrlEntry[] = [];
   for (const u of urls) {
-    const loc = u.loc?.trim();
-    if (!loc || seen.has(loc)) continue;
+    let loc = u.loc?.trim();
+    if (!loc) continue;
+    if (baseUrl) loc = rewriteToBaseUrl(loc, baseUrl);
+    if (seen.has(loc)) continue;
     seen.add(loc);
     deduped.push({ loc, lastmod: u.lastmod });
   }

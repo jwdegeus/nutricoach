@@ -20,6 +20,7 @@ import {
 } from '@/components/catalyst/dropdown';
 import {
   markInboxNotificationReadAction,
+  markInboxNotificationUnreadAction,
   deleteInboxNotificationAction,
 } from '../actions/inboxNotifications.actions';
 import type { InboxNotificationRecord } from '../actions/inboxNotifications.actions';
@@ -105,7 +106,7 @@ export function InboxListClient({
     }
   };
 
-  const handleMarkRead = async (id: string) => {
+  const handleMarkRead = async (id: string, opts?: { silent?: boolean }) => {
     setMarkingId(id);
     setError(null);
     setNotifications((n) =>
@@ -114,7 +115,9 @@ export function InboxListClient({
     try {
       const result = await markInboxNotificationReadAction({ id });
       if (result.ok) {
-        showToast({ type: 'success', title: 'Gemarkeerd als gelezen' });
+        if (!opts?.silent) {
+          showToast({ type: 'success', title: 'Gemarkeerd als gelezen' });
+        }
         window.dispatchEvent(new CustomEvent('inbox-updated'));
         router.refresh();
       } else {
@@ -129,6 +132,36 @@ export function InboxListClient({
       );
       setError(
         err instanceof Error ? err.message : 'Fout bij markeren als gelezen',
+      );
+    } finally {
+      setMarkingId(null);
+    }
+  };
+
+  const handleMarkUnread = async (id: string) => {
+    setMarkingId(id);
+    setError(null);
+    setNotifications((n) =>
+      n.map((x) => (x.id === id ? { ...x, isRead: false } : x)),
+    );
+    try {
+      const result = await markInboxNotificationUnreadAction({ id });
+      if (result.ok) {
+        showToast({ type: 'success', title: 'Gemarkeerd als ongelezen' });
+        window.dispatchEvent(new CustomEvent('inbox-updated'));
+        router.refresh();
+      } else {
+        setNotifications((n) =>
+          n.map((x) => (x.id === id ? { ...x, isRead: true } : x)),
+        );
+        setError(result.error.message);
+      }
+    } catch (err) {
+      setNotifications((n) =>
+        n.map((x) => (x.id === id ? { ...x, isRead: true } : x)),
+      );
+      setError(
+        err instanceof Error ? err.message : 'Fout bij markeren als ongelezen',
       );
     } finally {
       setMarkingId(null);
@@ -182,7 +215,12 @@ export function InboxListClient({
             >
               <button
                 type="button"
-                onClick={() => setOpenedId(n.id)}
+                onClick={() => {
+                  setOpenedId(n.id);
+                  if (!n.isRead) {
+                    void handleMarkRead(n.id, { silent: true });
+                  }
+                }}
                 className="group min-w-0 flex-1 text-left"
               >
                 <div className="flex items-start gap-x-3">
@@ -218,7 +256,11 @@ export function InboxListClient({
                 {n.type === 'meal_plan_ready_for_review' && planId ? (
                   <Button
                     outline
-                    onClick={() => router.push(`/meal-plans/${planId}`)}
+                    onClick={() => {
+                      if (!n.isRead)
+                        void handleMarkRead(n.id, { silent: true });
+                      router.push(`/meal-plans/${planId}`);
+                    }}
                     className="hidden rounded-md bg-muted/50 px-2.5 py-1.5 text-sm font-semibold text-foreground ring-1 ring-border ring-inset hover:bg-muted sm:inline-flex dark:bg-white/5 dark:ring-white/10 dark:hover:bg-white/10"
                   >
                     Open weekmenu
@@ -227,11 +269,15 @@ export function InboxListClient({
                 {n.type === 'meal_plan_generation_failed' ? (
                   <Button
                     outline
-                    onClick={() =>
-                      planId
-                        ? router.push(`/meal-plans/${planId}`)
-                        : router.push('/meal-plans/new?retry=1')
-                    }
+                    onClick={() => {
+                      if (!n.isRead)
+                        void handleMarkRead(n.id, { silent: true });
+                      if (planId) {
+                        void router.push(`/meal-plans/${planId}`);
+                      } else {
+                        void router.push('/meal-plans/new?retry=1');
+                      }
+                    }}
                     className="hidden rounded-md bg-muted/50 px-2.5 py-1.5 text-sm font-semibold text-foreground ring-1 ring-border ring-inset hover:bg-muted sm:inline-flex dark:bg-white/5 dark:ring-white/10 dark:hover:bg-white/10"
                   >
                     Probeer opnieuw
@@ -252,7 +298,14 @@ export function InboxListClient({
                       anchor="bottom end"
                       className="min-w-36 rounded-lg py-1"
                     >
-                      {!n.isRead && (
+                      {n.isRead ? (
+                        <DropdownItem
+                          onClick={() => handleMarkUnread(n.id)}
+                          disabled={markingId !== null}
+                        >
+                          Markeer ongelezen
+                        </DropdownItem>
+                      ) : (
                         <DropdownItem
                           onClick={() => handleMarkRead(n.id)}
                           disabled={markingId !== null}

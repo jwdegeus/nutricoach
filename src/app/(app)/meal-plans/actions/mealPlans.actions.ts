@@ -61,9 +61,15 @@ type ActionResult<T> =
 /**
  * Create a new meal plan
  */
+export type CreateMealPlanResult = {
+  planId: string;
+  dbCoverageBelowTarget?: boolean;
+  debug?: { runId: string; logFileRelativePath?: string };
+};
+
 export async function createMealPlanAction(
   raw: unknown,
-): Promise<ActionResult<{ planId: string; dbCoverageBelowTarget?: boolean }>> {
+): Promise<ActionResult<CreateMealPlanResult>> {
   try {
     // Get authenticated user
     const supabase = await createClient();
@@ -118,10 +124,7 @@ export async function createMealPlanAction(
       );
     }
     type ErrorPayload = NonNullable<
-      Extract<
-        ActionResult<{ planId: string; dbCoverageBelowTarget?: boolean }>,
-        { ok: false }
-      >['error']
+      Extract<ActionResult<CreateMealPlanResult>, { ok: false }>['error']
     >;
     const err: ErrorPayload = {
       code: presentation.code,

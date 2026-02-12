@@ -23,6 +23,10 @@ import {
   processRecipeUrlWithGemini,
   RecipeImportAiParseError,
 } from '../services/geminiRecipeUrlImport.service';
+import {
+  normalizeIngredient,
+  normalizeIngredientFromCombinedText,
+} from '../utils/normalizeIngredient';
 
 /**
  * Action result type
@@ -694,7 +698,16 @@ export async function importRecipeFromUrlAction(
                   if (unitMatch) {
                     unit = unitMatch[1].trim();
                     name = unitMatch[2].trim();
-                  } else name = mainPart;
+                  } else {
+                    // Fallback: try normalizer for "1/2 theelepel kurkumapoeder" etc.
+                    const parsed =
+                      normalizeIngredientFromCombinedText(mainPart);
+                    if (parsed) {
+                      quantity = parsed.quantity;
+                      unit = parsed.unit;
+                      name = parsed.name;
+                    } else name = mainPart;
+                  }
                 }
                 return {
                   original_line: ing.text,
@@ -1005,14 +1018,17 @@ export async function importRecipeFromUrlAction(
             cook_minutes: null,
             total_minutes: null,
           },
-          ingredients: heuristic.ingredients.map((text) => ({
-            original_line: text,
-            name: text,
-            quantity: null,
-            unit: null,
-            note: null,
-            section: null as string | null,
-          })),
+          ingredients: heuristic.ingredients.map((text) => {
+            const base = {
+              original_line: text,
+              name: text,
+              quantity: null as number | null,
+              unit: null as string | null,
+              note: null as string | null,
+              section: null as string | null,
+            };
+            return normalizeIngredient(base, { useOriginalLine: true });
+          }),
           instructions: heuristic.instructions.map((text, idx) => ({
             step: idx + 1,
             text,
@@ -1344,10 +1360,15 @@ export async function importRecipeFromUrlAction(
 
       const extractedNoSections = {
         ...geminiResult.extracted,
-        ingredients: geminiResult.extracted.ingredients.map((ing) => ({
-          ...ing,
-          section: null as string | null,
-        })),
+        ingredients: geminiResult.extracted.ingredients.map((ing) => {
+          const withNullSection = {
+            ...ing,
+            section: null as string | null,
+          };
+          return normalizeIngredient(withNullSection, {
+            useOriginalLine: true,
+          });
+        }),
         instructions: mergedInstructions,
       };
 

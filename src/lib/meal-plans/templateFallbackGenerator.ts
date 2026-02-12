@@ -334,9 +334,9 @@ export function generateTemplateMealDraft(
     }
   }
 
-  used.add(ingredientRefs[0].nevoCode);
-  used.add(ingredientRefs[1].nevoCode);
-  used.add(ingredientRefs[2].nevoCode);
+  for (const ref of ingredientRefs) {
+    if (ref.nevoCode) used.add(ref.nevoCode);
+  }
 
   if (fatPool.length > 0 && ingredientRefs.length < maxIngredients) {
     const alreadyFatLike = ingredientRefs.some(
@@ -417,7 +417,11 @@ export async function buildMealFromDraft(
   let estimatedMacros: Meal['estimatedMacros'];
   try {
     const nevoRefs = draft.ingredientRefs.filter(
-      (ref) => ref.nevoCode && !ref.nevoCode.startsWith('FLAVOR:'),
+      (ref): ref is typeof ref & { nevoCode: string } => {
+        const code = ref.nevoCode;
+        if (!code) return false;
+        return !code.startsWith('FLAVOR:');
+      },
     );
     const macros = await calcMealMacros(
       nevoRefs.map((ref) => ({

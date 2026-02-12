@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/catalyst/button';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { Checkbox, CheckboxField } from '@/components/catalyst/checkbox';
 import {
   Field,
@@ -215,74 +215,74 @@ export function MealSlotStylePreferencesClient({
             {t('mealSlotStyleBreakfastLabel')}
           </Label>
           <Description>{t('mealSlotStyleBreakfastDescription')}</Description>
-          <Select
-            id="meal_slot_style_breakfast"
+          <Listbox
             value={toValue(preferredBreakfastStyle)}
-            onChange={(e) =>
+            onChange={(val) =>
               setPreferredBreakfastStyle(
-                e.target.value === ''
-                  ? null
-                  : (e.target.value as BreakfastStyle),
+                val === '' ? null : (val as BreakfastStyle),
               )
             }
             disabled={savePending}
             className="mt-2"
+            aria-label={t('mealSlotStyleBreakfastLabel')}
           >
-            <option value="">{t('mealSlotStyleNoPreference')}</option>
+            <ListboxOption value="">
+              {t('mealSlotStyleNoPreference')}
+            </ListboxOption>
             {BREAKFAST_VALUES.map((val) => (
-              <option key={val} value={val}>
+              <ListboxOption key={val} value={val}>
                 {t(BREAKFAST_OPTION_KEYS[val] as 'mealSlotStyleOptAny')}
-              </option>
+              </ListboxOption>
             ))}
-          </Select>
+          </Listbox>
         </Field>
         <Field>
           <Label htmlFor="meal_slot_style_lunch">
             {t('mealSlotStyleLunchLabel')}
           </Label>
           <Description>{t('mealSlotStyleLunchDescription')}</Description>
-          <Select
-            id="meal_slot_style_lunch"
+          <Listbox
             value={toValue(preferredLunchStyle)}
-            onChange={(e) =>
-              setPreferredLunchStyle(
-                e.target.value === '' ? null : (e.target.value as LunchStyle),
-              )
+            onChange={(val) =>
+              setPreferredLunchStyle(val === '' ? null : (val as LunchStyle))
             }
             disabled={savePending}
             className="mt-2"
+            aria-label={t('mealSlotStyleLunchLabel')}
           >
-            <option value="">{t('mealSlotStyleNoPreference')}</option>
+            <ListboxOption value="">
+              {t('mealSlotStyleNoPreference')}
+            </ListboxOption>
             {LUNCH_VALUES.map((val) => (
-              <option key={val} value={val}>
+              <ListboxOption key={val} value={val}>
                 {t(LUNCH_OPTION_KEYS[val] as 'mealSlotStyleOptAny')}
-              </option>
+              </ListboxOption>
             ))}
-          </Select>
+          </Listbox>
         </Field>
         <Field>
           <Label htmlFor="meal_slot_style_dinner">
             {t('mealSlotStyleDinnerLabel')}
           </Label>
           <Description>{t('mealSlotStyleDinnerDescription')}</Description>
-          <Select
-            id="meal_slot_style_dinner"
+          <Listbox
             value={toValue(preferredDinnerStyle)}
-            onChange={(e) =>
-              setPreferredDinnerStyle(
-                e.target.value === '' ? null : (e.target.value as DinnerStyle),
-              )
+            onChange={(val) =>
+              setPreferredDinnerStyle(val === '' ? null : (val as DinnerStyle))
             }
             disabled={savePending}
             className="mt-2"
+            aria-label={t('mealSlotStyleDinnerLabel')}
           >
-            <option value="">{t('mealSlotStyleNoPreference')}</option>
+            <ListboxOption value="">
+              {t('mealSlotStyleNoPreference')}
+            </ListboxOption>
             {DINNER_VALUES.map((val) => (
-              <option key={val} value={val}>
+              <ListboxOption key={val} value={val}>
                 {t(DINNER_OPTION_KEYS[val] as 'mealSlotStyleOptAny')}
-              </option>
+              </ListboxOption>
             ))}
-          </Select>
+          </Listbox>
         </Field>
         <div className="border-t border-zinc-200 pt-4 dark:border-zinc-700">
           <span className="text-base/6 font-medium text-zinc-950 sm:text-sm/6 dark:text-white">
@@ -295,30 +295,30 @@ export function MealSlotStylePreferencesClient({
             <Label htmlFor="meal_slot_style_weekend_dinner">
               {t('weekendDinnerStyleLabel')}
             </Label>
-            <Select
-              id="meal_slot_style_weekend_dinner"
+            <Listbox
               value={toValue(preferredWeekendDinnerStyle)}
-              onChange={(e) =>
+              onChange={(val) =>
                 setPreferredWeekendDinnerStyle(
-                  e.target.value === ''
-                    ? null
-                    : (e.target.value as WeekendDinnerStyle),
+                  val === '' ? null : (val as WeekendDinnerStyle),
                 )
               }
               disabled={savePending}
               className="mt-2"
+              aria-label={t('weekendDinnerStyleLabel')}
             >
-              <option value="">{t('mealSlotStyleNoPreference')}</option>
+              <ListboxOption value="">
+                {t('mealSlotStyleNoPreference')}
+              </ListboxOption>
               {WEEKEND_DINNER_VALUES.map((val) => (
-                <option key={val} value={val}>
+                <ListboxOption key={val} value={val}>
                   {t(
                     WEEKEND_DINNER_OPTION_KEYS[
                       val
                     ] as 'weekendDinnerOptSpecial',
                   )}
-                </option>
+                </ListboxOption>
               ))}
-            </Select>
+            </Listbox>
           </Field>
           <Field className="mt-3">
             <Label>{t('weekendDaysLabel')}</Label>

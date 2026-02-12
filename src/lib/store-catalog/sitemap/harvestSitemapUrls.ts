@@ -18,6 +18,8 @@ export type HarvestSitemapOptions = {
   maxRedirects?: number;
   rateLimitRps?: number;
   urlCap?: number;
+  /** When true, only include URLs ending with .html (product pages). Use for sitemaps like versenoten.nl that mix products, categories and blog. */
+  productUrlsOnly?: boolean;
 };
 
 export type HarvestSitemapResult = {
@@ -51,6 +53,8 @@ async function fetchSitemap(
       headers: {
         Accept: 'application/xml, text/xml, */*',
         'Accept-Encoding': 'identity',
+        'User-Agent':
+          'Mozilla/5.0 (compatible; NutriCoach-Sitemap/1.0; +https://nutricoach.app)',
       },
     });
     clearTimeout(timeoutId);
@@ -103,8 +107,12 @@ async function fetchSitemap(
 /** Unwrap <![CDATA[...]]> if present, otherwise return trimmed value. */
 function unwrapCdata(value: string): string {
   const t = value.trim();
-  if (t.startsWith('![CDATA[') && t.endsWith(']]')) {
-    return t.slice(8, -2).trim();
+  const cdataStart = t.indexOf('CDATA[');
+  if (cdataStart >= 0) {
+    const contentStart = cdataStart + 6;
+    const close = t.indexOf(']]>', contentStart);
+    if (close > contentStart) return t.slice(contentStart, close).trim();
+    if (t.endsWith(']]')) return t.slice(contentStart, -2).trim();
   }
   return t;
 }
@@ -161,14 +169,19 @@ function parseUrlset(
 
 /**
  * Extract <loc> from sitemapindex <sitemap> entries.
+ * Handles CDATA, relative URLs (resolved against parentBaseUrl), and normalizes output.
  */
-function parseSitemapIndex(xml: string): string[] {
+function parseSitemapIndex(xml: string, parentBaseUrl: string): string[] {
   const locs: string[] = [];
   const blockRegex = /<sitemap\b[^>]*>([\s\S]*?)<\/sitemap>/gi;
   let m: RegExpExecArray | null;
   while ((m = blockRegex.exec(xml)) !== null) {
-    const locMatch = /<loc\s*>([^<]+)<\/loc>/i.exec(m[1]);
-    if (locMatch) locs.push(locMatch[1].trim());
+    const locMatch = /<loc\s*>([\s\S]*?)<\/loc>/i.exec(m[1]);
+    const locRaw = locMatch ? locMatch[1] : null;
+    const loc = locRaw ? unwrapCdata(locRaw).trim() : null;
+    if (!loc) continue;
+    const normalized = normalizeLoc(loc, parentBaseUrl);
+    if (normalized) locs.push(normalized);
   }
   return locs;
 }
@@ -189,7 +202,12 @@ export async function harvestSitemapUrls(
   const maxRedirects = opts.maxRedirects ?? MAX_REDIRECTS;
   const rateLimitRps = opts.rateLimitRps ?? DEFAULT_RATE_LIMIT_RPS;
   const urlCap = opts.urlCap ?? URL_CAP;
+  const productUrlsOnly = opts.productUrlsOnly === true;
   const delayMs = rateLimitRps > 0 ? Math.ceil(1000 / rateLimitRps) : 0;
+
+  const urlFilter = productUrlsOnly
+    ? (u: SitemapUrl) => u.loc.endsWith('.html')
+    : () => true;
 
   const { body, finalUrl } = await fetchSitemap(sitemapUrl, {
     timeoutMs,
@@ -197,7 +215,7 @@ export async function harvestSitemapUrls(
   });
 
   if (isSitemapIndex(body)) {
-    const childLocs = parseSitemapIndex(body);
+    const childLocs = parseSitemapIndex(body, finalUrl);
     const allUrls: SitemapUrl[] = [];
     let capped = false;
     for (let i = 0; i < childLocs.length && allUrls.length < urlCap; i++) {
@@ -212,7 +230,7 @@ export async function harvestSitemapUrls(
           urlCap - allUrls.length,
           childLocs[i],
         );
-        allUrls.push(...urls);
+        allUrls.push(...urls.filter(urlFilter));
         if (childCapped || allUrls.length >= urlCap) {
           capped = true;
           break;
@@ -228,5 +246,8 @@ export async function harvestSitemapUrls(
   }
 
   const { urls, capped } = parseUrlset(body, urlCap, finalUrl);
-  return { urls, wasCapped: capped };
+  return {
+    urls: urls.filter(urlFilter),
+    wasCapped: capped,
+  };
 }

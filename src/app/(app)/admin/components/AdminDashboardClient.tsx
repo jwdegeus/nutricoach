@@ -203,6 +203,15 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
       ],
     },
     {
+      name: 'Generator v2 (diagnostiek)',
+      description:
+        'Database-eerst modus: gedetailleerde redenen per slot in het Generator-inzicht panel. Bepaal wanneer de generator zelf maaltijden maakt.',
+      href: '/admin/generator-v2',
+      icon: ChartBarIcon,
+      iconBackground: 'bg-teal-500',
+      stats: [],
+    },
+    {
       name: tProtocols('name'),
       description: tProtocols('description'),
       href: '/admin/therapeutic-protocols',
@@ -240,7 +249,7 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {adminSections.map((section) => (
           <div
             key={section.name}

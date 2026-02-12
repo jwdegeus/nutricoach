@@ -51,8 +51,12 @@ export async function GET(req: Request) {
     );
   }
 
-  const headerSecret = req.headers.get('x-cron-secret');
-  if (headerSecret !== secret) {
+  const authHeader = req.headers.get('authorization');
+  const xCronSecret = req.headers.get('x-cron-secret');
+  const receivedSecret = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : xCronSecret;
+  if (receivedSecret !== secret) {
     return NextResponse.json(
       { ok: false, error: 'Unauthorized' },
       { status: 401 },

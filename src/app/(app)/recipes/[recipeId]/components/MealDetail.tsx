@@ -66,6 +66,7 @@ import {
   type RecipeNutritionSummary,
   type ResolvedIngredientMatch,
 } from '../actions/ingredient-matching.actions';
+import { AutoLinkReviewDialog } from './AutoLinkReviewDialog';
 import { quantityUnitToGrams } from '@/src/lib/recipes/quantity-unit-to-grams';
 import {
   getHasAppliedAdaptationAction,
@@ -251,6 +252,8 @@ export function MealDetail({
   );
   /** Dialog voor bewerken bereidingsinstructies */
   const [instructionsEditOpen, setInstructionsEditOpen] = useState(false);
+  /** Auto-koppelen: review-dialog open */
+  const [autoLinkDialogOpen, setAutoLinkDialogOpen] = useState(false);
   /** Dialog voor ingrediënten toevoegen/bewerken (volledig bewerkvenster) */
   const [ingredientsEditOpen, setIngredientsEditOpen] = useState(false);
   /** Modal om één ingrediënt toe te voegen */
@@ -1326,7 +1329,7 @@ export function MealDetail({
                   </div>
                 )}
 
-              {/* Classificeren + AI Magician + Waarom dit werkt toggle */}
+              {/* Classificeren + AI Magician + Koppel ingrediënten + Waarom dit werkt toggle */}
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <Button
                   outline
@@ -1338,6 +1341,12 @@ export function MealDetail({
                   <SparklesIcon data-slot="icon" />
                   AI Magician
                 </Button>
+                {mealSource === 'custom' && (
+                  <Button outline onClick={() => setAutoLinkDialogOpen(true)}>
+                    <LinkIcon data-slot="icon" />
+                    Koppel ingrediënten
+                  </Button>
+                )}
                 {hasAdvisoryContent && (
                   <Button
                     outline
@@ -1792,6 +1801,7 @@ export function MealDetail({
                                         ? {
                                             source: 'custom' as const,
                                             customFoodId: ref.customFoodId,
+                                            displayName: name,
                                           }
                                         : ref.fdcId != null
                                           ? {
@@ -1800,6 +1810,7 @@ export function MealDetail({
                                                 typeof ref.fdcId === 'number'
                                                   ? ref.fdcId
                                                   : Number(ref.fdcId),
+                                              displayName: name,
                                             }
                                           : typeof nevoCode === 'number' &&
                                               Number.isFinite(nevoCode) &&
@@ -1807,6 +1818,7 @@ export function MealDetail({
                                             ? {
                                                 source: 'nevo' as const,
                                                 nevoCode,
+                                                displayName: name,
                                               }
                                             : null;
                                       const refQtyNum =
@@ -1828,6 +1840,11 @@ export function MealDetail({
                                               quantity={refQtyNum}
                                               unit={refUnit}
                                               match={match}
+                                              originalIngredientDescription={
+                                                ing.name ||
+                                                ing.original_line ||
+                                                undefined
+                                              }
                                               mealId={mealId}
                                               mealSource={mealSource}
                                               ingredientIndex={idx}
@@ -1918,6 +1935,11 @@ export function MealDetail({
                                             match={
                                               resolvedLegacyMatches?.[idx] ??
                                               null
+                                            }
+                                            originalIngredientDescription={
+                                              ing.name ||
+                                              ing.original_line ||
+                                              undefined
                                             }
                                             mealId={mealId}
                                             mealSource={mealSource}
@@ -2030,6 +2052,7 @@ export function MealDetail({
                                       ? {
                                           source: 'custom' as const,
                                           customFoodId: ref.customFoodId,
+                                          displayName: name,
                                         }
                                       : ref.fdcId != null
                                         ? {
@@ -2038,6 +2061,7 @@ export function MealDetail({
                                               typeof ref.fdcId === 'number'
                                                 ? ref.fdcId
                                                 : Number(ref.fdcId),
+                                            displayName: name,
                                           }
                                         : typeof nevoCode === 'number' &&
                                             Number.isFinite(nevoCode) &&
@@ -2045,6 +2069,7 @@ export function MealDetail({
                                           ? {
                                               source: 'nevo' as const,
                                               nevoCode,
+                                              displayName: name,
                                             }
                                           : null;
                                     return (
@@ -2320,6 +2345,11 @@ export function MealDetail({
                                               match={
                                                 resolvedLegacyMatches?.[idx] ??
                                                 null
+                                              }
+                                              originalIngredientDescription={
+                                                ing.name ||
+                                                ing.original_line ||
+                                                undefined
                                               }
                                               mealId={mealId}
                                               mealSource={mealSource}
@@ -2773,6 +2803,14 @@ export function MealDetail({
         recipeId={mealId}
         recipeName={mealName}
         onApplied={onRecipeApplied}
+      />
+
+      {/* Auto-koppel ingrediënten: controleer voor toepassen */}
+      <AutoLinkReviewDialog
+        open={autoLinkDialogOpen}
+        onClose={() => setAutoLinkDialogOpen(false)}
+        recipeId={mealId}
+        onApplied={() => onRecipeAppliedSilent?.()}
       />
 
       {/* Classificeren Dialog (load/save via actions; overlay from response) */}

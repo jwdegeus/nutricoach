@@ -268,8 +268,9 @@ export function MealDetailDialog({
               {meal.ingredientRefs.map((ref, idx) => {
                 const name =
                   ref.displayName ||
-                  nevoFoodNamesByCode[ref.nevoCode] ||
-                  `NEVO ${ref.nevoCode}`;
+                  (ref.nevoCode && nevoFoodNamesByCode[ref.nevoCode]) ||
+                  (ref.nevoCode ? `NEVO ${ref.nevoCode}` : null) ||
+                  'Ingrediënt';
                 return (
                   <li
                     key={idx}
@@ -292,7 +293,7 @@ export function MealDetailDialog({
               const hasProteinPowder = meal.ingredientRefs.some((ref) => {
                 const n = (
                   ref.displayName ||
-                  nevoFoodNamesByCode[ref.nevoCode] ||
+                  (ref.nevoCode && nevoFoodNamesByCode[ref.nevoCode]) ||
                   ''
                 ).toLowerCase();
                 return /eiwitpoeder|rijsteiwitpoeder|ei-eiwitpoeder|protein.*poeder/.test(

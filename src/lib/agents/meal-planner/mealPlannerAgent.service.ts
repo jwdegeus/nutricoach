@@ -247,12 +247,18 @@ function clonePlan(plan: MealPlanResponse): MealPlanResponse {
   return JSON.parse(JSON.stringify(plan)) as MealPlanResponse;
 }
 
+type SlotProvenanceEntry = {
+  source: 'db' | 'ai' | 'history';
+  reason?: string;
+};
+
 /**
  * Apply prefilled meals into plan for selected slots.
  * - De-dupe per day (same meal id not twice on same day).
  * - Avoid same meal on consecutive days (no identical breakfast/dinner two days in a row).
  * - MVP: each replacement is validated; only applied if the plan still passes hard constraints.
- * Returns number of meals actually replaced (provenance.reusedRecipeCount).
+ * - When slotProvenanceOut is provided, fills it: replaced slots → 'db', untouched remain 'ai'.
+ * Returns number of meals from recipe DB (custom_meals) replaced. Meals from meal_history don't count as "database".
  */
 async function applyPrefilledMeals(
   plan: MealPlanResponse,
@@ -260,6 +266,7 @@ async function applyPrefilledMeals(
   prefilledBySlot: Partial<Record<MealSlot, Meal[]>>,
   slotIndices: { dayIndex: number; slotIndex: number }[],
   rules: ReturnType<typeof deriveDietRuleSet>,
+  slotProvenanceOut?: Record<string, SlotProvenanceEntry>,
 ): Promise<number> {
   const slots = request.slots;
   const startDate = new Date(request.dateRange.start);
@@ -326,7 +333,14 @@ async function applyPrefilledMeals(
     day.meals[slotIndex] = replacedMeal;
     usedOnDay.add(candidate.id);
     baseIdByDayAndSlot.set(`${dayIndex}-${slot}`, candidate.id);
-    replaced++;
+    if (slotProvenanceOut) {
+      // Only custom_meals count as "database"; meal_history = reused past meals, often AI-generated
+      const fromRecipeDb = candidate.recipeSource === 'custom_meals';
+      slotProvenanceOut[`${dateStr}-${slot}`] = {
+        source: fromRecipeDb ? 'db' : 'history',
+      };
+    }
+    if (candidate.recipeSource === 'custom_meals') replaced++;
   }
 
   return replaced;
@@ -347,6 +361,14 @@ async function applyPrefilledAndAttachProvenance(
   let reusedRecipeCount: number;
   let generatedRecipeCount: number;
 
+  const slotProvenance: Record<string, SlotProvenanceEntry> = {};
+  for (const day of plan.days) {
+    for (const meal of day.meals) {
+      const key = `${day.date}-${meal.slot}`;
+      slotProvenance[key] = { source: 'ai' };
+    }
+  }
+
   if (
     options?.prefilledBySlot &&
     Object.keys(options.prefilledBySlot).length > 0
@@ -365,6 +387,7 @@ async function applyPrefilledAndAttachProvenance(
       options.prefilledBySlot,
       slotIndices,
       rules,
+      slotProvenance,
     );
     reusedRecipeCount = replaced;
     generatedRecipeCount = totalMeals - replaced;
@@ -377,13 +400,30 @@ async function applyPrefilledAndAttachProvenance(
     reusedRecipeCount,
     generatedRecipeCount,
   };
+  const dbSlots = Object.values(slotProvenance).filter(
+    (e) => e.source === 'db',
+  ).length;
+  const dbCoverage =
+    totalMeals > 0
+      ? {
+          dbSlots,
+          totalSlots: totalMeals,
+          percent: Math.round((dbSlots / totalMeals) * 100),
+        }
+      : undefined;
+
   const meta = plan.metadata ?? {
     generatedAt: new Date().toISOString(),
     dietKey: request.profile.dietKey,
     totalDays: plan.days.length,
     totalMeals,
   };
-  plan.metadata = { ...meta, provenance } as MealPlanResponse['metadata'];
+  plan.metadata = {
+    ...meta,
+    provenance,
+    slotProvenance,
+    ...(dbCoverage && { dbCoverage }),
+  } as MealPlanResponse['metadata'];
 }
 
 /**
@@ -1508,10 +1548,14 @@ export class MealPlannerAgentService {
       if (macroOnlyIssues.length > 0 && nonMacroIssues.length === 0) {
         const { calcMealMacros } = await import('./mealPlannerAgent.tools');
         const currentMacros = await calcMealMacros(
-          meal.ingredientRefs.map((ref) => ({
-            nevoCode: ref.nevoCode,
-            quantityG: ref.quantityG,
-          })),
+          meal.ingredientRefs
+            .filter((ref): ref is typeof ref & { nevoCode: string } =>
+              Boolean(ref.nevoCode),
+            )
+            .map((ref) => ({
+              nevoCode: ref.nevoCode,
+              quantityG: ref.quantityG,
+            })),
         );
 
         // Simple scaling: adjust all quantities proportionally to meet calorie target
@@ -1528,7 +1572,9 @@ export class MealPlannerAgentService {
             ingredientRefs: meal.ingredientRefs.map((ref) => {
               const oldG = ref.quantityG;
               const newG = Math.max(1, Math.round(ref.quantityG * scale));
-              adjustments.push({ nevoCode: ref.nevoCode, oldG, newG });
+              if (ref.nevoCode) {
+                adjustments.push({ nevoCode: ref.nevoCode, oldG, newG });
+              }
               return { ...ref, quantityG: newG };
             }),
           };

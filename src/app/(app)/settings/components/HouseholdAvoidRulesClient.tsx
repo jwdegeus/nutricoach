@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/catalyst/button';
 import { Input } from '@/components/catalyst/input';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { Badge } from '@/components/catalyst/badge';
 import { Text } from '@/components/catalyst/text';
 import {
@@ -236,37 +236,47 @@ export function HouseholdAvoidRulesClient({
             <Label htmlFor="household-avoid-type">
               {t('householdAvoidTypeLabel')}
             </Label>
-            <Select
-              id="household-avoid-type"
+            <Listbox
               value={ruleType}
-              onChange={(e) =>
-                setRuleType(e.target.value as 'allergen' | 'avoid' | 'warning')
+              onChange={(val) =>
+                setRuleType(val as 'allergen' | 'avoid' | 'warning')
               }
               disabled={addPending}
               className="mt-2"
+              aria-label="Type"
             >
-              <option value="allergen">{RULE_TYPE_LABELS.allergen}</option>
-              <option value="avoid">{RULE_TYPE_LABELS.avoid}</option>
-              <option value="warning">{RULE_TYPE_LABELS.warning}</option>
-            </Select>
+              <ListboxOption value="allergen">
+                {RULE_TYPE_LABELS.allergen}
+              </ListboxOption>
+              <ListboxOption value="avoid">
+                {RULE_TYPE_LABELS.avoid}
+              </ListboxOption>
+              <ListboxOption value="warning">
+                {RULE_TYPE_LABELS.warning}
+              </ListboxOption>
+            </Listbox>
           </Field>
           <Field>
             <Label htmlFor="household-avoid-match-mode">
               {t('householdAvoidMatchModeLabel')}
             </Label>
-            <Select
-              id="household-avoid-match-mode"
+            <Listbox
               value={matchMode}
-              onChange={(e) => {
-                setMatchMode(e.target.value as 'term' | 'nevo_code');
+              onChange={(val) => {
+                setMatchMode(val as 'term' | 'nevo_code');
                 setValueError(null);
               }}
               disabled={addPending}
               className="mt-2"
+              aria-label="Match mode"
             >
-              <option value="term">{MATCH_MODE_LABELS.term}</option>
-              <option value="nevo_code">{MATCH_MODE_LABELS.nevo_code}</option>
-            </Select>
+              <ListboxOption value="term">
+                {MATCH_MODE_LABELS.term}
+              </ListboxOption>
+              <ListboxOption value="nevo_code">
+                {MATCH_MODE_LABELS.nevo_code}
+              </ListboxOption>
+            </Listbox>
           </Field>
           <Field>
             <Label htmlFor="household-avoid-value">
@@ -298,16 +308,20 @@ export function HouseholdAvoidRulesClient({
                 {t('householdAvoidStrictnessWarningNote')}
               </Description>
             )}
-            <Select
-              id="household-avoid-strictness"
+            <Listbox
               value={effectiveStrictness}
-              onChange={(e) => setStrictness(e.target.value as 'hard' | 'soft')}
+              onChange={(val) => setStrictness(val as 'hard' | 'soft')}
               disabled={addPending || ruleType === 'warning'}
               className="mt-2"
+              aria-label="Striktheid"
             >
-              <option value="hard">{STRICTNESS_LABELS.hard}</option>
-              <option value="soft">{STRICTNESS_LABELS.soft}</option>
-            </Select>
+              <ListboxOption value="hard">
+                {STRICTNESS_LABELS.hard}
+              </ListboxOption>
+              <ListboxOption value="soft">
+                {STRICTNESS_LABELS.soft}
+              </ListboxOption>
+            </Listbox>
           </Field>
           <Field>
             <Label htmlFor="household-avoid-note">

@@ -48,9 +48,12 @@ RLS is op alle tabellen actief; in de cron wordt een **admin/service_role** clie
 | **detailBatchSize**   | number  | 200     | Aantal product-URL’s per batch in één run. Zonder full mode wordt alleen de eerste batch verwerkt.                                                                                               |
 | **detailConcurrency** | number  | 3       | Aantal gelijktijdige detail-fetches binnen een batch.                                                                                                                                            |
 | **detailDelayMs**     | number  | 0       | Pauze in ms tussen elke detail-fetch. Voor Ekoplaza: 2000.                                                                                                                                       |
-| **fullSync**          | boolean | false   | Indien true: bij elke run alle sitemap-URL’s verwerken (in chunks) én deactivate sweep uitvoeren. Overschrijft het effect van alleen `?full=1` op de cron niet – beide kunnen full gedrag geven. |
+| **fullSync**          | boolean | false   | Indien true: bij elke run alle sitemap-URL's verwerken (in chunks) én deactivate sweep uitvoeren. Overschrijft het effect van alleen `?full=1` op de cron niet – beide kunnen full gedrag geven. |
+| **productUrlsOnly**   | boolean | false   | Indien true: alleen URL's die eindigen op .html meenemen. Voor sitemaps die producten, categorieën en blog mixen (bijv. versenoten.nl).                                                          |
 
 Defaults worden in code toegepast als de key ontbreekt of ongeldig is.
+
+**URL-rewrite (www vs non-www)**: Als de sitemap URL's met een andere host bevat dan de `base_url` van de winkel (bijv. sitemap: `versenoten.nl`, base_url: `www.versenoten.nl`), worden product-URL's automatisch herschreven naar het origin van `base_url`. Dit lost veel FETCH_FAILED:404 op bij PrestaShop-winkels.
 
 ---
 

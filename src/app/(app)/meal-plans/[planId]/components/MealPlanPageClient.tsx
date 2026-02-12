@@ -14,6 +14,8 @@ export type LinkedRecipe = {
   name?: string;
 };
 
+type SlotProvenance = Record<string, { source: string; reason?: string }>;
+
 type MealPlanPageClientProps = {
   planId: string;
   plan: MealPlanResponse;
@@ -21,6 +23,7 @@ type MealPlanPageClientProps = {
   nevoFoodNamesByCode: Record<string, string>;
   planStatus?: MealPlanStatus;
   linkedRecipesByMealId?: Record<string, LinkedRecipe>;
+  slotProvenance?: SlotProvenance;
 };
 
 export function MealPlanPageClient({
@@ -30,6 +33,7 @@ export function MealPlanPageClient({
   nevoFoodNamesByCode,
   planStatus,
   linkedRecipesByMealId = {},
+  slotProvenance,
 }: MealPlanPageClientProps) {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -60,6 +64,7 @@ export function MealPlanPageClient({
         nevoFoodNamesByCode={nevoFoodNamesByCode}
         planStatus={planStatus}
         linkedRecipesByMealId={linkedRecipesByMealId}
+        slotProvenance={slotProvenance}
         onEditStarted={() => setIsEditing(true)}
       />
     </div>

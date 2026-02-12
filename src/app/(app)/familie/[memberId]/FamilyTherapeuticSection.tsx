@@ -10,7 +10,7 @@ import {
   Label,
   Description,
 } from '@/components/catalyst/fieldset';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { useToast } from '@/src/components/app/ToastContext';
 import { ArrowPathIcon } from '@heroicons/react/16/solid';
 import {
@@ -202,21 +202,21 @@ export function FamilyTherapeuticSection({ memberId }: { memberId: string }) {
         </Field>
         <Field>
           <Label htmlFor="fm-sex">{t('sex')}</Label>
-          <Select
-            id="fm-sex"
+          <Listbox
             value={sex}
-            onChange={(e) =>
-              setSex(e.target.value as 'female' | 'male' | 'other' | 'unknown')
+            onChange={(val) =>
+              setSex(val as 'female' | 'male' | 'other' | 'unknown')
             }
             disabled={healthSaving}
             className="mt-2"
+            aria-label="Geslacht"
           >
             {SEX_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
+              <ListboxOption key={opt.value} value={opt.value}>
                 {opt.label}
-              </option>
+              </ListboxOption>
             ))}
-          </Select>
+          </Listbox>
         </Field>
         <Field>
           <Label htmlFor="fm-height">{t('heightCm')}</Label>
@@ -274,20 +274,20 @@ export function FamilyTherapeuticSection({ memberId }: { memberId: string }) {
                   {t('activeLabel')}: {activeProtocolLabel}
                 </p>
               )}
-              <Select
-                id="fm-protocol"
+              <Listbox
                 value={activeProtocolId ?? ''}
-                onChange={(e) => setActiveProtocolId(e.target.value || null)}
+                onChange={(val) => setActiveProtocolId(val || null)}
                 disabled={protocolSaving}
                 className="mt-2"
+                aria-label={t('chooseProtocol')}
               >
-                <option value="">{t('chooseProtocol')}</option>
+                <ListboxOption value="">{t('chooseProtocol')}</ListboxOption>
                 {protocols.map((p) => (
-                  <option key={p.id} value={p.id}>
+                  <ListboxOption key={p.id} value={p.id}>
                     {p.nameNl}
-                  </option>
+                  </ListboxOption>
                 ))}
-              </Select>
+              </Listbox>
               <div className="mt-2 flex justify-end">
                 <Button
                   type="button"

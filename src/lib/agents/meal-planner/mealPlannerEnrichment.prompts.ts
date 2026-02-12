@@ -19,8 +19,13 @@ function formatMealIngredients(
   }
 
   const items = meal.ingredientRefs.map((ref) => {
-    const name = nevoFoodNamesByCode[ref.nevoCode] || `NEVO ${ref.nevoCode}`;
-    return `- ${name} (nevoCode: ${ref.nevoCode}, quantity: ${ref.quantityG}g)`;
+    const code = ref.nevoCode ?? ref.customFoodId ?? ref.fdcId ?? '?';
+    const name =
+      ref.displayName ||
+      (ref.nevoCode && nevoFoodNamesByCode[ref.nevoCode]) ||
+      (ref.nevoCode ? `NEVO ${ref.nevoCode}` : null) ||
+      `Ingrediënt (${code})`;
+    return `- ${name} (ref: ${code}, quantity: ${ref.quantityG}g)`;
   });
 
   return items.join('\n');

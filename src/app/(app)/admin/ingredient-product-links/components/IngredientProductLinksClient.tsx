@@ -6,7 +6,7 @@ import { Text } from '@/components/catalyst/text';
 import { Button } from '@/components/catalyst/button';
 import { Input } from '@/components/catalyst/input';
 import { Field, Label } from '@/components/catalyst/fieldset';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import {
   searchCanonicalIngredientsAction,
   getCanonicalIngredientByIdAction,
@@ -162,10 +162,6 @@ export function IngredientProductLinksClient({
 
   const handleIngredientSelect = (id: string) => {
     setSelectedCanonicalIngredientId(id);
-  };
-
-  const handleStoreChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedStoreId(e.target.value);
   };
 
   const runProductSearch = useCallback(async () => {
@@ -403,18 +399,19 @@ export function IngredientProductLinksClient({
         </Heading>
         <Field>
           <Label>Winkel</Label>
-          <Select
+          <Listbox
             value={selectedStoreId}
-            onChange={handleStoreChange}
+            onChange={(val) => setSelectedStoreId(val)}
             className="mt-1"
+            aria-label="Winkel"
           >
-            <option value="">Kies een winkel</option>
+            <ListboxOption value="">Kies een winkel</ListboxOption>
             {stores.map((s) => (
-              <option key={s.id} value={s.id}>
+              <ListboxOption key={s.id} value={s.id}>
                 {s.name}
-              </option>
+              </ListboxOption>
             ))}
-          </Select>
+          </Listbox>
         </Field>
       </section>
 

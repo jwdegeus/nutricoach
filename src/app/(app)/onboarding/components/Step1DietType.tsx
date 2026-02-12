@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { getDietTypes } from '../queries/diet-types.queries';
 import type { DietType } from '../queries/diet-types.queries';
 
@@ -53,23 +53,22 @@ export function Step1DietType({ value, onChange }: Step1DietTypeProps) {
           {/* TODO: i18n key: onboarding.step1.dietTypeLabel */}
           Dieettype
         </label>
-        <Select
-          id="diet-type"
+        <Listbox
           value={value}
-          onChange={(e) => onChange(e.target.value)}
-          required
+          onChange={(val) => onChange(val)}
           disabled={isLoading}
+          aria-label="Dieettype"
         >
-          <option value="">
+          <ListboxOption value="">
             {/* TODO: i18n key: onboarding.step1.selectPlaceholder */}
             {isLoading ? 'Laden...' : '-- Selecteer een dieettype --'}
-          </option>
+          </ListboxOption>
           {dietTypes.map((diet) => (
-            <option key={diet.id} value={diet.id}>
+            <ListboxOption key={diet.id} value={diet.id}>
               {diet.name}
-            </option>
+            </ListboxOption>
           ))}
-        </Select>
+        </Listbox>
         {dietTypes.length > 0 && (
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
             {dietTypes.find((d) => d.id === value)?.description}

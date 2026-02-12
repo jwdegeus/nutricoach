@@ -19,6 +19,8 @@
     "normalize:fndds-nutrients": "tsx scripts/normalize-fndds-nutrients.ts",
     "map:fndds-nutrients": "tsx scripts/map-fndds-nutrients.ts",
     "import:fndds-translations-csv": "tsx scripts/import-fndds-translations-csv.ts",
+    "mealplan:log:report": "tsx scripts/meal-planner-log-report.ts",
+    "mealplan:debug:bundle": "tsx scripts/meal-planner-debug-bundle.ts",
     "prepare": "husky"
   },
   "dependencies": {

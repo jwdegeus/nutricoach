@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/catalyst/button';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { Radio, RadioField, RadioGroup } from '@/components/catalyst/radio';
 import {
   Field,
@@ -233,21 +233,21 @@ export function FamilyDietCard({
       <Field>
         <Label htmlFor="family-diet-type">{t('familyDietTypeLabel')}</Label>
         <Description>{t('familyDietTypeDescription')}</Description>
-        <Select
-          id="family-diet-type"
+        <Listbox
           value={dietTypeId}
-          onChange={(e) => setDietTypeId(e.target.value)}
+          onChange={(val) => setDietTypeId(val)}
           disabled={loading}
+          aria-label={t('familyDietTypePlaceholder')}
         >
-          <option value="">
+          <ListboxOption value="">
             {loading ? t('loading') : t('familyDietTypePlaceholder')}
-          </option>
+          </ListboxOption>
           {dietTypes.map((diet) => (
-            <option key={diet.id} value={diet.id}>
+            <ListboxOption key={diet.id} value={diet.id}>
               {diet.name}
-            </option>
+            </ListboxOption>
           ))}
-        </Select>
+        </Listbox>
       </Field>
       <Field>
         <label className="flex items-center gap-2">
@@ -274,34 +274,34 @@ export function FamilyDietCard({
         </p>
         <Field>
           <Label htmlFor="family-max-prep">{t('familyMaxPrepLabel')}</Label>
-          <Select
-            id="family-max-prep"
-            value={maxPrepMinutes.toString()}
-            onChange={(e) => setMaxPrepMinutes(Number(e.target.value))}
+          <Listbox
+            value={maxPrepMinutes}
+            onChange={(val) => setMaxPrepMinutes(Number(val))}
             disabled={loading}
+            aria-label="Max bereidingstijd"
           >
             {PREP_TIME_OPTIONS.map((m) => (
-              <option key={m} value={m}>
+              <ListboxOption key={m} value={m}>
                 {m} {t('familyMinutes')}
-              </option>
+              </ListboxOption>
             ))}
-          </Select>
+          </Listbox>
           <Description>{t('familyMaxPrepHelp')}</Description>
         </Field>
         <Field>
           <Label htmlFor="family-servings">{t('familyServingsLabel')}</Label>
-          <Select
-            id="family-servings"
-            value={servingsDefault.toString()}
-            onChange={(e) => setServingsDefault(Number(e.target.value))}
+          <Listbox
+            value={servingsDefault}
+            onChange={(val) => setServingsDefault(Number(val))}
             disabled={loading}
+            aria-label="Standaard porties"
           >
             {[1, 2, 3, 4, 5, 6].map((n) => (
-              <option key={n} value={n}>
+              <ListboxOption key={n} value={n}>
                 {n} {n === 1 ? t('familyPortion') : t('familyPortions')}
-              </option>
+              </ListboxOption>
             ))}
-          </Select>
+          </Listbox>
           <Description>{t('familyServingsHelp')}</Description>
         </Field>
       </div>

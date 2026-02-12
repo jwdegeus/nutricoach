@@ -27,7 +27,6 @@ import {
 } from '@/components/catalyst/dropdown';
 import { Input } from '@/components/catalyst/input';
 import { Textarea } from '@/components/catalyst/textarea';
-import { Select } from '@/components/catalyst/select';
 import {
   Listbox,
   ListboxLabel,
@@ -1635,23 +1634,24 @@ export function GuardRailsVNextOverview({
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <Field>
                     <Label>Diet Logic (P0–P3)</Label>
-                    <Select
+                    <Listbox
                       value={policyEditFormData.dietLogic}
-                      onChange={(e) =>
+                      onChange={(val) =>
                         setPolicyEditFormData({
                           ...policyEditFormData,
-                          dietLogic: e.target.value as DietLogicType,
+                          dietLogic: val as DietLogicType,
                         })
                       }
+                      aria-label="Diet Logic"
                     >
                       {(Object.keys(DIET_LOGIC_LABELS) as DietLogicType[]).map(
                         (key) => (
-                          <option key={key} value={key}>
+                          <ListboxOption key={key} value={key}>
                             {DIET_LOGIC_LABELS[key].name}
-                          </option>
+                          </ListboxOption>
                         ),
                       )}
-                    </Select>
+                    </Listbox>
                   </Field>
                   <Field>
                     <Label>Prioriteit</Label>
@@ -1671,18 +1671,19 @@ export function GuardRailsVNextOverview({
                   </Field>
                   <Field>
                     <Label>Striktheid</Label>
-                    <Select
+                    <Listbox
                       value={policyEditFormData.strictness}
-                      onChange={(e) =>
+                      onChange={(val) =>
                         setPolicyEditFormData({
                           ...policyEditFormData,
-                          strictness: e.target.value as 'hard' | 'soft',
+                          strictness: val as 'hard' | 'soft',
                         })
                       }
+                      aria-label="Striktheid"
                     >
-                      <option value="hard">Streng</option>
-                      <option value="soft">Zacht</option>
-                    </Select>
+                      <ListboxOption value="hard">Streng</ListboxOption>
+                      <ListboxOption value="soft">Zacht</ListboxOption>
+                    </Listbox>
                   </Field>
                   {/* FORCE: min per dag/week – altijd tonen, bij FORCE gebruikt */}
                   <Field>
@@ -1849,39 +1850,39 @@ export function GuardRailsVNextOverview({
                       {/* Actie */}
                       <Field>
                         <Label htmlFor="edit-action">Actie</Label>
-                        <Select
-                          id="edit-action"
+                        <Listbox
                           value={editFormData.action}
-                          onChange={(e) => {
+                          onChange={(val) => {
                             setEditFormData({
                               ...editFormData,
-                              action: e.target.value as 'allow' | 'block',
+                              action: val as 'allow' | 'block',
                             });
                           }}
                           disabled={!editableFields.action}
+                          aria-label="Actie"
                         >
-                          <option value="allow">Allow</option>
-                          <option value="block">Block</option>
-                        </Select>
+                          <ListboxOption value="allow">Allow</ListboxOption>
+                          <ListboxOption value="block">Block</ListboxOption>
+                        </Listbox>
                       </Field>
 
                       {/* Striktheid */}
                       <Field>
                         <Label htmlFor="edit-strictness">Striktheid</Label>
-                        <Select
-                          id="edit-strictness"
+                        <Listbox
                           value={editFormData.strictness}
-                          onChange={(e) => {
+                          onChange={(val) => {
                             setEditFormData({
                               ...editFormData,
-                              strictness: e.target.value as 'hard' | 'soft',
+                              strictness: val as 'hard' | 'soft',
                             });
                           }}
                           disabled={!editableFields.strictness}
+                          aria-label="Striktheid"
                         >
-                          <option value="hard">Hard</option>
-                          <option value="soft">Soft</option>
-                        </Select>
+                          <ListboxOption value="hard">Hard</ListboxOption>
+                          <ListboxOption value="soft">Soft</ListboxOption>
+                        </Listbox>
                       </Field>
 
                       {/* Prioriteit */}
@@ -1921,11 +1922,10 @@ export function GuardRailsVNextOverview({
                       {/* Target */}
                       <Field>
                         <Label htmlFor="edit-target">Target</Label>
-                        <Select
-                          id="edit-target"
+                        <Listbox
                           value={editFormData.target}
-                          onChange={(e) => {
-                            const newTarget = e.target.value as
+                          onChange={(val) => {
+                            const newTarget = val as
                               | 'ingredient'
                               | 'step'
                               | 'metadata';
@@ -1951,11 +1951,16 @@ export function GuardRailsVNextOverview({
                             }
                           }}
                           disabled={!editableFields.target}
+                          aria-label="Target"
                         >
-                          <option value="ingredient">Ingredient</option>
-                          <option value="step">Step</option>
-                          <option value="metadata">Metadata</option>
-                        </Select>
+                          <ListboxOption value="ingredient">
+                            Ingredient
+                          </ListboxOption>
+                          <ListboxOption value="step">Step</ListboxOption>
+                          <ListboxOption value="metadata">
+                            Metadata
+                          </ListboxOption>
+                        </Listbox>
                         {editingRule && isConstraintRule(editingRule.id) && (
                           <Description>
                             Categorie (afgeleid van categorie) - kan worden
@@ -1967,11 +1972,10 @@ export function GuardRailsVNextOverview({
                       {/* Match Mode */}
                       <Field>
                         <Label htmlFor="edit-match-mode">Match Mode</Label>
-                        <Select
-                          id="edit-match-mode"
+                        <Listbox
                           value={editFormData.matchMode}
-                          onChange={(e) => {
-                            const newMode = e.target.value as
+                          onChange={(val) => {
+                            const newMode = val as
                               | 'exact'
                               | 'word_boundary'
                               | 'substring'
@@ -1998,12 +2002,19 @@ export function GuardRailsVNextOverview({
                             }
                           }}
                           disabled={!editableFields.matchMode}
+                          aria-label="Match Mode"
                         >
-                          <option value="exact">Exact</option>
-                          <option value="word_boundary">Word Boundary</option>
-                          <option value="substring">Substring</option>
-                          <option value="canonical_id">Canonical ID</option>
-                        </Select>
+                          <ListboxOption value="exact">Exact</ListboxOption>
+                          <ListboxOption value="word_boundary">
+                            Word Boundary
+                          </ListboxOption>
+                          <ListboxOption value="substring">
+                            Substring
+                          </ListboxOption>
+                          <ListboxOption value="canonical_id">
+                            Canonical ID
+                          </ListboxOption>
+                        </Listbox>
                         {validationErrors.matchMode && (
                           <Description className="text-red-600 dark:text-red-400">
                             {validationErrors.matchMode}
@@ -2051,24 +2062,26 @@ export function GuardRailsVNextOverview({
                       {/* Reason Code */}
                       <Field className="md:col-span-2">
                         <Label htmlFor="edit-reason-code">Reason Code</Label>
-                        <Select
-                          id="edit-reason-code"
+                        <Listbox
                           value={editFormData.reasonCode}
-                          onChange={(e) => {
+                          onChange={(val) => {
                             setEditFormData({
                               ...editFormData,
-                              reasonCode: e.target.value,
+                              reasonCode: val,
                             });
                           }}
                           disabled={!editableFields.reasonCode}
+                          aria-label="Reason Code"
                         >
-                          <option value="">Selecteer reason code</option>
+                          <ListboxOption value="">
+                            Selecteer reason code
+                          </ListboxOption>
                           {getReasonCodeOptions().map((code) => (
-                            <option key={code} value={code} title={code}>
+                            <ListboxOption key={code} value={code} title={code}>
                               {getGuardReasonLabel(code)}
-                            </option>
+                            </ListboxOption>
                           ))}
-                        </Select>
+                        </Listbox>
                         <Description>
                           Selecteer de reason code voor deze regel
                         </Description>
@@ -2131,28 +2144,25 @@ export function GuardRailsVNextOverview({
               <FieldGroup>
                 <Field>
                   <Label htmlFor="create-rule-type">Regeltype *</Label>
-                  <Select
-                    id="create-rule-type"
+                  <Listbox
                     value=""
-                    onChange={(e) => {
-                      const mode = e.target.value as
-                        | 'recipe_rule'
-                        | 'constraint'
-                        | '';
+                    onChange={(val) => {
+                      const mode = val as 'recipe_rule' | 'constraint' | '';
                       if (mode) {
                         setCreateMode(mode);
                         setValidationErrors({});
                       }
                     }}
+                    aria-label="Regeltype"
                   >
-                    <option value="">Selecteer regeltype</option>
-                    <option value="recipe_rule">
+                    <ListboxOption value="">Selecteer regeltype</ListboxOption>
+                    <ListboxOption value="recipe_rule">
                       Ingredient/tekst regel (Recipe Adaptation Rule)
-                    </option>
-                    <option value="constraint">
+                    </ListboxOption>
+                    <ListboxOption value="constraint">
                       Category constraint (Diet Category Constraint)
-                    </option>
-                  </Select>
+                    </ListboxOption>
+                  </Listbox>
                   <Description>
                     Kies het type regel dat je wilt aanmaken. Recipe rules zijn
                     voor specifieke ingredient/tekst matching, constraints zijn
@@ -2199,11 +2209,10 @@ export function GuardRailsVNextOverview({
                   {/* Target */}
                   <Field>
                     <Label htmlFor="create-target">Target *</Label>
-                    <Select
-                      id="create-target"
+                    <Listbox
                       value={createFormData.target}
-                      onChange={(e) => {
-                        const newTarget = e.target.value as
+                      onChange={(val) => {
+                        const newTarget = val as
                           | 'ingredient'
                           | 'step'
                           | 'metadata';
@@ -2228,11 +2237,14 @@ export function GuardRailsVNextOverview({
                           });
                         }
                       }}
+                      aria-label="Target"
                     >
-                      <option value="ingredient">Ingredient</option>
-                      <option value="step">Step</option>
-                      <option value="metadata">Metadata</option>
-                    </Select>
+                      <ListboxOption value="ingredient">
+                        Ingredient
+                      </ListboxOption>
+                      <ListboxOption value="step">Step</ListboxOption>
+                      <ListboxOption value="metadata">Metadata</ListboxOption>
+                    </Listbox>
                     {validationErrors.target && (
                       <Description className="text-red-600 dark:text-red-400">
                         {validationErrors.target}
@@ -2243,11 +2255,10 @@ export function GuardRailsVNextOverview({
                   {/* Match Mode */}
                   <Field>
                     <Label htmlFor="create-match-mode">Match Mode *</Label>
-                    <Select
-                      id="create-match-mode"
+                    <Listbox
                       value={createFormData.matchMode}
-                      onChange={(e) => {
-                        const newMode = e.target.value as
+                      onChange={(val) => {
+                        const newMode = val as
                           | 'exact'
                           | 'word_boundary'
                           | 'substring'
@@ -2273,12 +2284,17 @@ export function GuardRailsVNextOverview({
                           });
                         }
                       }}
+                      aria-label="Match Mode"
                     >
-                      <option value="exact">Exact</option>
-                      <option value="word_boundary">Word Boundary</option>
-                      <option value="substring">Substring</option>
-                      <option value="canonical_id">Canonical ID</option>
-                    </Select>
+                      <ListboxOption value="exact">Exact</ListboxOption>
+                      <ListboxOption value="word_boundary">
+                        Word Boundary
+                      </ListboxOption>
+                      <ListboxOption value="substring">Substring</ListboxOption>
+                      <ListboxOption value="canonical_id">
+                        Canonical ID
+                      </ListboxOption>
+                    </Listbox>
                     {validationErrors.matchMode && (
                       <Description className="text-red-600 dark:text-red-400">
                         {validationErrors.matchMode}
@@ -2289,13 +2305,12 @@ export function GuardRailsVNextOverview({
                   {/* Reason Code */}
                   <Field className="md:col-span-2">
                     <Label htmlFor="create-reason-code">Reason Code *</Label>
-                    <Select
-                      id="create-reason-code"
+                    <Listbox
                       value={createFormData.reasonCode}
-                      onChange={(e) => {
+                      onChange={(val) => {
                         setCreateFormData({
                           ...createFormData,
-                          reasonCode: e.target.value,
+                          reasonCode: val,
                         });
                         if (validationErrors.reasonCode) {
                           setValidationErrors({
@@ -2304,14 +2319,17 @@ export function GuardRailsVNextOverview({
                           });
                         }
                       }}
+                      aria-label="Reason Code"
                     >
-                      <option value="">Selecteer reason code</option>
+                      <ListboxOption value="">
+                        Selecteer reason code
+                      </ListboxOption>
                       {getReasonCodeOptions().map((code) => (
-                        <option key={code} value={code} title={code}>
+                        <ListboxOption key={code} value={code} title={code}>
                           {getGuardReasonLabel(code)}
-                        </option>
+                        </ListboxOption>
                       ))}
-                    </Select>
+                    </Listbox>
                     {validationErrors.reasonCode && (
                       <Description className="text-red-600 dark:text-red-400">
                         {validationErrors.reasonCode}
@@ -2497,24 +2515,24 @@ export function GuardRailsVNextOverview({
                     <Label htmlFor="create-diet-logic">
                       Diet Logic (P0–P3) *
                     </Label>
-                    <Select
-                      id="create-diet-logic"
+                    <Listbox
                       value={createFormData.dietLogic}
-                      onChange={(e) => {
+                      onChange={(val) => {
                         setCreateFormData({
                           ...createFormData,
-                          dietLogic: e.target.value as DietLogicType,
+                          dietLogic: val as DietLogicType,
                         });
                       }}
+                      aria-label="Diet Logic"
                     >
                       {(Object.keys(DIET_LOGIC_LABELS) as DietLogicType[]).map(
                         (key) => (
-                          <option key={key} value={key}>
+                          <ListboxOption key={key} value={key}>
                             {DIET_LOGIC_LABELS[key].name}
-                          </option>
+                          </ListboxOption>
                         ),
                       )}
-                    </Select>
+                    </Listbox>
                     <Description>
                       DROP (blokkeren), FORCE (verplicht), LIMIT (beperkt), PASS
                       (toegestaan)
@@ -2524,19 +2542,19 @@ export function GuardRailsVNextOverview({
                   {/* Strictness */}
                   <Field>
                     <Label htmlFor="create-strictness">Striktheid *</Label>
-                    <Select
-                      id="create-strictness"
+                    <Listbox
                       value={createFormData.strictness}
-                      onChange={(e) => {
+                      onChange={(val) => {
                         setCreateFormData({
                           ...createFormData,
-                          strictness: e.target.value as 'hard' | 'soft',
+                          strictness: val as 'hard' | 'soft',
                         });
                       }}
+                      aria-label="Striktheid"
                     >
-                      <option value="hard">Streng</option>
-                      <option value="soft">Zacht</option>
-                    </Select>
+                      <ListboxOption value="hard">Streng</ListboxOption>
+                      <ListboxOption value="soft">Zacht</ListboxOption>
+                    </Listbox>
                   </Field>
 
                   {/* Priority */}

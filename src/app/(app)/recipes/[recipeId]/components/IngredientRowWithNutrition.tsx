@@ -49,6 +49,8 @@ type Match = {
   customFoodId?: string;
   /** FNDDS survey food fdc_id when source is fndds */
   fdcId?: number;
+  /** Weergavenaam van het gekoppelde product (NEVO/custom/FNDDS) */
+  displayName?: string;
 };
 
 function normalizeText(text: string): string {
@@ -70,6 +72,8 @@ type IngredientRowWithNutritionProps = {
   note?: string;
   /** Match met database (NEVO, custom of FNDDS). Bij null toont dropdown "Nog niet gematcht" + suggesties */
   match: Match | null;
+  /** Originele ingrediëntomschrijving vóór koppeling (voor weergave in edit-dialog) */
+  originalIngredientDescription?: string;
   /** Voor legacy-ingrediënten: mealId om ref op te slaan */
   mealId?: string;
   /** Voor legacy-ingrediënten: mealSource */
@@ -107,6 +111,7 @@ export function IngredientRowWithNutrition({
   unit,
   note,
   match,
+  originalIngredientDescription,
   mealId,
   mealSource,
   ingredientIndex,
@@ -971,6 +976,69 @@ export function IngredientRowWithNutrition({
         <DialogTitle>Ingrediënt bewerken</DialogTitle>
         <DialogBody>
           <div className="space-y-4">
+            {(match || canSearchSuggestions) && (
+              <div className="rounded-lg bg-muted/30 px-4 py-3">
+                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Gekoppeld product
+                </p>
+                {match ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-foreground">
+                      {match.displayName ||
+                        (match.source === 'nevo'
+                          ? `NEVO ${match.nevoCode ?? ''}`
+                          : match.source === 'custom'
+                            ? 'Eigen ingrediënt'
+                            : 'FNDDS ingrediënt')}
+                    </span>
+                    <Badge
+                      color={
+                        match.source === 'nevo'
+                          ? 'blue'
+                          : match.source === 'custom'
+                            ? 'zinc'
+                            : 'emerald'
+                      }
+                      className="text-xs"
+                    >
+                      {match.source === 'nevo'
+                        ? 'NEVO'
+                        : match.source === 'custom'
+                          ? 'Eigen'
+                          : 'FNDDS'}
+                    </Badge>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Nog niet gekoppeld aan een product.
+                  </p>
+                )}
+                {match &&
+                  originalIngredientDescription &&
+                  originalIngredientDescription.trim() !== '' && (
+                    <div className="mt-2 border-t border-white/10 pt-2">
+                      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                        Originele omschrijving
+                      </p>
+                      <p className="mt-0.5 text-sm text-muted-foreground italic">
+                        {originalIngredientDescription}
+                      </p>
+                    </div>
+                  )}
+                {canSearchSuggestions && (
+                  <Button
+                    plain
+                    className="mt-2 -ml-1 text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400"
+                    onClick={() => {
+                      setEditDialogOpen(false);
+                      openLinkDialog();
+                    }}
+                  >
+                    {match ? 'Wijzig koppeling' : 'Koppelen'}
+                  </Button>
+                )}
+              </div>
+            )}
             <Field>
               <Label>Naam</Label>
               <Input

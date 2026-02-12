@@ -3,6 +3,7 @@
 import { Link } from '@/components/catalyst/link';
 import { Badge } from '@/components/catalyst/badge';
 import { IngredientEditForm } from '../../components/IngredientEditForm';
+import { LinkIngredientToProductSection } from '../../components/LinkIngredientToProductSection';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 
 type FnddsIngredientDetailPageClientProps = {
@@ -41,6 +42,8 @@ export function FnddsIngredientDetailPageClient({
             </div>
           </div>
         </div>
+
+        <LinkIngredientToProductSection ingredientName={name} />
 
         <IngredientEditForm
           source="fndds_survey"

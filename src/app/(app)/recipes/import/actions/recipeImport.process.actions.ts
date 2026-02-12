@@ -9,6 +9,7 @@ import {
   processRecipeImageWithGemini,
   processRecipeImagesWithGemini,
 } from '../services/geminiRecipeImport.service';
+import { normalizeIngredient } from '../utils/normalizeIngredient';
 import { z } from 'zod';
 
 /**
@@ -405,6 +406,24 @@ export async function processRecipeImportWithGeminiAction(
       }
 
       const extracted = geminiResult.extracted as Record<string, unknown>;
+      const ingredients = Array.isArray(extracted?.ingredients)
+        ? (
+            extracted.ingredients as Array<{
+              name: string;
+              quantity?: number | null;
+              unit?: string | null;
+              original_line?: string;
+              note?: string | null;
+              section?: string | null;
+            }>
+          ).map((ing) => normalizeIngredient(ing, { useOriginalLine: true }))
+        : extracted?.ingredients;
+
+      const normalizedExtracted = {
+        ...extracted,
+        ingredients: ingredients ?? extracted?.ingredients,
+      };
+
       const updateData: {
         raw_ocr_text: string | null;
         gemini_raw_json: unknown;
@@ -416,8 +435,8 @@ export async function processRecipeImportWithGeminiAction(
       } = {
         raw_ocr_text: geminiResult.ocrText || null,
         gemini_raw_json: geminiRawJson,
-        extracted_recipe_json: geminiResult.extracted,
-        original_recipe_json: geminiResult.extracted,
+        extracted_recipe_json: normalizedExtracted,
+        original_recipe_json: normalizedExtracted,
         confidence_overall:
           (extracted?.confidence as { overall?: unknown } | undefined)
             ?.overall ?? null,

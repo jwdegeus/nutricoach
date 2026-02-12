@@ -18,7 +18,7 @@ import {
 } from '@/components/catalyst/dialog';
 import { Button } from '@/components/catalyst/button';
 import { Input } from '@/components/catalyst/input';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
 import { TableRow, TableCell } from '@/components/catalyst/table';
 import {
@@ -203,35 +203,37 @@ export function PantryRow({
                 <span className="text-sm font-medium text-foreground">
                   {t('location')}
                 </span>
-                <Select
+                <Listbox
                   value={editStorageLocationId}
-                  onChange={(e) => setEditStorageLocationId(e.target.value)}
+                  onChange={(val) => setEditStorageLocationId(val)}
                   className="mt-1"
+                  aria-label={t('locationNotSet')}
                 >
-                  <option value="">{t('locationNotSet')}</option>
+                  <ListboxOption value="">{t('locationNotSet')}</ListboxOption>
                   {pantryLocations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
+                    <ListboxOption key={loc.id} value={loc.id}>
                       {loc.name}
-                    </option>
+                    </ListboxOption>
                   ))}
-                </Select>
+                </Listbox>
               </label>
               <label className="block">
                 <span className="text-sm font-medium text-foreground">
                   {t('linkToStore')}
                 </span>
-                <Select
+                <Listbox
                   value={editPreferredStoreId}
-                  onChange={(e) => setEditPreferredStoreId(e.target.value)}
+                  onChange={(val) => setEditPreferredStoreId(val)}
                   className="mt-1"
+                  aria-label={t('storeNotSet')}
                 >
-                  <option value="">{t('storeNotSet')}</option>
+                  <ListboxOption value="">{t('storeNotSet')}</ListboxOption>
                   {groceryStores.map((store) => (
-                    <option key={store.id} value={store.id}>
+                    <ListboxOption key={store.id} value={store.id}>
                       {store.name}
-                    </option>
+                    </ListboxOption>
                   ))}
-                </Select>
+                </Listbox>
               </label>
               <div>
                 <span className="text-sm font-medium text-foreground">

@@ -2,8 +2,8 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { Link } from '@/components/catalyst/link';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { useTranslations } from 'next-intl';
-import { ChevronDownIcon } from '@heroicons/react/16/solid';
 
 const tabs = [
   { href: '/account', labelKey: 'account.title' as const },
@@ -34,30 +34,23 @@ export function AccountSectionTabs() {
       className="sticky top-16 z-10 border-b border-border/50 bg-background/80 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:py-0"
       role="banner"
     >
-      {/* Mobile: native select with chevron overlay */}
+      {/* Mobile: Tailwind-styled Listbox (non-native dropdown) */}
       <div className="sm:hidden">
         <label htmlFor="account-tabs" className="sr-only">
           Account secties
         </label>
-        <div className="relative">
-          <select
-            id="account-tabs"
-            value={currentHref}
-            onChange={(e) => router.push(e.target.value)}
-            className="block w-full appearance-none rounded-lg border border-border bg-input py-2.5 pr-10 pl-4 text-base text-foreground focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background focus:outline-none"
-            aria-label="Account secties"
-          >
-            {tabs.map((t) => (
-              <option key={t.href} value={t.href}>
-                {getLabel(t.labelKey)}
-              </option>
-            ))}
-          </select>
-          <ChevronDownIcon
-            className="pointer-events-none absolute top-1/2 right-3 size-5 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-        </div>
+        <Listbox
+          value={currentHref}
+          onChange={(val) => router.push(val)}
+          aria-label="Account secties"
+          className="w-full"
+        >
+          {tabs.map((t) => (
+            <ListboxOption key={t.href} value={t.href}>
+              {getLabel(t.labelKey)}
+            </ListboxOption>
+          ))}
+        </Listbox>
       </div>
 
       {/* Desktop: nav with underline indicator */}

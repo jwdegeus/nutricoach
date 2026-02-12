@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Subheading } from '@/components/catalyst/heading';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import {
   Table,
   TableBody,
@@ -245,20 +245,19 @@ export function FamilieIntakeOverviewClient({
             <span className="text-sm font-medium text-foreground">
               {t('filterByMember')}
             </span>
-            <Select
+            <Listbox
               value={selectedMemberId}
-              onChange={(e) => setSelectedMemberId(e.target.value)}
+              onChange={(val) => setSelectedMemberId(val)}
               className="min-w-[160px]"
-              name="member"
               aria-label={t('filterByMember')}
             >
-              <option value="all">{t('allMembers')}</option>
+              <ListboxOption value="all">{t('allMembers')}</ListboxOption>
               {MOCK_MEMBERS.map((m) => (
-                <option key={m.id} value={m.id}>
+                <ListboxOption key={m.id} value={m.id}>
                   {m.name}
-                </option>
+                </ListboxOption>
               ))}
-            </Select>
+            </Listbox>
           </label>
         </div>
         <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
@@ -286,20 +285,19 @@ export function FamilieIntakeOverviewClient({
           <span className="text-sm font-medium text-foreground">
             {t('filterByMember')}
           </span>
-          <Select
+          <Listbox
             value={selectedMemberId}
-            onChange={(e) => setSelectedMemberId(e.target.value)}
+            onChange={(val) => setSelectedMemberId(val)}
             className="min-w-[180px]"
-            name="member"
             aria-label={t('filterByMember')}
           >
-            <option value="all">{t('allMembers')}</option>
+            <ListboxOption value="all">{t('allMembers')}</ListboxOption>
             {MOCK_MEMBERS.map((m) => (
-              <option key={m.id} value={m.id}>
+              <ListboxOption key={m.id} value={m.id}>
                 {m.name}
-              </option>
+              </ListboxOption>
             ))}
-          </Select>
+          </Listbox>
         </label>
       </div>
 

@@ -9,7 +9,7 @@ import {
   Description,
 } from '@/components/catalyst/fieldset';
 import { Text } from '@/components/catalyst/text';
-import { Select } from '@/components/catalyst/select';
+import { Listbox, ListboxOption } from '@/components/catalyst/listbox';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/src/components/app/ToastContext';
@@ -76,16 +76,16 @@ export function LanguageSelector({
         <Field>
           <Label htmlFor="language">{tCommon('language')}</Label>
           <Description>{t('languageDescription')}</Description>
-          <Select
-            id="language"
+          <Listbox
             value={selectedLanguage}
-            onChange={(e) => handleLanguageChange(e.target.value)}
+            onChange={(val) => handleLanguageChange(val)}
             disabled={isPending}
             className="mt-2"
+            aria-label={tCommon('language')}
           >
-            <option value="nl">{tCommon('dutch')}</option>
-            <option value="en">{tCommon('english')}</option>
-          </Select>
+            <ListboxOption value="nl">{tCommon('dutch')}</ListboxOption>
+            <ListboxOption value="en">{tCommon('english')}</ListboxOption>
+          </Listbox>
         </Field>
       </FieldGroup>
     </div>
