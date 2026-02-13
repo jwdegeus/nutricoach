@@ -15,6 +15,7 @@ import {
   loadGuardrailsRuleset,
   evaluateGuardrails,
 } from '@/src/lib/guardrails-vnext';
+import { loadMagicianOverrides } from '@/src/lib/diet-validation/magician-overrides.loader';
 import { mapRecipeDraftToGuardrailsTargets } from '@/src/lib/guardrails-vnext/adapters/recipe-adaptation';
 import type {
   GuardDecision,
@@ -375,11 +376,13 @@ export async function applyRecipeAdaptationAction(
 
         const targets = mapRecipeDraftToGuardrailsTargets(draft, 'nl');
 
+        const overrides = await loadMagicianOverrides();
         const context: EvaluationContext = {
           dietKey: adaptation.dietId,
           mode: 'recipe_adaptation',
           locale: 'nl',
           timestamp: new Date().toISOString(),
+          excludeOverrides: overrides,
         };
 
         const decision = evaluateGuardrails({

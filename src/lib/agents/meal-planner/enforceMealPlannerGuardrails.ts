@@ -8,6 +8,7 @@ import {
   loadRulesetWithDietLogic,
   evaluateGuardrails,
 } from '@/src/lib/guardrails-vnext';
+import { loadMagicianOverrides } from '@/src/lib/diet-validation/magician-overrides.loader';
 import {
   mapMealPlanToGuardrailsTargets,
   getMealPlanIngredientsPerDay,
@@ -51,11 +52,13 @@ export async function enforceMealPlannerGuardrails(
       userId,
     });
 
+    const overrides = await loadMagicianOverrides();
     const context: EvaluationContext = {
       dietKey,
       mode: 'meal_planner',
       locale,
       timestamp: new Date().toISOString(),
+      excludeOverrides: overrides,
     };
 
     const decision = evaluateGuardrails({

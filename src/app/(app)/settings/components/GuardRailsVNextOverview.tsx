@@ -1380,7 +1380,6 @@ export function GuardRailsVNextOverview({
                     <TableHeader className="w-10" title="Actief / Gepauzeerd" />
                     <TableHeader>Categorie</TableHeader>
                     <TableHeader>Diet Logic (P0–P3)</TableHeader>
-                    <TableHeader>Actie</TableHeader>
                     <TableHeader>Striktheid</TableHeader>
                     <TableHeader>Prioriteit</TableHeader>
                     <TableHeader>Items</TableHeader>
@@ -1486,15 +1485,6 @@ export function GuardRailsVNextOverview({
                                 : 'Toestaan'}
                             </Badge>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            color={policy.action === 'block' ? 'red' : 'green'}
-                          >
-                            {policy.action === 'block'
-                              ? 'Blokkeren'
-                              : 'Toestaan'}
-                          </Badge>
                         </TableCell>
                         <TableCell>
                           <span className="inline-flex items-center gap-1">

@@ -6,6 +6,7 @@ import {
   loadGuardrailsRuleset,
   evaluateGuardrails,
 } from '@/src/lib/guardrails-vnext';
+import { loadMagicianOverrides } from '@/src/lib/diet-validation/magician-overrides.loader';
 import type { TextAtom, GuardDecision } from '@/src/lib/guardrails-vnext/types';
 import { getGuardReasonLabel } from '@/src/lib/guardrails-vnext/ui/reasonLabels';
 
@@ -253,12 +254,13 @@ export async function evaluateDietGuardrailsAction(
     const stepAtoms = parseTextareaToAtoms(steps, 'steps');
     const metadataAtoms = parseTextareaToAtoms(metadata, 'metadata');
 
-    // Build evaluation context
+    const overrides = await loadMagicianOverrides();
     const context = {
       dietId: input.dietTypeId,
       locale: 'nl' as const,
       mode: 'recipe_adaptation' as const,
       timestamp: new Date().toISOString(),
+      excludeOverrides: overrides,
     };
 
     // Evaluate

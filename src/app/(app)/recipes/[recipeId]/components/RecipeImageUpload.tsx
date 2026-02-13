@@ -53,13 +53,6 @@ export function RecipeImageUpload({
 
   // Update previewUrl when currentImageUrl changes
   useEffect(() => {
-    console.log('[RecipeImageUpload] currentImageUrl changed:', {
-      mealId,
-      currentImageUrl,
-      currentImageUrlType: typeof currentImageUrl,
-      currentImageUrlString: String(currentImageUrl),
-      previous: previewUrl,
-    });
     // Ensure we use the string value, not an object
     const imageUrlString =
       currentImageUrl && typeof currentImageUrl === 'string'
@@ -120,14 +113,6 @@ export function RecipeImageUpload({
         if (isRelativePath && !normalizedUrl.startsWith('/')) {
           normalizedUrl = `/${normalizedUrl}`;
         }
-
-        console.log('[RecipeImageUpload] Setting preview URL:', {
-          original: imageUrlString,
-          normalized: normalizedUrl,
-          isAbsoluteUrl,
-          isDataUrl,
-          isRelativePath,
-        });
 
         setPreviewUrl(normalizedUrl);
       } catch (e) {
@@ -456,7 +441,7 @@ export function RecipeImageUpload({
             <button
               type="button"
               onClick={handleClick}
-              className="block h-full w-full cursor-pointer transition-opacity hover:opacity-95"
+              className="relative block h-full w-full cursor-pointer transition-opacity hover:opacity-95"
               disabled={isBusy}
               aria-label="Receptafbeelding vergroten"
             >
@@ -539,7 +524,7 @@ export function RecipeImageUpload({
             <button
               type="button"
               onClick={handleClick}
-              className="block h-full w-full cursor-pointer transition-opacity hover:opacity-95"
+              className="relative block h-full w-full cursor-pointer transition-opacity hover:opacity-95"
               disabled={isBusy}
               aria-label="Receptafbeelding vergroten"
             >
@@ -550,6 +535,7 @@ export function RecipeImageUpload({
                 className="rounded-t-lg object-cover"
                 sizes="(max-width: 768px) 100vw, 800px"
                 unoptimized
+                priority
                 onError={() => setImageLoadError(true)}
               />
             </button>
@@ -622,7 +608,7 @@ export function RecipeImageUpload({
             <button
               type="button"
               onClick={handleClick}
-              className="block h-full max-h-[192px] min-h-[80px] w-full cursor-pointer transition-opacity hover:opacity-90"
+              className="relative block h-full max-h-[192px] min-h-[80px] w-full cursor-pointer transition-opacity hover:opacity-90"
               disabled={isBusy}
             >
               {!imageLoadError ? (
@@ -634,6 +620,7 @@ export function RecipeImageUpload({
                     className="rounded-lg object-contain shadow-sm transition-shadow hover:shadow-md"
                     sizes="(max-width: 768px) 100vw, 320px"
                     unoptimized
+                    priority
                     onError={() => setImageLoadError(true)}
                   />
                 </span>

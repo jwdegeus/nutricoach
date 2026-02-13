@@ -54,6 +54,11 @@ async function getAdminStats() {
       ? withoutCategoryData
       : Number(withoutCategoryData) || 0;
 
+  const { count: magicianOverridesCount = 0 } = await supabase
+    .from('magician_validator_overrides')
+    .select('*', { count: 'exact', head: true })
+    .eq('is_active', true);
+
   const [
     templateRes,
     templateActiveRes,
@@ -137,6 +142,7 @@ async function getAdminStats() {
     stores: {
       total: storesRes.error ? 0 : (storesRes.count ?? 0),
     },
+    magicianOverrides: magicianOverridesCount ?? 0,
   };
 }
 

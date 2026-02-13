@@ -127,19 +127,44 @@ function getMatchMode(rule: GuardRule, targetType: MatchTarget): MatchMode {
 }
 
 /**
+ * Check of een match een false positive is volgens excludeOverrides (magician_validator_overrides).
+ * Bijv. "aardappel" in "zoete_aardappel" = zoete aardappel, geen nachtschade.
+ */
+function isExcludedByOverrides(
+  atomText: string,
+  matchedTerm: string,
+  overrides: Record<string, string[]>,
+): boolean {
+  const key = matchedTerm.toLowerCase().trim();
+  const patterns = overrides[key];
+  if (!patterns?.length) return false;
+  const lower = atomText.toLowerCase();
+  const normalized = lower.replace(/-/g, ' ').replace(/\s+/g, ' ');
+  return (
+    patterns.some((p) => lower.includes(p)) ||
+    (key === 'bloem' && patterns.some((p) => normalized.includes(p)))
+  );
+}
+
+/**
  * Find matches for a rule against targets
  *
  * Block rules with target "ingredient" are also evaluated against step text,
  * so verboden ingrediënten (bv. paprika, nachtschade) in bereidingsinstructies
  * worden meegenomen in de compliance-analyse.
  *
+ * excludeOverrides (uit magician_validator_overrides via admin): als atom.text een patroon bevat
+ * voor de gematchte term, wordt de match niet toegevoegd (false positive).
+ *
  * @param rule - Rule to match
  * @param targets - All targets (ingredient, step, metadata)
+ * @param excludeOverrides - Optional false-positive uitsluitingen uit admin
  * @returns Array of matches found
  */
 function findRuleMatches(
   rule: GuardRule,
   targets: { ingredient: TextAtom[]; step: TextAtom[]; metadata: TextAtom[] },
+  excludeOverrides?: Record<string, string[]>,
 ): GuardRuleMatch[] {
   const matches: GuardRuleMatch[] = [];
   const slots: { type: MatchTarget; atoms: TextAtom[] }[] = [];
@@ -155,45 +180,46 @@ function findRuleMatches(
 
   if (slots.length === 0) return matches;
 
+  const pushIfNotExcluded = (
+    atom: TextAtom,
+    matchedText: string,
+    matchMode: MatchMode,
+  ) => {
+    if (
+      excludeOverrides &&
+      isExcludedByOverrides(atom.text, matchedText, excludeOverrides)
+    ) {
+      return; // False positive volgens admin overrides
+    }
+    const isDuplicate = matches.some(
+      (m) => m.ruleId === rule.id && m.targetPath === atom.path,
+    );
+    if (!isDuplicate) {
+      matches.push({
+        ruleId: rule.id,
+        matchedText,
+        targetPath: atom.path,
+        matchMode,
+        locale: atom.locale,
+        ruleCode: rule.metadata.ruleCode,
+        ruleLabel: rule.metadata.label,
+      });
+    }
+  };
+
   for (const { type, atoms } of slots) {
     const matchMode = getMatchMode(rule, type);
 
     const termMatches = findMatches(atoms, rule.match.term, matchMode);
     for (const { atom, matchedText } of termMatches) {
-      const isDuplicate = matches.some(
-        (m) => m.ruleId === rule.id && m.targetPath === atom.path,
-      );
-      if (!isDuplicate) {
-        matches.push({
-          ruleId: rule.id,
-          matchedText,
-          targetPath: atom.path,
-          matchMode,
-          locale: atom.locale,
-          ruleCode: rule.metadata.ruleCode,
-          ruleLabel: rule.metadata.label,
-        });
-      }
+      pushIfNotExcluded(atom, matchedText, matchMode);
     }
 
     if (rule.match.synonyms) {
       for (const synonym of rule.match.synonyms) {
         const synonymMatches = findMatches(atoms, synonym, matchMode);
         for (const { atom, matchedText } of synonymMatches) {
-          const isDuplicate = matches.some(
-            (m) => m.ruleId === rule.id && m.targetPath === atom.path,
-          );
-          if (!isDuplicate) {
-            matches.push({
-              ruleId: rule.id,
-              matchedText,
-              targetPath: atom.path,
-              matchMode,
-              locale: atom.locale,
-              ruleCode: rule.metadata.ruleCode,
-              ruleLabel: rule.metadata.label,
-            });
-          }
+          pushIfNotExcluded(atom, matchedText, matchMode);
         }
       }
     }
@@ -440,7 +466,7 @@ export function evaluateGuardrails(
     const rule = sortedRules[step];
 
     // Find matches for this rule
-    const matches = findRuleMatches(rule, targets);
+    const matches = findRuleMatches(rule, targets, context.excludeOverrides);
     const matchFound = matches.length > 0;
 
     // Apply match to decision state

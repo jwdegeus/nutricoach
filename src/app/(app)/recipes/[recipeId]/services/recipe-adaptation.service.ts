@@ -22,6 +22,8 @@ import type {
 } from '../recipe-ai.types';
 import type { DietRuleset, ValidationReport } from './diet-validator';
 import { validateDraft, findForbiddenMatches } from './diet-validator';
+import { loadMagicianOverrides } from '@/src/lib/diet-validation/magician-overrides.loader';
+import { loadMagicianIngredientSynonyms } from '@/src/lib/diet-validation/magician-ingredient-synonyms.loader';
 import type { DietRuleSet } from '@/src/lib/diets';
 // vNext guard rails (shadow mode)
 import {
@@ -135,6 +137,11 @@ export class RecipeAdaptationService {
         ruleset.forbidden.length,
       );
 
+      const [overrides, extraSynonyms] = await Promise.all([
+        loadMagicianOverrides(),
+        loadMagicianIngredientSynonyms(),
+      ]);
+
       // Generate draft with engine (first attempt)
       // Bij twee-fase flow: bestaande violations + keuzes (Kies X / Vervang / Schrappen) meegiven
       const existingViolations = input.existingAnalysis?.violations;
@@ -150,8 +157,10 @@ export class RecipeAdaptationService {
           false,
           existingViolations,
           violationChoices,
+          overrides,
+          extraSynonyms,
         );
-        validation = validateDraft(draft, ruleset);
+        validation = validateDraft(draft, ruleset, overrides, extraSynonyms);
 
         if (!validation.ok) {
           needsRetry = true;
@@ -177,8 +186,10 @@ export class RecipeAdaptationService {
             true,
             existingViolations,
             violationChoices,
+            overrides,
+            extraSynonyms,
           );
-          validation = validateDraft(draft, ruleset);
+          validation = validateDraft(draft, ruleset, overrides, extraSynonyms);
 
           if (!validation.ok) {
             // In strict mode, if there are still violations, it's likely because:
@@ -313,7 +324,16 @@ export class RecipeAdaptationService {
         noRulesConfigured: true,
       };
     }
-    const violations = this.analyzeRecipeForViolations(recipe, ruleset);
+    const [overrides, extraSynonyms] = await Promise.all([
+      loadMagicianOverrides(),
+      loadMagicianIngredientSynonyms(),
+    ]);
+    const violations = this.analyzeRecipeForViolations(
+      recipe,
+      ruleset,
+      overrides,
+      extraSynonyms,
+    );
 
     const summary =
       violations.length === 0
@@ -522,13 +542,24 @@ export class RecipeAdaptationService {
               // Check if we already have this term
               const existing = forbidden.find((f) => f.term === term);
               if (!existing && term) {
-                // strictness: hard = blokkeren/vervangen, soft = beperkt/waarschuwing (limit)
-                const hard = constraint.strictness === 'hard';
+                // diet_logic: LIMIT = altijd soft ("Beperkt"), DROP = strictness bepaalt hard/soft
+                // LIMIT-regels mogen nooit als "Strikt verboden" getoond worden – ze zijn max per dag/week, niet blokkeren
+                const dietLogic = (constraint as { diet_logic?: string })
+                  .diet_logic;
+                const isLimit = dietLogic === 'limit';
+                const hard =
+                  !isLimit &&
+                  (constraint as { strictness?: string }).strictness === 'hard';
+                const catName =
+                  (category as { name_nl?: string }).name_nl ?? '';
+                const ruleLabel = isLimit
+                  ? `${catName} (Beperkt)`
+                  : `${catName} (${hard ? 'Strikt verboden' : 'Niet gewenst'})`;
                 forbidden.push({
                   term,
                   synonyms: synonyms.map((s: string) => s.toLowerCase()),
                   ruleCode: hard ? 'GUARD_RAIL_HARD' : 'GUARD_RAIL_SOFT',
-                  ruleLabel: `${category.name_nl} (${hard ? 'Strikt verboden' : 'Niet gewenst'})`,
+                  ruleLabel,
                   substitutionSuggestions,
                 });
               }
@@ -1474,6 +1505,8 @@ export class RecipeAdaptationService {
    *
    * @param recipe - Recipe data
    * @param ruleset - Diet ruleset
+   * @param overrides - False-positive exclusions uit magician_validator_overrides
+   * @param extraSynonyms - Extra NL↔EN synoniemen uit magician_ingredient_synonyms
    * @returns Array of violations found
    */
   private analyzeRecipeForViolations(
@@ -1483,6 +1516,8 @@ export class RecipeAdaptationService {
       steps: string[];
     },
     ruleset: DietRuleset,
+    overrides?: Record<string, string[]> | null,
+    extraSynonyms: Record<string, string[]> = {},
   ): ViolationDetail[] {
     const violations: ViolationDetail[] = [];
     const foundIngredients = new Set<string>(); // Track to avoid duplicates
@@ -1564,7 +1599,13 @@ export class RecipeAdaptationService {
         `[RecipeAdaptation] Checking ingredient: searchText="${searchText.substring(0, 80)}..."`,
       );
 
-      const matches = findForbiddenMatches(searchText, ruleset, 'ingredients');
+      const matches = findForbiddenMatches(
+        searchText,
+        ruleset,
+        'ingredients',
+        overrides ?? {},
+        extraSynonyms,
+      );
 
       if (matches.length > 0) {
         const match = matches[0];
@@ -1682,7 +1723,13 @@ export class RecipeAdaptationService {
         `[RecipeAdaptation] Checking step: "${stepText.substring(0, 50)}..."`,
       );
 
-      const matches = findForbiddenMatches(stepText, ruleset, 'steps');
+      const matches = findForbiddenMatches(
+        stepText,
+        ruleset,
+        'steps',
+        overrides ?? {},
+        extraSynonyms,
+      );
 
       for (const match of matches) {
         // Check if this violation was already found in ingredients
@@ -1828,6 +1875,8 @@ export class RecipeAdaptationService {
    * @param ruleset - Diet ruleset
    * @param strict - Whether to use strict mode (no forbidden ingredients)
    * @param violationChoices - Per violation: use_allowed | substitute | remove
+   * @param overrides - False-positive exclusions (for strict-mode findForbiddenMatches)
+   * @param extraSynonyms - Extra NL↔EN synoniemen (for strict-mode findForbiddenMatches)
    * @returns Rewritten recipe
    */
   private generateRewrite(
@@ -1840,6 +1889,8 @@ export class RecipeAdaptationService {
     ruleset: DietRuleset,
     strict: boolean,
     violationChoices?: Array<{ choice: ViolationChoice; substitute?: string }>,
+    overrides: Record<string, string[]> = {},
+    extraSynonyms: Record<string, string[]> = {},
   ): {
     ingredients: IngredientLine[];
     steps: StepLine[];
@@ -2071,6 +2122,8 @@ export class RecipeAdaptationService {
           ingredientName,
           ruleset,
           'ingredients',
+          overrides ?? {},
+          extraSynonyms,
         );
         if (matches.length > 0) {
           const match = matches[0];
@@ -2182,6 +2235,8 @@ export class RecipeAdaptationService {
     strict: boolean,
     existingViolations?: ViolationDetail[],
     violationChoices?: Array<{ choice: ViolationChoice; substitute?: string }>,
+    overrides?: Record<string, string[]> | null,
+    extraSynonyms: Record<string, string[]> = {},
   ): Promise<RecipeAdaptationDraft> {
     // Load recipe, ruleset and diet name in parallel where possible
     const supabase = await createClient();
@@ -2274,7 +2329,12 @@ export class RecipeAdaptationService {
     const violations =
       existingViolations !== undefined
         ? existingViolations
-        : this.analyzeRecipeForViolations(recipe, ruleset);
+        : this.analyzeRecipeForViolations(
+            recipe,
+            ruleset,
+            overrides,
+            extraSynonyms,
+          );
 
     let draft: RecipeAdaptationDraft;
 
@@ -2335,6 +2395,8 @@ export class RecipeAdaptationService {
         ruleset,
         false,
         defaultChoices,
+        overrides ?? {},
+        extraSynonyms,
       );
       const summary =
         substitutionPairs.length > 0
@@ -2446,12 +2508,13 @@ export class RecipeAdaptationService {
         locale: vNextLocale,
       });
 
-      // Build evaluation context
+      const overrides = await loadMagicianOverrides();
       const context: EvaluationContext = {
         dietId,
         locale: vNextLocale,
         mode: 'recipe_adaptation',
         timestamp: new Date().toISOString(),
+        excludeOverrides: overrides,
       };
 
       // Evaluate with vNext

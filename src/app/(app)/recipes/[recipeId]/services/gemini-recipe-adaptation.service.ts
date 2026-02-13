@@ -204,15 +204,15 @@ export async function generateRecipeAdaptationWithGemini(
  * System instruction: chef met wetboeken.
  * [DIEETREGELS] wordt vervangen door de geformatteerde regels uit ruleset + violations.
  */
-const SYSTEM_INSTRUCTION = `Je bent een culinaire expert gespecialiseerd in therapeutische diëten zoals Wahls Paleo, Keto en Auto-immuun Paleo.
+const SYSTEM_INSTRUCTION = `Je bent een culinaire expert gespecialiseerd in therapeutische diëten (Wahls Paleo, Keto, Auto-immuun Paleo).
 
-**Jouw taak:** Transformeer het aangeboden recept op basis van de meegeleverde [DIEETREGELS].
+**Taak:** Transformeer het recept conform de [DIEETREGELS]. Alle gedetecteerde afwijkingen MOETEN worden aangepast.
 
-**Strikte richtlijnen:**
-1. Gebruik ALTIJD de verplichte substituties uit de [DIEETREGELS] voor verboden ingrediënten.
-2. Herschrijf de bereidingsstappen VOLLEDIG zodat ze logisch zijn voor de nieuwe ingrediënten (bijv. kortere kooktijd voor bloemkoolrijst vs. gewone rijst).
-3. Voeg een 'why_this_works' sectie toe die specifiek de gezondheidsvoordelen binnen dit dieet benoemt.
-4. De output MOET in het Nederlands zijn en strikt voldoen aan het gevraagde JSON schema.`;
+**Richtlijnen:**
+1. **Substituties:** Gebruik exact de voorgestelde vervangingen uit de gedetecteerde afwijkingen. Bij meerdere opties: kies de meest passende voor het gerecht.
+2. **Stappen:** Herschrijf de bereidingswijze volledig. Pas kooktijden aan (bijv. bloemkoolrijst: 5–8 min; gewone rijst: 15–20 min). Behoud de structuur van het gerecht.
+3. **why_this_works:** 2–4 korte bullets over de dieetvoordelen (geen granen, meer groente, etc.).
+4. **Output:** Alleen geldige JSON, geen tekst ervoor of erna. Taal: Nederlands.`;
 
 /**
  * Build prompt: system instruction + [DIEETREGELS] + recept + eventueel schraplijst.
@@ -259,20 +259,20 @@ function buildAdaptationPrompt(
     )
     .join('\n');
 
-  // [DIEETREGELS]: verboden termen + per violation de regel en voorgestelde vervanging
+  // [DIEETREGELS]: verboden termen + gedetecteerde violations met concrete vervangingen
   const dieetregelsLines = [
     `Dieet: ${dietName}`,
     '',
-    'Verboden / beperkt (uit dieetregels):',
+    '--- Verboden/beperkt ---',
     ...ruleset.forbidden.map(
       (r) =>
-        `- ${r.term}${r.synonyms?.length ? ` (${r.synonyms.slice(0, 3).join(', ')})` : ''}: ${r.ruleLabel}. Vervanging: ${(r.substitutionSuggestions ?? []).slice(0, 3).join(', ') || 'geen opgegeven'}`,
+        `• ${r.term}${r.synonyms?.length ? ` (syn: ${r.synonyms.slice(0, 4).join(', ')})` : ''}: ${r.ruleLabel}. Suggesties: ${(r.substitutionSuggestions ?? []).slice(0, 4).join(', ') || '–'}`,
     ),
     '',
-    'Gedetecteerde afwijkingen in dit recept (deze MOETEN worden aangepast):',
+    '--- Gedetecteerde afwijkingen (VERPLICHT aanpassen) ---',
     ...violations.map(
       (v) =>
-        `- "${v.ingredientName}" | Regel: ${v.ruleLabel} | Voorgestelde vervanging: ${v.suggestion}`,
+        `• "${v.ingredientName}" → regel: ${v.ruleLabel} → vervang door: ${v.suggestion || 'zie suggesties hierboven'}`,
     ),
   ];
   const dieetregelsBlock = dieetregelsLines.join('\n');
@@ -367,11 +367,13 @@ function convertGeminiResponseToDraft(
 /**
  * AI-augmentatie: laat het model redeneren over dieetregels en ingrediënten.
  * Vult code-based violations aan met suggesties waar het model bv. "mozzarella = zuivel" afleidt.
+ * Overrides uit admin worden gebruikt om AI-false-positives te filteren (geen hardcoded lijst).
  */
 export async function suggestViolationsWithAI(
   recipe: RecipeData,
   ruleset: DietRuleset,
   dietName: string,
+  overrides?: Record<string, string[]>,
 ): Promise<ViolationDetail[]> {
   const gemini = getGeminiClient();
   const ingredients = Array.isArray(recipe.mealData?.ingredientRefs)
@@ -401,21 +403,46 @@ export async function suggestViolationsWithAI(
     ...new Set(ruleset.forbidden.map((r) => r.ruleLabel)),
   ].join('; ');
 
-  const prompt = `Je bent een dieetdeskundige. Gegeven de dieetregels en de recept-ingrediënten hieronder, welke ingrediënten wijken waarschijnlijk af?
+  // Dynamisch: al-gefilterde patronen uit overrides (admin)
+  const excludePatternsDesc =
+    overrides && Object.keys(overrides).length > 0
+      ? Object.entries(overrides)
+          .flatMap(([term, patterns]) =>
+            patterns.map((p) => `${p} (voor ${term})`),
+          )
+          .slice(0, 30) // Beperk voor promptgrootte
+          .join(', ')
+      : '';
+  const excludeHint =
+    excludePatternsDesc.length > 0
+      ? `Ingrediënten die één van deze patronen bevatten zijn al goedgekeurd: ${excludePatternsDesc}. Geen violation voorstellen voor zulke ingrediënten.`
+      : '';
+
+  // Dynamisch: focus-termen uit ruleset (geen hardcoded voorbeelden)
+  const focusTerms = ruleset.forbidden
+    .flatMap((r) => [r.term, ...(r.synonyms ?? [])])
+    .filter(Boolean)
+    .map((t) => t.toLowerCase())
+    .filter((t, i, arr) => arr.indexOf(t) === i)
+    .slice(0, 50) // Beperk
+    .join(', ');
+  const focusHint = `Focus op overtredingen van deze termen: ${focusTerms}.`;
+
+  const prompt = `Je bent een dieetdeskundige. Welke recept-ingrediënten wijken af van het dieet?
 
 DIET: ${dietName}
-VERBODEN/BEPERKTE REGELS (uit dieetregels): ${ruleSummary}
+REGELS: ${ruleSummary}
 
-RECEPT-INGREDIËNTEN (elk regel = één ingrediënt of combinatie):
+INGREDIËNTEN:
 ${ingredientLines.map((l: string, i: number) => `${i + 1}. ${l}`).join('\n')}
 
-Redeneer kort: bv. "mozzarella is zuivel", "honing is toegevoegde suiker", "sojasaus is soja".
-Geef alleen suggesties met confidence >= ${AI_SUGGESTION_MIN_CONFIDENCE}.
+Regels:
+- Suggereer alleen bij confidence >= ${AI_SUGGESTION_MIN_CONFIDENCE}.
+${excludeHint ? `- ${excludeHint}` : ''}
+- ${focusHint}
 
-Belangrijk: bloemkoolrijst (cauliflower rice) is een groente, GEEN zuivel; noem dit nooit als zuivel-/dairy-overtreding.
-
-Antwoord in JSON: { "suggestions": [ { "ingredient": "exacte naam zoals in de lijst", "ruleLabel": "naam van de regel die geschonden wordt", "confidence": 0.85 } ] }
-Alleen objecten met confidence >= ${AI_SUGGESTION_MIN_CONFIDENCE} opnemen.`;
+Antwoord in JSON: { "suggestions": [ { "ingredient": "exacte naam uit de lijst", "ruleLabel": "regelnaam", "confidence": 0.85 } ] }
+Alleen objecten met confidence >= ${AI_SUGGESTION_MIN_CONFIDENCE}.`;
 
   try {
     const raw = await gemini.generateJson({
@@ -447,42 +474,34 @@ Alleen objecten met confidence >= ${AI_SUGGESTION_MIN_CONFIDENCE} opnemen.`;
         (s.confidence ?? 0) >= AI_SUGGESTION_MIN_CONFIDENCE,
     );
 
-    // False positives: ingrediënten die de AI soms ten onrechte als zuivel/dairy classificeert
-    const isDairyRule = (label: string) => /zuivel|dairy/i.test(label ?? '');
-    const dairyFalsePositiveIngredients = [
-      'bloemkoolrijst',
-      'bloemkool',
-      'cauliflower rice',
-      'cauliflower',
-      'ijsblokjes',
-      'ijsblokje',
-      'kokosyoghurt',
-      'kokos yoghurt',
-      'amandelyoghurt',
-      'amandel yoghurt',
-      'haveryoghurt',
-      'sojayoghurt',
-      'plantaardige yoghurt',
-      'kokosmelk',
-      'amandelmelk',
-      'havermelk',
-      'sojamelk',
-      'rijstmelk',
-      'plantaardige melk',
-      'rijstazijn',
-      'rice vinegar',
-    ];
-    const isDairyFalsePositive = (ingredient: string, ruleLabel: string) => {
-      if (!isDairyRule(ruleLabel)) return false;
+    // Filter false positives via overrides uit admin (geen hardcoded lijst)
+    const isExcludedByOverrides = (
+      ingredient: string,
+      ruleLabel: string,
+    ): boolean => {
+      if (!overrides || Object.keys(overrides).length === 0) return false;
       const norm = ingredient.trim().toLowerCase();
-      return dairyFalsePositiveIngredients.some(
-        (fp) => norm === fp || norm.includes(fp),
+      const rulesForLabel = ruleset.forbidden.filter(
+        (r) =>
+          r.ruleLabel?.toLowerCase().includes(ruleLabel.toLowerCase()) ||
+          ruleLabel.toLowerCase().includes(r.ruleLabel?.toLowerCase() ?? ''),
       );
+      for (const rule of rulesForLabel) {
+        const termsToCheck = [rule.term, ...(rule.synonyms ?? [])].map((t) =>
+          t.toLowerCase().trim(),
+        );
+        for (const term of termsToCheck) {
+          const patterns = overrides[term];
+          if (patterns?.length && patterns.some((p) => norm.includes(p)))
+            return true;
+        }
+      }
+      return false;
     };
 
     const filtered = suggestions.filter(
       (s: { ingredient: string; ruleLabel: string }) =>
-        !isDairyFalsePositive(s.ingredient, s.ruleLabel),
+        !isExcludedByOverrides(s.ingredient, s.ruleLabel),
     );
 
     const ruleByLabel = new Map(ruleset.forbidden.map((r) => [r.ruleLabel, r]));

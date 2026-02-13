@@ -23,6 +23,7 @@ import {
   loadRulesetWithDietLogic,
   evaluateGuardrails,
 } from '@/src/lib/guardrails-vnext';
+import { loadMagicianOverrides } from '@/src/lib/diet-validation/magician-overrides.loader';
 import { mapPlanEditToGuardrailsTargets } from '@/src/lib/guardrails-vnext/adapters/plan-chat';
 import type { EvaluationContext } from '@/src/lib/guardrails-vnext/types';
 import { evaluateDietLogic } from '@/src/lib/diet-logic';
@@ -218,12 +219,13 @@ export class PlanChatService {
           userId,
         });
 
-        // Build evaluation context
+        const overrides = await loadMagicianOverrides();
         const context: EvaluationContext = {
           dietKey: plan.dietKey,
           locale: 'nl',
           mode: 'plan_chat',
           timestamp: new Date().toISOString(),
+          excludeOverrides: overrides,
         };
 
         // Evaluate guardrails (allow/block)
@@ -350,11 +352,13 @@ export class PlanChatService {
         userId,
       });
 
+      const overrides = await loadMagicianOverrides();
       const context: EvaluationContext = {
         dietKey,
         locale: 'nl',
         mode: 'plan_chat',
         timestamp: new Date().toISOString(),
+        excludeOverrides: overrides,
       };
 
       const decision = evaluateGuardrails({

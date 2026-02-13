@@ -1,0 +1,31 @@
+-- Seed: magician_ingredient_synonyms met waarden uit EXTRA_INGREDIENT_SYNONYMS (diet-validator.ts)
+
+INSERT INTO public.magician_ingredient_synonyms (forbidden_term, synonym, display_order) VALUES
+  ('kaas', 'mozzarella', 1), ('kaas', 'geitenkaas', 2), ('kaas', 'blauwe kaas', 3), ('kaas', 'feta', 4), ('kaas', 'parmezaan', 5),
+  ('kaas', 'cheddar', 6), ('kaas', 'brie', 7), ('kaas', 'camembert', 8), ('kaas', 'roomkaas', 9), ('kaas', 'buffalo mozzarella', 10),
+  ('kaas', 'verse mozzarella', 11),
+  ('suiker', 'honing', 12), ('suiker', 'ahornsiroop', 13), ('suiker', 'agavesiroop', 14), ('suiker', 'maissiroop', 15),
+  ('suiker', 'rietsuiker', 16), ('suiker', 'basterdsuiker', 17), ('suiker', 'poedersuiker', 18),
+  ('mais', 'maiskorrels', 19), ('mais', 'maïs', 20), ('mais', 'corn', 21), ('mais', 'corn kernels', 22), ('mais', 'maismeel', 23),
+  ('mais', 'cornmeal', 24),
+  ('paprika', 'paprikapoeder', 25), ('paprika', 'zoete paprika', 26), ('paprika', 'gerookte paprikapoeder', 27),
+  ('paprika', 'zoete paprikapoeder', 28), ('paprika', 'sweet paprika', 29), ('paprika', 'groene paprika', 30),
+  ('paprika', 'rode paprika', 31), ('paprika', 'gele paprika', 32), ('paprika', 'paprika''s', 33), ('paprika', 'paprikas', 34),
+  ('paprika', 'bell pepper', 35), ('paprika', 'bell peppers', 36),
+  ('tomaat', 'cherrytomaat', 37), ('tomaat', 'cherrytomaatjes', 38), ('tomaat', 'tomaatjes', 39), ('tomaat', 'tomaten', 40),
+  ('soja', 'sojasaus', 41), ('soja', 'tamari', 42), ('soja', 'ketjap', 43), ('soja', 'sojabonen', 44),
+  ('cheese', 'mozzarella', 45), ('cheese', 'geitenkaas', 46), ('cheese', 'blauwe kaas', 47), ('cheese', 'feta', 48),
+  ('cheese', 'parmezaan', 49), ('cheese', 'cheddar', 50), ('cheese', 'brie', 51), ('cheese', 'camembert', 52),
+  ('cheese', 'roomkaas', 53), ('cheese', 'buffalo mozzarella', 54), ('cheese', 'verse mozzarella', 55),
+  ('dairy', 'mozzarella', 56), ('dairy', 'melk', 57), ('dairy', 'yoghurt', 58), ('dairy', 'boter', 59),
+  ('dairy', 'room', 60), ('dairy', 'kaas', 61), ('dairy', 'geitenkaas', 62), ('dairy', 'feta', 63),
+  ('sugar', 'honing', 64), ('sugar', 'ahornsiroop', 65), ('sugar', 'agavesiroop', 66), ('sugar', 'maissiroop', 67),
+  ('sugar', 'rietsuiker', 68), ('sugar', 'basterdsuiker', 69), ('sugar', 'poedersuiker', 70), ('sugar', 'maple syrup', 71),
+  ('sugar', 'agave', 72),
+  ('corn', 'maiskorrels', 73), ('corn', 'maïs', 74), ('corn', 'corn kernels', 75),
+  ('corn', 'maismeel', 76), ('corn', 'cornmeal', 77),
+  ('soy', 'sojasaus', 78), ('soy', 'tamari', 79), ('soy', 'ketjap', 80), ('soy', 'sojabonen', 81),
+  ('soy', 'tofu', 82), ('soy', 'tempeh', 83), ('soy', 'miso', 84),
+  ('tomato', 'cherrytomaat', 85), ('tomato', 'cherrytomaatjes', 86), ('tomato', 'cherry tomato', 87),
+  ('tomato', 'tomaatjes', 88), ('tomato', 'tomaten', 89), ('tomato', 'tomatoes', 90)
+ON CONFLICT (forbidden_term, synonym) DO NOTHING;

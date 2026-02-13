@@ -10,6 +10,7 @@ import type {
   EvaluationContext,
   GuardrailsRuleset,
 } from '@/src/lib/guardrails-vnext/types';
+import { loadMagicianOverrides } from '@/src/lib/diet-validation/magician-overrides.loader';
 import { getCurrentDietIdAction } from '../[recipeId]/actions/recipe-ai.persist.actions';
 import {
   getNevoFoodNamesByCodesAction,
@@ -50,24 +51,23 @@ function isIngredientPath(path: string): boolean {
  *
  * violatingCount = totaal aantal atomen (ingrediënt + stap) met een violation,
  * voor de tooltip ("X item(s) wijkt af").
+ *
+ * False positives (zoete aardappel etc.) worden gefilterd door evaluateGuardrails
+ * via context.excludeOverrides (magician_validator_overrides uit admin).
  */
 function complianceFromDecision(
   decision: GuardDecision,
   ingredientCount: number,
 ): { scorePercent: number; violatingCount: number } {
+  const applicableMatches = decision.matches.filter((m) =>
+    decision.appliedRuleIds.includes(m.ruleId),
+  );
+
   if (ingredientCount === 0) {
-    const violatingPaths = new Set(
-      decision.matches
-        .filter((m) => decision.appliedRuleIds.includes(m.ruleId))
-        .map((m) => m.targetPath),
-    );
+    const violatingPaths = new Set(applicableMatches.map((m) => m.targetPath));
     return { scorePercent: 100, violatingCount: violatingPaths.size };
   }
-  const violatingPaths = new Set(
-    decision.matches
-      .filter((m) => decision.appliedRuleIds.includes(m.ruleId))
-      .map((m) => m.targetPath),
-  );
+  const violatingPaths = new Set(applicableMatches.map((m) => m.targetPath));
   const violatingIngredientPaths = new Set(
     [...violatingPaths].filter(isIngredientPath),
   );
@@ -209,6 +209,8 @@ export async function getRecipeComplianceScoresAction(
     return { ok: true, data: empty };
   }
 
+  const overrides = await loadMagicianOverrides();
+
   let ruleset: GuardrailsRuleset;
   try {
     ruleset = await loadGuardrailsRuleset({
@@ -245,6 +247,7 @@ export async function getRecipeComplianceScoresAction(
     locale: 'nl',
     mode: 'recipe_adaptation',
     timestamp: new Date().toISOString(),
+    excludeOverrides: overrides,
   };
 
   // Resolve displayNames for refs that only have nevoCode/customFoodId (so guardrails match on names)
@@ -290,16 +293,15 @@ export async function getRecipeComplianceScoresAction(
         context,
         targets,
       });
-      const violatingPaths = new Set(
-        decision.matches
-          .filter((m) => decision.appliedRuleIds.includes(m.ruleId))
-          .map((m) => m.targetPath),
+      const { scorePercent, violatingCount } = complianceFromDecision(
+        decision,
+        0,
       );
       scores[item.id] = {
-        scorePercent: 100,
-        ok: decision.ok,
+        scorePercent,
+        ok: violatingCount === 0 ? true : decision.ok,
         dietId,
-        violatingCount: violatingPaths.size,
+        violatingCount,
       };
       continue;
     }
@@ -316,7 +318,7 @@ export async function getRecipeComplianceScoresAction(
     );
     scores[item.id] = {
       scorePercent,
-      ok: decision.ok,
+      ok: violatingCount === 0 ? true : decision.ok,
       dietId,
       violatingCount,
     };

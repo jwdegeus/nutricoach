@@ -315,6 +315,12 @@ export type EvaluationContext = {
 
   /** Timestamp when evaluation occurred */
   timestamp: string;
+
+  /**
+   * False-positive uitsluitingen uit magician_validator_overrides (admin).
+   * Key = verboden term (aardappel, potato), value = patronen; als atom.text een patroon bevat, geen match.
+   */
+  excludeOverrides?: Record<string, string[]>;
 };
 
 /**

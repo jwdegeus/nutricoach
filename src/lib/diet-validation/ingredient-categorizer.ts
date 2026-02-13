@@ -477,10 +477,32 @@ export function isHighHistamine(ingredientName: string): boolean {
   );
 }
 
+/** Zoete aardappel (Ipomoea batatas) is géén nachtschade – Convolvulaceae. */
+const SWEET_POTATO_PATTERNS = [
+  'zoete aardappel',
+  'aardappel zoete',
+  'zoete_aardappel',
+  'aardappel_zoete',
+  'sweet potato',
+  'sweet_potato',
+  'batata doce',
+  'batata_doce',
+  'bataat',
+];
+
+function isSweetPotato(ingredientName: string): boolean {
+  const lower = ingredientName.toLowerCase().replace(/\s+/g, ' ');
+  const normalized = normalizeIngredientName(ingredientName);
+  return SWEET_POTATO_PATTERNS.some(
+    (p) => lower.includes(p) || normalized.includes(p.replace(/\s+/g, '_')),
+  );
+}
+
 /**
  * Check if ingredient is a nightshade
  */
 export function isNightshade(ingredientName: string): boolean {
+  if (isSweetPotato(ingredientName)) return false;
   return ingredientMatchesCategory(ingredientName, 'nightshades');
 }
 

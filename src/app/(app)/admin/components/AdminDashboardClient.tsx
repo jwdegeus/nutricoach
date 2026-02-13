@@ -16,6 +16,7 @@ import {
   ClipboardDocumentListIcon,
   ShoppingBagIcon,
   BuildingStorefrontIcon,
+  SparklesIcon,
 } from '@heroicons/react/20/solid';
 
 type StatItem = {
@@ -62,6 +63,7 @@ type AdminStats = {
   stores: {
     total: number;
   };
+  magicianOverrides: number;
 };
 
 type AdminDashboardClientProps = {
@@ -130,6 +132,17 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
       icon: BuildingStorefrontIcon,
       iconBackground: 'bg-amber-500',
       stats: [{ label: 'Winkels', value: stats.stores.total }],
+    },
+    {
+      name: 'AI Magician overrides',
+      description:
+        'False-positive uitsluitingen: zoete aardappel, bloemkool, pasta-as-spread. Beheer welke ingrediëntpatronen een dieet-violation negeren.',
+      href: '/admin/ai-magician',
+      icon: SparklesIcon,
+      iconBackground: 'bg-fuchsia-500',
+      stats: [
+        { label: 'Actieve uitsluitingen', value: stats.magicianOverrides },
+      ],
     },
     {
       name: 'Dieettypes',
@@ -249,7 +262,7 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
         {adminSections.map((section) => (
           <div
             key={section.name}

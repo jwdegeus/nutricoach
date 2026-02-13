@@ -6,6 +6,7 @@ import {
   loadGuardrailsRuleset,
   evaluateGuardrails,
 } from '@/src/lib/guardrails-vnext';
+import { loadMagicianOverrides } from '@/src/lib/diet-validation/magician-overrides.loader';
 import { mapMealPlanToGuardrailsTargets } from '@/src/lib/guardrails-vnext/adapters/meal-planner';
 import type {
   EvaluationContext,
@@ -481,11 +482,13 @@ export async function applyMealPlanDraftAction(raw: unknown): Promise<
         'nl',
       );
 
+      const overrides = await loadMagicianOverrides();
       const context: EvaluationContext = {
         dietKey,
         locale: 'nl',
         mode: 'plan_chat',
         timestamp: new Date().toISOString(),
+        excludeOverrides: overrides,
       };
 
       const decision = evaluateGuardrails({
@@ -839,11 +842,13 @@ export async function updateMealPlanDraftSlotAction(
       });
 
       const targets = mapMealPlanToGuardrailsTargets(newDraft, 'nl');
+      const overrides = await loadMagicianOverrides();
       const context: EvaluationContext = {
         dietKey,
         locale: 'nl',
         mode: 'plan_chat',
         timestamp: new Date().toISOString(),
+        excludeOverrides: overrides,
       };
 
       const decision = evaluateGuardrails({
