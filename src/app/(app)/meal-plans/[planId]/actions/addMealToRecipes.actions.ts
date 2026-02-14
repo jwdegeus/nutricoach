@@ -3,7 +3,7 @@
 import { createClient } from '@/src/lib/supabase/server';
 import { CustomMealsService } from '@/src/lib/custom-meals/customMeals.service';
 import type { Meal } from '@/src/lib/diets';
-import type { EnrichedMeal } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
+import type { EnrichedMeal } from '@/src/lib/meal-plans/enrichment.types';
 
 export type AddMealToRecipesResult =
   | { ok: true; recipeId: string }

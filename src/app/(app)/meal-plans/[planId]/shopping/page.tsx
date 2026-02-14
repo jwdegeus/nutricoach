@@ -4,7 +4,7 @@ import { createClient } from '@/src/lib/supabase/server';
 import { loadMealPlanAction } from '../../actions/mealPlans.actions';
 import { getStoresForShoppingAction } from '../../actions/storeProductLinks.actions';
 import { ShoppingListView } from '../../shopping/components/ShoppingListView';
-import { MealPlannerShoppingService } from '@/src/lib/agents/meal-planner';
+import { MealPlannerShoppingService } from '@/src/lib/meal-plans/shopping.service';
 import { PantryService } from '@/src/lib/pantry/pantry.service';
 import { Heading } from '@/components/catalyst/heading';
 import { Text } from '@/components/catalyst/text';

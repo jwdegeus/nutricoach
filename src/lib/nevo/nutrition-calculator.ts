@@ -241,6 +241,40 @@ export async function calculateMealNutrition(
 }
 
 /**
+ * Macro summary for meal/day validation
+ */
+export type MacroSummary = {
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+};
+
+/**
+ * Calculate macros for a single meal based on ingredient references
+ *
+ * @param ingredients - Array of ingredient references with nevoCode and quantityG
+ * @returns Macro summary (calories, protein, carbs, fat)
+ */
+export async function calcMealMacros(
+  ingredients: Array<{ nevoCode: string; quantityG: number }>,
+): Promise<MacroSummary> {
+  const mealIngredients: MealIngredient[] = ingredients.map((ing) => ({
+    nevo_food_id: parseInt(ing.nevoCode, 10),
+    amount_g: ing.quantityG,
+  }));
+
+  const nutrition = await calculateMealNutrition(mealIngredients);
+
+  return {
+    calories: nutrition.energy_kcal ?? 0,
+    proteinG: nutrition.protein_g ?? 0,
+    carbsG: nutrition.carbs_g ?? 0,
+    fatG: nutrition.fat_g ?? 0,
+  };
+}
+
+/**
  * Calculate nutritional values for a recipe (NEVO + custom ingredients)
  *
  * @param ingredients - Array of recipe ingredients with nevo_food_id or custom_food_id and amount_g

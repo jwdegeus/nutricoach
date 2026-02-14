@@ -1,180 +1,31 @@
 'use server';
 
-import { createClient } from '@/src/lib/supabase/server';
-import { getGeminiClient } from '@/src/lib/ai/gemini/gemini.client';
-import { applyPlanEdit } from '@/src/lib/agents/meal-planner/planEdit.apply';
-import { AppError, type AppErrorCode } from '@/src/lib/errors/app-error';
-import type { PlanEdit } from '@/src/lib/agents/meal-planner/planEdit.types';
+import type { PlanEdit } from '@/src/lib/meal-plans/planEdit.types';
 
-/**
- * Action result type
- */
 type ActionResult<T> =
   | { ok: true; data: T }
   | {
       ok: false;
       error: {
-        code: AppErrorCode;
+        code: 'AUTH_ERROR' | 'DB_ERROR' | 'FEATURE_DISABLED';
         message: string;
       };
     };
 
 /**
- * Map plan edit action to run type
- */
-function getRunType(
-  action: PlanEdit['action'],
-): 'generate' | 'regenerate' | 'enrich' {
-  switch (action) {
-    case 'REGENERATE_DAY':
-      return 'regenerate';
-    case 'REPLACE_MEAL':
-    case 'ADD_SNACK':
-    case 'REMOVE_MEAL':
-      return 'generate';
-    default:
-      return 'generate';
-  }
-}
-
-/**
- * Apply a direct plan edit (without chat) - runs asynchronously
+ * Plan edit is temporarily disabled (meal generator removed).
  */
 export async function applyDirectPlanEditAction(
-  edit: PlanEdit,
+  _edit: PlanEdit,
 ): Promise<ActionResult<{ runId: string; planId: string }>> {
-  try {
-    // Get authenticated user
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return {
-        ok: false,
-        error: {
-          code: 'AUTH_ERROR',
-          message: 'Je moet ingelogd zijn om een plan edit toe te passen',
-        },
-      };
-    }
-
-    // Log "running" status at start (model from GEMINI_MODEL_PLAN / GEMINI_MODEL in .env.local)
-    const model = getGeminiClient().getModelName('plan');
-    const runType = getRunType(edit.action);
-    const { data: runData, error: runError } = await supabase
-      .from('meal_plan_runs')
-      .insert({
-        user_id: user.id,
-        meal_plan_id: edit.planId,
-        run_type: runType,
-        model,
-        status: 'running',
-        duration_ms: 0,
-      })
-      .select('id')
-      .single();
-
-    if (runError || !runData) {
-      return {
-        ok: false,
-        error: {
-          code: 'DB_ERROR',
-          message:
-            'Fout bij starten edit: ' + (runError?.message || 'Unknown error'),
-        },
-      };
-    }
-
-    const runId = runData.id;
-
-    // Start edit asynchronously (don't await)
-    const startTime = Date.now();
-    applyPlanEdit({
-      userId: user.id,
-      edit,
-      runId, // Pass runId so apply function doesn't log duplicate runs
-    })
-      .then(async (_result) => {
-        // Update run status to success
-        const duration = Date.now() - startTime;
-        await supabase
-          .from('meal_plan_runs')
-          .update({
-            status: 'success',
-            duration_ms: duration,
-          })
-          .eq('id', runId);
-      })
-      .catch(async (error) => {
-        // Update run status to error
-        const duration = Date.now() - startTime;
-        const errorCode =
-          error instanceof AppError ? error.code : 'AGENT_ERROR';
-        const errorMessage =
-          error instanceof AppError
-            ? error.safeMessage
-            : error instanceof Error
-              ? error.message
-              : 'Unknown error';
-
-        await supabase
-          .from('meal_plan_runs')
-          .update({
-            status: 'error',
-            duration_ms: duration,
-            error_code: errorCode,
-            error_message: errorMessage,
-          })
-          .eq('id', runId);
-      });
-
-    return {
-      ok: true,
-      data: {
-        runId,
-        planId: edit.planId,
-      },
-    };
-  } catch (error) {
-    // Handle AppError directly
-    if (error instanceof AppError) {
-      return {
-        ok: false,
-        error: {
-          code: error.code,
-          message: error.safeMessage,
-        },
-      };
-    }
-
-    // Fallback for other errors
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-
-    // Determine error code
-    let code: 'VALIDATION_ERROR' | 'DB_ERROR' | 'AGENT_ERROR' = 'DB_ERROR';
-    if (
-      errorMessage.includes('validation') ||
-      errorMessage.includes('Invalid')
-    ) {
-      code = 'VALIDATION_ERROR';
-    } else if (
-      errorMessage.includes('Gemini') ||
-      errorMessage.includes('agent')
-    ) {
-      code = 'AGENT_ERROR';
-    }
-
-    return {
-      ok: false,
-      error: {
-        code,
-        message: errorMessage,
-      },
-    };
-  }
+  return {
+    ok: false,
+    error: {
+      code: 'FEATURE_DISABLED',
+      message:
+        'Plan bewerken is tijdelijk uitgeschakeld. Deze functie komt binnenkort weer beschikbaar.',
+    },
+  };
 }
 
 /**
@@ -186,6 +37,7 @@ export async function checkPlanEditStatusAction(runId: string): Promise<
     errorMessage?: string;
   }>
 > {
+  const { createClient } = await import('@/src/lib/supabase/server');
   try {
     const supabase = await createClient();
     const {
@@ -245,6 +97,7 @@ export async function getActivePlanEditsAction(
 ): Promise<
   ActionResult<Array<{ runId: string; runType: string; createdAt: string }>>
 > {
+  const { createClient } = await import('@/src/lib/supabase/server');
   try {
     const supabase = await createClient();
     const {

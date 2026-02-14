@@ -12,7 +12,6 @@ import {
   XCircleIcon,
   ChartBarIcon,
   BeakerIcon,
-  Cog6ToothIcon,
   ClipboardDocumentListIcon,
   ShoppingBagIcon,
   BuildingStorefrontIcon,
@@ -45,11 +44,6 @@ type AdminStats = {
     custom: number;
     fndds: number;
     withoutCategory: number;
-  };
-  generator: {
-    templatesTotal: number;
-    templatesActive: number;
-    poolItems: number;
   };
   therapeuticProtocols: {
     total: number;
@@ -196,33 +190,6 @@ export function AdminDashboardClient({ stats }: AdminDashboardClientProps) {
           href: '/admin/ingredients?filter=noCategory',
         },
       ],
-    },
-    {
-      name: 'Generator beheer',
-      description:
-        'Beheer templates, slots, pools en instellingen voor de weekmenu-generator. Genereer een preview zonder plan op te slaan.',
-      href: '/admin/generator-config',
-      icon: Cog6ToothIcon,
-      iconBackground: 'bg-emerald-500',
-      stats: [
-        { label: 'Templates totaal', value: stats.generator.templatesTotal },
-        {
-          label: 'Templates actief',
-          value: stats.generator.templatesActive,
-          icon: CheckCircleIcon,
-          iconColor: 'text-green-600 dark:text-green-400',
-        },
-        { label: 'Pool items', value: stats.generator.poolItems },
-      ],
-    },
-    {
-      name: 'Generator v2 (diagnostiek)',
-      description:
-        'Database-eerst modus: gedetailleerde redenen per slot in het Generator-inzicht panel. Bepaal wanneer de generator zelf maaltijden maakt.',
-      href: '/admin/generator-v2',
-      icon: ChartBarIcon,
-      iconBackground: 'bg-teal-500',
-      stats: [],
     },
     {
       name: tProtocols('name'),

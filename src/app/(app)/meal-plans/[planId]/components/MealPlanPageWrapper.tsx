@@ -1,14 +1,15 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { MealPlanResponse } from '@/src/lib/diets';
-import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
+import type { MealPlanEnrichmentResponse } from '@/src/lib/meal-plans/enrichment.types';
 import type { MealPlanStatus } from '@/src/lib/meal-plans/mealPlans.types';
 import { GuardrailsViolationEmptyState } from './GuardrailsViolationEmptyState';
 import { getCurrentDietIdAction } from '@/src/app/(app)/recipes/[recipeId]/actions/recipe-ai.persist.actions';
 import { regenerateMealPlanAction } from '../../actions/mealPlans.actions';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/src/components/app/ToastContext';
 
 type GuardrailsViolationState = {
   reasonCodes: string[];
@@ -40,8 +41,10 @@ export function MealPlanPageWrapper({
   children,
 }: MealPlanPageWrapperProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [guardrailsViolation, setGuardrailsViolation] =
     useState<GuardrailsViolationState | null>(null);
+  const violationRef = useRef<GuardrailsViolationState | null>(null);
   const [dietTypeId, setDietTypeId] = useState<string | undefined>(undefined);
   const [isRetrying, setIsRetrying] = useState(false);
 
@@ -88,6 +91,7 @@ export function MealPlanPageWrapper({
   }, [guardrailsViolation, dietTypeId]);
 
   const handleRetry = async () => {
+    violationRef.current = guardrailsViolation;
     setIsRetrying(true);
     setGuardrailsViolation(null);
 
@@ -97,6 +101,13 @@ export function MealPlanPageWrapper({
       if (result.ok) {
         router.refresh();
         router.push(`/meal-plans/${planId}/shopping`);
+      } else if (result.error.code === 'FEATURE_DISABLED') {
+        showToast({
+          type: 'error',
+          title: 'Regeneratie uitgeschakeld',
+          description: result.error.message,
+        });
+        setGuardrailsViolation(violationRef.current);
       } else {
         // Check for guardrails violation again
         if (

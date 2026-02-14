@@ -2,8 +2,8 @@
 
 import { createClient } from '@/src/lib/supabase/server';
 import { MealPlansService } from '@/src/lib/meal-plans/mealPlans.service';
-import { MealPlannerShoppingService } from '@/src/lib/agents/meal-planner';
-import type { ShoppingListResponse } from '@/src/lib/agents/meal-planner';
+import { MealPlannerShoppingService } from '@/src/lib/meal-plans/shopping.service';
+import type { ShoppingListResponse } from '@/src/lib/meal-plans/shopping.types';
 
 /**
  * Action result type

@@ -8,7 +8,7 @@
 import 'server-only';
 import { createClient } from '@/src/lib/supabase/server';
 import type { Meal, MealPlanResponse } from '@/src/lib/diets';
-import { calcMealMacros } from '@/src/lib/agents/meal-planner/mealPlannerAgent.tools';
+import { calcMealMacros } from '@/src/lib/nevo/nutrition-calculator';
 import type { DietKey, MealSlot } from '@/src/lib/diets';
 
 /**

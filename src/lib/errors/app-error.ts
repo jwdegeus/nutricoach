@@ -23,6 +23,7 @@ export type AppErrorCode =
   | 'MEAL_PLAN_CULINARY_VIOLATION'
   | 'MEAL_PLAN_DB_COVERAGE_TOO_LOW'
   | 'MEAL_PLAN_VARIETY_TARGETS_NOT_MET'
+  | 'FEATURE_DISABLED'
   | 'INTERNAL';
 
 /** Ontbrekende FORCE-categorie bij quotum-falen (voor substitutie/“voeg toe”-feedback) */

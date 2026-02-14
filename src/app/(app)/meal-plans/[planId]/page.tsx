@@ -7,7 +7,6 @@ import { getNevoFoodByCode } from '@/src/lib/nevo/nutrition-calculator';
 import { MealPlanActionsClient } from './components/MealPlanActionsClient';
 import { MealPlanPageWrapper } from './components/MealPlanPageWrapper';
 import { MealPlanPageClient } from './components/MealPlanPageClient';
-import { GeneratorInzichtPanel } from './components/GeneratorInzichtPanel';
 import { MealPlanDraftBannerClient } from './components/MealPlanDraftBannerClient';
 import { MealPlanHeaderMeta } from '../components/MealPlanHeaderMeta';
 import { TherapeuticSummaryCard } from '../components/TherapeuticSummaryCard';
@@ -57,15 +56,8 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
 
   const plan = planResult.data;
 
-  // Provenance: was this plan created by a cron job?
-  const { data: cronJob } = await supabase
-    .from('meal_plan_generation_jobs')
-    .select('id')
-    .eq('meal_plan_id', plan.id)
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const cronJobId = (cronJob as { id: string } | null)?.id ?? null;
+  // Cron job provenance removed (meal_plan_generation_jobs table dropped)
+  const cronJobId: string | null = null;
 
   // Get diet type name - from default family member or user's active profile, then diet_types table
   let dietTypeName = plan.dietKey.replace(/_/g, ' '); // Fallback
@@ -193,7 +185,7 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
   const dbCoverageMeta = currentSnapshot?.metadata?.dbCoverage as
     | { dbSlots: number; totalSlots: number; percent: number }
     | undefined;
-  const fallbackReasonsMeta = currentSnapshot?.metadata?.fallbackReasons as
+  const _fallbackReasonsMeta = currentSnapshot?.metadata?.fallbackReasons as
     | { reason: string; count: number }[]
     | undefined;
   const showDbCoveragePanel =
@@ -220,7 +212,7 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
   };
   const reasonLabelFor = (reason: string) =>
     REASON_LABELS[reason] ?? 'Onbekende reden';
-  let hasMissingRefs = false;
+  let _hasMissingRefs = false;
   const aiSlotsList: {
     date: string;
     slotLabel: string;
@@ -234,7 +226,7 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
   ) {
     for (const [key, entry] of Object.entries(slotProvenance)) {
       if (entry?.source !== 'ai' || !entry.reason) continue;
-      if (entry.reason === 'missing_ingredient_refs') hasMissingRefs = true;
+      if (entry.reason === 'missing_ingredient_refs') _hasMissingRefs = true;
       const date = key.slice(0, 10);
       const slot = key.slice(11);
       const slotLabel = SLOT_LABELS[slot] ?? slot;
@@ -246,7 +238,7 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
         a.date.localeCompare(b.date) || a.slotLabel.localeCompare(b.slotLabel),
     );
   }
-  const aiSlotsDisplay = aiSlotsList.slice(0, 10);
+  const _aiSlotsDisplay = aiSlotsList.slice(0, 10);
 
   // Servings metadata (defensive: plan may have been scaled to household)
   const servingsMeta = (
@@ -468,15 +460,6 @@ export default async function MealPlanDetailPage({ params }: PageProps) {
             : null
         }
       />
-
-      {showDbCoveragePanel && dbCoverageMeta && (
-        <GeneratorInzichtPanel
-          dbCoverageMeta={dbCoverageMeta}
-          fallbackReasonsMeta={fallbackReasonsMeta}
-          aiSlotsDisplay={aiSlotsDisplay}
-          hasMissingRefs={hasMissingRefs}
-        />
-      )}
 
       <div
         className={

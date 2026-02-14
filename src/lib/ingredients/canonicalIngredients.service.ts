@@ -159,6 +159,63 @@ export async function searchCanonicalIngredients(options: {
   }
 }
 
+const NEVO_REF_BATCH_SIZE = 100;
+
+/**
+ * Bulk lookup: nevoCode -> canonical_ingredients.id via canonical_ingredient_catalog_v1.
+ * ref_type = 'nevo', ref_value in (nevoCodes). Chunks in batches to avoid .in() limits.
+ */
+export async function getCanonicalIngredientIdsByNevoCodes(
+  nevoCodes: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(nevoCodes)].filter(Boolean);
+  if (unique.length === 0) return new Map();
+
+  const result = new Map<string, string>();
+  const batches: string[][] = [];
+  for (let i = 0; i < unique.length; i += NEVO_REF_BATCH_SIZE) {
+    batches.push(unique.slice(i, i + NEVO_REF_BATCH_SIZE));
+  }
+
+  try {
+    const supabase = await createClient();
+    for (const batch of batches) {
+      const { data, error } = await supabase
+        .from(CATALOG_VIEW)
+        .select('ingredient_id, ref_value')
+        .eq('ref_type', 'nevo')
+        .in('ref_value', batch);
+
+      if (error) {
+        const isSchemaCache =
+          /schema cache|relation.*does not|could not find/i.test(error.message);
+        if (isSchemaCache) {
+          console.warn(
+            'Canonical ingredient catalog view not available (migrations may not be applied). Run: supabase db push',
+          );
+          return result;
+        }
+        console.error(
+          'Canonical ingredient lookup by nevoCodes failed:',
+          error.message,
+        );
+        continue;
+      }
+      for (const row of data ?? []) {
+        const refValue = row.ref_value as string | null;
+        const ingredientId = row.ingredient_id as string | null;
+        if (refValue != null && ingredientId != null) {
+          result.set(refValue, ingredientId);
+        }
+      }
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Canonical ingredient lookup error:', msg);
+  }
+  return result;
+}
+
 /**
  * Get one canonical ingredient by id with all refs.
  * Returns null if not found or on error.

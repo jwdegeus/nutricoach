@@ -1,12 +1,11 @@
 import { Text } from '@/components/catalyst/text';
-import { Link } from '@/components/catalyst/link';
 
 type MealPlanProvenanceProps = {
   cronJobId: string | null;
 };
 
 /**
- * Compact meta row: provenance "Aangemaakt door: Cron job" + runId link when plan was created by a cron job.
+ * Compact meta row: provenance "Aangemaakt door: Cron job" when plan was created by a cron job.
  */
 export function MealPlanProvenance({ cronJobId }: MealPlanProvenanceProps) {
   if (!cronJobId || cronJobId.length === 0) return null;
@@ -17,7 +16,7 @@ export function MealPlanProvenance({ cronJobId }: MealPlanProvenanceProps) {
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
       <Text>Aangemaakt door: Cron job</Text>
       <span className="text-zinc-300 dark:text-zinc-600">·</span>
-      <Link href="/meal-plans/jobs">Job: {shortId}</Link>
+      <Text>Job: {shortId}</Text>
     </div>
   );
 }

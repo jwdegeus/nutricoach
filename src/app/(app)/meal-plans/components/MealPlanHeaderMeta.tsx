@@ -6,7 +6,6 @@ import {
   DropdownMenu,
 } from '@/components/catalyst/dropdown';
 import { Heading } from '@/components/catalyst/heading';
-import { Link } from '@/components/catalyst/link';
 import { ChevronDownIcon } from '@heroicons/react/16/solid';
 
 export type MealPlanHeaderMetaProps = {
@@ -119,15 +118,7 @@ export function MealPlanHeaderMeta({
                 </>
               )}
               {cronJobId && cronJobId.length > 0 && (
-                <div>
-                  Aangemaakt door cron job{' '}
-                  <Link
-                    href="/meal-plans/jobs"
-                    className="text-foreground underline hover:no-underline"
-                  >
-                    {cronJobId.slice(0, 8)}…
-                  </Link>
-                </div>
+                <div>Aangemaakt door cron job {cronJobId.slice(0, 8)}…</div>
               )}
               {reuse != null && (reuse.reused > 0 || reuse.generated > 0) && (
                 <div>

@@ -20,7 +20,7 @@ import type { MealPlanResponse } from '@/src/lib/diets';
 import type {
   EnrichedMeal,
   CookPlanDay,
-} from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
+} from '@/src/lib/meal-plans/enrichment.types';
 import { Text } from '@/components/catalyst/text';
 import { useToast } from '@/src/components/app/ToastContext';
 import { addMealToRecipesAction } from '../actions/addMealToRecipes.actions';

@@ -38,7 +38,7 @@ import type {
 import type {
   ShoppingListResponse,
   MealPlanCoverage,
-} from '@/src/lib/agents/meal-planner';
+} from '@/src/lib/meal-plans/shopping.types';
 
 type StoreForShopping = { id: string; name: string };
 

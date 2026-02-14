@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { MealPlanResponse } from '@/src/lib/diets';
-import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
+import type { MealPlanEnrichmentResponse } from '@/src/lib/meal-plans/enrichment.types';
 import type { MealPlanStatus } from '@/src/lib/meal-plans/mealPlans.types';
 import { Text } from '@/components/catalyst/text';
 import { MealPlanCards } from './MealPlanCards';

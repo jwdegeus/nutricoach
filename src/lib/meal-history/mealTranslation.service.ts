@@ -16,7 +16,7 @@ import type {
   EnrichedMeal,
   CookPlanDay,
   MealPlanEnrichmentResponse,
-} from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
+} from '@/src/lib/meal-plans/enrichment.types';
 
 /**
  * Check if we should skip translation due to potential quota issues

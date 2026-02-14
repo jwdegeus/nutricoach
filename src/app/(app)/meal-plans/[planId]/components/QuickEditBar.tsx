@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/catalyst/button';
 import { Plus, RefreshCw, Loader2 } from 'lucide-react';
 import { applyDirectPlanEditAction } from '../actions/planEdit.actions';
-import type { PlanEdit } from '@/src/lib/agents/meal-planner/planEdit.types';
+import type { PlanEdit } from '@/src/lib/meal-plans/planEdit.types';
 
 type QuickEditBarProps = {
   planId: string;

@@ -21,12 +21,12 @@ import type { MealPlanResponse } from '@/src/lib/diets';
 import type {
   EnrichedMeal,
   CookPlanDay,
-} from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
+} from '@/src/lib/meal-plans/enrichment.types';
 import type { MealPlanStatus } from '@/src/lib/meal-plans/mealPlans.types';
 import { MealDetailDialog } from './MealDetailDialog';
 import { applyDirectPlanEditAction } from '../actions/planEdit.actions';
 import { updateMealPlanDraftSlotAction } from '../actions/planReview.actions';
-import type { PlanEdit } from '@/src/lib/agents/meal-planner/planEdit.types';
+import type { PlanEdit } from '@/src/lib/meal-plans/planEdit.types';
 import type { LinkedRecipe } from './MealPlanPageClient';
 
 type MealCardProps = {

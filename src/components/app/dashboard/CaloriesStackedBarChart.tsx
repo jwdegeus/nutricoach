@@ -77,7 +77,7 @@ export function CaloriesStackedBarChart({ data }: Props) {
         </button>
       </div>
 
-      <div className="min-h-[240px] flex-1">
+      <div className="relative min-h-[200px] w-full min-w-0 flex-1 basis-0 overflow-hidden sm:min-h-[240px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
@@ -94,6 +94,8 @@ export function CaloriesStackedBarChart({ data }: Props) {
               tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
               tickLine={false}
               axisLine={false}
+              minTickGap={24}
+              interval="preserveStartEnd"
             />
             <YAxis
               stroke="var(--color-muted-foreground)"

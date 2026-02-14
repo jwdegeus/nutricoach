@@ -10,10 +10,7 @@ import { Heading } from '@/components/catalyst/heading';
 import { Text } from '@/components/catalyst/text';
 import { Link } from '@/components/catalyst/link';
 import { ConfirmDialog } from '@/components/catalyst/confirm-dialog';
-import {
-  regenerateMealPlanAction,
-  deleteMealPlanAction,
-} from '../../actions/mealPlans.actions';
+import { deleteMealPlanAction } from '../../actions/mealPlans.actions';
 import {
   startMealPlanReviewAction,
   applyMealPlanDraftAction,
@@ -58,8 +55,6 @@ export function MealPlanActions({
   const { showToast } = useToast();
   const [isStartingReview, setIsStartingReview] = useState(false);
   const [isApplyingDraft, setIsApplyingDraft] = useState(false);
-  const [isRegenerating, setIsRegenerating] = useState(false);
-  const [isRegeneratingDay, setIsRegeneratingDay] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
@@ -102,10 +97,14 @@ export function MealPlanActions({
           result.error.details &&
           'reasonCodes' in result.error.details
         ) {
-          const d = result.error.details;
+          const d = result.error.details as {
+            reasonCodes: string[];
+            contentHash?: string;
+            rulesetVersion?: number;
+          };
           onGuardrailsViolation?.({
-            reasonCodes: d.reasonCodes,
-            contentHash: d.contentHash ?? '',
+            reasonCodes: Array.isArray(d.reasonCodes) ? d.reasonCodes : [],
+            contentHash: typeof d.contentHash === 'string' ? d.contentHash : '',
             rulesetVersion: d.rulesetVersion,
           });
         }
@@ -138,10 +137,14 @@ export function MealPlanActions({
           result.error.details &&
           'reasonCodes' in result.error.details
         ) {
-          const d = result.error.details;
+          const d = result.error.details as {
+            reasonCodes: string[];
+            contentHash?: string;
+            rulesetVersion?: number;
+          };
           onGuardrailsViolation?.({
-            reasonCodes: d.reasonCodes,
-            contentHash: d.contentHash ?? '',
+            reasonCodes: Array.isArray(d.reasonCodes) ? d.reasonCodes : [],
+            contentHash: typeof d.contentHash === 'string' ? d.contentHash : '',
             rulesetVersion: d.rulesetVersion,
           });
         }
@@ -150,117 +153,6 @@ export function MealPlanActions({
       setError(err instanceof Error ? err.message : 'Fout bij toepassen draft');
     } finally {
       setIsApplyingDraft(false);
-    }
-  };
-
-  const handleRegenerateFull = async () => {
-    setIsRegenerating(true);
-    setError(null);
-    setErrorCode(null);
-    setErrorDetails(null);
-    onGuardrailsViolation?.(null);
-
-    try {
-      const result = await regenerateMealPlanAction({ planId });
-
-      if (result.ok) {
-        showToast({ type: 'success', title: 'Weekmenu regeneratie gestart' });
-        router.refresh();
-        router.push(`/meal-plans/${planId}/shopping`);
-      } else {
-        // Check for guardrails violation
-        if (
-          result.error.code === 'GUARDRAILS_VIOLATION' &&
-          result.error.details &&
-          'reasonCodes' in result.error.details
-        ) {
-          const d = result.error.details;
-          onGuardrailsViolation?.({
-            reasonCodes: d.reasonCodes,
-            contentHash: d.contentHash,
-            rulesetVersion: d.rulesetVersion,
-            ...('forceDeficits' in d &&
-              Array.isArray(d.forceDeficits) && {
-                forceDeficits: d.forceDeficits,
-              }),
-          });
-        } else {
-          setErrorCode(result.error.code);
-          setError(result.error.message);
-          setErrorDetails(
-            'details' in result.error &&
-              result.error.details &&
-              typeof result.error.details === 'object' &&
-              !Array.isArray(result.error.details)
-              ? (result.error.details as Record<string, unknown>)
-              : null,
-          );
-        }
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Fout bij regenereren plan',
-      );
-    } finally {
-      setIsRegenerating(false);
-    }
-  };
-
-  const handleRegenerateDay = async () => {
-    if (!selectedDate) {
-      setError('Selecteer eerst een datum');
-      return;
-    }
-
-    setIsRegeneratingDay(true);
-    setError(null);
-    setErrorCode(null);
-    setErrorDetails(null);
-    onGuardrailsViolation?.(null);
-
-    try {
-      const result = await regenerateMealPlanAction({
-        planId,
-        onlyDate: selectedDate,
-      });
-
-      if (result.ok) {
-        showToast({ type: 'success', title: 'Dag regeneratie gestart' });
-        router.refresh();
-      } else {
-        // Check for guardrails violation
-        if (
-          result.error.code === 'GUARDRAILS_VIOLATION' &&
-          result.error.details &&
-          'reasonCodes' in result.error.details
-        ) {
-          const d = result.error.details;
-          onGuardrailsViolation?.({
-            reasonCodes: d.reasonCodes,
-            contentHash: d.contentHash,
-            rulesetVersion: d.rulesetVersion,
-            ...('forceDeficits' in d &&
-              Array.isArray(d.forceDeficits) && {
-                forceDeficits: d.forceDeficits,
-              }),
-          });
-        } else {
-          setErrorCode(result.error.code);
-          setError(result.error.message);
-          setErrorDetails(
-            'details' in result.error &&
-              result.error.details &&
-              typeof result.error.details === 'object' &&
-              !Array.isArray(result.error.details)
-              ? (result.error.details as Record<string, unknown>)
-              : null,
-          );
-        }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fout bij regenereren dag');
-    } finally {
-      setIsRegeneratingDay(false);
     }
   };
 
@@ -323,12 +215,7 @@ export function MealPlanActions({
               {planStatus === 'draft' ? (
                 <Button
                   onClick={handleApplyDraft}
-                  disabled={
-                    isApplyingDraft ||
-                    isStartingReview ||
-                    isRegenerating ||
-                    isRegeneratingDay
-                  }
+                  disabled={isApplyingDraft || isStartingReview}
                   className="w-full"
                 >
                   {isApplyingDraft ? (
@@ -346,12 +233,7 @@ export function MealPlanActions({
               ) : (
                 <Button
                   onClick={handleStartReview}
-                  disabled={
-                    isStartingReview ||
-                    isApplyingDraft ||
-                    isRegenerating ||
-                    isRegeneratingDay
-                  }
+                  disabled={isStartingReview || isApplyingDraft}
                   outline
                   className="w-full"
                 >
@@ -377,30 +259,13 @@ export function MealPlanActions({
           )}
 
           <div className="space-y-2">
-            <Button
-              onClick={handleRegenerateFull}
-              disabled={
-                isRegenerating ||
-                isRegeneratingDay ||
-                isStartingReview ||
-                isApplyingDraft
-              }
-              className="w-full"
-            >
-              {isRegenerating ? (
-                <>
-                  <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
-                  Regenereren...
-                </>
-              ) : (
-                <>
-                  <ArrowPathIcon className="mr-2 h-4 w-4" />
-                  Regenereren Volledig Plan
-                </>
-              )}
+            <Button disabled className="w-full" title="Tijdelijk uitgeschakeld">
+              <ArrowPathIcon className="mr-2 h-4 w-4" />
+              Regenereren Volledig Plan
             </Button>
             <p className="text-xs text-muted-foreground">
-              Genereert het hele plan opnieuw met dezelfde instellingen
+              Regeneratie is tijdelijk uitgeschakeld. Binnenkort weer
+              beschikbaar.
             </p>
           </div>
 
@@ -409,12 +274,7 @@ export function MealPlanActions({
               <Listbox
                 value={selectedDate}
                 onChange={setSelectedDate}
-                disabled={
-                  isRegenerating ||
-                  isRegeneratingDay ||
-                  isStartingReview ||
-                  isApplyingDraft
-                }
+                disabled
                 placeholder="Selecteer datum"
                 className="flex-1"
               >
@@ -425,32 +285,17 @@ export function MealPlanActions({
                 ))}
               </Listbox>
               <Button
-                onClick={handleRegenerateDay}
-                disabled={
-                  isRegenerating ||
-                  isRegeneratingDay ||
-                  isStartingReview ||
-                  isApplyingDraft ||
-                  !selectedDate
-                }
+                disabled
                 outline
                 className="shrink-0"
+                title="Tijdelijk uitgeschakeld"
               >
-                {isRegeneratingDay ? (
-                  <>
-                    <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
-                    Regenereren...
-                  </>
-                ) : (
-                  <>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    Regenereren dag
-                  </>
-                )}
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                Regenereren dag
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Kies een dag en klik op Regenereren dag.
+              Regeneratie is tijdelijk uitgeschakeld.
             </p>
           </div>
 
@@ -460,13 +305,7 @@ export function MealPlanActions({
                 setError(null);
                 setShowDeleteDialog(true);
               }}
-              disabled={
-                isRegenerating ||
-                isRegeneratingDay ||
-                isDeleting ||
-                isStartingReview ||
-                isApplyingDraft
-              }
+              disabled={isDeleting || isStartingReview || isApplyingDraft}
               outline
               className="w-full"
             >

@@ -10,7 +10,7 @@ import { Loader2, ShoppingCart } from 'lucide-react';
 import type {
   ShoppingListResponse,
   MealPlanCoverage,
-} from '@/src/lib/agents/meal-planner';
+} from '@/src/lib/meal-plans/shopping.types';
 
 type MissingIngredientsPanelProps = {
   shoppingList: ShoppingListResponse;

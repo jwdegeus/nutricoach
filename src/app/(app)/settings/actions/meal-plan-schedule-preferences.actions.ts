@@ -3,7 +3,6 @@
 import { z } from 'zod';
 import { createClient } from '@/src/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { scheduleNextMealPlanJobAction } from '@/src/app/(app)/meal-plans/jobs/actions/mealPlanJobSchedule.actions';
 import type { MealSlot } from '@/src/lib/diets';
 
 /** Minimal columns for schedule prefs (no SELECT *) */
@@ -160,44 +159,18 @@ export async function updateMealPlanSchedulePreferencesAction(
     revalidatePath('/familie/edit');
     revalidatePath('/familie');
 
-    // Best-effort reschedule: preferences save stays ok if scheduling fails
-    try {
-      const scheduleResult = await scheduleNextMealPlanJobAction();
-      if (scheduleResult.ok) {
-        return {
-          ok: true,
-          data: {
-            shoppingDay,
-            leadTimeHours,
-            favoriteMealIds: favoriteIds,
-            scheduled: true,
-          },
-        };
-      }
-      return {
-        ok: true,
-        data: {
-          shoppingDay,
-          leadTimeHours,
-          favoriteMealIds: favoriteIds,
-          scheduled: false,
-          scheduleWarning:
-            'Voorkeuren opgeslagen; planning kon niet worden bijgewerkt.',
-        },
-      };
-    } catch {
-      return {
-        ok: true,
-        data: {
-          shoppingDay,
-          leadTimeHours,
-          favoriteMealIds: favoriteIds,
-          scheduled: false,
-          scheduleWarning:
-            'Voorkeuren opgeslagen; planning kon niet worden bijgewerkt.',
-        },
-      };
-    }
+    // Meal plan job scheduling is disabled; prefs still saved
+    return {
+      ok: true,
+      data: {
+        shoppingDay,
+        leadTimeHours,
+        favoriteMealIds: favoriteIds,
+        scheduled: false,
+        scheduleWarning:
+          'Voorkeuren opgeslagen. Weekmenu-planning is tijdelijk uitgeschakeld.',
+      },
+    };
   } catch (err) {
     return {
       ok: false,

@@ -88,9 +88,9 @@ export async function createMealPlanAction(
     }
 
     // Validate input
-    let input: CreateMealPlanInput;
+    let _input: CreateMealPlanInput;
     try {
-      input = createMealPlanInputSchema.parse(raw);
+      _input = createMealPlanInputSchema.parse(raw);
     } catch (error) {
       return {
         ok: false,
@@ -104,13 +104,14 @@ export async function createMealPlanAction(
       };
     }
 
-    // Create plan
-    const service = new MealPlansService();
-    const result = await service.createPlanForUser(user.id, input);
-
+    // Meal plan generatie is tijdelijk uitgeschakeld
     return {
-      ok: true,
-      data: result,
+      ok: false,
+      error: {
+        code: 'FEATURE_DISABLED',
+        message:
+          'Meal plan generatie is tijdelijk uitgeschakeld. Deze functie komt binnenkort weer beschikbaar.',
+      },
     };
   } catch (error) {
     const presentation = presentMealPlanError(error);
@@ -184,9 +185,9 @@ export async function regenerateMealPlanAction(
     }
 
     // Validate input
-    let input: RegenerateMealPlanInput;
+    let _input: RegenerateMealPlanInput;
     try {
-      input = regenerateMealPlanInputSchema.parse(raw);
+      _input = regenerateMealPlanInputSchema.parse(raw);
     } catch (error) {
       return {
         ok: false,
@@ -200,13 +201,14 @@ export async function regenerateMealPlanAction(
       };
     }
 
-    // Regenerate plan
-    const service = new MealPlansService();
-    const result = await service.regeneratePlanForUser(user.id, input);
-
+    // Meal plan regeneratie is tijdelijk uitgeschakeld
     return {
-      ok: true,
-      data: result,
+      ok: false,
+      error: {
+        code: 'FEATURE_DISABLED',
+        message:
+          'Meal plan regeneratie is tijdelijk uitgeschakeld. Deze functie komt binnenkort weer beschikbaar.',
+      },
     };
   } catch (error) {
     // Handle AppError directly

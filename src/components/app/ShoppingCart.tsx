@@ -14,7 +14,7 @@ import {
 import { NavbarItem } from '@/components/catalyst/navbar';
 import { Text } from '@/components/catalyst/text';
 import { getShoppingCartAction } from '@/src/app/(app)/meal-plans/actions/shopping-cart.actions';
-import type { ShoppingListResponse } from '@/src/lib/agents/meal-planner';
+import type { ShoppingListResponse } from '@/src/lib/meal-plans/shopping.types';
 
 export function ShoppingCart() {
   const pathname = usePathname();

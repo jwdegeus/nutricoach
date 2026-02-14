@@ -1,7 +1,7 @@
 import { createClient } from '@/src/lib/supabase/server';
 import { isAdmin } from '@/src/lib/auth/roles';
 import { redirect, notFound } from 'next/navigation';
-import { getCanonicalIngredientIdsByNevoCodes } from '@/src/lib/agents/meal-planner/mealPlannerShopping.service';
+import { getCanonicalIngredientIdsByNevoCodes } from '@/src/lib/ingredients/canonicalIngredients.service';
 import { NevoIngredientDetailPageClient } from './NevoIngredientDetailPageClient';
 
 type PageProps = {

@@ -60,25 +60,12 @@ async function getAdminStats() {
     .eq('is_active', true);
 
   const [
-    templateRes,
-    templateActiveRes,
-    poolRes,
     protocolsRes,
     protocolsActiveRes,
     productSourceRes,
     productSourceActiveRes,
     storesRes,
   ] = await Promise.all([
-    supabase
-      .from('meal_plan_templates')
-      .select('id', { count: 'exact', head: true }),
-    supabase
-      .from('meal_plan_templates')
-      .select('id', { count: 'exact', head: true })
-      .eq('is_active', true),
-    supabase
-      .from('meal_plan_pool_items')
-      .select('id', { count: 'exact', head: true }),
     supabase
       .from('therapeutic_protocols')
       .select('id', { count: 'exact', head: true }),
@@ -95,13 +82,6 @@ async function getAdminStats() {
       .eq('is_enabled', true),
     supabase.from('stores').select('id', { count: 'exact', head: true }),
   ]);
-  const generatorStats = {
-    templatesTotal: templateRes.error ? 0 : (templateRes.count ?? 0),
-    templatesActive: templateActiveRes.error
-      ? 0
-      : (templateActiveRes.count ?? 0),
-    poolItems: poolRes.error ? 0 : (poolRes.count ?? 0),
-  };
   const therapeuticProtocolsTotal = protocolsRes.error
     ? 0
     : (protocolsRes.count ?? 0);
@@ -127,7 +107,6 @@ async function getAdminStats() {
       fndds: fnddsCount ?? 0,
       withoutCategory: withoutCategoryCount,
     },
-    generator: generatorStats,
     therapeuticProtocols: {
       total: therapeuticProtocolsTotal,
       active: therapeuticProtocolsActive,

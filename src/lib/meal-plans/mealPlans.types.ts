@@ -10,7 +10,7 @@ import type {
   DietRuleSet,
   MealIngredientRef,
 } from '@/src/lib/diets';
-import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner';
+import type { MealPlanEnrichmentResponse } from '@/src/lib/meal-plans/enrichment.types';
 
 /** DB: status — draft | applied | archived */
 export type MealPlanStatus = 'draft' | 'applied' | 'archived';

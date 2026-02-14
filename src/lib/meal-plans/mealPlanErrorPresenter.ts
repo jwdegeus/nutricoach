@@ -185,6 +185,11 @@ const MEAL_PLAN_ERROR_MAP: Record<
       'Pas je dieetvoorkeuren aan in beheer (admin).',
     ],
   },
+  FEATURE_DISABLED: {
+    userMessageNl:
+      'Meal plan generatie is tijdelijk uitgeschakeld. Deze functie komt binnenkort weer beschikbaar.',
+    userActionHints: [],
+  },
   INTERNAL: {
     userMessageNl: 'Er ging iets mis. Probeer het opnieuw.',
     userActionHints: [

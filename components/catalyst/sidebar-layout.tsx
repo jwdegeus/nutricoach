@@ -89,14 +89,16 @@ export function SidebarLayout({
         </div>
       </header>
 
-      {/* Content – bg-background expliciet zodat dark mode primary-950 correct toont */}
-      <main className="flex flex-1 flex-col bg-background pb-2 lg:min-w-0 lg:pr-2 lg:pl-64">
+      {/* Content – bg-background expliciet zodat dark mode primary-950 correct toont. min-w-0 lets flex child shrink so charts don't overflow on mobile */}
+      <main className="flex min-w-0 flex-1 flex-col bg-background pb-2 lg:pr-2 lg:pl-64">
         {/* Navbar on desktop — sticky top-0 z-20, h-16 (page-sticky layers use top-16) */}
         <header className="sticky top-0 z-20 hidden h-16 shrink-0 items-center border-b border-border/50 bg-background/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 lg:flex">
           {navbar}
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-6 lg:p-8">
-          <div className="w-full max-w-full flex-1">{children}</div>
+        <div className="flex min-w-0 flex-1 flex-col gap-4 p-6 lg:p-8">
+          <div className="w-full max-w-full min-w-0 flex-1 overflow-x-hidden">
+            {children}
+          </div>
         </div>
       </main>
     </div>

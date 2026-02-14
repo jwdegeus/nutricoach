@@ -1,7 +1,7 @@
 'use client';
 
 import type { MealPlanResponse, MealPlanDay } from '@/src/lib/diets';
-import type { MealPlanEnrichmentResponse } from '@/src/lib/agents/meal-planner/mealPlannerEnrichment.types';
+import type { MealPlanEnrichmentResponse } from '@/src/lib/meal-plans/enrichment.types';
 import type { MealPlanStatus } from '@/src/lib/meal-plans/mealPlans.types';
 import type { LinkedRecipe } from './MealPlanPageClient';
 import { MealCard } from './MealCard';

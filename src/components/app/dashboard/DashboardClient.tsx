@@ -115,37 +115,45 @@ export function DashboardClient({ members, topMeals }: Props) {
       </div>
 
       {/* Chart widgets — bento grid */}
-      <div className="mt-6 grid w-full flex-1 gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid w-full min-w-0 flex-1 gap-4 lg:grid-cols-2">
         {/* Calories — full width on lg (spans 2 cols) */}
-        <BentoCell placement="lg:col-span-2" round="rounded-lg" bg="bg-muted">
-          <div className="flex h-full min-h-[320px] flex-col p-6 sm:p-8">
+        <BentoCell
+          placement="lg:col-span-2 min-w-0"
+          round="rounded-lg"
+          bg="bg-muted"
+        >
+          <div className="flex h-full min-h-[320px] min-w-0 flex-col overflow-x-auto p-6 sm:p-8">
             <CaloriesStackedBarChart data={caloriesData} />
           </div>
         </BentoCell>
 
         {/* Vitamins */}
-        <BentoCell round="rounded-lg" bg="bg-muted">
-          <div className="flex h-full min-h-[280px] flex-col p-6 sm:p-8">
+        <BentoCell placement="min-w-0" round="rounded-lg" bg="bg-muted">
+          <div className="flex h-full min-h-[280px] min-w-0 flex-col overflow-x-auto p-6 sm:p-8">
             <VitaminsAreaChart data={vitaminData} />
           </div>
         </BentoCell>
 
         {/* Minerals */}
-        <BentoCell round="rounded-lg" bg="bg-muted">
-          <div className="flex h-full min-h-[280px] flex-col p-6 sm:p-8">
+        <BentoCell placement="min-w-0" round="rounded-lg" bg="bg-muted">
+          <div className="flex h-full min-h-[280px] min-w-0 flex-col overflow-x-auto p-6 sm:p-8">
             <MineralsAreaChart data={mineralData} />
           </div>
         </BentoCell>
 
         {/* Supplements */}
-        <BentoCell round="rounded-lg" bg="bg-muted">
-          <div className="flex h-full min-h-[280px] flex-col p-6 sm:p-8">
+        <BentoCell placement="min-w-0" round="rounded-lg" bg="bg-muted">
+          <div className="flex h-full min-h-[280px] min-w-0 flex-col overflow-x-auto p-6 sm:p-8">
             <SupplementsBarChart data={supplementData} />
           </div>
         </BentoCell>
 
         {/* Top meals — full width */}
-        <BentoCell placement="lg:col-span-2" round="rounded-lg" bg="bg-muted">
+        <BentoCell
+          placement="lg:col-span-2 min-w-0"
+          round="rounded-lg"
+          bg="bg-muted"
+        >
           <div className="flex h-full min-h-[240px] flex-col p-6 sm:p-8">
             <TopMealsWidget initialMeals={topMeals} />
           </div>
